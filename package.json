@@ -1,0 +1,8 @@
+{
+  "name": "okai-note-site",
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^8.2.0",
+    "@netlify/functions": "^2.8.2"
+  }
+}
