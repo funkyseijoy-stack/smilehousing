@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>おうちノート更新中…</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #faf7f2; color: #2b2b2b;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #msg { text-align: center; padding: 24px; font-size: 15px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div id="msg">起動中…</div>
+<script>
+var msgEl = document.getElementById('msg');
+
+function setMsg(text) {
+  msgEl.textContent = text;
+}
+
+if (!window.opener) {
+  setMsg('このページは単体では使用できません。\n業務用アプリから開いてください。');
+} else {
+  try {
+    window.opener.postMessage({ type: 'okai-note-ready' }, '*');
+  } catch (e) {}
+
+  setMsg('データを待っています…');
+
+  window.addEventListener('message', async function (event) {
+    if (event.source !== window.opener) return;
+    var msg = event.data;
+    if (!msg || msg.type !== 'okai-note-push') return;
+
+    setMsg('おうちノートを更新しています…');
+
+    try {
+      var resp = await fetch('/api/save-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': msg.apiKey || '' },
+        body: JSON.stringify({ slug: msg.slug, data: msg.data, photos: msg.photos })
+      });
+      var ok = resp.ok;
+      var body = null;
+      try { body = await resp.json(); } catch (e) {}
+
+      if (ok) {
+        setMsg('✅ 更新が完了しました。\nこのタブは閉じて大丈夫です。');
+      } else {
+        setMsg('❌ 更新に失敗しました（エラー: ' + resp.status + '）\nこのタブは閉じて大丈夫です。');
+      }
+
+      try {
+        window.opener.postMessage({
+          type: 'okai-note-result',
+          ok: ok,
+          status: resp.status,
+          photoCount: body && body.photoCount
+        }, '*');
+      } catch (e) {}
+
+      if (ok) {
+        setTimeout(function () { window.close(); }, 1500);
+      }
+    } catch (err) {
+      setMsg('❌ 通信エラーが発生しました。\nこのタブは閉じて大丈夫です。');
+      try {
+        window.opener.postMessage({ type: 'okai-note-result', ok: false, error: String(err) }, '*');
+      } catch (e) {}
+    }
+  });
+}
+</script>
+</body>
+</html>
