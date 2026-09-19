@@ -11,7 +11,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     display: flex; align-items: center; justify-content: center;
   }
-  #msg { text-align: center; padding: 24px; font-size: 15px; line-height: 1.8; }
+  #msg { text-align: center; padding: 24px; font-size: 15px; line-height: 1.8; white-space: pre-line; }
 </style>
 </head>
 <body>
@@ -26,9 +26,29 @@ function setMsg(text) {
 if (!window.opener) {
   setMsg('このページは単体では使用できません。\n業務用アプリから開いてください。');
 } else {
-  try {
-    window.opener.postMessage({ type: 'okai-note-ready' }, '*');
-  } catch (e) {}
+  var pushReceived = false;
+  var readyInterval = null;
+  var readyAttempts = 0;
+  var MAX_READY_ATTEMPTS = 60; // 60 x 500ms = 30 seconds
+
+  function sendReady() {
+    if (pushReceived) return;
+    readyAttempts++;
+    try {
+      window.opener.postMessage({ type: 'okai-note-ready' }, '*');
+    } catch (e) {}
+    if (readyAttempts >= MAX_READY_ATTEMPTS) {
+      clearInterval(readyInterval);
+      if (!pushReceived) {
+        setMsg('❌ 業務用アプリとの通信がタイムアウトしました。\nこのタブを閉じて、業務用アプリ側でもう一度お試しください。');
+      }
+    }
+  }
+
+  // Send immediately, then keep retrying every 500ms until the opener
+  // (which may still be busy preparing data) picks up the signal.
+  sendReady();
+  readyInterval = setInterval(sendReady, 500);
 
   setMsg('データを待っています…');
 
@@ -36,6 +56,9 @@ if (!window.opener) {
     if (event.source !== window.opener) return;
     var msg = event.data;
     if (!msg || msg.type !== 'okai-note-push') return;
+
+    pushReceived = true;
+    if (readyInterval) { clearInterval(readyInterval); readyInterval = null; }
 
     setMsg('おうちノートを更新しています…');
 
