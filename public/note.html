@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>おうちノート</title>
+<style>
+  :root {
+    --ink: #2b2b2b;
+    --ink-soft: #767676;
+    --line: #e6e2da;
+    --bg: #faf7f2;
+    --card: #ffffff;
+    --accent: #2B4C6F;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+  .header { text-align: center; padding: 18px 0 22px; }
+  .header .logo { font-size: 13px; color: var(--ink-soft); letter-spacing: 0.05em; }
+  .header h1 { font-size: 22px; margin: 6px 0 2px; }
+  .header .sub { font-size: 13px; color: var(--ink-soft); }
+  .section { margin-bottom: 26px; }
+  .section-title {
+    font-size: 15px; font-weight: 700; color: var(--accent);
+    margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .card-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .card-sub { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .card-body { font-size: 13.5px; line-height: 1.7; white-space: pre-wrap; }
+  .empty { font-size: 13px; color: var(--ink-soft); padding: 10px 2px; }
+  .photo-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .photo-grid img {
+    width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 10px;
+    border: 1px solid var(--line); cursor: pointer; background: #eee;
+  }
+  .loading, .error {
+    text-align: center; padding: 60px 20px; color: var(--ink-soft); font-size: 14px;
+  }
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+    display: none; align-items: center; justify-content: center; z-index: 999;
+    padding: 20px;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 100%; max-height: 90vh; border-radius: 6px; }
+  .updated {
+    text-align: center; font-size: 11.5px; color: var(--ink-soft); margin-top: 30px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="loading" id="loadingMsg">読み込み中…</div>
+  </div>
+  <div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+    <img id="lightboxImg" src="">
+  </div>
+
+<script>
+function esc(s) {
+  return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function photoUrl(slug, key) {
+  return '/api/get-photo?slug=' + encodeURIComponent(slug) + '&key=' + encodeURIComponent(key);
+}
+
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function renderPhotoGrid(slug, photos) {
+  if (!photos || !photos.length) return '';
+  return '<div class="photo-grid">' + photos.map(p =>
+    '<img src="' + esc(photoUrl(slug, p.key)) + '" onclick="openLightbox(this.src)" loading="lazy">'
+  ).join('') + '</div>';
+}
+
+async function main() {
+  const params = new URLSearchParams(location.search);
+  const slug = params.get('c') || params.get('slug');
+  const app = document.getElementById('app');
+
+  if (!slug) {
+    app.innerHTML = '<div class="error">ページが見つかりません。<br>URLをご確認ください。</div>';
+    return;
+  }
+
+  let data;
+  try {
+    const res = await fetch('/api/get-note?slug=' + encodeURIComponent(slug));
+    if (res.status === 404) {
+      app.innerHTML = '<div class="error">まだ準備中です。<br>担当者にお問い合わせください。</div>';
+      return;
+    }
+    if (!res.ok) throw new Error('failed');
+    data = await res.json();
+  } catch (e) {
+    app.innerHTML = '<div class="error">読み込みに失敗しました。<br>時間をおいて再度お試しください。</div>';
+    return;
+  }
+
+  const customerName = data.customerName || '';
+  const meetings = data.meetings || [];
+  const specs = data.specs || [];
+  const confirmations = data.confirmations || [];
+  const furniture = data.furniture || [];
+  const album = data.album || [];
+  const folders = data.folders || [];
+
+  let html = '';
+  html += '<div class="header">';
+  html += '<div class="logo">🏠 住まいるハウジング</div>';
+  html += '<h1>' + esc(customerName ? customerName + '様' : 'お客様') + ' おうちノート</h1>';
+  html += '<div class="sub">これまでの打合せ・仕様・お写真をご確認いただけます</div>';
+  html += '</div>';
+
+  // 打合せ記録
+  html += '<div class="section"><div class="section-title">📝 打合せ記録</div>';
+  html += meetings.length
+    ? meetings.map(m => '<div class="card"><div class="card-sub">' + esc(m.date || '') + '</div><div class="card-title">' + esc(m.title || '') + '</div><div class="card-body">' + esc(m.content || '') + '</div></div>').join('')
+    : '<div class="empty">まだ記録がありません。</div>';
+  html += '</div>';
+
+  // 仕様
+  html += '<div class="section"><div class="section-title">🛠️ 仕様</div>';
+  html += specs.length
+    ? specs.map(s => '<div class="card"><div class="card-title">' + esc(s.category || '') + '</div><div class="card-body">' + esc(s.content || '') + '</div>' + renderPhotoGrid(slug, s.photos) + '</div>').join('')
+    : '<div class="empty">まだ仕様の記録がありません。</div>';
+  html += '</div>';
+
+  // 確認事項
+  html += '<div class="section"><div class="section-title">✅ 確認事項</div>';
+  html += confirmations.length
+    ? confirmations.map(c => '<div class="card"><div class="card-title">' + esc(c.label || '') + '</div><div class="card-body">' + esc(c.content || '') + '</div>' + renderPhotoGrid(slug, c.photos) + '</div>').join('')
+    : '<div class="empty">まだ確認事項がありません。</div>';
+  html += '</div>';
+
+  // 家具・インテリア
+  if (furniture.length) {
+    html += '<div class="section"><div class="section-title">🛋️ 家具・インテリア</div>';
+    html += furniture.map(f => '<div class="card"><div class="card-title">' + esc(f.label || '') + '</div><div class="card-body">' + esc(f.content || '') + '</div></div>').join('');
+    html += '</div>';
+  }
+
+  // 写真アルバム
+  html += '<div class="section"><div class="section-title">📷 写真アルバム</div>';
+  html += album.length ? renderPhotoGrid(slug, album) : '<div class="empty">まだ写真がありません。</div>';
+  html += '</div>';
+
+  // 写真フォルダ
+  if (folders.length) {
+    html += '<div class="section"><div class="section-title">📁 写真フォルダ</div>';
+    html += folders.map(f => '<div class="card"><div class="card-title">' + esc(f.name || '') + '</div>' + renderPhotoGrid(slug, f.photos) + '</div>').join('');
+    html += '</div>';
+  }
+
+  if (data.updatedAt) {
+    const d = new Date(data.updatedAt);
+    html += '<div class="updated">最終更新：' + esc(d.toLocaleString('ja-JP')) + '</div>';
+  }
+
+  app.innerHTML = html;
+}
+
+main();
+</script>
+</body>
+</html>
