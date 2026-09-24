@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>住まいるハウジング 社内アプリ</title>
+<link rel="stylesheet" href="/staff/style.css">
+</head>
+<body>
+<div class="shell" id="app"><div class="empty">読み込み中…</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BASE = '';
+const NOTE_API_KEY = 'uyTVTIzf-Oox5KwaIBIAJB53QT5zCJf3';
+const CATEGORIES = ["新築", "リフォーム", "不動産", "賃貸", "除雪"];
+const DETAILED_CATEGORIES = ["新築", "リフォーム"];
+const CONSTRUCTION_STAGES = ["契約", "仕様確定", "着工", "上棟", "引き渡し"];
+
+// デフォルトのタブ構成(設定画面で自由に追加・削除・並び替え・リネームできる)
+const DEFAULT_TABS = [
+  { key: 'spec', label: '仕様', templateItems: ["外部", "インテリア", "お風呂", "キッチン", "洗面", "トイレ", "その他"] },
+  { key: 'confirm', label: '確認事項', templateItems: ["身長", "ご主人・奥様の家事頻度", "持ち込み家具寸法"] },
+  { key: 'furniture', label: '家具', templateItems: [] }
+];
+const DEFAULT_VENDORS = ["中村電工", "舟生さん", "宮崎さん", "浅野先生", "丸ニサッシ", "長江建材", "ミヤケ", "堀塗装", "プロタッチ", "井上板金", "森組", "左官屋さん", "足場", "アスファルト・舗装", "TOTO", "ミラタップ"];
+
+function esc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+function genLocalId() { return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function getToken() { return localStorage.getItem('staffToken') || ''; }
+
+async function apiGet(collection) {
+  const res = await fetch('/api/staff-data?collection=' + encodeURIComponent(collection), {
+    headers: { 'X-Staff-Token': getToken() }
+  });
+  if (res.status === 401) { logout(); throw new Error('unauthorized'); }
+  const j = await res.json();
+  return j.items || [];
+}
+async function apiPost(collection, data) {
+  const res = await fetch('/api/staff-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Staff-Token': getToken() },
+    body: JSON.stringify({ collection, data })
+  });
+  if (res.status === 401) { logout(); throw new Error('unauthorized'); }
+  return await res.json();
+}
+async function apiPut(collection, id, data) {
+  const res = await fetch('/api/staff-data', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Staff-Token': getToken() },
+    body: JSON.stringify({ collection, id, data })
+  });
+  if (res.status === 401) { logout(); throw new Error('unauthorized'); }
+  return await res.json();
+}
+async function apiDelete(collection, id) {
+  const res = await fetch('/api/staff-data', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'X-Staff-Token': getToken() },
+    body: JSON.stringify({ collection, id })
+  });
+  if (res.status === 401) { logout(); throw new Error('unauthorized'); }
+  return await res.json();
+}
+async function uploadPhoto(customerId, file) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const res = await fetch('/api/staff-upload-photo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Staff-Token': getToken() },
+    body: JSON.stringify({ slug: customerId, dataUrl })
+  });
+  if (!res.ok) throw new Error('upload_failed');
+  return await res.json(); // { ok, key }
+}
+function photoUrl(customerId, key) {
+  return '/api/get-photo?slug=' + encodeURIComponent(customerId) + '&key=' + encodeURIComponent(key);
+}
+function logout() { localStorage.removeItem('staffToken'); render(); }
+
+/* ---------- state ---------- */
+let customers = [], meetingNotes = [], tabItems = [];
+let configDoc = null; // { id, tabs: [{key,label,templateItems}], vendors }
+let currentCustomerId = null;
+let currentTab = 'meeting';
+let currentView = 'list'; // 'list' | 'settings'
+let settingsDraft = null; // working copy of configDoc while on the settings screen
+
+function tabsList() {
+  return (configDoc && configDoc.tabs && configDoc.tabs.length) ? configDoc.tabs : DEFAULT_TABS;
+}
+function vendorsList() {
+  return (configDoc && configDoc.vendors) ? configDoc.vendors : DEFAULT_VENDORS;
+}
+
+async function loadAll() {
+  const [custs, meets, items, configs] = await Promise.all([
+    apiGet('customers'), apiGet('meetingNotes'), apiGet('tabItems'), apiGet('configLists')
+  ]);
+  customers = custs; meetingNotes = meets; tabItems = items;
+  configDoc = configs.find(c => c.id === 'main') || null;
+  if (!configDoc) {
+    configDoc = await apiPost('configLists', {
+      id: 'main',
+      tabs: DEFAULT_TABS.map(t => ({ ...t, key: t.key })),
+      vendors: DEFAULT_VENDORS.slice()
+    });
+  }
+}
+
+/* ---------- render ---------- */
+function render() {
+  const app = document.getElementById('app');
+  if (!getToken()) { renderLogin(app); return; }
+  if (customers === null) { app.innerHTML = '<div class="empty">読み込み中…</div>'; return; }
+  if (currentView === 'settings') { renderSettings(app); return; }
+  if (currentCustomerId) renderDetail(app);
+  else renderList(app);
+}
+
+function renderLogin(app) {
+  app.innerHTML = `
+    <div class="login-wrap">
+      <h1>住まいるハウジング</h1>
+      <div class="sub">社内アプリ（合い言葉でログイン）</div>
+      <input type="password" id="pwInput" placeholder="合い言葉">
+      <button class="btn btn-primary btn-full" id="loginBtn" style="margin-top:10px;">ログイン</button>
+    </div>`;
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  document.getElementById('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+}
+async function doLogin() {
+  const pw = document.getElementById('pwInput').value;
+  try {
+    const res = await fetch('/api/staff-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    const j = await res.json();
+    if (j.ok) { localStorage.setItem('staffToken', j.token); await boot(); }
+    else toast('合い言葉が違います');
+  } catch (e) { toast('通信に失敗しました'); }
+}
+
+function renderList(app) {
+  const q = (document.getElementById('searchInput') || {}).value || '';
+  const filtered = customers.filter(c => (c.name || '').includes(q));
+  app.innerHTML = `
+    <div class="row-between">
+      <h1>お客様一覧</h1>
+      <div class="row">
+        <button class="btn btn-ghost btn-small" id="settingsBtn">⚙ 設定</button>
+        <button class="btn btn-ghost btn-small" id="logoutBtn">ログアウト</button>
+      </div>
+    </div>
+    <div class="sub">住まいるハウジング 社内アプリ</div>
+    <input type="text" id="searchInput" placeholder="お客様名で検索" value="${esc(q)}" style="margin-bottom:12px;">
+    <div id="custList"></div>
+    <button class="btn btn-primary btn-full" id="addCustBtn" style="margin-top:14px;">＋ お客様を追加</button>
+  `;
+  const listEl = document.getElementById('custList');
+  listEl.innerHTML = filtered.length ? filtered.map(c => `
+    <div class="card customer-card" data-id="${c.id}">
+      <div class="row-between">
+        <div><span class="tag">${esc(c.category || '新築')}</span><div style="font-weight:700; margin-top:6px;">${esc(c.name || '')}</div></div>
+      </div>
+    </div>
+  `).join('') : '<div class="empty">お客様が登録されていません。</div>';
+  listEl.querySelectorAll('.customer-card').forEach(el => el.addEventListener('click', () => { currentCustomerId = el.dataset.id; currentTab = 'meeting'; render(); }));
+  document.getElementById('searchInput').addEventListener('input', render);
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('settingsBtn').addEventListener('click', () => { settingsDraft = JSON.parse(JSON.stringify({ tabs: tabsList(), vendors: vendorsList() })); currentView = 'settings'; render(); });
+  document.getElementById('addCustBtn').addEventListener('click', addCustomer);
+}
+
+async function addCustomer() {
+  const name = prompt('お客様名を入力してください');
+  if (!name) return;
+  const category = prompt('分類を入力してください（新築 / リフォーム / 不動産 / 賃貸 / 除雪）', '新築');
+  if (!CATEGORIES.includes(category)) { toast('分類が正しくありません'); return; }
+  const c = await apiPost('customers', { name, category, status: 'active' });
+  customers.push(c);
+
+  // 新築・リフォームは、設定画面で決めたタブ構成と雛形から初期項目を自動で作成する
+  if (DETAILED_CATEGORIES.includes(category)) {
+    for (const tab of tabsList()) {
+      for (const label of (tab.templateItems || [])) {
+        const it = await apiPost('tabItems', { customerId: c.id, tabKey: tab.key, label, content: '', photoKeys: [] });
+        tabItems.push(it);
+      }
+    }
+    toast('追加しました（雛形からタブの初期項目を作成しました）');
+  } else {
+    toast('追加しました');
+  }
+  render();
+}
+
+/* ---------- 設定（タブ構成・テンプレート管理） ---------- */
+function renderSettings(app) {
+  const tabs = settingsDraft.tabs;
+  app.innerHTML = `
+    <div class="back-link" id="backBtn">← お客様一覧へ戻る</div>
+    <h1>設定・タブ管理</h1>
+    <div class="sub">お客様詳細ページの「打合せ記録」以外のタブを、ここで自由に追加・削除・並び替え・リネームできます。各タブの「新しいお客様を追加した時の雛形」も設定できます。</div>
+
+    <div id="tabsArea"></div>
+    <button class="btn btn-ghost btn-full" id="addTabBtn" style="margin:10px 0 18px;">＋ タブを追加</button>
+
+    <div class="card">
+      <b>業者一覧</b>
+      <div class="sub">よく使う業者名の一覧です（今後、業者への依頼機能で選択式にする際に使用します）。1行に1つ。</div>
+      <textarea id="vendorsInput" style="min-height:120px;">${esc(vendorsList().join('\n'))}</textarea>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="saveSettingsBtn">保存する</button>
+  `;
+  const tabsArea = document.getElementById('tabsArea');
+  tabsArea.innerHTML = tabs.map((t, i) => `
+    <div class="card" data-idx="${i}">
+      <div class="row-between">
+        <input type="text" class="tab-label-input" data-idx="${i}" value="${esc(t.label)}" style="font-weight:700; flex-grow:1; margin-right:8px;">
+        <div class="row">
+          <button class="btn btn-ghost btn-small tab-up" data-idx="${i}" ${i===0?'disabled':''}>↑</button>
+          <button class="btn btn-ghost btn-small tab-down" data-idx="${i}" ${i===tabs.length-1?'disabled':''}>↓</button>
+          <button class="btn btn-danger btn-small tab-del" data-idx="${i}">削除</button>
+        </div>
+      </div>
+      <div class="sub" style="margin-top:8px;">新しいお客様を追加した時に自動で作られる項目（1行に1つ）</div>
+      <textarea class="tab-template-input" data-idx="${i}">${esc((t.templateItems||[]).join('\n'))}</textarea>
+    </div>
+  `).join('');
+
+  document.getElementById('backBtn').addEventListener('click', () => { currentView = 'list'; render(); });
+  document.getElementById('addTabBtn').addEventListener('click', () => {
+    syncDraftFromInputs();
+    settingsDraft.tabs.push({ key: genLocalId(), label: '新しいタブ', templateItems: [] });
+    render();
+  });
+  tabsArea.querySelectorAll('.tab-up').forEach(b => b.addEventListener('click', () => {
+    syncDraftFromInputs();
+    const i = Number(b.dataset.idx);
+    [settingsDraft.tabs[i-1], settingsDraft.tabs[i]] = [settingsDraft.tabs[i], settingsDraft.tabs[i-1]];
+    render();
+  }));
+  tabsArea.querySelectorAll('.tab-down').forEach(b => b.addEventListener('click', () => {
+    syncDraftFromInputs();
+    const i = Number(b.dataset.idx);
+    [settingsDraft.tabs[i+1], settingsDraft.tabs[i]] = [settingsDraft.tabs[i], settingsDraft.tabs[i+1]];
+    render();
+  }));
+  tabsArea.querySelectorAll('.tab-del').forEach(b => b.addEventListener('click', () => {
+    if (!confirm('このタブを削除しますか？（すでに入力済みのお客様データは残りますが、タブとしては表示されなくなります）')) return;
+    syncDraftFromInputs();
+    const i = Number(b.dataset.idx);
+    settingsDraft.tabs.splice(i, 1);
+    render();
+  }));
+  document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+}
+function syncDraftFromInputs() {
+  document.querySelectorAll('.tab-label-input').forEach(inp => { settingsDraft.tabs[Number(inp.dataset.idx)].label = inp.value; });
+  document.querySelectorAll('.tab-template-input').forEach(ta => {
+    settingsDraft.tabs[Number(ta.dataset.idx)].templateItems = ta.value.split('\n').map(s => s.trim()).filter(Boolean);
+  });
+}
+async function saveSettings() {
+  syncDraftFromInputs();
+  const tabs = settingsDraft.tabs.map(t => ({ key: t.key, label: (t.label || '').trim() || '無題のタブ', templateItems: t.templateItems || [] }));
+  const vendors = document.getElementById('vendorsInput').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!tabs.length) { toast('タブを1つ以上残してください'); return; }
+  const updated = await apiPut('configLists', 'main', { tabs, vendors });
+  configDoc = updated;
+  toast('設定を保存しました');
+  currentView = 'list';
+  render();
+}
+
+function renderDetail(app) {
+  const c = customers.find(c => c.id === currentCustomerId);
+  if (!c) { currentCustomerId = null; render(); return; }
+  const isDetailed = DETAILED_CATEGORIES.includes(c.category);
+  const tabs = isDetailed
+    ? [['meeting','打合せ記録'], ...tabsList().map(t => [t.key, t.label])]
+    : [['meeting','打合せ記録']];
+
+  app.innerHTML = `
+    <div class="back-link" id="backBtn">← 一覧へ戻る</div>
+    <div class="row-between">
+      <div><span class="tag">${esc(c.category || '新築')}</span><h1>${esc(c.name || '')}</h1></div>
+      <button class="btn btn-danger btn-small" id="delCustBtn">削除</button>
+    </div>
+    ${isDetailed ? `
+      <div class="stage-select-row">🏗 進み具合：
+        <select id="stageSelect">${CONSTRUCTION_STAGES.map(s => `<option value="${s}" ${s === (c.constructionStage||CONSTRUCTION_STAGES[0]) ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      </div>` : ''}
+    <button class="btn btn-primary btn-full" id="pushBtn" style="margin-bottom:10px;">🌐 おうちノートを更新する</button>
+    <div class="tabs">${tabs.map(([k,label]) => `<button class="tab-btn ${currentTab===k?'active':''}" data-tab="${k}">${esc(label)}</button>`).join('')}</div>
+    <div id="tabContent"></div>
+  `;
+  document.getElementById('backBtn').addEventListener('click', () => { currentCustomerId = null; render(); });
+  document.getElementById('delCustBtn').addEventListener('click', async () => {
+    if (!confirm('このお客様を削除しますか？')) return;
+    await apiDelete('customers', c.id);
+    customers = customers.filter(x => x.id !== c.id);
+    currentCustomerId = null; toast('削除しました'); render();
+  });
+  const stageSel = document.getElementById('stageSelect');
+  if (stageSel) stageSel.addEventListener('change', async () => {
+    await apiPut('customers', c.id, { constructionStage: stageSel.value });
+    c.constructionStage = stageSel.value;
+    toast('進み具合を更新しました');
+  });
+  document.getElementById('pushBtn').addEventListener('click', () => pushNote(c));
+  app.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => { currentTab = b.dataset.tab; render(); }));
+
+  renderTab(document.getElementById('tabContent'), c);
+}
+
+function renderTab(el, c) {
+  if (currentTab === 'meeting') return renderMeetingTab(el, c);
+  const tabDef = tabsList().find(t => t.key === currentTab);
+  if (tabDef) return renderCustomTab(el, c, tabDef);
+  el.innerHTML = '<div class="empty">このタブは見つかりませんでした。</div>';
+}
+
+function renderMeetingTab(el, c) {
+  const rows = meetingNotes.filter(m => m.customerId === c.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  el.innerHTML = (rows.length ? rows.map(m => `
+    <div class="card" data-id="${m.id}">
+      <div class="row-between"><span class="tag">${esc(m.title||'')}</span><span style="font-size:11px; color:var(--ink-soft);">${esc(m.date||'')}</span></div>
+      <div style="margin-top:8px; white-space:pre-wrap; font-size:13.5px;">${esc(m.content||'')}</div>
+      <div class="row" style="margin-top:8px;"><button class="btn btn-ghost btn-small edit-meet" data-id="${m.id}">編集</button><button class="btn btn-danger btn-small del-meet" data-id="${m.id}">削除</button></div>
+    </div>`).join('') : '<div class="empty">まだ記録がありません。</div>')
+    + '<button class="btn btn-primary btn-full" id="addMeetBtn">＋ 打合せ記録を追加</button>';
+  el.querySelector('#addMeetBtn').addEventListener('click', () => editMeeting(c, null));
+  el.querySelectorAll('.edit-meet').forEach(b => b.addEventListener('click', () => editMeeting(c, b.dataset.id)));
+  el.querySelectorAll('.del-meet').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('削除しますか？')) return;
+    await apiDelete('meetingNotes', b.dataset.id);
+    meetingNotes = meetingNotes.filter(m => m.id !== b.dataset.id);
+    toast('削除しました'); render();
+  }));
+}
+async function editMeeting(c, id) {
+  const m = id ? meetingNotes.find(m => m.id === id) : null;
+  const title = prompt('タグ（例：キッチン仕様）', m ? m.title : '');
+  if (title === null) return;
+  const content = prompt('打合せ内容', m ? m.content : '');
+  if (content === null) return;
+  const date = prompt('日付（例：2026-09-23）', m ? m.date : new Date().toISOString().slice(0,10));
+  if (id) {
+    const updated = await apiPut('meetingNotes', id, { title, content, date });
+    meetingNotes = meetingNotes.map(x => x.id === id ? updated : x);
+  } else {
+    const created = await apiPost('meetingNotes', { customerId: c.id, title, content, date });
+    meetingNotes.push(created);
+  }
+  toast('保存しました'); render();
+}
+
+/* ---------- 自由なタブ（項目名＋内容＋写真） ---------- */
+function renderCustomTab(el, c, tabDef) {
+  const rows = tabItems.filter(it => it.customerId === c.id && it.tabKey === tabDef.key);
+  el.innerHTML = (rows.length ? rows.map(it => `
+    <div class="card" data-id="${it.id}">
+      <div class="row-between"><b>${esc(it.label||'')}</b><div class="row"><button class="btn btn-ghost btn-small edit-item" data-id="${it.id}">編集</button><button class="btn btn-danger btn-small del-item" data-id="${it.id}">削除</button></div></div>
+      <div style="margin-top:6px; font-size:13.5px; white-space:pre-wrap;">${esc(it.content||'')}</div>
+      <div class="photo-grid">${(it.photoKeys||[]).map(k => `<img src="${photoUrl(c.id,k)}">`).join('')}</div>
+      <input type="file" accept="image/*" multiple style="margin-top:8px;" class="item-photo-input" data-id="${it.id}">
+    </div>`).join('') : '<div class="empty">まだ項目がありません。</div>')
+    + '<button class="btn btn-primary btn-full" id="addItemBtn">＋ 項目を追加</button>';
+  el.querySelector('#addItemBtn').addEventListener('click', () => editCustomItem(c, tabDef, null));
+  el.querySelectorAll('.edit-item').forEach(b => b.addEventListener('click', () => editCustomItem(c, tabDef, b.dataset.id)));
+  el.querySelectorAll('.del-item').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('削除しますか？')) return;
+    await apiDelete('tabItems', b.dataset.id);
+    tabItems = tabItems.filter(x => x.id !== b.dataset.id);
+    toast('削除しました'); render();
+  }));
+  el.querySelectorAll('.item-photo-input').forEach(inp => inp.addEventListener('change', async (e) => {
+    const id = inp.dataset.id;
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    toast('アップロード中…');
+    const it = tabItems.find(x => x.id === id);
+    const newKeys = [];
+    for (const f of files) {
+      try { const res = await uploadPhoto(c.id, f); newKeys.push(res.key); } catch (err) { toast('アップロード失敗：' + f.name); }
+    }
+    const photoKeys = [...(it.photoKeys||[]), ...newKeys];
+    const updated = await apiPut('tabItems', id, { photoKeys });
+    tabItems = tabItems.map(x => x.id === id ? updated : x);
+    toast('写真を追加しました'); render();
+  }));
+}
+async function editCustomItem(c, tabDef, id) {
+  const it = id ? tabItems.find(x => x.id === id) : null;
+  const label = prompt('項目名', it ? it.label : '');
+  if (label === null) return;
+  const content = prompt('内容', it ? it.content : '');
+  if (content === null) return;
+  if (id) {
+    const updated = await apiPut('tabItems', id, { label, content });
+    tabItems = tabItems.map(x => x.id === id ? updated : x);
+  } else {
+    const created = await apiPost('tabItems', { customerId: c.id, tabKey: tabDef.key, label, content, photoKeys: [] });
+    tabItems.push(created);
+  }
+  toast('保存しました'); render();
+}
+
+/* ---------- おうちノートへの反映（お客様公開サイトへ push） ---------- */
+async function pushNote(c) {
+  toast('更新しています…');
+  try {
+    const isDetailed = DETAILED_CATEGORIES.includes(c.category);
+    const meetings = meetingNotes.filter(m => m.customerId === c.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(m => ({ date: m.date, title: m.title, content: m.content }));
+
+    let specsPayload = [], confirmationsPayload = [], furniturePayload = [], customSections = [];
+    if (isDetailed) {
+      for (const tab of tabsList()) {
+        const items = tabItems.filter(it => it.customerId === c.id && it.tabKey === tab.key);
+        if (tab.key === 'spec') {
+          specsPayload = items.map(it => ({ category: it.label, content: it.content || '', photos: (it.photoKeys||[]).map(k => ({ key: k })) }));
+        } else if (tab.key === 'confirm') {
+          confirmationsPayload = items.map(it => ({ label: it.label, content: it.content || '', photos: (it.photoKeys||[]).map(k => ({ key: k })) }));
+        } else if (tab.key === 'furniture') {
+          furniturePayload = items.map(it => ({ label: it.label, content: it.content || '' }));
+        } else {
+          customSections.push({ label: tab.label, items: items.map(it => ({ label: it.label, content: it.content || '', photos: (it.photoKeys||[]).map(k => ({ key: k })) })) });
+        }
+      }
+    }
+
+    const data = {
+      customerName: c.name || '',
+      constructionStage: c.constructionStage || (isDetailed ? CONSTRUCTION_STAGES[0] : ''),
+      meetings, specs: specsPayload, confirmations: confirmationsPayload, furniture: furniturePayload, customSections,
+      album: [], folders: []
+    };
+
+    const res = await fetch('/api/save-note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': NOTE_API_KEY },
+      body: JSON.stringify({ slug: c.id, data, photos: [] })
+    });
+    if (res.ok) toast('✅ おうちノートを更新しました');
+    else toast('❌ 更新に失敗しました（status=' + res.status + '）');
+  } catch (e) {
+    toast('❌ 更新に失敗しました：' + (e && e.message || e));
+  }
+}
+
+/* ---------- boot ---------- */
+async function boot() {
+  if (!getToken()) { render(); return; }
+  customers = null;
+  render();
+  try {
+    await loadAll();
+  } catch (e) {
+    toast('読み込みに失敗しました');
+    customers = [];
+  }
+  render();
+}
+boot();
+</script>
+</body>
+</html>
