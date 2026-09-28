@@ -271,7 +271,7 @@
     <h2 style="margin:0 0 4px;">住まいるアプリ</h2>
     <p class="muted" style="margin:0 0 16px;font-size:.8rem;">社内用アプリです。合い言葉を入力してください。</p>
     <div style="position:relative;margin-bottom:10px;">
-      <input type="password" id="staffLoginInput" placeholder="合い言葉" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;text-align:center;">
+      <input type="text" id="staffLoginInput" placeholder="合い言葉" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-form-type="other" style="width:100%;text-align:center;-webkit-text-security:disc;text-security:disc;">
       <button type="button" id="staffLoginToggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:.72rem;cursor:pointer;padding:4px 6px;">表示</button>
     </div>
     <button class="btn" style="width:100%;" id="staffLoginBtn">ログイン</button>
@@ -1025,11 +1025,21 @@
     if(overlay) overlay.hidden = true;
   }
 
+  var staffLoginInFlight = false;
   async function doStaffLogin(){
+    if(staffLoginInFlight) return;
     var input = document.getElementById("staffLoginInput");
     var pw = input ? input.value.trim() : "";
     var errEl = document.getElementById("staffLoginError");
+    var btn = document.getElementById("staffLoginBtn");
     if(errEl) errEl.hidden = true;
+    if(!pw){
+      if(errEl){ errEl.textContent = "合い言葉を入力してください"; errEl.hidden = false; }
+      return;
+    }
+    staffLoginInFlight = true;
+    var origBtnText = btn ? btn.textContent : "";
+    if(btn){ btn.disabled = true; btn.textContent = "確認中…"; }
     try{
       var res = await fetch('/api/staff-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
       var raw = await res.text();
@@ -1045,6 +1055,10 @@
         errEl.hidden = false;
       }
     }catch(e){ if(errEl){ errEl.textContent = "通信に失敗しました（詳細: " + String(e && e.message || e) + "）"; errEl.hidden = false; } }
+    finally{
+      staffLoginInFlight = false;
+      if(btn){ btn.disabled = false; btn.textContent = origBtnText || "ログイン"; }
+    }
   }
 
   async function boot(){
@@ -3365,8 +3379,9 @@
     });
     document.getElementById("staffLoginToggle").addEventListener("click", function(){
       var inp = document.getElementById("staffLoginInput");
-      var showing = inp.type === "text";
-      inp.type = showing ? "password" : "text";
+      var showing = inp.style.webkitTextSecurity === "none";
+      inp.style.webkitTextSecurity = showing ? "disc" : "none";
+      inp.style.textSecurity = showing ? "disc" : "none";
       this.textContent = showing ? "表示" : "隠す";
     });
 
