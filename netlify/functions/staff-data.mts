@@ -10,11 +10,15 @@ const CORS_HEADERS = {
 // staff-auth.mts と同じ値にしてください。
 const STAFF_PASSPHRASE = "sumairu2026";
 
-// このNetlify版アプリで扱えるコレクション名（Claude版アプリのdb.collection名と合わせている）
+// このNetlify版アプリで扱えるコレクション名（住まいるアプリ本体のdb.collection名と合わせている）
 const ALLOWED_COLLECTIONS = [
   "customers", "cases", "vendors", "meetingNotes", "specs",
   "confirmations", "furniture", "checklists", "materials",
   "customerTasks", "configLists", "tabItems",
+  // 住まいるアプリ本体（Netlify単独版）で使うコレクション
+  "projects", "requests", "attachments", "activity", "tasks",
+  "messages", "specPhotos", "confirmItems", "albumPhotos",
+  "reservations", "settings",
 ];
 
 function genId() {
@@ -96,8 +100,16 @@ export default async (req: Request, context: Context) => {
       });
     }
     const key = `${collection}/${id}`;
-    const existing = (await store.get(key, { type: "json" })) || { id };
-    const doc = { ...existing, ...(body.data || {}), id, updatedAt: new Date().toISOString() };
+    // replace:true は Firestore の .set() と同じ「完全上書き」。住まいるアプリ本体は
+    // クライアント側で常にドキュメント全体を組み立てて保存するため、こちらを使う。
+    // 省略時（他アプリの既存の呼び出し）は従来通りマージ更新のまま。
+    let doc;
+    if (body.replace) {
+      doc = { ...(body.data || {}), id, updatedAt: new Date().toISOString() };
+    } else {
+      const existing = (await store.get(key, { type: "json" })) || { id };
+      doc = { ...existing, ...(body.data || {}), id, updatedAt: new Date().toISOString() };
+    }
     await store.setJSON(key, doc);
     return new Response(JSON.stringify(doc), {
       status: 200,
