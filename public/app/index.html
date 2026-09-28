@@ -1040,7 +1040,11 @@
   function showLoginScreen(reason){
     clearStaffToken();
     var overlay = document.getElementById("staffLoginOverlay");
-    if(overlay) overlay.hidden = false;
+    // overlay要素にはインラインでdisplay:flexが指定されているため、hidden属性
+    // だけではブラウザのデフォルトスタイル([hidden]{display:none})より
+    // インラインスタイルの方が優先されてしまい、実際には非表示にならない。
+    // style.displayを明示的に切り替えることで確実に表示/非表示を制御する。
+    if(overlay){ overlay.hidden = false; overlay.style.display = "flex"; }
     var errEl = document.getElementById("staffLoginError");
     if(errEl && reason){
       errEl.textContent = reason;
@@ -1049,7 +1053,7 @@
   }
   function hideLoginScreen(){
     var overlay = document.getElementById("staffLoginOverlay");
-    if(overlay) overlay.hidden = true;
+    if(overlay){ overlay.hidden = true; overlay.style.display = "none"; }
   }
 
   var staffLoginInFlight = false;
