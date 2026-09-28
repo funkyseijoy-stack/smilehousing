@@ -1032,14 +1032,19 @@
     if(errEl) errEl.hidden = true;
     try{
       var res = await fetch('/api/staff-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
-      var j = await res.json();
-      if(j.ok){
+      var raw = await res.text();
+      var j = null;
+      try{ j = JSON.parse(raw); }catch(e2){ /* not JSON */ }
+      if(j && j.ok){
         setStaffToken(j.token);
         if(input) input.value = "";
         hideLoginScreen();
         boot();
-      } else if(errEl){ errEl.hidden = false; }
-    }catch(e){ if(errEl){ errEl.textContent = "通信に失敗しました"; errEl.hidden = false; } }
+      } else if(errEl){
+        errEl.textContent = "合い言葉が違います（詳細: HTTP " + res.status + " " + String(raw||"").slice(0,100) + "）";
+        errEl.hidden = false;
+      }
+    }catch(e){ if(errEl){ errEl.textContent = "通信に失敗しました（詳細: " + String(e && e.message || e) + "）"; errEl.hidden = false; } }
   }
 
   async function boot(){
