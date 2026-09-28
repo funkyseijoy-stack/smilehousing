@@ -859,6 +859,7 @@
         <label class="field" style="flex-direction:row; align-items:center; gap:6px;"><input type="checkbox" id="tfHasDeadline"> 期限あり</label>
         <label class="field">期限<input type="date" id="tfDeadline"></label>
       </div>
+      <label class="field" style="flex-direction:row; align-items:center; gap:6px;"><input type="checkbox" id="tfPrivate"> 自分だけのタスク（他の人には表示されません）</label>
       <label class="field">添付（写真・PDFなど）<input type="file" id="tfAttachment" multiple></label>
       <div class="row" style="margin-block-start:6px;">
         <button class="btn" id="tfSubmit">追加</button>
@@ -1174,7 +1175,14 @@
   function liveRequests(){ return state.requests.filter(function(r){ return !r.deletedAt; }); }
   function liveAttachments(){ return state.attachments.filter(function(a){ return !a.deletedAt; }); }
   function liveNotes(){ return state.meetingNotes.filter(function(n){ return !n.deletedAt; }); }
-  function liveTasks(){ return state.tasks.filter(function(t){ return !t.deletedAt; }); }
+  function liveTasks(){
+    return state.tasks.filter(function(t){
+      if(t.deletedAt) return false;
+      // 「自分だけのタスク」は作成した本人以外には見せない
+      if(t.private && t.creator && t.creator!==state.currentUser) return false;
+      return true;
+    });
+  }
   function liveMessages(){ return state.messages.filter(function(m){ return !m.deletedAt; }); }
   function liveSpecPhotos(){ return state.specPhotos.filter(function(p){ return !p.deletedAt; }); }
   function liveConfirmItems(){ return state.confirmItems.filter(function(p){ return !p.deletedAt; }); }
@@ -1260,7 +1268,7 @@
         var canForward = STATUS_ORDER.indexOf(status) < STATUS_ORDER.length-1;
         var canBack = STATUS_ORDER.indexOf(status) > 0;
         return '<div class="kancard" data-taskid="'+t.id+'">'+
-          '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+'</div>'+
+          '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+(t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.68rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
@@ -1861,6 +1869,8 @@
     render();
     saveDoc("specPhotos", p.id, p);
     logActivity((p.category||"")+"のプランボードを"+(p.reflected?"おうちノートに反映しました":"反映解除しました"));
+    // 「反映」の印をつけた/外した時点で、ボタンを別途押さなくても自動でおうちノートに同期する
+    pushToOkaiNote(p.projectId, {silent:true});
   }
 
   // ================= おうちノート（お客様向けサイト）への反映 =================
@@ -1879,9 +1889,10 @@
     });
   }
   async function buildOkaiNoteData(proj){
-    var meetings = liveNotes().filter(function(n){ return n.projectId===proj.id; })
-      .slice().sort(function(a,b){ return (b.date||b.createdAt||"").localeCompare(a.date||a.createdAt||""); })
-      .map(function(n){ return { date: n.date || (n.createdAt||"").slice(0,10), title: n.author||"", content: n.content||"" }; });
+    // 打合せ内容（社内メモ）は社内限定の情報のため、お客様向け「おうちノート」には
+    // 送らない。（以前はここで全件送信してしまっており、社内向けの指示等も
+    // お客様に見える状態になってしまっていたため修正した。）
+    var meetings = [];
 
     var reflectedPhotos = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.reflected; })
       .slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
@@ -1914,13 +1925,14 @@
       photos: photos
     };
   }
-  function pushToOkaiNote(){
-    var proj = projectById(state.currentProjectId);
-    if(!proj){ toast("案件を選択してください"); return; }
+  function pushToOkaiNote(projectIdArg, opts){
+    var silent = !!(opts && opts.silent);
+    var proj = projectById(projectIdArg || state.currentProjectId);
+    if(!proj){ if(!silent) toast("案件を選択してください"); return Promise.resolve(); }
     var statusLabel = document.getElementById("okaiNoteStatusLabel");
-    if(statusLabel) statusLabel.textContent = "送信データを準備中…";
-    buildOkaiNoteData(proj).then(function(payload){
-      if(statusLabel) statusLabel.textContent = "おうちノートへ送信中…";
+    if(statusLabel && !silent) statusLabel.textContent = "送信データを準備中…";
+    return buildOkaiNoteData(proj).then(function(payload){
+      if(statusLabel && !silent) statusLabel.textContent = "おうちノートへ送信中…";
       // 住まいるアプリ本体とおうちノートは同じNetlifyサイト内なので、
       // 別タブを介さず直接APIを呼べる（Claudeアーティファクト版では
       // クロスオリジン制約があったためポップアップ中継が必要だった）。
@@ -1931,14 +1943,14 @@
       });
     }).then(function(res){
       if(res && res.ok){
-        toast("✅ おうちノートを更新しました");
-        logActivity((proj.customer||proj.name||"")+"のおうちノートを更新しました");
+        if(!silent) toast("✅ おうちノートを更新しました");
+        logActivity((proj.customer||proj.name||"")+"のおうちノートを"+(silent?"自動更新しました":"更新しました"));
       } else {
         toast("❌ おうちノートの更新に失敗しました");
       }
       if(statusLabel) statusLabel.textContent = "";
     }).catch(function(e){
-      toast("送信に失敗しました："+(e && e.message || e));
+      toast("おうちノートへの送信に失敗しました："+(e && e.message || e));
       if(statusLabel) statusLabel.textContent = "";
     });
   }
@@ -2694,6 +2706,8 @@
     render();
     await saveDoc("projects", p.id, p);
     logActivity("案件「"+p.name+"」の進捗を「"+tag+"」にしました");
+    // 進捗タグはお客様にも見える情報なので、変更したら自動でおうちノートに同期する
+    pushToOkaiNote(p.id, {silent:true});
   }
 
   async function addVendor(){
@@ -2848,6 +2862,7 @@
     document.getElementById("tfContent").value = "";
     document.getElementById("tfHasDeadline").checked = false;
     document.getElementById("tfDeadline").value = "";
+    document.getElementById("tfPrivate").checked = false;
     document.getElementById("tfAttachment").value = "";
     document.getElementById("taskFormModal").hidden = false;
   }
@@ -2863,6 +2878,7 @@
     var method = document.getElementById("tfMethod").value;
     var hasDeadline = document.getElementById("tfHasDeadline").checked;
     var deadline = document.getElementById("tfDeadline").value;
+    var isPrivate = document.getElementById("tfPrivate").checked;
     var files = document.getElementById("tfAttachment").files;
 
     var attachmentAssetIds = [];
@@ -2879,6 +2895,7 @@
       hasDeadline: hasDeadline, deadline: hasDeadline?deadline:"",
       requestTo: requestTo||"", requestMethod: method,
       attachmentAssetIds: attachmentAssetIds,
+      private: isPrivate,
       status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
     state.tasks.push(t);
