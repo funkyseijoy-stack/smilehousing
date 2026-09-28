@@ -944,13 +944,30 @@
   // ================= Netlify連携（社内合い言葉ログイン・データ保存） =================
   // Claudeアーティファクト版の db/assets/downloads と同じ関数名・呼び出し方を保つことで、
   // 上の全機能（案件管理〜プランボード等）のロジックには手を入れずに済むようにしている。
-  function getStaffToken(){ try{ return localStorage.getItem(STAFF_TOKEN_KEY) || ""; }catch(e){ return ""; } }
-  function setStaffToken(t){ try{ localStorage.setItem(STAFF_TOKEN_KEY, t); }catch(e){ /* ignore */ } }
-  function clearStaffToken(){ try{ localStorage.removeItem(STAFF_TOKEN_KEY); }catch(e){ /* ignore */ } }
+  // localStorageが使えない環境（プライベートブラウズ・Cookie/サイトデータをブロック設定
+  // にしている場合など）でも、ログイン後アプリが動き続けられるよう、メモリ上にも
+  // トークンを保持しておく（その場合ページ再読み込みでログインし直しにはなる）。
+  var memStaffToken = "";
+  function getStaffToken(){
+    try{ var v = localStorage.getItem(STAFF_TOKEN_KEY); if(v) return v; }catch(e){ /* ignore */ }
+    return memStaffToken;
+  }
+  function setStaffToken(t){
+    memStaffToken = t || "";
+    try{ localStorage.setItem(STAFF_TOKEN_KEY, t); }catch(e){ /* ignore */ }
+  }
+  function clearStaffToken(){
+    memStaffToken = "";
+    try{ localStorage.removeItem(STAFF_TOKEN_KEY); }catch(e){ /* ignore */ }
+  }
 
   async function apiGet(collection){
     var res = await fetch('/api/staff-data?collection='+encodeURIComponent(collection), { headers:{'X-Staff-Token': getStaffToken()} });
-    if(res.status===401){ showLoginScreen(); throw new Error('unauthorized'); }
+    if(res.status===401){
+      toast("認証エラーが発生しました（データ取得: " + collection + "）。もう一度ログインしてください");
+      showLoginScreen();
+      throw new Error('unauthorized');
+    }
     var j = await res.json();
     return j.items||[];
   }
