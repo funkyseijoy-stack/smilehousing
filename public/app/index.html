@@ -270,7 +270,10 @@
     <div id="loginIconSlot" style="width:64px;height:64px;margin:0 auto 14px;border-radius:16px;background:linear-gradient(155deg, var(--accent) 0%, var(--accent-ink) 100%); display:flex;align-items:center;justify-content:center;"></div>
     <h2 style="margin:0 0 4px;">住まいるアプリ</h2>
     <p class="muted" style="margin:0 0 16px;font-size:.8rem;">社内用アプリです。合い言葉を入力してください。</p>
-    <input type="password" id="staffLoginInput" placeholder="合い言葉" style="width:100%;text-align:center;margin-bottom:10px;">
+    <div style="position:relative;margin-bottom:10px;">
+      <input type="password" id="staffLoginInput" placeholder="合い言葉" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;text-align:center;">
+      <button type="button" id="staffLoginToggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:.72rem;cursor:pointer;padding:4px 6px;">表示</button>
+    </div>
     <button class="btn" style="width:100%;" id="staffLoginBtn">ログイン</button>
     <p id="staffLoginError" hidden style="color:var(--danger);font-size:.78rem;margin:10px 0 0;">合い言葉が違います</p>
   </div>
@@ -1024,7 +1027,7 @@
 
   async function doStaffLogin(){
     var input = document.getElementById("staffLoginInput");
-    var pw = input ? input.value : "";
+    var pw = input ? input.value.trim() : "";
     var errEl = document.getElementById("staffLoginError");
     if(errEl) errEl.hidden = true;
     try{
@@ -3354,6 +3357,12 @@
     document.getElementById("staffLoginBtn").addEventListener("click", doStaffLogin);
     document.getElementById("staffLoginInput").addEventListener("keydown", function(e){
       if(e.key === "Enter") doStaffLogin();
+    });
+    document.getElementById("staffLoginToggle").addEventListener("click", function(){
+      var inp = document.getElementById("staffLoginInput");
+      var showing = inp.type === "text";
+      inp.type = showing ? "password" : "text";
+      this.textContent = showing ? "表示" : "隠す";
     });
 
     document.querySelectorAll(".tab-btn").forEach(function(btn){
