@@ -714,6 +714,15 @@
       <p class="muted" style="font-size:.76rem; margin:0 0 8px;">「定価」扱いの見積書を見るときに求める番号です。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
+
+    <div class="card">
+      <h3>Gmail連携（プランボードの下書き作成用）</h3>
+      <p class="muted" style="font-size:.76rem; margin:0 0 8px;">プランボード画面の「Gmail下書きを作成」を使うには、最初に一度だけ smilehousing8@gmail.com でこの連携を許可してください。一度許可すれば、以後は操作不要です。</p>
+      <div class="row" style="align-items:center; gap:10px;">
+        <span id="gmailConnStatus" class="muted">確認中…</span>
+        <button class="btn secondary small" id="btnConnectGmail">Gmailと連携する</button>
+      </div>
+    </div>
   </section>
 
   <!-- ========== GMAIL (受信箱の確認用) ========== -->
@@ -1361,6 +1370,27 @@
     document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===tabName); });
     document.querySelectorAll(".panel").forEach(function(p){ p.classList.toggle("active", p.id === "panel-"+tabName); });
     if(tabName==="gmail") loadGmailInbox(document.getElementById("gmailSearchInput").value);
+    if(tabName==="settings") refreshGmailConnStatus();
+  }
+
+  // ================= Gmail連携（OAuth） =================
+  // プランボードなどからGmail下書きを作成するための、社内共有アカウントの連携状態確認・接続開始。
+  async function refreshGmailConnStatus(){
+    var el = document.getElementById("gmailConnStatus");
+    if(!el) return;
+    el.textContent = "確認中…";
+    try{
+      var res = await fetch("/api/gmail-status", { headers: { "X-Staff-Token": getStaffToken()||"" } });
+      if(res.status===401){ el.textContent = "確認できませんでした（要ログイン）"; return; }
+      var data = await res.json();
+      el.textContent = data.connected ? "✅ 連携済み" : "未連携（下のボタンから連携してください）";
+    }catch(e){ el.textContent = "確認できませんでした"; }
+  }
+  function connectGmail(){
+    var t = getStaffToken();
+    if(!t){ toast("ログインし直してください"); return; }
+    window.open("/api/google-oauth-start?token="+encodeURIComponent(t), "_blank");
+    toast("別タブでGoogleの認証画面を開きました。完了したら「Gmailと連携する」の表示を確認してください。");
   }
 
   // 全画面表示（Fullscreen API）。iPadOS・Safariのバージョンや埋め込み環境によっては
@@ -3706,6 +3736,7 @@
       removeStaff(x.dataset.delstaff);
     });
     document.getElementById("btnSavePin").addEventListener("click", savePin);
+    document.getElementById("btnConnectGmail").addEventListener("click", connectGmail);
 
     function handleTableClick(e){
       var btn = e.target.closest("button[data-act]");
@@ -3879,7 +3910,6 @@
     document.getElementById("pbDownload").addEventListener("click", pbDownloadImage);
     document.getElementById("pbDownloadTop").addEventListener("click", pbDownloadImage);
     document.getElementById("pbSend").addEventListener("click", async function(){
-      if(!mcp){ toast("この画面ではGmail連携が利用できません"); return; }
       var toRaw = document.getElementById("pbMailTo").value.trim();
       var subject = document.getElementById("pbMailSubject").value.trim();
       var body = document.getElementById("pbMailBody").value;
@@ -3899,15 +3929,19 @@
         var atts = [];
         for(var bi=0; bi<blobsToSend.length; bi++){
           var bEntry = blobsToSend[bi];
-          if(fileArgsSupported){
-            atts.push({ filename:bEntry.name, mimeType:"image/png", content:{ $file:{data:bEntry.blob, name:bEntry.name, type:"image/png"} } });
-          } else {
-            var b64 = await blobToBase64(bEntry.blob);
-            atts.push({ filename:bEntry.name, mimeType:"image/png", content:b64 });
-          }
+          var b64 = await blobToBase64(bEntry.blob);
+          atts.push({ filename:bEntry.name, mimeType:"image/png", content:b64 });
         }
-        var input = { to:to, subject:subject, body:body, attachments:atts };
-        await mcp.callTool("Gmail","create_draft", input);
+        var res = await fetch("/api/gmail-create-draft", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
+          body: JSON.stringify({ to:to, subject:subject, body:body, attachments:atts })
+        });
+        if(res.status===409){
+          toast("Gmail連携がまだ設定されていません。設定画面の「Gmailと連携する」から連携してください。");
+          return;
+        }
+        if(!res.ok){ throw new Error("gmail_create_draft_failed"); }
         toast("Gmail下書きを作成しました（添付"+atts.length+"件）");
         logActivity("プランボードのGmail下書きを作成しました");
       }catch(e){ toast("Gmail下書きの作成に失敗しました"); }
