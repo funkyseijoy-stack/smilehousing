@@ -2552,7 +2552,6 @@
   }
 
   async function checkGmailReplies(){
-    if(!mcp){ toast("この画面ではGmail連携が利用できません"); return; }
     var candidates = liveRequests().filter(function(r){ return r.status==="依頼済み" && r.method==="gmail" && r.gmailThreadId; });
     if(candidates.length===0){ toast("確認対象の依頼がありません"); return; }
     var threadIds = [];
@@ -2561,9 +2560,12 @@
     var threadMessages = {};
     for(var i=0;i<threadIds.length;i++){
       try{
-        var result = await mcp.callTool("Gmail","get_thread", { threadId: threadIds[i], messageFormat:"MINIMAL" });
-        var payload = (result && result.payload) || {};
-        threadMessages[threadIds[i]] = payload.messages || [];
+        var res = await fetch("/api/gmail-get-thread?threadId="+encodeURIComponent(threadIds[i]), {
+          headers:{ "X-Staff-Token": getStaffToken()||"" }
+        });
+        if(!res.ok){ threadMessages[threadIds[i]] = []; continue; }
+        var data = await res.json();
+        threadMessages[threadIds[i]] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date }; });
       }catch(e){ threadMessages[threadIds[i]] = []; }
     }
     var foundCount = 0; var touched = [];
@@ -2596,22 +2598,29 @@
     if(!listEl) return;
     empty.hidden = true; errorEl.hidden = true; loading.hidden = false;
     listEl.innerHTML = "";
-    if(!mcp){ loading.hidden = true; errorEl.hidden = false; return; }
     try{
       var q = (query||"").trim() || "in:inbox";
-      var result = await mcp.callTool("Gmail","search_threads", { query:q, pageSize:25, view:"THREAD_VIEW_MINIMAL" });
-      var payload = (result && result.payload) || {};
-      var threads = payload.threads || [];
+      var res = await fetch("/api/gmail-search-threads?q="+encodeURIComponent(q)+"&maxResults=25", {
+        headers:{ "X-Staff-Token": getStaffToken()||"" }
+      });
+      if(res.status===409){
+        loading.hidden = true;
+        errorEl.hidden = false;
+        errorEl.textContent = "Gmail連携がまだ設定されていません。設定画面の「Gmailと連携する」から連携してください。";
+        return;
+      }
+      if(!res.ok) throw new Error("gmail_search_failed");
+      var data = await res.json();
+      var threads = data.threads || [];
       loading.hidden = true;
       gmailThreadsCache = threads;
       if(threads.length === 0){ empty.hidden = false; return; }
-      listEl.innerHTML = threads.map(function(t, idx){
-        var msg = (t.messages && t.messages[0]) || {};
-        var sender = escapeHtml(msg.sender || "");
-        var subject = escapeHtml(msg.subject || t.subject || "(件名なし)");
-        var snippet = escapeHtml(msg.snippet || t.snippet || "");
-        var date = msg.date ? fmtTs(msg.date) : "";
-        var url = gmailViewUrlFor(t, msg);
+      listEl.innerHTML = threads.map(function(t){
+        var sender = escapeHtml(t.sender || "");
+        var subject = escapeHtml(t.subject || "(件名なし)");
+        var snippet = escapeHtml(t.snippet || "");
+        var date = t.date ? fmtTs(t.date) : "";
+        var url = t.viewUrl || gmailViewUrlFor(t, null);
         return '<a class="gmailrow" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+
           '<div class="gr-top"><span>'+sender+'</span><span class="tabular">'+date+'</span></div>'+
           '<div class="gr-subject">'+subject+'</div>'+
@@ -2621,6 +2630,7 @@
     }catch(e){
       loading.hidden = true;
       errorEl.hidden = false;
+      errorEl.textContent = "この画面ではGmailの受信箱を読み込めませんでした。";
     }
   }
 
