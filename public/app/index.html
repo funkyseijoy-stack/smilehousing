@@ -964,8 +964,7 @@
   async function apiGet(collection){
     var res = await fetch('/api/staff-data?collection='+encodeURIComponent(collection), { headers:{'X-Staff-Token': getStaffToken()} });
     if(res.status===401){
-      toast("認証エラーが発生しました（データ取得: " + collection + "）。もう一度ログインしてください");
-      showLoginScreen();
+      showLoginScreen("認証エラー（データ取得: " + collection + "）。もう一度ログインしてください");
       throw new Error('unauthorized');
     }
     var j = await res.json();
@@ -978,9 +977,12 @@
         headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
         body: JSON.stringify({ collection:collection, id:id, data:data, replace:true })
       });
-      if(res.status===401){ showLoginScreen(); return false; }
+      if(res.status===401){
+        showLoginScreen("認証エラー（保存: " + collection + "）。もう一度ログインしてください");
+        return false;
+      }
       return true;
-    }catch(e){ toast("保存に失敗しました"); return false; }
+    }catch(e){ toast("保存に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
   async function hardDeleteDoc(collection, id){
     try{
@@ -989,9 +991,12 @@
         headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
         body: JSON.stringify({ collection:collection, id:id })
       });
-      if(res.status===401){ showLoginScreen(); return false; }
+      if(res.status===401){
+        showLoginScreen("認証エラー（削除: " + collection + "）。もう一度ログインしてください");
+        return false;
+      }
       return true;
-    }catch(e){ toast("削除に失敗しました"); return false; }
+    }catch(e){ toast("削除に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
 
   assets = {
@@ -1032,10 +1037,15 @@
     }
   };
 
-  function showLoginScreen(){
+  function showLoginScreen(reason){
     clearStaffToken();
     var overlay = document.getElementById("staffLoginOverlay");
     if(overlay) overlay.hidden = false;
+    var errEl = document.getElementById("staffLoginError");
+    if(errEl && reason){
+      errEl.textContent = reason;
+      errEl.hidden = false;
+    }
   }
   function hideLoginScreen(){
     var overlay = document.getElementById("staffLoginOverlay");
