@@ -3,8 +3,8 @@ import { getStore } from "@netlify/blobs";
 
 // 住まいるアプリ（このサイト）と、おうちノート本体（strong-piroshki-295252、
 // customer-data.mts / customer-inbox.mts）をつなぐ橋渡し関数。
-// お客様側のCookie認証はドメインをまたげないため、共有APIキーで
-// サーバー間から直接おうちノートのAPIを呼び出す。
+// スタッフのCookie認証はドメインをまたげないため、既存のスタッフ合い言葉を
+// ヘッダーで渡してサーバー間から直接おうちノートのAPIを呼び出す。
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -15,8 +15,6 @@ const CORS_HEADERS = {
 // staff-data.mts と同じ合い言葉（住まいるアプリ内の認証）
 const STAFF_PASSPHRASE = "sumairu2026";
 
-// おうちノート側（strong-piroshki の staff-auth.mts）と同じ値を、両サイトの
-// 環境変数 BRIDGE_API_KEY に設定しておく（コードには埋め込まない）。
 const OKAINOTE_BASE = "https://strong-piroshki-295252.netlify.app";
 
 function json(body: unknown, status = 200): Response {
@@ -36,12 +34,13 @@ function randomToken(): string {
 }
 
 async function okaiFetch(path: string, init?: RequestInit): Promise<Response> {
-  const bridgeKey = Netlify.env.get("BRIDGE_API_KEY") || process.env.BRIDGE_API_KEY || "";
+  // おうちノート本体（strong-piroshki）の staff-auth.mts には、既存のスタッフ合い言葉
+  // （STAFF_ACCESS_CODE、住まいるアプリの合い言葉と同じ値）をヘッダーで渡して認証する。
   return fetch(`${OKAINOTE_BASE}${path}`, {
     ...init,
     headers: {
       ...(init?.headers || {}),
-      "x-bridge-api-key": bridgeKey,
+      "x-staff-code": STAFF_PASSPHRASE,
     },
   });
 }
