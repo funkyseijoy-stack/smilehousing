@@ -380,6 +380,7 @@
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
           <button class="btn secondary small" id="btnPushOkaiNote">🌐 おうちノートを更新する</button>
+          <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
           <button class="btn ghost small" id="btnCopyOkaiNoteLink">お客様用リンクをコピー</button>
           <span class="muted" id="okaiNoteStatusLabel" style="font-size:.75rem;"></span>
         </div>
@@ -843,6 +844,17 @@
         <div class="row" style="margin-block-start:10px;"><button class="btn" id="pbSend">この内容でGmail下書きを作成</button></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ========== OKAINOTE VIEW MODAL ========== -->
+<div class="pbmodal" id="okaiNoteViewModal" hidden>
+  <div class="pbcard" style="padding:0;">
+    <div class="pbheaderbar">
+      <button class="btn secondary small" id="okaiNoteViewClose">← 一覧へ戻る</button>
+      <a class="btn secondary small" id="okaiNoteViewOpenNewTab" href="#" target="_blank" rel="noopener">新しいタブで開く</a>
+    </div>
+    <iframe id="okaiNoteViewFrame" src="about:blank" style="flex:1 1 auto; width:100%; border:0; background:#fff;"></iframe>
   </div>
 </div>
 
@@ -1969,6 +1981,18 @@
     } else {
       toast(url);
     }
+  }
+  function viewOkaiNote(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    var url = okaiNoteUrl(proj);
+    document.getElementById("okaiNoteViewFrame").src = url;
+    document.getElementById("okaiNoteViewOpenNewTab").href = url;
+    document.getElementById("okaiNoteViewModal").hidden = false;
+  }
+  function closeOkaiNoteView(){
+    document.getElementById("okaiNoteViewModal").hidden = true;
+    document.getElementById("okaiNoteViewFrame").src = "about:blank";
   }
 
   function deleteSpecPhoto(id){
@@ -3557,6 +3581,8 @@
     document.getElementById("btnEditProject").addEventListener("click", openEditProjectForm);
     document.getElementById("btnPushOkaiNote").addEventListener("click", pushToOkaiNote);
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
+    document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
+    document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);
     document.getElementById("btnSaveEditProject").addEventListener("click", saveEditProject);
     document.getElementById("btnCancelEditProject").addEventListener("click", cancelEditProject);
     document.getElementById("projectTypeFilterBar").addEventListener("click", function(e){
