@@ -1748,10 +1748,13 @@
   function renderSpecFacility(){
     var wrap = document.getElementById("specFacilityWrap");
     if(!wrap) return;
+    var proj = projectById(state.currentProjectId);
+    var notes = (proj && proj.facilityNotes) || {};
     wrap.innerHTML = FACILITY_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
         '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
         buildSpecGallery("facility",cat,null,null,{kind:"photo"})+
+        '<textarea class="facilityNote" data-facilitynote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-start:12px; margin-block-end:5px; flex-wrap:wrap; gap:6px;">'+
         '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">プランボード・図面（新しい順）</span>'+
         '<span class="row" style="gap:6px;">'+
@@ -1763,6 +1766,13 @@
         buildSpecGallery("facility",cat,null,null,{kind:"planboard", newestFirst:true, noAdd:true})+
         '</div>';
     }).join("");
+  }
+  async function updateFacilityNote(cat, value){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    proj.facilityNotes = proj.facilityNotes || {};
+    proj.facilityNotes[cat] = value;
+    await saveDoc("projects", proj.id, proj);
   }
   function interiorColorCatsFor(proj){
     var custom = (proj && proj.interiorColorCatsCustom) || [];
@@ -3882,6 +3892,8 @@
         if(note){ updateRoomNote(note.dataset.roomnote, note.value); return; }
         var extNote = e.target.closest("[data-exteriornote]");
         if(extNote){ updateExteriorNote(extNote.dataset.exteriornote, extNote.value); return; }
+        var facNote = e.target.closest("[data-facilitynote]");
+        if(facNote){ updateFacilityNote(facNote.dataset.facilitynote, facNote.value); return; }
       });
     });
     document.getElementById("btnAddRoom").addEventListener("click", addRoom);
