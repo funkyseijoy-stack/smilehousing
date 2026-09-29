@@ -966,7 +966,7 @@
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
-  var OKAINOTE_BASE = "https://sprightly-pegasus-9b65a7.netlify.app";
+  var OKAINOTE_BASE = "https://strong-piroshki-295252.netlify.app";
   var OKAINOTE_API_KEY = "uyTVTIzf-Oox5KwaIBIAJB53QT5zCJf3";
   var state = {
     projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [],
@@ -1973,7 +1973,9 @@
 
   // ================= おうちノート（お客様向けサイト）への反映 =================
   function okaiNoteUrl(proj){
-    return OKAINOTE_BASE + "/note.html?c=" + encodeURIComponent(proj.id);
+    // お客様には現在、案件ごとに異なるURLではなく共通の1つのURLを案内している
+    // （アプリ内でお名前をタップして識別する方式）ため、そのまま返す。
+    return OKAINOTE_BASE + "/";
   }
   async function urlToDataUrl(url){
     var res = await fetch(url);
