@@ -642,8 +642,8 @@
       <div class="subpanel" id="sub-plan">
         <div class="card">
           <h3>この案件の図面</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面の一覧です（閲覧用）。書き込みをするには「設備仕様」タブのプランボードを開いてください。</p>
-          <div class="filelist" id="drawingsList"></div>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面の一覧です。タップするとそのままプランボードで開き、見たり書き込んだりできます。</p>
+          <div class="pbsourcelist" id="drawingsList"></div>
           <div class="empty" id="drawingsEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
         </div>
       </div>
@@ -1600,9 +1600,7 @@
     var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(a){
-      var ext = (a.name||"").split(".").pop().slice(0,4).toUpperCase();
-      return '<div class="filechip"><div class="ficon">'+escapeHtml(ext)+'</div><div class="finame">'+escapeHtml(a.name)+'</div>'+
-        '<div class="fisize tabular">'+fmtSize(a.sizeBytes)+'</div></div>';
+      return '<div class="pbsourcechip" data-openplan="'+a.id+'" title="タップして開く（表示・書き込み）">🗂️ '+escapeHtml(a.name)+'</div>';
     }).join("");
   }
 
@@ -3895,6 +3893,11 @@
       pbLoadFromBlob(f, isPdf);
     });
     document.getElementById("planSourceList").addEventListener("click", function(e){
+      var chip = e.target.closest("[data-openplan]");
+      if(!chip) return;
+      openPlanBoard(chip.dataset.openplan);
+    });
+    document.getElementById("drawingsList").addEventListener("click", function(e){
       var chip = e.target.closest("[data-openplan]");
       if(!chip) return;
       openPlanBoard(chip.dataset.openplan);
