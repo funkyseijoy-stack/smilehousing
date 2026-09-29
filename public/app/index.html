@@ -801,8 +801,8 @@
     </div>
 
     <div class="card">
-      <h3>見積書「定価」ロック用の暗証番号</h3>
-      <p class="muted" style="font-size:.76rem; margin:0 0 8px;">「定価」扱いの見積書を見るときに求める番号です。業者向けメールには見積の種類は表示されません。</p>
+      <h3>見積書「仕切り」ロック用の暗証番号</h3>
+      <p class="muted" style="font-size:.76rem; margin:0 0 8px;">「仕切り」扱いの見積書を見るときに求める番号です。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
 
@@ -1661,7 +1661,7 @@
     var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId; });
     empty.hidden = rows.length !== 0;
     list.innerHTML = rows.map(function(a){
-      var locked = a.kind === "quote" && a.quoteType === "定価" && !state.quoteUnlocked;
+      var locked = a.kind === "quote" && a.quoteType === "仕切り" && !state.quoteUnlocked;
       // Locked quotes reveal nothing but the fact that something is locked
       // here — no filename, no extension, no size — so a glance at this
       // list can't leak which vendor or file it is before the PIN is entered.
@@ -1711,7 +1711,11 @@
         filesHtml+
         '<div class="row" style="margin-block-start:6px; flex-wrap:wrap;">'+
         '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
-        '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button></div></div>';
+        '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→検討中へ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="houselist" data-id="'+n.id+'">→家づくりリストへ</button>'+
+        '</div></div>';
     }).join("");
   }
 
@@ -2642,6 +2646,55 @@
     render();
     await saveDoc("confirmItems", doc.id, doc);
     logActivity("検討中「"+content.slice(0,20)+"」を追加しました");
+  }
+  async function createTaskFromNote(noteId, taskType){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
+    if(!note){ toast("打合せ記録が見つかりません"); return; }
+    var content = (note.content||"").trim();
+    if(!content){ toast("内容が空です"); return; }
+
+    if(taskType === "confirm"){
+      var doc1 = { id: uid("cf"), projectId: proj.id, kind:"confirm", content: content,
+        responseType: "自由入力", options: [], answer: null, answeredAt: null,
+        hasDeadline: false, deadline: null, attachments: [], createdAt: nowIso() };
+      state.confirmItems.push(doc1);
+      render();
+      await saveDoc("confirmItems", doc1.id, doc1);
+      logActivity("打合せ記録から確認事項「"+content.slice(0,20)+"」を作成しました");
+      toast("✅ 確認事項に追加しました");
+      return;
+    }
+
+    if(taskType === "consider"){
+      var doc2 = { id: uid("cs"), projectId: proj.id, kind:"consider", content: content,
+        status: "検討中", statusHistory: [{status:"検討中", ts: nowIso(), actor: state.currentUser||""}],
+        attachments: [], createdAt: nowIso() };
+      state.confirmItems.push(doc2);
+      render();
+      await saveDoc("confirmItems", doc2.id, doc2);
+      logActivity("打合せ記録から検討中「"+content.slice(0,20)+"」を作成しました");
+      toast("✅ 検討中に追加しました");
+      return;
+    }
+
+    if(taskType === "houselist"){
+      var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.considerations) || [];
+      var next = current.concat([{ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,8)), title: content.slice(0,160), note: "", status: "検討中", createdAt: new Date().toISOString() }]);
+      okaiBridgeFetch('', {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
+      }).then(function(res){
+        if(!res.ok){ toast("家づくりリストへの追加に失敗しました"); return; }
+        okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+        okaiBridgeCache[proj.id].customer = res.body.customer;
+        if(currentSub === "okainote") renderOkaiConsider(res.body.customer);
+        logActivity("打合せ記録から家づくりリスト「"+content.slice(0,20)+"」を作成しました");
+        toast("✅ 家づくりリストに追加しました");
+      }).catch(function(){ toast("家づくりリストへの追加に失敗しました"); });
+    }
   }
   async function advanceConsiderStatus(id){
     var item = state.confirmItems.find(function(x){ return x.id===id && x.kind==="consider"; });
@@ -4570,6 +4623,7 @@
       else if(act==="editnote"){ editMeetingNote(id); }
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
+      else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
     }
     document.getElementById("projectTableBody").addEventListener("click", handleTableClick);
     document.getElementById("pendingTableBody").addEventListener("click", handleTableClick);
