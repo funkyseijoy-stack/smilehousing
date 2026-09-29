@@ -3818,7 +3818,7 @@
     document.getElementById("btnBackToList").addEventListener("click", closeProjectDetail);
     document.getElementById("btnDeleteProject").addEventListener("click", function(){ if(confirm2()) deleteProject(); });
     document.getElementById("btnEditProject").addEventListener("click", openEditProjectForm);
-    document.getElementById("btnPushOkaiNote").addEventListener("click", pushToOkaiNote);
+    document.getElementById("btnPushOkaiNote").addEventListener("click", function(){ pushToOkaiNote(); });
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);
