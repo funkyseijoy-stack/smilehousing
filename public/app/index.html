@@ -2767,7 +2767,11 @@
         errorEl.textContent = "Gmail連携がまだ設定されていません。設定画面の「Gmailと連携する」から連携してください。";
         return;
       }
-      if(!res.ok) throw new Error("gmail_search_failed");
+      if(!res.ok){
+        var errBody = "";
+        try{ errBody = await res.text(); }catch(e2){ /* ignore */ }
+        throw new Error("HTTP "+res.status+" "+String(errBody||"").slice(0,200));
+      }
       var data = await res.json();
       var threads = data.threads || [];
       loading.hidden = true;
@@ -2788,7 +2792,7 @@
     }catch(e){
       loading.hidden = true;
       errorEl.hidden = false;
-      errorEl.textContent = "この画面ではGmailの受信箱を読み込めませんでした。";
+      errorEl.textContent = "この画面ではGmailの受信箱を読み込めませんでした（詳細: "+String(e && e.message || e)+"）";
     }
   }
 
