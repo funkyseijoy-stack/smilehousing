@@ -2105,7 +2105,7 @@
     if(!p) return;
     document.getElementById("pbModal").hidden = false;
     pb.currentAttachmentId = null;
-    pb.saveTarget = {type:"spec", scope:p.scope, category:p.category, roomId:p.roomId||null, side:p.side||null, kind:(p.kind||"photo")};
+    pb.saveTarget = {type:"spec", scope:p.scope, category:p.category, roomId:p.roomId||null, side:p.side||null, kind:(p.kind||"photo"), sourcePhotoId:p.id};
     document.getElementById("pbMailTo").value = "";
     document.getElementById("pbMailSubject").value = "";
     document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -3640,30 +3640,60 @@
     pb.touches = {}; pb.pinchStartDist = null; pb.drawing = false;
     var layer = document.getElementById("pbItemsLayer"); if(layer) layer.innerHTML = "";
   }
+  async function pbSaveSpecOverwrite(target, blob){
+    try{
+      var res = await assets.upload(blob, {type:"image/png"});
+      var existing = state.specPhotos.find(function(x){ return x.id===target.sourcePhotoId; });
+      if(!existing){ toast("編集前の写真が見つかりませんでした"); return; }
+      existing.assetId = res.id;
+      existing.url = res.url;
+      existing.contentType = "image/png";
+      existing.updatedAt = nowIso();
+      blobCache[res.id] = blob;
+      render();
+      await saveDoc("specPhotos", existing.id, existing);
+      logActivity(target.category+"の写真を上書き保存しました");
+      toast("上書き保存しました");
+      closePlanBoard();
+    }catch(e){ toast("保存に失敗しました"); }
+  }
+  async function pbSaveSpecAsNew(target, blob){
+    try{
+      var res2 = await assets.upload(blob, {type:"image/png"});
+      var name2 = (target.category||"プランボード") + "_" + todayStr() + ".png";
+      // 既存の写真を編集した場合は元の種類（写真/プランボード）を引き継ぐ。
+      // target.kindが無い場合（白紙から新規作成・新しい図面の取り込み）は
+      // これまで通り、設備仕様の図面はプランボード扱いにする。
+      var kind2 = target.kind || ((target.scope==="facility") ? "planboard" : "photo");
+      var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: target.scope, category: target.category,
+        roomId: target.roomId || null, side: target.side || null, assetId: res2.id, url: res2.url, kind: kind2,
+        contentType: "image/png", fileName: name2, createdAt: nowIso() };
+      blobCache[res2.id] = blob;
+      state.specPhotos.push(doc);
+      render();
+      await saveDoc("specPhotos", doc.id, doc);
+      logActivity(target.category+"のプランボードを保存しました");
+      toast("新しい写真として保存しました");
+      closePlanBoard();
+    }catch(e){ toast("保存に失敗しました"); }
+  }
   async function pbSaveToProject(){
     if(!state.currentProjectId){ toast("案件が選択されていません"); return; }
     if(!assets){ toast("この画面では保存が利用できません"); return; }
     var blob = await pbCanvasToBlob();
     var target = pb.saveTarget || {type:"attachment"};
     if(target.type === "spec"){
-      try{
-        var res2 = await assets.upload(blob, {type:"image/png"});
-        var name2 = (target.category||"プランボード") + "_" + todayStr() + ".png";
-        // 既存の写真を編集した場合は元の種類（写真/プランボード）を引き継ぐ。
-        // target.kindが無い場合（白紙から新規作成・新しい図面の取り込み）は
-        // これまで通り、設備仕様の図面はプランボード扱いにする。
-        var kind2 = target.kind || ((target.scope==="facility") ? "planboard" : "photo");
-        var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: target.scope, category: target.category,
-          roomId: target.roomId || null, side: target.side || null, assetId: res2.id, url: res2.url, kind: kind2,
-          contentType: "image/png", fileName: name2, createdAt: nowIso() };
-        blobCache[res2.id] = blob;
-        state.specPhotos.push(doc);
-        render();
-        await saveDoc("specPhotos", doc.id, doc);
-        logActivity(target.category+"のプランボードを保存しました");
-        toast("案件に保存しました");
-        closePlanBoard();
-      }catch(e){ toast("保存に失敗しました"); }
+      if(target.sourcePhotoId){
+        askChoice("保存方法を選んでください", "編集前の写真をどうしますか？", [
+          {label:"上書き保存する（編集前は残らない）", value:"overwrite"},
+          {label:"新しい写真として保存する（編集前も残る）", value:"new"}
+        ], function(choice){
+          if(choice==="overwrite") pbSaveSpecOverwrite(target, blob);
+          else if(choice==="new") pbSaveSpecAsNew(target, blob);
+        });
+        return;
+      }
+      await pbSaveSpecAsNew(target, blob);
       return;
     }
     var name = "プランボード_" + todayStr() + ".png";
