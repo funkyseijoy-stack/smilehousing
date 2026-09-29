@@ -386,7 +386,7 @@
         </div>
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
-          <button class="btn secondary small" id="btnPushOkaiNote">🌐 おうちノートを更新する</button>
+          <button class="btn secondary small" id="btnPushOkaiNote">🌐 おうちノートに同期する</button>
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
           <button class="btn ghost small" id="btnCopyOkaiNoteLink">お客様用リンクをコピー</button>
           <span class="muted" id="okaiNoteStatusLabel" style="font-size:.75rem;"></span>
@@ -1051,8 +1051,6 @@
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
-  var OKAINOTE_BASE = "https://strong-piroshki-295252.netlify.app";
-  var OKAINOTE_API_KEY = "uyTVTIzf-Oox5KwaIBIAJB53QT5zCJf3";
   var state = {
     projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [],
     settings: { progressTags: ["契約前","契約後","着工","上棟","引渡し"], staffList: ["社長","朋子","山本","渡邊"], pin: "0000" },
@@ -2070,8 +2068,12 @@
     render();
     saveDoc("specPhotos", p.id, p);
     logActivity((p.category||"")+"のプランボードを"+(p.reflected?"おうちノートに反映しました":"反映解除しました"));
-    // 「反映」の印をつけた/外した時点で、ボタンを別途押さなくても自動でおうちノートに同期する
-    pushToOkaiNote(p.projectId, {silent:true});
+    // 「反映」の印をつけた時点で、実際のおうちノートへ自動で送信する
+    // （一度送ったものは取り消せないため、反映を外しても送信済みの内容はそのまま残る）
+    if(p.reflected){
+      var proj = projectById(p.projectId);
+      if(proj) pushSpecPhotoToOkai(proj, p).then(function(){ render(); });
+    }
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
@@ -2081,110 +2083,50 @@
     render();
     saveDoc("meetingNotes", n.id, n);
     logActivity("打合せ記録を"+(n.reflected?"おうちノートに反映しました":"反映解除しました"));
-    // 「反映」の印をつけた/外した時点で、ボタンを別途押さなくても自動でおうちノートに同期する
-    pushToOkaiNote(n.projectId, {silent:true});
+    // 反映一覧（meetings配列）は毎回全件で置き換えるため、反映を外した場合は
+    // 次にどちらかを更新した時点でおうちノートの一覧からも外れる
+    var proj = projectById(n.projectId);
+    if(proj) pushMeetingNotesToOkai(proj);
   }
 
   // ================= おうちノート（お客様向けサイト）への反映 =================
-  function okaiNoteUrl(proj){
-    return OKAINOTE_BASE + "/?c=" + encodeURIComponent(proj.id);
-  }
-  async function urlToDataUrl(url){
-    var res = await fetch(url);
-    if(!res.ok) throw new Error("画像の読み込みに失敗しました");
-    var blob = await res.blob();
-    return new Promise(function(resolve, reject){
-      var reader = new FileReader();
-      reader.onloadend = function(){ resolve(reader.result); };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+  // 以前はここで/api/save-note（お客様には繋がっていない別系統の仕組み）を
+  // 使っていたが、実際のおうちノート（customer-data / customer-inbox、
+  // okainote-bridge経由）に置き換えた。リンクも「リンクを発行」で使っている
+  // ものと同じ、実在するお客様専用リンクを使う。
+  async function getOrIssueOkaiLink(proj){
+    var cached = okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].link;
+    if(cached && cached.url) return cached.url;
+    var res = await okaiBridgeFetch('', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'ensureLink', projectId: proj.id, customerName: proj.customer||proj.name||"お客様" })
     });
-  }
-  async function buildOkaiNoteData(proj){
-    // 打合せ内容（社内メモ）は、スタッフが「おうちノートに反映」を押したものだけを送る。
-    // （以前は全件を自動送信しており、社内向けの指示等もお客様に見える状態に
-    // なってしまっていたため、選択制に変更した。）
-    var meetings = liveNotes().filter(function(n){ return n.projectId===proj.id && n.reflected; })
-      .slice().sort(function(a,b){ return (a.date||a.createdAt||"").localeCompare(b.date||b.createdAt||""); })
-      .map(function(n){ return { date: n.date || "", title: "", content: n.content || "" }; });
-
-    var reflectedPhotos = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.reflected; })
-      .slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
-
-    var specs = [];
-    var photos = [];
-    for(var i=0;i<reflectedPhotos.length;i++){
-      var p = reflectedPhotos[i];
-      var key = p.id;
-      try{
-        var dataUrl = await urlToDataUrl(p.url);
-        photos.push({ key: key, dataUrl: dataUrl });
-        specs.push({ category: p.category||"", content: "", photos: [{key: key}] });
-      }catch(e){
-        // 1枚失敗しても他は続行する
-      }
-    }
-
-    return {
-      data: {
-        customerName: proj.customer || proj.name || "",
-        constructionStage: proj.progressTag || "",
-        meetings: meetings,
-        specs: specs,
-        confirmations: [],
-        furniture: [],
-        album: [],
-        folders: []
-      },
-      photos: photos
-    };
-  }
-  function pushToOkaiNote(projectIdArg, opts){
-    var silent = !!(opts && opts.silent);
-    var proj = projectById(projectIdArg || state.currentProjectId);
-    if(!proj){ if(!silent) toast("案件を選択してください"); return Promise.resolve(); }
-    var statusLabel = document.getElementById("okaiNoteStatusLabel");
-    if(statusLabel && !silent) statusLabel.textContent = "送信データを準備中…";
-    return buildOkaiNoteData(proj).then(function(payload){
-      if(statusLabel && !silent) statusLabel.textContent = "おうちノートへ送信中…";
-      // 住まいるアプリ本体とおうちノートは同じNetlifyサイト内なので、
-      // 別タブを介さず直接APIを呼べる（Claudeアーティファクト版では
-      // クロスオリジン制約があったためポップアップ中継が必要だった）。
-      return fetch('/api/save-note', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Api-Key': OKAINOTE_API_KEY},
-        body: JSON.stringify({ slug: proj.id, data: payload.data, photos: payload.photos })
-      });
-    }).then(function(res){
-      if(res && res.ok){
-        if(!silent) toast("✅ おうちノートを更新しました");
-        logActivity((proj.customer||proj.name||"")+"のおうちノートを"+(silent?"自動更新しました":"更新しました"));
-      } else {
-        toast("❌ おうちノートの更新に失敗しました");
-      }
-      if(statusLabel) statusLabel.textContent = "";
-    }).catch(function(e){
-      toast("おうちノートへの送信に失敗しました："+(e && e.message || e));
-      if(statusLabel) statusLabel.textContent = "";
-    });
+    if(!res.ok || !res.body.link) throw new Error("link_failed");
+    okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+    okaiBridgeCache[proj.id].link = res.body.link;
+    renderOkaiLink(proj, {link:res.body.link});
+    return res.body.link.url;
   }
   function copyOkaiNoteLink(){
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
-    var url = okaiNoteUrl(proj);
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(url).then(function(){ toast("リンクをコピーしました"); }, function(){ toast(url); });
-    } else {
-      toast(url);
-    }
+    getOrIssueOkaiLink(proj).then(function(url){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(function(){ toast("リンクをコピーしました"); }, function(){ toast(url); });
+      } else {
+        toast(url);
+      }
+    }).catch(function(){ toast("リンクの発行に失敗しました"); });
   }
   function viewOkaiNote(){
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
-    var url = okaiNoteUrl(proj);
-    document.getElementById("okaiNoteViewFrame").src = url;
-    document.getElementById("okaiNoteViewOpenNewTab").href = url;
-    document.getElementById("okaiNoteViewModal").hidden = false;
+    getOrIssueOkaiLink(proj).then(function(url){
+      document.getElementById("okaiNoteViewFrame").src = url;
+      document.getElementById("okaiNoteViewOpenNewTab").href = url;
+      document.getElementById("okaiNoteViewModal").hidden = false;
+    }).catch(function(){ toast("リンクの発行に失敗しました"); });
   }
   function closeOkaiNoteView(){
     document.getElementById("okaiNoteViewModal").hidden = true;
@@ -2506,6 +2448,116 @@
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'markInboxRead', projectId: proj.id, id: id })
     }).then(function(){ loadOkaiNotePanel(); }).catch(function(){});
+  }
+
+  // ---- 打合せ記録・設備仕様写真を、実際のおうちノートへ反映する ----
+  // （以前はpushToOkaiNote/save-noteという別系統の仕組みを使っており、
+  // 実際にお客様が見るおうちノートには繋がっていなかった。橋渡し関数
+  // okainote-bridge.mts経由で、customer-data / customer-inbox に直接書き込む。）
+  function slugForOkaiCategory(scope, category){
+    return String(scope||"cat")+"_"+String(category||"").replace(/[^0-9A-Za-z一-龠ぁ-んァ-ヶー]+/g, "").slice(0,40);
+  }
+  async function okaiFetchCustomerData(projectId){
+    var res = await okaiBridgeFetch('?projectId='+encodeURIComponent(projectId)+'&resource=data');
+    if(!res.ok) throw new Error("okainote_fetch_failed");
+    okaiBridgeCache[projectId] = okaiBridgeCache[projectId] || {};
+    okaiBridgeCache[projectId].customer = res.body.customer;
+    return res.body.customer;
+  }
+  async function ensureOkaiSpecCategory(projectId, categoryId, categoryName){
+    var cached = okaiBridgeCache[projectId] && okaiBridgeCache[projectId].customer;
+    var customer = cached || await okaiFetchCustomerData(projectId);
+    var existing = (customer && customer.customSpecCategories) || [];
+    if(existing.some(function(c){ return c.id===categoryId; })) return;
+    var next = existing.concat([{ id: categoryId, name: categoryName||categoryId, summary: "" }]);
+    var res = await okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: projectId, patch: { customSpecCategories: next } })
+    });
+    if(res.ok){
+      okaiBridgeCache[projectId] = okaiBridgeCache[projectId] || {};
+      okaiBridgeCache[projectId].customer = res.body.customer;
+    }
+  }
+  async function blobForAsset(assetId, url){
+    if(blobCache[assetId]) return blobCache[assetId];
+    var res = await fetch(url);
+    if(!res.ok) throw new Error("fetch_failed");
+    return await res.blob();
+  }
+  async function okaiPostInboxEntry(projectId, customerName, entry){
+    var res = await okaiBridgeFetch('', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'postInboxEntry', projectId: projectId, customerName: customerName||"お客様", entry: entry })
+    });
+    if(!res.ok) throw new Error("postInboxEntry_failed");
+    return res.body;
+  }
+  async function pushSpecPhotoToOkai(proj, p){
+    if(!proj || !p || p.okaiPushedAt) return;
+    try{
+      var categoryId = slugForOkaiCategory(p.scope, p.category);
+      await ensureOkaiSpecCategory(proj.id, categoryId, p.category||p.scope||"仕様");
+      var blob = await blobForAsset(p.assetId, p.url);
+      var dataBase64 = await blobToBase64(blob);
+      await okaiPostInboxEntry(proj.id, proj.customer||proj.name, {
+        type: "staff_document",
+        text: p.category||"",
+        meta: { kind: (p.kind==="planboard"?"planboard":"spec_photo"), category: categoryId },
+        images: [{ name: p.fileName||"photo.jpg", contentType: p.contentType||"image/jpeg", dataBase64: dataBase64 }]
+      });
+      p.okaiPushedAt = nowIso();
+      await saveDoc("specPhotos", p.id, p);
+    }catch(e){ toast("おうちノートへの反映に失敗しました（"+(p.fileName||"写真")+"）"); }
+  }
+  async function pushMeetingNotesToOkai(proj){
+    if(!proj) return;
+    try{
+      var notes = liveNotes().filter(function(n){ return n.projectId===proj.id && n.reflected; })
+        .slice().sort(function(a,b){ return String(b.date||b.createdAt||"").localeCompare(String(a.date||a.createdAt||"")); });
+      var meetings = notes.map(function(n){ return { id: n.id, date: n.date||"", title:"", note: n.content||"" }; });
+      var res = await okaiBridgeFetch('', {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ projectId: proj.id, patch: { meetings: meetings } })
+      });
+      if(!res.ok) throw new Error("meetings_patch_failed");
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      // 打合せ記録に添付された写真・PDFのうち、まだ送っていない分だけ追加で送る
+      for(var i=0;i<notes.length;i++){
+        var n = notes[i];
+        var files = n.files || [];
+        var pushedCount = n.okaiPushedFileCount || 0;
+        if(files.length > pushedCount){
+          for(var j=pushedCount;j<files.length;j++){
+            var f = files[j];
+            try{
+              var blob = await blobForAsset(f.id, f.url);
+              var dataBase64 = await blobToBase64(blob);
+              await okaiPostInboxEntry(proj.id, proj.customer||proj.name, {
+                type: "staff_document", text: "", meta: { meetingId: n.id },
+                images: [{ name: f.name||"file", contentType: f.contentType||"image/jpeg", dataBase64: dataBase64 }]
+              });
+            }catch(e){ /* 1件失敗しても他は続行する */ }
+          }
+          n.okaiPushedFileCount = files.length;
+          await saveDoc("meetingNotes", n.id, n);
+        }
+      }
+    }catch(e){ toast("打合せ記録のおうちノート反映に失敗しました"); }
+  }
+  async function syncAllToOkaiNote(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    toast("おうちノートへ同期中…");
+    await pushMeetingNotesToOkai(proj);
+    var pending = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.reflected && !p.okaiPushedAt; });
+    for(var i=0;i<pending.length;i++){ await pushSpecPhotoToOkai(proj, pending[i]); }
+    render();
+    toast("✅ おうちノートに同期しました");
   }
 
   function deleteSpecPhoto(id){
@@ -3404,8 +3456,6 @@
     render();
     await saveDoc("projects", p.id, p);
     logActivity("案件「"+p.name+"」の進捗を「"+tag+"」にしました");
-    // 進捗タグはお客様にも見える情報なので、変更したら自動でおうちノートに同期する
-    pushToOkaiNote(p.id, {silent:true});
   }
 
   async function addVendor(){
@@ -4421,7 +4471,7 @@
     document.getElementById("btnBackToList").addEventListener("click", closeProjectDetail);
     document.getElementById("btnDeleteProject").addEventListener("click", function(){ if(confirm2()) deleteProject(); });
     document.getElementById("btnEditProject").addEventListener("click", openEditProjectForm);
-    document.getElementById("btnPushOkaiNote").addEventListener("click", function(){ pushToOkaiNote(); });
+    document.getElementById("btnPushOkaiNote").addEventListener("click", function(){ syncAllToOkaiNote(); });
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);

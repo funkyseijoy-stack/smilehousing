@@ -153,6 +153,30 @@ export default async (req: Request, context: Context) => {
       return json({ ok: true });
     }
 
+    if (action === "postInboxEntry") {
+      // 打合せ記録・設備仕様写真などを「おうちノート」の受信箱（customer-inbox）へ
+      // スタッフから直接投稿する（住まいるアプリの「反映」操作から呼ばれる）。
+      const entry = body.entry;
+      if (!entry || typeof entry !== "object") return json({ error: "entry_required" }, 400);
+      const customerName = String(body.customerName || "お客様").slice(0, 100);
+      const res = await okaiFetch(`/api/customer-inbox`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: entry.type,
+          customerId: projectId,
+          customerName,
+          direction: "staff_to_customer",
+          text: entry.text || "",
+          images: Array.isArray(entry.images) ? entry.images : [],
+          meta: entry.meta || {},
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: "okainote_unavailable", detail: data }, 502);
+      return json({ id: data.id });
+    }
+
     return json({ error: "unknown_action" }, 400);
   }
 
