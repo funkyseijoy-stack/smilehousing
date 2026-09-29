@@ -597,8 +597,16 @@
 
         <div class="card">
           <h3>予約状況（お客様がおうちノートで確認・予約）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">Googleカレンダーに既存の予定がある場合は、ここから手動で追加するとお客様のおうちノートにも表示されます。</p>
           <div id="okaiBookingList" style="display:flex; flex-direction:column; gap:6px;"></div>
           <div class="empty" id="okaiBookingEmpty" hidden>予約はまだありません。</div>
+          <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
+            <label class="field">日付<input type="date" id="okaiBookDate"></label>
+            <label class="field">開始時刻<input type="time" id="okaiBookTime"></label>
+            <label class="field">所要時間（分）<input type="number" id="okaiBookDuration" value="120" step="30" min="30" max="480"></label>
+            <label class="field">種別<input type="text" id="okaiBookService" placeholder="例：来店・オンライン・銀行・ショールーム"></label>
+            <button class="btn secondary" id="btnOkaiAddBooking">予約を手動で追加</button>
+          </div>
         </div>
 
         <div class="card">
@@ -2204,7 +2212,11 @@
     if(!bookings.length){ list.innerHTML = ""; empty.hidden = false; return; }
     empty.hidden = true;
     list.innerHTML = bookings.map(function(b){
-      return '<div class="card" style="padding:8px 10px;">'+escapeOkai(b.dateLabel||b.date)+' '+escapeOkai(b.time)+'〜'+escapeOkai(b.endTime)+'　<span class="pill tag">'+escapeOkai(b.service)+'</span></div>';
+      var key = escapeOkai(b.date)+"|"+escapeOkai(b.time);
+      return '<div class="card" style="padding:8px 10px;"><div class="row" style="justify-content:space-between; align-items:center;">'+
+        '<span>'+escapeOkai(b.dateLabel||b.date)+' '+escapeOkai(b.time)+'〜'+escapeOkai(b.endTime)+'　<span class="pill tag">'+escapeOkai(b.service)+'</span></span>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-booking="'+key+'">削除</button>'+
+        '</div></div>';
     }).join("");
   }
   function renderOkaiSpecStatus(customer){
@@ -2363,6 +2375,60 @@
       renderOkaiConsider(res.body.customer);
       toast("✅ 家づくりリストに追加しました");
     }).catch(function(){ toast("追加に失敗しました"); });
+  }
+
+  function okaiDateLabel(dateStr){
+    try{
+      var d = new Date(dateStr+"T00:00:00+09:00");
+      var w = ["日","月","火","水","木","金","土"][d.getDay()];
+      return (d.getMonth()+1)+"/"+d.getDate()+"("+w+")";
+    }catch(e){ return dateStr; }
+  }
+  function okaiAddBooking(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var date = document.getElementById("okaiBookDate").value;
+    var time = document.getElementById("okaiBookTime").value;
+    var duration = parseInt(document.getElementById("okaiBookDuration").value, 10) || 120;
+    var service = document.getElementById("okaiBookService").value.trim();
+    if(!date || !time || !service){ toast("日付・開始時刻・種別を入力してください"); return; }
+    var totalMin = parseInt(time.slice(0,2),10)*60 + parseInt(time.slice(3,5),10) + duration;
+    var endTime = String(Math.floor(totalMin/60)).padStart(2,"0")+":"+String(totalMin%60).padStart(2,"0");
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.nextBookings) || [];
+    var next = current.concat([{ date: date, dateLabel: okaiDateLabel(date), time: time, endTime: endTime, service: service }]);
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { nextBookings: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("予約の追加に失敗しました"); return; }
+      document.getElementById("okaiBookDate").value = "";
+      document.getElementById("okaiBookTime").value = "";
+      document.getElementById("okaiBookService").value = "";
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiBooking(res.body.customer);
+      toast("✅ 予約を追加しました");
+    }).catch(function(){ toast("予約の追加に失敗しました"); });
+  }
+  function okaiDeleteBooking(key){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    if(!confirm("この予約を削除しますか？")) return;
+    var parts = key.split("|");
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.nextBookings) || [];
+    var next = current.filter(function(b){ return !(b.date===parts[0] && b.time===parts[1]); });
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { nextBookings: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("削除に失敗しました"); return; }
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiBooking(res.body.customer);
+      toast("削除しました");
+    }).catch(function(){ toast("削除に失敗しました"); });
   }
 
   function okaiDeleteEstimate(id){
@@ -4225,6 +4291,12 @@
 
     document.getElementById("btnOkaiRefresh").addEventListener("click", loadOkaiNotePanel);
     document.getElementById("btnOkaiIssueLink").addEventListener("click", okaiIssueLink);
+    document.getElementById("btnOkaiAddBooking").addEventListener("click", okaiAddBooking);
+    document.getElementById("okaiBookingList").addEventListener("click", function(e){
+      var btn = e.target.closest("[data-okai-del-booking]");
+      if(!btn) return;
+      okaiDeleteBooking(btn.dataset.okaiDelBooking);
+    });
     document.getElementById("btnOkaiAddEstimate").addEventListener("click", okaiAddEstimate);
     document.getElementById("btnOkaiAddConsider").addEventListener("click", okaiAddConsider);
     document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
