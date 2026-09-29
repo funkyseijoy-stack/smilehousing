@@ -650,7 +650,8 @@
           <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
           <textarea id="meetingNoteInput" rows="4" placeholder="打合せの内容を入力してください"></textarea>
           <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
-          <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">追加</button></div>
+          <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
+          <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">追加</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
         </div>
         <div class="card">
           <h3>これまでの記録</h3>
@@ -855,6 +856,19 @@
       <a class="btn secondary small" id="okaiNoteViewOpenNewTab" href="#" target="_blank" rel="noopener">新しいタブで開く</a>
     </div>
     <iframe id="okaiNoteViewFrame" src="about:blank" style="flex:1 1 auto; width:100%; border:0; background:#fff;"></iframe>
+  </div>
+</div>
+
+<!-- ========== SPEC PHOTO LIGHTBOX ========== -->
+<div class="pbmodal" id="specPhotoLightbox" hidden>
+  <div class="pbcard" style="padding:14px;">
+    <div class="pbheaderbar">
+      <button class="btn secondary small" id="specLightboxClose">← 閉じる</button>
+      <button class="btn secondary small" id="specLightboxEdit">✏️ プランボードで編集する</button>
+    </div>
+    <div style="flex:1 1 auto; display:flex; align-items:center; justify-content:center; overflow:auto; min-height:0;">
+      <img id="specLightboxImg" src="" alt="" style="max-width:100%; max-height:100%; object-fit:contain;">
+    </div>
   </div>
 </div>
 
@@ -1569,7 +1583,7 @@
       var filesHtml = (n.files && n.files.length) ? '<div class="row" style="margin-block-start:6px; flex-wrap:wrap; gap:6px;">'+confirmAttachmentsHtml(n.files)+'</div>' : "";
       return '<div class="noteitem"><div class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</div><div class="ntext">'+escapeHtml(n.content)+'</div>'+
         filesHtml+
-        '<div class="row" style="margin-block-start:6px;"><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button></div></div>';
+        '<div class="row" style="margin-block-start:6px;"><button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button></div></div>';
     }).join("");
   }
 
@@ -1685,7 +1699,9 @@
     }
     var html = photos.map(function(p){
       var isPlan = (p.kind||"photo")==="planboard";
-      return '<div class="specphoto" data-openspec="'+p.id+'" title="'+(isPlan?"クリックして編集（Gmail添付もできます）":"クリックしてプランボードで開く（版として保存）")+'">'+
+      var isPdfPhoto = (p.contentType||"").indexOf("pdf")>=0;
+      var thumbTitle = isPlan ? "クリックして編集（Gmail添付もできます）" : (isPdfPhoto ? "クリックしてプランボードで開く（版として保存）" : "クリックして拡大表示（編集も可能です）");
+      return '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
         '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">'+
         '<span class="splabel">'+fmtTs(p.createdAt)+'</span>'+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
@@ -1998,6 +2014,19 @@
   function deleteSpecPhoto(id){
     var p = state.specPhotos.find(function(x){ return x.id===id; });
     softDelete("specPhotos","specPhotos", id, "仕様写真「"+(p?p.category:"")+"」");
+  }
+  var lightboxPhotoId = null;
+  function openSpecPhotoLightbox(photoId){
+    var p = state.specPhotos.find(function(x){ return x.id===photoId; });
+    if(!p) return;
+    lightboxPhotoId = photoId;
+    document.getElementById("specLightboxImg").src = p.url;
+    document.getElementById("specPhotoLightbox").hidden = false;
+  }
+  function closeSpecPhotoLightbox(){
+    document.getElementById("specPhotoLightbox").hidden = true;
+    document.getElementById("specLightboxImg").src = "";
+    lightboxPhotoId = null;
   }
   function openSpecPhotoInPlanBoard(photoId){
     var p = state.specPhotos.find(function(x){ return x.id===photoId; });
@@ -2876,6 +2905,7 @@
   }
 
   // ================= meeting notes (⑧) =================
+  var editingMeetingNoteId = null;
   async function addMeetingNote(){
     var input = document.getElementById("meetingNoteInput");
     var content = input.value.trim();
@@ -2884,8 +2914,23 @@
     var dateInput = document.getElementById("meetingNoteDate");
     var noteDate = (dateInput && dateInput.value) ? dateInput.value : todayStr();
     var fileInput = document.getElementById("meetingNoteFile");
-    var files = await uploadFilesAsAttachmentsArray(fileInput ? fileInput.files : null);
-    var n = { id:uid("note"), projectId: state.currentProjectId, content:content, date: noteDate, files: files, author: state.currentUser||"", createdAt: nowIso() };
+    var newFiles = await uploadFilesAsAttachmentsArray(fileInput ? fileInput.files : null);
+
+    if(editingMeetingNoteId){
+      var existing = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
+      if(!existing){ toast("記録が見つかりませんでした"); cancelEditMeetingNote(); return; }
+      existing.content = content;
+      existing.date = noteDate;
+      if(newFiles.length) existing.files = (existing.files||[]).concat(newFiles);
+      existing.updatedAt = nowIso();
+      cancelEditMeetingNote();
+      render();
+      await saveDoc("meetingNotes", existing.id, existing);
+      logActivity("打合せ内容を編集しました");
+      return;
+    }
+
+    var n = { id:uid("note"), projectId: state.currentProjectId, content:content, date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso() };
     state.meetingNotes.push(n);
     input.value = "";
     if(fileInput) fileInput.value = "";
@@ -2894,7 +2939,43 @@
     await saveDoc("meetingNotes", n.id, n);
     logActivity("打合せ内容を記録しました");
   }
-  async function deleteMeetingNote(id){ await softDelete("meetingNotes","meetingNotes", id, "打合せ記録"); }
+  function editMeetingNote(id){
+    var n = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!n){ toast("記録が見つかりませんでした"); return; }
+    editingMeetingNoteId = id;
+    var input = document.getElementById("meetingNoteInput");
+    var dateInput = document.getElementById("meetingNoteDate");
+    var fileInput = document.getElementById("meetingNoteFile");
+    if(input) input.value = n.content || "";
+    if(dateInput) dateInput.value = n.date || todayStr();
+    if(fileInput) fileInput.value = "";
+    var btn = document.getElementById("btnAddMeetingNote");
+    if(btn) btn.textContent = "更新";
+    var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
+    if(cancelBtn) cancelBtn.hidden = false;
+    var hint = document.getElementById("meetingNoteEditHint");
+    if(hint) hint.hidden = false;
+    if(input) input.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+  function cancelEditMeetingNote(){
+    editingMeetingNoteId = null;
+    var input = document.getElementById("meetingNoteInput");
+    var dateInput = document.getElementById("meetingNoteDate");
+    var fileInput = document.getElementById("meetingNoteFile");
+    if(input) input.value = "";
+    if(dateInput) dateInput.value = todayStr();
+    if(fileInput) fileInput.value = "";
+    var btn = document.getElementById("btnAddMeetingNote");
+    if(btn) btn.textContent = "追加";
+    var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
+    if(cancelBtn) cancelBtn.hidden = true;
+    var hint = document.getElementById("meetingNoteEditHint");
+    if(hint) hint.hidden = true;
+  }
+  async function deleteMeetingNote(id){
+    if(editingMeetingNoteId === id) cancelEditMeetingNote();
+    await softDelete("meetingNotes","meetingNotes", id, "打合せ記録");
+  }
 
   // ================= tasks (社内タスク管理・最重要) =================
   function openTaskForm(){
@@ -3583,6 +3664,12 @@
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);
+    document.getElementById("specLightboxClose").addEventListener("click", closeSpecPhotoLightbox);
+    document.getElementById("specLightboxEdit").addEventListener("click", function(){
+      var id = lightboxPhotoId;
+      closeSpecPhotoLightbox();
+      if(id) openSpecPhotoInPlanBoard(id);
+    });
     document.getElementById("btnSaveEditProject").addEventListener("click", saveEditProject);
     document.getElementById("btnCancelEditProject").addEventListener("click", cancelEditProject);
     document.getElementById("projectTypeFilterBar").addEventListener("click", function(e){
@@ -3685,6 +3772,7 @@
 
     document.getElementById("meetingNoteInput");
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
+    document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
 
     document.getElementById("btnAddCustomerInfo").addEventListener("click", addCustomerInfo);
     document.getElementById("customerInfoList").addEventListener("click", function(e){
@@ -3741,7 +3829,17 @@
         var togglereflect = e.target.closest("[data-togglereflect]");
         if(togglereflect){ togglePbReflected(togglereflect.dataset.togglereflect); return; }
         var openspec = e.target.closest("[data-openspec]");
-        if(openspec){ openSpecPhotoInPlanBoard(openspec.dataset.openspec); return; }
+        if(openspec){
+          var openspecId = openspec.dataset.openspec;
+          var openspecPhoto = state.specPhotos.find(function(x){ return x.id===openspecId; });
+          var openspecIsPdf = openspecPhoto && (openspecPhoto.contentType||"").indexOf("pdf")>=0;
+          if(openspec.classList.contains("pbentry-thumb") || openspecIsPdf){
+            openSpecPhotoInPlanBoard(openspecId);
+          } else {
+            openSpecPhotoLightbox(openspecId);
+          }
+          return;
+        }
         var delintcat = e.target.closest("[data-delintcat]");
         if(delintcat){ deleteInteriorColorCategory(delintcat.dataset.delintcat); return; }
         var delroomcat = e.target.closest("[data-delroomcat]");
@@ -3856,6 +3954,7 @@
       else if(act==="delrequest"){ if(confirm2()) deleteRequest(id); }
       else if(act==="delvendor"){ if(confirm2()) deleteVendor(id); }
       else if(act==="delattachment"){ if(confirm2()) deleteAttachment(id); }
+      else if(act==="editnote"){ editMeetingNote(id); }
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
     }
     document.getElementById("projectTableBody").addEventListener("click", handleTableClick);
