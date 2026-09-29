@@ -780,6 +780,7 @@
   <div class="pbcard" style="position:relative;">
     <div class="pbheaderbar">
       <button class="btn secondary small" id="pbClose">← 一覧へ戻る</button>
+      <button class="btn secondary small" id="pbToggleActions">📤 保存・送信</button>
       <button class="btn secondary small" id="pbDownloadTop">⬇ ダウンロードする</button>
     </div>
     <div class="pbtoolbar">
@@ -829,7 +830,7 @@
       </div>
     </div>
     <div class="pbstage"><div id="pbStageInner"><canvas id="pbImageCanvas"></canvas><canvas id="pbBaseCanvas"></canvas><canvas id="pbOverlayCanvas"></canvas><div id="pbItemsLayer"></div></div></div>
-    <div class="card" style="margin-block-end:0;">
+    <div class="card" style="margin-block-end:0;" id="pbActionsCard" hidden>
       <div class="row">
         <button class="btn" id="pbSaveToProject">この内容を案件に保存</button>
         <button class="btn secondary" id="pbDownload">画像として保存</button>
@@ -3435,6 +3436,7 @@
     pb.saveTarget = saveTarget || {type:"attachment"};
     pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
     pbUpdatePdfPageNav();
+    document.getElementById("pbActionsCard").hidden = true;
     document.getElementById("pbMailTo").value = "";
     document.getElementById("pbMailSubject").value = "";
     document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -3642,6 +3644,7 @@
       document.getElementById("pbModal").hidden = false;
       pb.currentAttachmentId = null;
       pb.saveTarget = {type:"attachment"};
+      document.getElementById("pbActionsCard").hidden = true;
       document.getElementById("pbMailTo").value = "";
       document.getElementById("pbMailSubject").value = "";
       document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -3953,6 +3956,11 @@
     document.getElementById("pbZoomIn").addEventListener("click", function(){ pbZoomBy(0.1); });
     document.getElementById("pbPdfPrev").addEventListener("click", function(){ pbRenderPdfPage(pb.pdfPage-1); });
     document.getElementById("pbPdfNext").addEventListener("click", function(){ pbRenderPdfPage(pb.pdfPage+1); });
+    document.getElementById("pbToggleActions").addEventListener("click", function(){
+      var card = document.getElementById("pbActionsCard");
+      card.hidden = !card.hidden;
+      if(!card.hidden) card.scrollIntoView({behavior:"smooth", block:"start"});
+    });
     document.getElementById("pbItemsLayer").addEventListener("click", function(e){
       var del = e.target.closest(".pbitem-del");
       if(del){ pb.items = pb.items.filter(function(x){ return x.id!==del.dataset.delitem; }); pbRenderItems(); }
