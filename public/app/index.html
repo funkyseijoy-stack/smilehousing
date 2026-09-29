@@ -295,6 +295,7 @@
     <div class="userpicker">
       <span class="muted" style="font-size:.72rem;">担当者</span>
       <select id="userSelect"></select>
+      <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 最新の内容に更新</button>
       <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span></button>
     </div>
   </header>
@@ -786,7 +787,8 @@
   <div class="pbcard" style="position:relative;">
     <div class="pbheaderbar">
       <button class="btn secondary small" id="pbClose">← 一覧へ戻る</button>
-      <button class="btn secondary small" id="pbToggleActions">📤 保存・送信</button>
+      <button class="btn" id="pbSaveTop">💾 保存する</button>
+      <button class="btn secondary small" id="pbToggleActions">📤 保存・送信（詳細）</button>
       <button class="btn secondary small" id="pbDownloadTop">⬇ ダウンロードする</button>
     </div>
     <div class="pbtoolbar">
@@ -1160,6 +1162,34 @@
     }
     render();
     populateUserSelect();
+  }
+
+  async function syncFromServer(){
+    var btn = document.getElementById("btnSyncNow");
+    var origText = btn ? btn.textContent : "";
+    if(btn){ btn.disabled = true; btn.textContent = "🔄 更新中…"; }
+    try{
+      var results = await Promise.all(DATA_COLLECTIONS.map(function(c){ return apiGet(c); }));
+      DATA_COLLECTIONS.forEach(function(c, i){ state[c] = results[i]; });
+      if(state.currentProjectId && !state.projects.some(function(p){ return p.id===state.currentProjectId; })){
+        var firstLive = state.projects.find(function(p){return !p.deletedAt;});
+        state.currentProjectId = firstLive ? firstLive.id : null;
+      }
+      var settingsItems = await apiGet("settings");
+      var s = settingsItems.find(function(x){ return x.id==="main"; });
+      if(s){
+        if(s.progressTags) state.settings.progressTags = s.progressTags;
+        if(s.staffList) state.settings.staffList = s.staffList;
+        if(s.pin) state.settings.pin = s.pin;
+      }
+      render();
+      populateUserSelect();
+      toast("最新の内容に更新しました");
+    }catch(e){
+      if(String(e && e.message)!=="unauthorized") toast("更新に失敗しました（詳細: "+String(e && e.message || e)+"）");
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = origText || "🔄 最新の内容に更新"; }
+    }
   }
 
   async function initDb(){
@@ -3684,6 +3714,7 @@
       state.currentUser = e.target.value;
       saveLocalUser(state.currentUser);
     });
+    document.getElementById("btnSyncNow").addEventListener("click", syncFromServer);
     var fsBtn = document.getElementById("btnFullscreen");
     if(fsBtn){
       if(!isFullscreenSupported()) fsBtn.hidden = true;
@@ -4164,6 +4195,7 @@
 
     document.getElementById("pbClose").addEventListener("click", closePlanBoard);
     document.getElementById("pbSaveToProject").addEventListener("click", pbSaveToProject);
+    document.getElementById("pbSaveTop").addEventListener("click", pbSaveToProject);
     document.getElementById("pbDownload").addEventListener("click", pbDownloadImage);
     document.getElementById("pbDownloadTop").addEventListener("click", pbDownloadImage);
     document.getElementById("pbSend").addEventListener("click", async function(){
