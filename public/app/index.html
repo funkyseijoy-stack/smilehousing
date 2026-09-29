@@ -1002,6 +1002,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1142,7 +1143,17 @@
   }
 
   assets = {
-    upload: function(file, opts){
+    // 保存前に、HEIC/HEIF（iPhoneのカメラ・写真ライブラリの既定形式）を
+    // 自動でJPEGに変換しておく。多くのブラウザは<img>でHEICを表示できず、
+    // 「追加はできるが表示されない」原因になるため、アップロード経路の
+    // どこから呼ばれてもここで一括して防ぐ。
+    upload: async function(file, opts){
+      var uploadFile = file;
+      try{
+        if(typeof isHeicFile === "function" && isHeicFile(file)){
+          uploadFile = await heicToJpegBlob(file);
+        }
+      }catch(e){ uploadFile = file; }
       return new Promise(function(resolve, reject){
         var reader = new FileReader();
         reader.onload = async function(){
@@ -1158,13 +1169,13 @@
             resolve({
               id: slug + "/" + j.key,
               url: '/api/get-photo?slug='+encodeURIComponent(slug)+'&key='+encodeURIComponent(j.key),
-              contentType: (opts && opts.type) || file.type,
-              sizeBytes: file.size
+              contentType: (opts && opts.type) || uploadFile.type,
+              sizeBytes: uploadFile.size
             });
           }catch(e){ reject(e); }
         };
         reader.onerror = reject;
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(uploadFile);
       });
     }
   };
@@ -2774,10 +2785,31 @@
   }
 
   // ================= 写真管理・アルバム・参考写真 =================
-  function compressImageFile(file, maxDim, quality){
+  // iPhoneのカメラ・写真ライブラリはHEIC/HEIF形式で保存されることが多いが、
+  // ほとんどのブラウザ（Chrome/Firefox/Windows等）は<img>でHEICを表示できない。
+  // そのため「追加はできるが表示されない」状態になるので、アップロード前に
+  // 必ずJPEGへ変換しておく。
+  function isHeicFile(file){
+    var type = (file && file.type || "").toLowerCase();
+    var name = (file && file.name || "").toLowerCase();
+    return type.indexOf("heic")!==-1 || type.indexOf("heif")!==-1 || /\.(heic|heif)$/.test(name);
+  }
+  async function heicToJpegBlob(file, quality){
+    if(typeof heic2any !== "function") return file;
+    try{
+      var result = await heic2any({ blob: file, toType: "image/jpeg", quality: quality || 0.82 });
+      var out = Array.isArray(result) ? result[0] : result;
+      return out || file;
+    }catch(e){ return file; }
+  }
+  async function compressImageFile(file, maxDim, quality){
     maxDim = maxDim || 1600; quality = quality || 0.82;
+    var srcFile = file;
+    if(isHeicFile(file)){
+      srcFile = await heicToJpegBlob(file, quality);
+    }
     return new Promise(function(resolve){
-      if(!file.type || file.type.indexOf("image")!==0){ resolve(file); return; }
+      if(!srcFile.type || srcFile.type.indexOf("image")!==0){ resolve(srcFile); return; }
       var reader = new FileReader();
       reader.onload = function(){
         var img = new Image();
@@ -2789,14 +2821,14 @@
           var ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, w, h);
           canvas.toBlob(function(blob){
-            resolve(blob && blob.size < file.size ? blob : file);
+            resolve(blob && blob.size < srcFile.size ? blob : srcFile);
           }, "image/jpeg", quality);
         };
-        img.onerror = function(){ resolve(file); };
+        img.onerror = function(){ resolve(srcFile); };
         img.src = reader.result;
       };
-      reader.onerror = function(){ resolve(file); };
-      reader.readAsDataURL(file);
+      reader.onerror = function(){ resolve(srcFile); };
+      reader.readAsDataURL(srcFile);
     });
   }
   async function uploadAlbumPhotos(kind, fileList, categoryId){
