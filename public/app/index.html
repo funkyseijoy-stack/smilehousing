@@ -237,6 +237,10 @@
   .specphotos{ display:flex; flex-wrap:wrap; gap:8px; }
   .specphoto{ position:relative; width:72px; height:72px; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface); flex-shrink:0; }
   .specphoto img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .specphoto video{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+  .specphoto-playbadge{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-size:1.1rem; text-shadow:0 1px 3px rgba(0,0,0,.6); pointer-events:none; }
+  .specphoto-file{ width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:var(--surface-2); font-size:1.4rem; }
+  .specphoto-filelabel{ font-size:.6rem; font-weight:700; color:var(--muted); }
   .specphoto .spdel{ position:absolute; top:2px; right:2px; background:rgba(20,16,12,.62); color:#fff; border:none; border-radius:999px; width:18px; height:18px; line-height:1; font-size:.68rem; cursor:pointer; padding:0; }
   .specphoto:not(.specadd){ cursor:pointer; }
   .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.56rem; text-align:center; padding:1px 0; pointer-events:none; }
@@ -868,6 +872,7 @@
     </div>
     <div style="flex:1 1 auto; display:flex; align-items:center; justify-content:center; overflow:auto; min-height:0;">
       <img id="specLightboxImg" src="" alt="" style="max-width:100%; max-height:100%; object-fit:contain;">
+      <video id="specLightboxVideo" src="" controls playsinline style="max-width:100%; max-height:100%;" hidden></video>
     </div>
   </div>
 </div>
@@ -1699,17 +1704,24 @@
     }
     var html = photos.map(function(p){
       var isPlan = (p.kind||"photo")==="planboard";
-      var isPdfPhoto = (p.contentType||"").indexOf("pdf")>=0;
-      var thumbTitle = isPlan ? "クリックして編集（Gmail添付もできます）" : (isPdfPhoto ? "クリックしてプランボードで開く（版として保存）" : "クリックして拡大表示（編集も可能です）");
+      var ct = p.contentType||"";
+      var isPdfPhoto = ct.indexOf("pdf")>=0;
+      var isVideoPhoto = ct.indexOf("video")>=0;
+      var thumbTitle = isPlan ? "クリックして編集（Gmail添付もできます）" : (isPdfPhoto ? "クリックしてプランボードで開く（版として保存）" : (isVideoPhoto ? "クリックして再生" : "クリックして拡大表示（編集も可能です）"));
+      var thumbInner = isPdfPhoto ?
+        '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>' :
+        (isVideoPhoto ?
+          '<video src="'+p.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
+          '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
       return '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
-        '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">'+
+        thumbInner+
         '<span class="splabel">'+fmtTs(p.createdAt)+'</span>'+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
     }).join("");
     if(!opts.noAdd){
       var inputId = "spu_"+scope+"_"+encodeURIComponent(category)+(roomId?"_"+roomId:"")+(side?"_"+encodeURIComponent(side):"")+(opts.kind?"_"+opts.kind:"");
       html += '<label class="specphoto specadd" for="'+inputId+'">＋</label>'+
-        '<input type="file" id="'+inputId+'" accept="image/*" multiple hidden '+
+        '<input type="file" id="'+inputId+'" accept="image/*,application/pdf,video/*" multiple hidden '+
         'data-spec-scope="'+scope+'" data-spec-cat="'+escapeHtml(category)+'"'+
         (roomId?' data-spec-room="'+roomId+'"':'')+(side?' data-spec-side="'+escapeHtml(side)+'"':'')+'>';
     }
@@ -1848,12 +1860,17 @@
     renderSpecInterior();
     renderSpecRooms();
   }
+  var SPEC_UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // サーバー関数のリクエストサイズ上限に合わせた安全値
   async function uploadSpecPhotos(scope, category, roomId, side, fileList){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var files = Array.prototype.slice.call(fileList||[]);
     for(var i=0;i<files.length;i++){
       var f = files[i];
+      if(f.size > SPEC_UPLOAD_MAX_BYTES){
+        toast(f.name+"：ファイルサイズが大きすぎるため登録できませんでした（4MBまで。動画は短く撮影するか圧縮してください）");
+        continue;
+      }
       try{
         var res = await assets.upload(f);
         var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: scope, category: category,
@@ -2020,12 +2037,27 @@
     var p = state.specPhotos.find(function(x){ return x.id===photoId; });
     if(!p) return;
     lightboxPhotoId = photoId;
-    document.getElementById("specLightboxImg").src = p.url;
+    var isVideo = (p.contentType||"").indexOf("video")>=0;
+    var imgEl = document.getElementById("specLightboxImg");
+    var videoEl = document.getElementById("specLightboxVideo");
+    var editBtn = document.getElementById("specLightboxEdit");
+    if(isVideo){
+      imgEl.hidden = true; imgEl.src = "";
+      videoEl.hidden = false; videoEl.src = p.url;
+      if(editBtn) editBtn.hidden = true;
+    } else {
+      videoEl.hidden = true; videoEl.pause(); videoEl.src = "";
+      imgEl.hidden = false; imgEl.src = p.url;
+      if(editBtn) editBtn.hidden = false;
+    }
     document.getElementById("specPhotoLightbox").hidden = false;
   }
   function closeSpecPhotoLightbox(){
     document.getElementById("specPhotoLightbox").hidden = true;
-    document.getElementById("specLightboxImg").src = "";
+    var imgEl = document.getElementById("specLightboxImg");
+    var videoEl = document.getElementById("specLightboxVideo");
+    imgEl.src = ""; imgEl.hidden = false;
+    videoEl.pause(); videoEl.src = ""; videoEl.hidden = true;
     lightboxPhotoId = null;
   }
   function openSpecPhotoInPlanBoard(photoId){
