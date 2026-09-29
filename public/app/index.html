@@ -2105,7 +2105,7 @@
     if(!p) return;
     document.getElementById("pbModal").hidden = false;
     pb.currentAttachmentId = null;
-    pb.saveTarget = {type:"spec", scope:p.scope, category:p.category, roomId:p.roomId||null, side:p.side||null};
+    pb.saveTarget = {type:"spec", scope:p.scope, category:p.category, roomId:p.roomId||null, side:p.side||null, kind:(p.kind||"photo")};
     document.getElementById("pbMailTo").value = "";
     document.getElementById("pbMailSubject").value = "";
     document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -3649,7 +3649,10 @@
       try{
         var res2 = await assets.upload(blob, {type:"image/png"});
         var name2 = (target.category||"プランボード") + "_" + todayStr() + ".png";
-        var kind2 = (target.scope==="facility") ? "planboard" : "photo";
+        // 既存の写真を編集した場合は元の種類（写真/プランボード）を引き継ぐ。
+        // target.kindが無い場合（白紙から新規作成・新しい図面の取り込み）は
+        // これまで通り、設備仕様の図面はプランボード扱いにする。
+        var kind2 = target.kind || ((target.scope==="facility") ? "planboard" : "photo");
         var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: target.scope, category: target.category,
           roomId: target.roomId || null, side: target.side || null, assetId: res2.id, url: res2.url, kind: kind2,
           contentType: "image/png", fileName: name2, createdAt: nowIso() };
