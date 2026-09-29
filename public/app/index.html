@@ -1973,9 +1973,7 @@
 
   // ================= おうちノート（お客様向けサイト）への反映 =================
   function okaiNoteUrl(proj){
-    // お客様には現在、案件ごとに異なるURLではなく共通の1つのURLを案内している
-    // （アプリ内でお名前をタップして識別する方式）ため、そのまま返す。
-    return OKAINOTE_BASE + "/";
+    return OKAINOTE_BASE + "/?c=" + encodeURIComponent(proj.id);
   }
   async function urlToDataUrl(url){
     var res = await fetch(url);

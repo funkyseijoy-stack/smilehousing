@@ -8,7 +8,7 @@ export default async (req: Request, context: Context) => {
   if (!slug || !key) {
     return new Response(JSON.stringify({ error: "slug_and_key_required" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
@@ -18,7 +18,7 @@ export default async (req: Request, context: Context) => {
   if (!result || !result.data) {
     return new Response(JSON.stringify({ error: "not_found" }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
@@ -29,6 +29,7 @@ export default async (req: Request, context: Context) => {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "public, max-age=31536000, immutable",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 };
