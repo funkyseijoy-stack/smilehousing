@@ -3681,38 +3681,58 @@
       closePlanBoard();
     }catch(e){ toast("保存に失敗しました"); }
   }
+  function pbSetSaveButtonsBusy(busy){
+    ["pbSaveTop","pbSaveToProject"].forEach(function(id){
+      var b = document.getElementById(id);
+      if(!b) return;
+      b.disabled = busy;
+      if(busy){ if(!b.dataset.origText) b.dataset.origText = b.textContent; b.textContent = "保存中…"; }
+      else if(b.dataset.origText){ b.textContent = b.dataset.origText; }
+    });
+  }
   async function pbSaveToProject(){
+    if(pb.saving) return; // 連打による二重・三重保存を防ぐ
     if(!state.currentProjectId){ toast("案件が選択されていません"); return; }
     if(!assets){ toast("この画面では保存が利用できません"); return; }
-    var blob = await pbCanvasToBlob();
-    var target = pb.saveTarget || {type:"attachment"};
-    if(target.type === "spec"){
-      if(target.sourcePhotoId){
-        askChoice("保存方法を選んでください", "編集前の写真をどうしますか？", [
-          {label:"上書き保存する（編集前は残らない）", value:"overwrite"},
-          {label:"新しい写真として保存する（編集前も残る）", value:"new"}
-        ], function(choice){
-          if(choice==="overwrite") pbSaveSpecOverwrite(target, blob);
-          else if(choice==="new") pbSaveSpecAsNew(target, blob);
-        });
+    pb.saving = true;
+    pbSetSaveButtonsBusy(true);
+    try{
+      var blob = await pbCanvasToBlob();
+      var target = pb.saveTarget || {type:"attachment"};
+      if(target.type === "spec"){
+        if(target.sourcePhotoId){
+          await new Promise(function(resolve){
+            askChoice("保存方法を選んでください", "編集前の写真をどうしますか？", [
+              {label:"上書き保存する（編集前は残らない）", value:"overwrite"},
+              {label:"新しい写真として保存する（編集前も残る）", value:"new"}
+            ], async function(choice){
+              if(choice==="overwrite") await pbSaveSpecOverwrite(target, blob);
+              else if(choice==="new") await pbSaveSpecAsNew(target, blob);
+              resolve();
+            });
+          });
+        } else {
+          await pbSaveSpecAsNew(target, blob);
+        }
         return;
       }
-      await pbSaveSpecAsNew(target, blob);
-      return;
+      var name = "プランボード_" + todayStr() + ".png";
+      try{
+        var res = await assets.upload(blob, {type:"image/png"});
+        var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:name,
+          contentType:"image/png", sizeBytes: res.sizeBytes||blob.size, uploadedAt: todayStr(), kind:"plan" };
+        blobCache[res.id] = blob;
+        state.attachments.push(att);
+        render();
+        await saveDoc("attachments", att.id, att);
+        logActivity("プランボードを保存しました（"+name+"）");
+        toast("案件に保存しました");
+        closePlanBoard();
+      }catch(e){ toast("保存に失敗しました"); }
+    } finally {
+      pb.saving = false;
+      pbSetSaveButtonsBusy(false);
     }
-    var name = "プランボード_" + todayStr() + ".png";
-    try{
-      var res = await assets.upload(blob, {type:"image/png"});
-      var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:name,
-        contentType:"image/png", sizeBytes: res.sizeBytes||blob.size, uploadedAt: todayStr(), kind:"plan" };
-      blobCache[res.id] = blob;
-      state.attachments.push(att);
-      render();
-      await saveDoc("attachments", att.id, att);
-      logActivity("プランボードを保存しました（"+name+"）");
-      toast("案件に保存しました");
-      closePlanBoard();
-    }catch(e){ toast("保存に失敗しました"); }
   }
 
   async function pbDownloadImage(){
