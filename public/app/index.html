@@ -3742,6 +3742,37 @@
     });
   }
 
+  function promptPickMeetingNote(callback){
+    var notes = liveNotes().filter(function(n){ return n.projectId===state.currentProjectId; })
+      .slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); }).slice(0,8);
+    var choices = notes.map(function(n){
+      return { label: (n.date||fmtTs(n.createdAt))+"："+(n.content||"").slice(0,20), value: n.id };
+    });
+    choices.push({label:"新しい打合せ記録を作って添付", value:"__new__"});
+    askChoice("どの打合せ記録に添付しますか？", "", choices, callback);
+  }
+  async function attachBlobsToMeetingNote(noteId, blobs, baseName){
+    var uploaded = [];
+    for(var i=0;i<blobs.length;i++){
+      if(!blobs[i]) continue;
+      var res = await assets.upload(blobs[i], {type:"image/png"});
+      blobCache[res.id] = blobs[i];
+      uploaded.push({ id: res.id, url: res.url, contentType:"image/png", name: baseName+(blobs.length>1?("_p"+(i+1)):"")+".png" });
+    }
+    if(noteId === "__new__"){
+      var n = { id:uid("note"), projectId: state.currentProjectId, content: baseName, date: todayStr(), files: uploaded, author: state.currentUser||"", createdAt: nowIso() };
+      state.meetingNotes.push(n);
+      await saveDoc("meetingNotes", n.id, n);
+    } else {
+      var note = state.meetingNotes.find(function(x){ return x.id===noteId; });
+      if(!note) return;
+      note.files = (note.files||[]).concat(uploaded);
+      note.updatedAt = nowIso();
+      await saveDoc("meetingNotes", note.id, note);
+    }
+    render();
+  }
+
   // ================= plan board (② embedded) =================
   var pb = {
     baseCanvas:null, overlayCanvas:null, baseCtx:null, overlayCtx:null,
@@ -3952,6 +3983,18 @@
         img.src = tmpCanvas.toDataURL("image/png");
       });
     }).catch(function(){ toast("ページの読み込みに失敗しました"); });
+  }
+  function pbRenderPdfPageToBlob(pageNum){
+    // 編集中のキャンバスには触れず、指定ページを単独でPNG化する（元図面のまま、書き込みなし）
+    return pb.pdfDoc.getPage(pageNum).then(function(page){
+      var scale = 2; var viewport = page.getViewport({scale:scale});
+      var tmpCanvas = document.createElement("canvas");
+      tmpCanvas.width = viewport.width; tmpCanvas.height = viewport.height;
+      var tmpCtx = tmpCanvas.getContext("2d");
+      return page.render({canvasContext:tmpCtx, viewport:viewport}).promise.then(function(){
+        return new Promise(function(resolve){ tmpCanvas.toBlob(function(blob){ resolve(blob); }, "image/png"); });
+      });
+    });
   }
   function pbUpdatePdfPageNav(){
     var nav = document.getElementById("pbPdfPageNav");
@@ -4215,18 +4258,58 @@
         }
         return;
       }
-      var name = "プランボード_" + todayStr() + ".png";
+      var baseName = "プランボード_" + todayStr();
       try{
-        var res = await assets.upload(blob, {type:"image/png"});
-        var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:name,
-          contentType:"image/png", sizeBytes: res.sizeBytes||blob.size, uploadedAt: todayStr(), kind:"plan" };
-        blobCache[res.id] = blob;
-        state.attachments.push(att);
-        render();
-        await saveDoc("attachments", att.id, att);
-        logActivity("プランボードを保存しました（"+name+"）");
-        toast("案件に保存しました");
-        closePlanBoard();
+        var dest = await new Promise(function(resolve){
+          askChoice("保存先を選んでください", "", [
+            {label:"図面として保存（案件の資料に追加）", value:"attachment"},
+            {label:"打合せ記録に添付する", value:"meeting"}
+          ], function(v){ resolve(v); });
+        });
+        if(dest===null){ return; }
+
+        var range = await new Promise(function(resolve){
+          if(pb.pdfDoc && pb.pdfNumPages>1){
+            askChoice("書き出す範囲を選んでください", "このページには今の書き込み内容が反映されます。他のページは元の図面のまま書き出されます。", [
+              {label:"このページのみ", value:"current"},
+              {label:"全ページを書き出す（"+pb.pdfNumPages+"ページ）", value:"all"}
+            ], function(v){ resolve(v); });
+          } else { resolve("current"); }
+        });
+        if(range===null){ return; }
+
+        var blobs = [blob];
+        if(range==="all" && pb.pdfDoc){
+          blobs = [];
+          for(var p=1; p<=pb.pdfNumPages; p++){
+            if(p === pb.pdfPage){ blobs.push(blob); }
+            else { blobs.push(await pbRenderPdfPageToBlob(p)); }
+          }
+        }
+
+        if(dest==="attachment"){
+          for(var bi=0; bi<blobs.length; bi++){
+            if(!blobs[bi]) continue;
+            var res = await assets.upload(blobs[bi], {type:"image/png"});
+            var attName = baseName+(blobs.length>1?("_p"+(bi+1)):"")+".png";
+            var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:attName,
+              contentType:"image/png", sizeBytes: res.sizeBytes||blobs[bi].size, uploadedAt: todayStr(), kind:"plan" };
+            blobCache[res.id] = blobs[bi];
+            state.attachments.push(att);
+            await saveDoc("attachments", att.id, att);
+          }
+          render();
+          logActivity("プランボードを保存しました（"+baseName+"）");
+          toast("案件に保存しました");
+          closePlanBoard();
+        } else if(dest==="meeting"){
+          var noteId = await new Promise(function(resolve){ promptPickMeetingNote(function(v){ resolve(v); }); });
+          if(noteId===null){ return; }
+          await attachBlobsToMeetingNote(noteId, blobs, baseName);
+          logActivity("プランボードを打合せ記録に添付しました");
+          toast("打合せ記録に添付しました");
+          closePlanBoard();
+        }
       }catch(e){ toast("保存に失敗しました"); }
     } finally {
       pb.saving = false;
