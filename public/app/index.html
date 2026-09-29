@@ -245,6 +245,8 @@
   .specphoto:not(.specadd){ cursor:pointer; }
   .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.56rem; text-align:center; padding:1px 0; pointer-events:none; }
   .specphoto.specadd{ display:flex; align-items:center; justify-content:center; cursor:pointer; border-style:dashed; color:var(--muted); font-size:1.3rem; }
+  .specphoto-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .pill.small{ padding:2px 7px; font-size:.6rem; }
   .pbentrylist{ display:flex; flex-direction:column; gap:8px; }
   .pbentry{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:7px; }
   .pbentry-thumb{ position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; flex-shrink:0; cursor:pointer; border:1px solid var(--border); }
@@ -1625,7 +1627,9 @@
       var filesHtml = (n.files && n.files.length) ? '<div class="row" style="margin-block-start:6px; flex-wrap:wrap; gap:6px;">'+confirmAttachmentsHtml(n.files)+'</div>' : "";
       return '<div class="noteitem"><div class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</div><div class="ntext">'+escapeHtml(n.content)+'</div>'+
         filesHtml+
-        '<div class="row" style="margin-block-start:6px;"><button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button></div></div>';
+        '<div class="row" style="margin-block-start:6px; flex-wrap:wrap;">'+
+        '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
+        '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button></div></div>';
     }).join("");
   }
 
@@ -1750,10 +1754,12 @@
         (isVideoPhoto ?
           '<video src="'+p.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
           '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
-      return '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
+      var tileHtml = '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
         thumbInner+
         '<span class="splabel">'+fmtTs(p.createdAt)+'</span>'+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
+      var reflectBtnHtml = '<button class="pill reflect small'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"反映済み":"反映")+'</button>';
+      return '<div class="specphoto-wrap">'+tileHtml+reflectBtnHtml+'</div>';
     }).join("");
     if(!opts.noAdd){
       var inputId = "spu_"+scope+"_"+encodeURIComponent(category)+(roomId?"_"+roomId:"")+(side?"_"+encodeURIComponent(side):"")+(opts.kind?"_"+opts.kind:"");
@@ -1970,6 +1976,17 @@
     // 「反映」の印をつけた/外した時点で、ボタンを別途押さなくても自動でおうちノートに同期する
     pushToOkaiNote(p.projectId, {silent:true});
   }
+  function toggleMeetingReflected(id){
+    var n = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!n) return;
+    n.reflected = !n.reflected;
+    n.reflectedAt = n.reflected ? nowIso() : null;
+    render();
+    saveDoc("meetingNotes", n.id, n);
+    logActivity("打合せ記録を"+(n.reflected?"おうちノートに反映しました":"反映解除しました"));
+    // 「反映」の印をつけた/外した時点で、ボタンを別途押さなくても自動でおうちノートに同期する
+    pushToOkaiNote(n.projectId, {silent:true});
+  }
 
   // ================= おうちノート（お客様向けサイト）への反映 =================
   function okaiNoteUrl(proj){
@@ -1987,10 +2004,12 @@
     });
   }
   async function buildOkaiNoteData(proj){
-    // 打合せ内容（社内メモ）は社内限定の情報のため、お客様向け「おうちノート」には
-    // 送らない。（以前はここで全件送信してしまっており、社内向けの指示等も
-    // お客様に見える状態になってしまっていたため修正した。）
-    var meetings = [];
+    // 打合せ内容（社内メモ）は、スタッフが「おうちノートに反映」を押したものだけを送る。
+    // （以前は全件を自動送信しており、社内向けの指示等もお客様に見える状態に
+    // なってしまっていたため、選択制に変更した。）
+    var meetings = liveNotes().filter(function(n){ return n.projectId===proj.id && n.reflected; })
+      .slice().sort(function(a,b){ return (a.date||a.createdAt||"").localeCompare(b.date||b.createdAt||""); })
+      .map(function(n){ return { date: n.date || "", title: "", content: n.content || "" }; });
 
     var reflectedPhotos = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.reflected; })
       .slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
@@ -4123,6 +4142,7 @@
       else if(act==="delattachment"){ if(confirm2()) deleteAttachment(id); }
       else if(act==="editnote"){ editMeetingNote(id); }
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
+      else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
     }
     document.getElementById("projectTableBody").addEventListener("click", handleTableClick);
     document.getElementById("pendingTableBody").addEventListener("click", handleTableClick);
