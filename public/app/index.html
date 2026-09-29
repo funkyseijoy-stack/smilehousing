@@ -822,6 +822,11 @@
         <button class="tbtn" id="pbRedo" disabled><span class="ic">↷</span></button>
         <button class="tbtn" id="pbClear"><span class="ic">🗑️</span></button>
       </div>
+      <div class="tool-group" id="pbPdfPageNav" hidden style="align-items:center; gap:6px;">
+        <button class="tbtn" id="pbPdfPrev"><span class="ic">◀</span></button>
+        <span id="pbPdfPageLabel" class="tabular">1 / 1</span>
+        <button class="tbtn" id="pbPdfNext"><span class="ic">▶</span></button>
+      </div>
     </div>
     <div class="pbstage"><div id="pbStageInner"><canvas id="pbImageCanvas"></canvas><canvas id="pbBaseCanvas"></canvas><canvas id="pbOverlayCanvas"></canvas><div id="pbItemsLayer"></div></div></div>
     <div class="card" style="margin-block-end:0;">
@@ -2531,6 +2536,21 @@
       reader.readAsDataURL(blob);
     });
   }
+  function reencodeAsJpeg(dataUrl, quality){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      img.onload = function(){
+        var c = document.createElement("canvas");
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        var ctx = c.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,c.width,c.height);
+        ctx.drawImage(img,0,0);
+        c.toBlob(function(blob){ blob ? resolve(blob) : reject(new Error("encode_failed")); }, "image/jpeg", quality);
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
   function dataUrlToBlob(dataUrl){
     var parts = dataUrl.split(",");
     var mimeMatch = parts[0].match(/:(.*?);/);
@@ -3050,7 +3070,8 @@
     currentAttachmentId:null, // if editing an existing saved plan board / attachment
     saveTarget:{type:"attachment"}, // where "この内容を案件に保存" writes to: {type:"attachment"} or {type:"spec", scope, category, roomId, side}
     zoom:1, items:[], pendingItem:null,
-    touches:{}, pinchStartDist:null, pinchStartZoom:1
+    touches:{}, pinchStartDist:null, pinchStartZoom:1,
+    pdfDoc:null, pdfPage:1, pdfNumPages:1
   };
   var PB_SYMBOLS = [
     {key:"outlet", label:"コンセント", glyph:"🔌"},
@@ -3234,6 +3255,32 @@
     reader.onerror = function(){ toast("ファイルの読み込みに失敗しました"); };
     reader.readAsDataURL(file);
   }
+  function pbRenderPdfPage(pageNum){
+    if(!pb.pdfDoc) return;
+    pageNum = Math.max(1, Math.min(pageNum, pb.pdfNumPages));
+    pb.pdfPage = pageNum;
+    pbUpdatePdfPageNav();
+    pb.pdfDoc.getPage(pageNum).then(function(page){
+      var scale = 2; var viewport = page.getViewport({scale:scale});
+      var tmpCanvas = document.createElement("canvas");
+      tmpCanvas.width = viewport.width; tmpCanvas.height = viewport.height;
+      var tmpCtx = tmpCanvas.getContext("2d");
+      return page.render({canvasContext:tmpCtx, viewport:viewport}).promise.then(function(){
+        var img = new Image();
+        img.onload = function(){ pbSetupCanvas(tmpCanvas.width, tmpCanvas.height, img); };
+        img.src = tmpCanvas.toDataURL("image/png");
+      });
+    }).catch(function(){ toast("ページの読み込みに失敗しました"); });
+  }
+  function pbUpdatePdfPageNav(){
+    var nav = document.getElementById("pbPdfPageNav");
+    if(!nav) return;
+    if(!pb.pdfDoc || pb.pdfNumPages<=1){ nav.hidden = true; return; }
+    nav.hidden = false;
+    document.getElementById("pbPdfPageLabel").textContent = pb.pdfPage+" / "+pb.pdfNumPages;
+    document.getElementById("pbPdfPrev").disabled = pb.pdfPage<=1;
+    document.getElementById("pbPdfNext").disabled = pb.pdfPage>=pb.pdfNumPages;
+  }
   function pbLoadPdfFile(file){
     if(typeof pdfjsLib === "undefined"){ toast("PDFの読み込みに失敗しました"); return; }
     toast("PDFを読み込んでいます…");
@@ -3242,16 +3289,10 @@
       var typedArray = new Uint8Array(reader.result);
       try{
         var loadingTask = pdfjsLib.getDocument({data: typedArray});
-        loadingTask.promise.then(function(pdf){ return pdf.getPage(1); }).then(function(page){
-          var scale = 2; var viewport = page.getViewport({scale:scale});
-          var tmpCanvas = document.createElement("canvas");
-          tmpCanvas.width = viewport.width; tmpCanvas.height = viewport.height;
-          var tmpCtx = tmpCanvas.getContext("2d");
-          return page.render({canvasContext:tmpCtx, viewport:viewport}).promise.then(function(){
-            var img = new Image();
-            img.onload = function(){ pbSetupCanvas(tmpCanvas.width, tmpCanvas.height, img); };
-            img.src = tmpCanvas.toDataURL("image/png");
-          });
+        loadingTask.promise.then(function(pdf){
+          pb.pdfDoc = pdf;
+          pb.pdfNumPages = pdf.numPages;
+          pbRenderPdfPage(1);
         }).catch(function(){ toast("PDFの読み込みに失敗しました"); });
       }catch(e){ toast("PDFの読み込みに失敗しました"); }
     };
@@ -3259,6 +3300,8 @@
     reader.readAsArrayBuffer(file);
   }
   function pbLoadFromBlob(blob, isPdf){
+    pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
+    pbUpdatePdfPageNav();
     if(isPdf) pbLoadPdfFile(blob); else pbLoadImageFile(blob);
   }
 
@@ -3332,15 +3375,21 @@
   }
   function pbCancelTextEditor(){ if(!pb.activeTextEditor) return; pb.activeTextEditor.el.remove(); pb.activeTextEditor=null; }
 
-  function pbCanvasToBlob(){
+  function pbCanvasToBlob(format, quality){
+    format = format || "image/png";
     return new Promise(function(resolve){
       var w = pb.baseCanvas.width, h = pb.baseCanvas.height;
       var tmp = document.createElement("canvas"); tmp.width = w; tmp.height = h;
       var ctx = tmp.getContext("2d");
+      if(format==="image/jpeg"){
+        // JPEGは透過を保持できないため、まず白背景で塗りつぶしておく
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0,0,w,h);
+      }
       // 元図面（pbImageCanvas）の上に書き込みレイヤー（pbBaseCanvas）を重ねて書き出す
       ctx.drawImage(pb.imageCanvas, 0, 0);
       ctx.drawImage(pb.baseCanvas, 0, 0);
-      if(!pb.items || !pb.items.length){ tmp.toBlob(function(blob){ resolve(blob); }, "image/png"); return; }
+      if(!pb.items || !pb.items.length){ tmp.toBlob(function(blob){ resolve(blob); }, format, quality); return; }
       pb.items.forEach(function(it){
         if(it.kind==="text"){
           // Plain colored text, no chip box — matches how typed notes
@@ -3376,7 +3425,7 @@
         ctx.fillText(it.text, bx+padX, it.y);
         ctx.restore();
       });
-      tmp.toBlob(function(blob){ resolve(blob); }, "image/png");
+      tmp.toBlob(function(blob){ resolve(blob); }, format, quality);
     });
   }
 
@@ -3384,6 +3433,8 @@
     document.getElementById("pbModal").hidden = false;
     pb.currentAttachmentId = sourceAttachmentId || null;
     pb.saveTarget = saveTarget || {type:"attachment"};
+    pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
+    pbUpdatePdfPageNav();
     document.getElementById("pbMailTo").value = "";
     document.getElementById("pbMailSubject").value = "";
     document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -3900,6 +3951,8 @@
     });
     document.getElementById("pbZoomOut").addEventListener("click", function(){ pbZoomBy(-0.1); });
     document.getElementById("pbZoomIn").addEventListener("click", function(){ pbZoomBy(0.1); });
+    document.getElementById("pbPdfPrev").addEventListener("click", function(){ pbRenderPdfPage(pb.pdfPage-1); });
+    document.getElementById("pbPdfNext").addEventListener("click", function(){ pbRenderPdfPage(pb.pdfPage+1); });
     document.getElementById("pbItemsLayer").addEventListener("click", function(e){
       var del = e.target.closest(".pbitem-del");
       if(del){ pb.items = pb.items.filter(function(x){ return x.id!==del.dataset.delitem; }); pbRenderItems(); }
@@ -3945,19 +3998,30 @@
       var sendBtn = document.getElementById("pbSend");
       sendBtn.disabled = true; sendBtn.textContent = "送信中…";
       try{
-        var editedBlob = await pbCanvasToBlob();
+        // メール添付はサイズが大きいと送信APIが失敗するため、JPEGに変換して軽量化する
+        // （画面表示・ダウンロード用のPNGとは別に、送信専用でここだけ変換する）。
+        var editedBlob = await pbCanvasToBlob("image/jpeg", 0.82);
         // Send the書き込み済み図面 alongside the untouched original (when the
         // board started from an imported drawing) so the recipient always
         // has the clean source file too, not just the marked-up version.
-        var blobsToSend = [{name:"プランボード（書き込み済み）.png", blob:editedBlob}];
+        var blobsToSend = [{name:"プランボード（書き込み済み）.jpg", blob:editedBlob}];
         if(pb.originalSnapshot){
-          blobsToSend.push({name:"プランボード（元図面）.png", blob: dataUrlToBlob(pb.originalSnapshot)});
+          try{
+            var origJpeg = await reencodeAsJpeg(pb.originalSnapshot, 0.82);
+            blobsToSend.push({name:"プランボード（元図面）.jpg", blob: origJpeg});
+          }catch(e){ /* 元図面の変換に失敗しても、書き込み済みの方だけで送信を続行する */ }
         }
         var atts = [];
+        var totalBytes = 0;
         for(var bi=0; bi<blobsToSend.length; bi++){
           var bEntry = blobsToSend[bi];
+          totalBytes += bEntry.blob.size;
           var b64 = await blobToBase64(bEntry.blob);
-          atts.push({ filename:bEntry.name, mimeType:"image/png", content:b64 });
+          atts.push({ filename:bEntry.name, mimeType:"image/jpeg", content:b64 });
+        }
+        if(totalBytes > 4*1024*1024){
+          toast("添付ファイルが大きすぎるため送信できません（約"+Math.round(totalBytes/1024/1024)+"MB）。恐れ入りますが、図面を分割するか、書き込みを減らしてお試しください。");
+          return;
         }
         var res = await fetch("/api/gmail-create-draft", {
           method:"POST",
@@ -3968,10 +4032,14 @@
           toast("Gmail連携がまだ設定されていません。設定画面の「Gmailと連携する」から連携してください。");
           return;
         }
-        if(!res.ok){ throw new Error("gmail_create_draft_failed"); }
+        if(!res.ok){
+          var errText = "";
+          try{ errText = JSON.stringify(await res.json()); }catch(e2){}
+          throw new Error("HTTP "+res.status+" "+errText);
+        }
         toast("Gmail下書きを作成しました（添付"+atts.length+"件）");
         logActivity("プランボードのGmail下書きを作成しました");
-      }catch(e){ toast("Gmail下書きの作成に失敗しました"); }
+      }catch(e){ toast("Gmail下書きの作成に失敗しました："+(e && e.message ? e.message : "")); }
       finally{ sendBtn.disabled=false; sendBtn.textContent="この内容でGmail下書きを作成"; }
     });
 
