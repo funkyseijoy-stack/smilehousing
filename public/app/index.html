@@ -404,6 +404,7 @@
         <button class="sub-btn" data-sub="plan">図面</button>
         <button class="sub-btn" data-sub="reservation">予約</button>
         <button class="sub-btn" data-sub="message">メッセージ</button>
+        <button class="sub-btn" data-sub="okainote">おうちノート連携</button>
       </div>
 
       <!-- 概要 subpanel -->
@@ -577,6 +578,79 @@
             <button class="btn small" id="btnSendMessage">送信</button>
           </div>
         </div>
+      </div>
+
+      <!-- おうちノート連携 subpanel -->
+      <div class="subpanel" id="sub-okainote">
+        <div class="card">
+          <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h3 style="margin:0;">お客様用リンク</h3>
+            <button class="btn secondary small" id="btnOkaiRefresh">更新</button>
+          </div>
+          <p class="muted" style="margin:6px 0 10px; font-size:.76rem;">お客様がスマホ等で開く「おうちノート」専用リンクです。発行すると、お客様専用のページ（ご家族・家電情報の入力、設備仕様の仮決定、追加見積りの承認、検討リストなどができます）が使えるようになります。</p>
+          <div id="okaiLinkArea" style="display:flex; flex-direction:column; gap:6px;"></div>
+          <div class="row" style="margin-block-start:10px;">
+            <button class="btn small" id="btnOkaiIssueLink">リンクを発行する</button>
+            <button class="btn ghost small" id="btnOkaiCopyLink2" hidden>リンクをコピー</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>予約状況（お客様がおうちノートで確認・予約）</h3>
+          <div id="okaiBookingList" style="display:flex; flex-direction:column; gap:6px;"></div>
+          <div class="empty" id="okaiBookingEmpty" hidden>予約はまだありません。</div>
+        </div>
+
+        <div class="card">
+          <h3>設備仕様の状況（お客様側の表示）</h3>
+          <div id="okaiSpecStatus" style="display:flex; flex-direction:column; gap:4px; font-size:.82rem;"></div>
+        </div>
+
+        <div class="card">
+          <h3>サンプル請求・検討リストの投稿（お客様から）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">メッセージのやり取りは対象外です。サンプル請求・写真共有・仕様の仮決定などお客様からの投稿がここに並びます。</p>
+          <div id="okaiInboxList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="empty" id="okaiInboxEmpty" hidden>まだ投稿はありません。</div>
+        </div>
+
+        <div class="card">
+          <h3>追加見積り</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">住まいるから追加見積りを送ると、お客様がおうちノートで「承認／見送り」を選べます。</p>
+          <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
+          <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
+            <label class="field">件名<input type="text" id="okaiEstTitle" placeholder="例：勝手口ドア変更"></label>
+            <label class="field">金額<input type="text" id="okaiEstAmount" placeholder="例：¥48,000"></label>
+            <label class="field">内容<textarea id="okaiEstNote" rows="2"></textarea></label>
+            <button class="btn secondary" id="btnOkaiAddEstimate">追加見積りを送る</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>ご家族・家電・持ち込み品（お客様入力）</h3>
+          <div id="okaiProfileArea" style="font-size:.82rem; line-height:1.8;"></div>
+        </div>
+
+        <div class="card">
+          <h3>家づくりリスト（お客様・スタッフ共有の検討項目）</h3>
+          <div id="okaiConsiderList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="empty" id="okaiConsiderEmpty" hidden>まだ項目がありません。</div>
+          <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
+            <label class="field">内容<input type="text" id="okaiConsiderTitle" placeholder="例：カーテンの色"></label>
+            <button class="btn secondary" id="btnOkaiAddConsider">追加</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>ポイントカード・A's 3D リンク</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">お客様のおうちノートに表示されるリンクです。https:// で始まるURLを入力してください。</p>
+          <div class="row">
+            <input type="text" id="okaiAce3dUrl" placeholder="https://..." style="flex:1;">
+            <button class="btn secondary small" id="btnOkaiSaveAce3d">保存</button>
+          </div>
+        </div>
+
+        <div class="empty" id="okaiUnavailable" hidden>おうちノートと通信できませんでした。しばらくしてからもう一度お試しください。</div>
       </div>
 
       <!-- 見積 subpanel -->
@@ -2092,6 +2166,222 @@
   function closeOkaiNoteView(){
     document.getElementById("okaiNoteViewModal").hidden = true;
     document.getElementById("okaiNoteViewFrame").src = "about:blank";
+  }
+
+  // ================= おうちノート連携（住まいるアプリ ⇔ おうちノート本体） =================
+  // メッセージのやり取りは対象外。それ以外（予約・仕様の状況・サンプル請求／検討リストの
+  // 投稿・追加見積り・ご家族情報・家づくりリスト・ポイントカード等のリンク）を橋渡しする。
+  var okaiBridgeCache = {};
+  function okaiBridgeFetch(query, options){
+    var opts = options || {};
+    var headers = Object.assign({'X-Staff-Token': getStaffToken()}, opts.headers||{});
+    return fetch('/api/okainote-bridge'+(query||''), Object.assign({}, opts, {headers:headers}))
+      .then(function(res){ return res.json().then(function(j){ return {ok:res.ok, body:j}; }); });
+  }
+  function escapeOkai(v){ return escapeHtml(String(v==null?"":v)); }
+
+  function renderOkaiLink(proj, data){
+    var area = document.getElementById("okaiLinkArea");
+    var copyBtn = document.getElementById("btnOkaiCopyLink2");
+    var link = data && data.link;
+    if(link && link.url){
+      area.innerHTML = '<div class="muted" style="font-size:.8rem; word-break:break-all;">'+escapeOkai(link.url)+'</div>';
+      copyBtn.hidden = false;
+      copyBtn.onclick = function(){
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(link.url).then(function(){ toast("リンクをコピーしました"); }, function(){ toast(link.url); });
+        } else { toast(link.url); }
+      };
+    } else {
+      area.innerHTML = '<div class="muted" style="font-size:.8rem;">まだリンクが発行されていません。</div>';
+      copyBtn.hidden = true;
+    }
+  }
+  function renderOkaiBooking(customer){
+    var list = document.getElementById("okaiBookingList");
+    var empty = document.getElementById("okaiBookingEmpty");
+    var bookings = (customer && customer.nextBookings) || [];
+    if(!bookings.length){ list.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+    list.innerHTML = bookings.map(function(b){
+      return '<div class="card" style="padding:8px 10px;">'+escapeOkai(b.dateLabel||b.date)+' '+escapeOkai(b.time)+'〜'+escapeOkai(b.endTime)+'　<span class="pill tag">'+escapeOkai(b.service)+'</span></div>';
+    }).join("");
+  }
+  function renderOkaiSpecStatus(customer){
+    var wrap = document.getElementById("okaiSpecStatus");
+    var status = (customer && customer.specStatus) || {};
+    var keys = Object.keys(status);
+    if(!keys.length){ wrap.innerHTML = '<div class="muted">情報がありません。</div>'; return; }
+    wrap.innerHTML = keys.map(function(k){
+      return '<div>'+escapeOkai(k)+'：<strong>'+escapeOkai(status[k])+'</strong></div>';
+    }).join("");
+  }
+  var OKAI_INBOX_LABELS = {sample_request:"サンプル請求", photo_share:"写真共有", spec_decision:"仕様の仮決定・決定", consideration_attachment:"検討項目の添付", staff_photo:"スタッフ写真", staff_document:"スタッフ資料"};
+  function renderOkaiInbox(entries){
+    var list = document.getElementById("okaiInboxList");
+    var empty = document.getElementById("okaiInboxEmpty");
+    if(!entries || !entries.length){ list.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+    list.innerHTML = entries.map(function(e){
+      var label = OKAI_INBOX_LABELS[e.type] || e.type;
+      var readBtn = e.read ? '' : '<button class="btn ghost small" data-okai-read="'+escapeOkai(e.id)+'">既読にする</button>';
+      return '<div class="card" style="padding:8px 10px;">'+
+        '<div class="row" style="justify-content:space-between; align-items:center;">'+
+        '<span class="pill tag">'+escapeOkai(label)+'</span>'+
+        '<span class="muted" style="font-size:.72rem;">'+escapeOkai((e.createdAt||"").slice(0,16).replace("T"," "))+'</span>'+
+        '</div>'+
+        (e.text?'<div style="margin-block-start:6px; font-size:.85rem; white-space:pre-wrap;">'+escapeOkai(e.text)+'</div>':'')+
+        (e.attachments&&e.attachments.length?'<div class="muted" style="font-size:.72rem; margin-block-start:4px;">添付 '+e.attachments.length+'件</div>':'')+
+        '<div style="margin-block-start:6px;">'+readBtn+'</div>'+
+        '</div>';
+    }).join("");
+  }
+  function renderOkaiEstimates(customer){
+    var list = document.getElementById("okaiEstimateList");
+    var empty = document.getElementById("okaiEstimateEmpty");
+    var items = (customer && customer.customerEstimates) || [];
+    if(!items.length){ list.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+    list.innerHTML = items.map(function(it){
+      return '<div class="card" style="padding:8px 10px;">'+
+        '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+escapeOkai(it.amount)+'</div>'+
+        (it.note?'<div class="muted" style="font-size:.8rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
+        '<div style="margin-block-start:6px;">お客様の回答：<strong>'+escapeOkai(it.customerResponse||"未回答")+'</strong></div>'+
+        '</div>';
+    }).join("");
+  }
+  function renderOkaiProfile(customer){
+    var area = document.getElementById("okaiProfileArea");
+    var profile = (customer && customer.customerProfile) || {familyMembers:[],appliances:[],bringIns:[]};
+    var html = "";
+    html += '<div><strong>ご家族</strong>：'+(profile.familyMembers.length? profile.familyMembers.map(function(m){ return escapeOkai(m.name)+'（身長'+escapeOkai(m.heightCm)+'cm）'; }).join("、") : '未入力')+'</div>';
+    html += '<div><strong>家電</strong>：'+(profile.appliances.length? profile.appliances.map(function(a){ return escapeOkai(a.name)+' '+escapeOkai(a.model)+' '+escapeOkai(a.size); }).join("、") : '未入力')+'</div>';
+    html += '<div><strong>持ち込み品</strong>：'+(profile.bringIns.length? profile.bringIns.map(function(b){ return escapeOkai(b.name)+'（'+escapeOkai(b.width)+'×'+escapeOkai(b.depth)+'×'+escapeOkai(b.height)+'）'; }).join("、") : '未入力')+'</div>';
+    area.innerHTML = html;
+  }
+  function renderOkaiConsider(customer){
+    var list = document.getElementById("okaiConsiderList");
+    var empty = document.getElementById("okaiConsiderEmpty");
+    var items = (customer && customer.considerations) || [];
+    if(!items.length){ list.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+    list.innerHTML = items.map(function(it){
+      return '<div class="card" style="padding:8px 10px;">'+
+        '<div class="row" style="justify-content:space-between;">'+
+        '<span>'+escapeOkai(it.title)+'</span><span class="pill tag">'+escapeOkai(it.status)+'</span>'+
+        '</div>'+
+        (it.note?'<div class="muted" style="font-size:.8rem;">'+escapeOkai(it.note)+'</div>':'')+
+        '</div>';
+    }).join("");
+  }
+
+  function loadOkaiNotePanel(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var unavailable = document.getElementById("okaiUnavailable");
+    unavailable.hidden = true;
+    document.getElementById("okaiAce3dUrl").value = "";
+    Promise.all([
+      okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=data'),
+      okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=inbox')
+    ]).then(function(results){
+      var dataRes = results[0], inboxRes = results[1];
+      if(!dataRes.ok){ unavailable.hidden = false; return; }
+      okaiBridgeCache[proj.id] = { customer: dataRes.body.customer, link: dataRes.body.link };
+      renderOkaiLink(proj, dataRes.body);
+      renderOkaiBooking(dataRes.body.customer);
+      renderOkaiSpecStatus(dataRes.body.customer);
+      renderOkaiEstimates(dataRes.body.customer);
+      renderOkaiProfile(dataRes.body.customer);
+      renderOkaiConsider(dataRes.body.customer);
+      document.getElementById("okaiAce3dUrl").value = (dataRes.body.customer && dataRes.body.customer.customerLinks && dataRes.body.customer.customerLinks.ace3dUrl) || "";
+      if(inboxRes.ok){ renderOkaiInbox(inboxRes.body.entries); }
+    }).catch(function(){ unavailable.hidden = false; });
+  }
+
+  function okaiIssueLink(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    okaiBridgeFetch('', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'ensureLink', projectId: proj.id, customerName: proj.customer||proj.name||"お客様" })
+    }).then(function(res){
+      if(!res.ok){ toast("リンクの発行に失敗しました"); return; }
+      renderOkaiLink(proj, {link:res.body.link});
+      toast("✅ リンクを発行しました");
+    }).catch(function(){ toast("リンクの発行に失敗しました"); });
+  }
+
+  function okaiAddEstimate(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var title = document.getElementById("okaiEstTitle").value.trim();
+    var amount = document.getElementById("okaiEstAmount").value.trim();
+    var note = document.getElementById("okaiEstNote").value.trim();
+    if(!title){ toast("件名を入力してください"); return; }
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.customerEstimates) || [];
+    var next = current.concat([{ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,8)), title: title, amount: amount, note: note, status: "確認中", updated: new Date().toISOString() }]);
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("追加見積りの送信に失敗しました"); return; }
+      document.getElementById("okaiEstTitle").value = "";
+      document.getElementById("okaiEstAmount").value = "";
+      document.getElementById("okaiEstNote").value = "";
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiEstimates(res.body.customer);
+      toast("✅ 追加見積りを送りました");
+      logActivity((proj.customer||proj.name||"")+"に追加見積り「"+title+"」を送りました");
+    }).catch(function(){ toast("追加見積りの送信に失敗しました"); });
+  }
+
+  function okaiAddConsider(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var title = document.getElementById("okaiConsiderTitle").value.trim();
+    if(!title){ toast("内容を入力してください"); return; }
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.considerations) || [];
+    var next = current.concat([{ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,8)), title: title, note: "", status: "検討中", createdAt: new Date().toISOString() }]);
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("追加に失敗しました"); return; }
+      document.getElementById("okaiConsiderTitle").value = "";
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiConsider(res.body.customer);
+      toast("✅ 家づくりリストに追加しました");
+    }).catch(function(){ toast("追加に失敗しました"); });
+  }
+
+  function okaiSaveAce3d(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var url = document.getElementById("okaiAce3dUrl").value.trim();
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { customerLinks: { ace3dUrl: url } } })
+    }).then(function(res){
+      if(!res.ok){ toast("保存に失敗しました（httpsのURLか確認してください）"); return; }
+      toast("✅ 保存しました");
+    }).catch(function(){ toast("保存に失敗しました"); });
+  }
+
+  function okaiMarkInboxRead(id){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    okaiBridgeFetch('', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'markInboxRead', projectId: proj.id, id: id })
+    }).then(function(){ loadOkaiNotePanel(); }).catch(function(){});
   }
 
   function deleteSpecPhoto(id){
@@ -3886,7 +4176,19 @@
         btn.classList.add("active");
         currentSub = btn.dataset.sub;
         document.getElementById("sub-"+currentSub).classList.add("active");
+        if(currentSub === "okainote") loadOkaiNotePanel();
       });
+    });
+
+    document.getElementById("btnOkaiRefresh").addEventListener("click", loadOkaiNotePanel);
+    document.getElementById("btnOkaiIssueLink").addEventListener("click", okaiIssueLink);
+    document.getElementById("btnOkaiAddEstimate").addEventListener("click", okaiAddEstimate);
+    document.getElementById("btnOkaiAddConsider").addEventListener("click", okaiAddConsider);
+    document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
+    document.getElementById("okaiInboxList").addEventListener("click", function(e){
+      var btn = e.target.closest("[data-okai-read]");
+      if(!btn) return;
+      okaiMarkInboxRead(btn.dataset.okaiRead);
     });
 
     document.getElementById("reqVendorList").addEventListener("change", function(e){
