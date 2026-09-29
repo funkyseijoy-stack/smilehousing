@@ -1,0 +1,11 @@
+/app/*
+  Cache-Control: no-cache, must-revalidate
+
+/app/
+  Cache-Control: no-cache, must-revalidate
+
+/app/manifest.json
+  Cache-Control: no-cache, must-revalidate
+
+/note.html
+  Cache-Control: no-cache, must-revalidate
