@@ -2244,7 +2244,10 @@
     empty.hidden = true;
     list.innerHTML = items.map(function(it){
       return '<div class="card" style="padding:8px 10px;">'+
+        '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
         '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+escapeOkai(it.amount)+'</div>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
+        '</div>'+
         (it.note?'<div class="muted" style="font-size:.8rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
         '<div style="margin-block-start:6px;">お客様の回答：<strong>'+escapeOkai(it.customerResponse||"未回答")+'</strong></div>'+
         '</div>';
@@ -2267,8 +2270,10 @@
     empty.hidden = true;
     list.innerHTML = items.map(function(it){
       return '<div class="card" style="padding:8px 10px;">'+
-        '<div class="row" style="justify-content:space-between;">'+
-        '<span>'+escapeOkai(it.title)+'</span><span class="pill tag">'+escapeOkai(it.status)+'</span>'+
+        '<div class="row" style="justify-content:space-between; align-items:center;">'+
+        '<span>'+escapeOkai(it.title)+'</span>'+
+        '<span class="row" style="gap:6px; align-items:center;"><span class="pill tag">'+escapeOkai(it.status)+'</span>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-consider="'+escapeOkai(it.id)+'">削除</button></span>'+
         '</div>'+
         (it.note?'<div class="muted" style="font-size:.8rem;">'+escapeOkai(it.note)+'</div>':'')+
         '</div>';
@@ -2358,6 +2363,44 @@
       renderOkaiConsider(res.body.customer);
       toast("✅ 家づくりリストに追加しました");
     }).catch(function(){ toast("追加に失敗しました"); });
+  }
+
+  function okaiDeleteEstimate(id){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    if(!confirm("この追加見積りを削除しますか？")) return;
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.customerEstimates) || [];
+    var next = current.filter(function(it){ return it.id !== id; });
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("削除に失敗しました"); return; }
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiEstimates(res.body.customer);
+      toast("削除しました");
+    }).catch(function(){ toast("削除に失敗しました"); });
+  }
+
+  function okaiDeleteConsider(id){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    if(!confirm("この項目を削除しますか？")) return;
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.considerations) || [];
+    var next = current.filter(function(it){ return it.id !== id; });
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("削除に失敗しました"); return; }
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiConsider(res.body.customer);
+      toast("削除しました");
+    }).catch(function(){ toast("削除に失敗しました"); });
   }
 
   function okaiSaveAce3d(){
@@ -4189,6 +4232,16 @@
       var btn = e.target.closest("[data-okai-read]");
       if(!btn) return;
       okaiMarkInboxRead(btn.dataset.okaiRead);
+    });
+    document.getElementById("okaiEstimateList").addEventListener("click", function(e){
+      var btn = e.target.closest("[data-okai-del-estimate]");
+      if(!btn) return;
+      okaiDeleteEstimate(btn.dataset.okaiDelEstimate);
+    });
+    document.getElementById("okaiConsiderList").addEventListener("click", function(e){
+      var btn = e.target.closest("[data-okai-del-consider]");
+      if(!btn) return;
+      okaiDeleteConsider(btn.dataset.okaiDelConsider);
     });
 
     document.getElementById("reqVendorList").addEventListener("change", function(e){
