@@ -4147,6 +4147,8 @@
     document.getElementById("projectTableBody").addEventListener("click", handleTableClick);
     document.getElementById("pendingTableBody").addEventListener("click", handleTableClick);
     document.getElementById("vendorTableBody").addEventListener("click", handleTableClick);
+    var meetingNoteListEl = document.getElementById("meetingNoteList");
+    if(meetingNoteListEl) meetingNoteListEl.addEventListener("click", handleTableClick);
     document.getElementById("attachmentList").addEventListener("click", function(e){
       var openEl = e.target.closest("[data-openatt]");
       if(openEl){ openAttachment(openEl.dataset.openatt); return; }
