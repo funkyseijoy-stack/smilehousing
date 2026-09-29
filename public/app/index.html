@@ -2805,31 +2805,48 @@
   async function compressImageFile(file, maxDim, quality){
     maxDim = maxDim || 1600; quality = quality || 0.82;
     var srcFile = file;
-    if(isHeicFile(file)){
-      srcFile = await heicToJpegBlob(file, quality);
-    }
-    return new Promise(function(resolve){
-      if(!srcFile.type || srcFile.type.indexOf("image")!==0){ resolve(srcFile); return; }
-      var reader = new FileReader();
-      reader.onload = function(){
-        var img = new Image();
-        img.onload = function(){
-          var scale = Math.min(1, maxDim/Math.max(img.naturalWidth, img.naturalHeight));
-          var w = Math.max(1, Math.round(img.naturalWidth*scale)), h = Math.max(1, Math.round(img.naturalHeight*scale));
-          var canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          var ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-          canvas.toBlob(function(blob){
-            resolve(blob && blob.size < srcFile.size ? blob : srcFile);
-          }, "image/jpeg", quality);
+    try{
+      if(isHeicFile(file)){
+        srcFile = await heicToJpegBlob(file, quality);
+      }
+    }catch(e){ srcFile = file; }
+    if(!srcFile || !srcFile.type || srcFile.type.indexOf("image")!==0){ return srcFile || file; }
+
+    // キャンバスでの軽量化処理は、端末やブラウザの状態によって稀に失敗・停止する
+    // ことがある（何のエラーも出ないまま固まる場合もある）。その場合でも必ず
+    // 数秒以内に処理を進め、元のファイルのままアップロードできるようにする。
+    var compressPromise = new Promise(function(resolve){
+      try{
+        var reader = new FileReader();
+        reader.onload = function(){
+          try{
+            var img = new Image();
+            img.onload = function(){
+              try{
+                var scale = Math.min(1, maxDim/Math.max(img.naturalWidth, img.naturalHeight));
+                var w = Math.max(1, Math.round(img.naturalWidth*scale)), h = Math.max(1, Math.round(img.naturalHeight*scale));
+                var canvas = document.createElement("canvas");
+                canvas.width = w; canvas.height = h;
+                var ctx = canvas.getContext("2d");
+                if(!ctx){ resolve(srcFile); return; }
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(function(blob){
+                  resolve(blob && blob.size < srcFile.size ? blob : srcFile);
+                }, "image/jpeg", quality);
+              }catch(e){ resolve(srcFile); }
+            };
+            img.onerror = function(){ resolve(srcFile); };
+            img.src = reader.result;
+          }catch(e){ resolve(srcFile); }
         };
-        img.onerror = function(){ resolve(srcFile); };
-        img.src = reader.result;
-      };
-      reader.onerror = function(){ resolve(srcFile); };
-      reader.readAsDataURL(srcFile);
+        reader.onerror = function(){ resolve(srcFile); };
+        reader.readAsDataURL(srcFile);
+      }catch(e){ resolve(srcFile); }
     });
+    var timeoutPromise = new Promise(function(resolve){
+      setTimeout(function(){ resolve(srcFile); }, 6000);
+    });
+    return Promise.race([compressPromise, timeoutPromise]);
   }
   async function uploadAlbumPhotos(kind, fileList, categoryId){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
