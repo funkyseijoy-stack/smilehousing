@@ -749,6 +749,9 @@
       <div class="empty" id="gmailEmpty" hidden>メールがありません。</div>
       <div class="empty" id="gmailLoading" hidden>読み込み中…</div>
       <div class="empty" id="gmailError" hidden>この画面ではGmailの受信箱を読み込めませんでした。</div>
+      <div class="row" style="justify-content:center; margin-block-start:10px;">
+        <button class="btn secondary small" id="btnLoadMoreGmail" hidden>もっと読み込む</button>
+      </div>
     </div>
   </section>
 
@@ -979,6 +982,8 @@
 
   var db="netlify", mcp=null, assets=null, downloads=null, fileArgsSupported=false;
   var gmailThreadsCache = [];
+  var gmailNextPageToken = null;
+  var gmailCurrentQuery = "";
   var STAFF_TOKEN_KEY = "sumairu_staff_token";
   var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations"];
 
@@ -2746,17 +2751,41 @@
     if(id) return "https://mail.google.com/mail/u/0/#all/"+id;
     return "https://mail.google.com/mail/u/0/#inbox";
   }
-  async function loadGmailInbox(query){
+  function gmailRowHtml(t){
+    var sender = escapeHtml(t.sender || "");
+    var subject = escapeHtml(t.subject || "(件名なし)");
+    var snippet = escapeHtml(t.snippet || "");
+    var date = t.date ? fmtTs(t.date) : "";
+    var url = t.viewUrl || gmailViewUrlFor(t, null);
+    return '<a class="gmailrow" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+
+      '<div class="gr-top"><span>'+sender+'</span><span class="tabular">'+date+'</span></div>'+
+      '<div class="gr-subject">'+subject+'</div>'+
+      '<div class="gr-snippet">'+snippet+'</div>'+
+      '</a>';
+  }
+
+  async function loadGmailInbox(query, opts){
+    opts = opts || {};
+    var append = !!opts.append;
     var listEl = document.getElementById("gmailList");
     var empty = document.getElementById("gmailEmpty");
     var loading = document.getElementById("gmailLoading");
     var errorEl = document.getElementById("gmailError");
+    var loadMoreBtn = document.getElementById("btnLoadMoreGmail");
     if(!listEl) return;
+    var q = (query||"").trim() || "in:inbox";
+    if(!append){
+      gmailCurrentQuery = q;
+      gmailNextPageToken = null;
+      gmailThreadsCache = [];
+      listEl.innerHTML = "";
+    }
     empty.hidden = true; errorEl.hidden = true; loading.hidden = false;
-    listEl.innerHTML = "";
+    if(loadMoreBtn) loadMoreBtn.hidden = true;
     try{
-      var q = (query||"").trim() || "in:inbox";
-      var res = await fetch("/api/gmail-search-threads?q="+encodeURIComponent(q)+"&maxResults=25", {
+      var apiUrl = "/api/gmail-search-threads?q="+encodeURIComponent(q)+"&maxResults=50";
+      if(append && gmailNextPageToken) apiUrl += "&pageToken="+encodeURIComponent(gmailNextPageToken);
+      var res = await fetch(apiUrl, {
         headers:{ "X-Staff-Token": getStaffToken()||"" }
       });
       if(res.status===409){
@@ -2773,20 +2802,13 @@
       var data = await res.json();
       var threads = data.threads || [];
       loading.hidden = true;
-      gmailThreadsCache = threads;
-      if(threads.length === 0){ empty.hidden = false; return; }
-      listEl.innerHTML = threads.map(function(t){
-        var sender = escapeHtml(t.sender || "");
-        var subject = escapeHtml(t.subject || "(件名なし)");
-        var snippet = escapeHtml(t.snippet || "");
-        var date = t.date ? fmtTs(t.date) : "";
-        var url = t.viewUrl || gmailViewUrlFor(t, null);
-        return '<a class="gmailrow" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+
-          '<div class="gr-top"><span>'+sender+'</span><span class="tabular">'+date+'</span></div>'+
-          '<div class="gr-subject">'+subject+'</div>'+
-          '<div class="gr-snippet">'+snippet+'</div>'+
-          '</a>';
-      }).join("");
+      gmailNextPageToken = data.nextPageToken || null;
+      gmailThreadsCache = append ? gmailThreadsCache.concat(threads) : threads;
+      if(gmailThreadsCache.length === 0){ empty.hidden = false; if(loadMoreBtn) loadMoreBtn.hidden = true; return; }
+      var rowsHtml = threads.map(gmailRowHtml).join("");
+      if(append){ listEl.insertAdjacentHTML("beforeend", rowsHtml); }
+      else { listEl.innerHTML = rowsHtml; }
+      if(loadMoreBtn) loadMoreBtn.hidden = !gmailNextPageToken;
     }catch(e){
       loading.hidden = true;
       errorEl.hidden = false;
@@ -3862,6 +3884,7 @@
     document.getElementById("btnRefreshGmail").addEventListener("click", function(){ loadGmailInbox(document.getElementById("gmailSearchInput").value); });
     document.getElementById("btnSearchGmail").addEventListener("click", function(){ loadGmailInbox(document.getElementById("gmailSearchInput").value); });
     document.getElementById("gmailSearchInput").addEventListener("keydown", function(e){ if(e.key==="Enter") loadGmailInbox(e.target.value); });
+    document.getElementById("btnLoadMoreGmail").addEventListener("click", function(){ loadGmailInbox(gmailCurrentQuery, {append:true}); });
     document.getElementById("btnSendChangeRequest").addEventListener("click", sendChangeRequest);
     document.getElementById("btnCancelChangeRequest").addEventListener("click", closeChangeRequestForm);
     document.getElementById("btnAddVendor").addEventListener("click", addVendor);

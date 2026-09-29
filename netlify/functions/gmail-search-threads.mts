@@ -61,7 +61,8 @@ export default async (req: Request, context: Context) => {
 
   const url = new URL(req.url);
   const q = url.searchParams.get("q") || "in:inbox";
-  const maxResults = Math.min(parseInt(url.searchParams.get("maxResults") || "25", 10) || 25, 50);
+  const maxResults = Math.min(parseInt(url.searchParams.get("maxResults") || "50", 10) || 50, 100);
+  const pageToken = url.searchParams.get("pageToken") || "";
 
   const tokenResult = await getAccessToken();
   if (!tokenResult.ok) {
@@ -74,6 +75,7 @@ export default async (req: Request, context: Context) => {
     const listUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/threads");
     listUrl.searchParams.set("q", q);
     listUrl.searchParams.set("maxResults", String(maxResults));
+    if (pageToken) listUrl.searchParams.set("pageToken", pageToken);
     const listRes = await fetch(listUrl.toString(), { headers: authHeader });
     const listData: any = await listRes.json();
     if (!listRes.ok) {
@@ -116,7 +118,7 @@ export default async (req: Request, context: Context) => {
       })
     );
 
-    return jsonResponse({ threads });
+    return jsonResponse({ threads, nextPageToken: listData.nextPageToken || null, resultSizeEstimate: listData.resultSizeEstimate });
   } catch (e: any) {
     return jsonResponse({ error: "unexpected_error", detail: e?.message || String(e) }, 500);
   }
