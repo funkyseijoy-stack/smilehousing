@@ -2500,7 +2500,7 @@
   async function blobForAsset(assetId, url){
     if(blobCache[assetId]) return blobCache[assetId];
     var res = await fetch(url);
-    if(!res.ok) throw new Error("fetch_failed");
+    if(!res.ok) throw new Error("写真の取得に失敗（fetch_failed status="+res.status+"）");
     return await res.blob();
   }
   async function okaiPostInboxEntry(projectId, customerName, entry){
@@ -2509,7 +2509,7 @@
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'postInboxEntry', projectId: projectId, customerName: customerName||"お客様", entry: entry })
     });
-    if(!res.ok) throw new Error("postInboxEntry_failed");
+    if(!res.ok) throw new Error("送信に失敗（postInboxEntry: "+JSON.stringify(res.body)+"）");
     return res.body;
   }
   var okaiStaleCategoriesCleaned = {};
@@ -2569,7 +2569,7 @@
       });
       p.okaiPushedAt = nowIso();
       await saveDoc("specPhotos", p.id, p);
-    }catch(e){ toast("おうちノートへの反映に失敗しました（"+(p.fileName||"写真")+"）"); }
+    }catch(e){ toast("おうちノートへの反映に失敗しました（"+(p.fileName||"写真")+"）："+(e&&e.message||e)); }
   }
   async function pushMeetingNotesToOkai(proj){
     if(!proj) return;
