@@ -177,6 +177,16 @@ export default async (req: Request, context: Context) => {
       return json({ id: data.id });
     }
 
+    if (action === "deleteInboxEntry") {
+      // 二重送信などで誤って作られたおうちノートの受信箱エントリーを片付ける。
+      const id = String(body.id || "");
+      if (!id) return json({ error: "id_required" }, 400);
+      const res = await okaiFetch(`/api/customer-inbox?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: "okainote_unavailable", detail: data }, 502);
+      return json({ ok: true });
+    }
+
     return json({ error: "unknown_action" }, 400);
   }
 

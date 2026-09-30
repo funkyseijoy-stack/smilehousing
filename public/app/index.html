@@ -2551,6 +2551,43 @@
         saveDoc("specPhotos", p.id, p);
       });
   }
+  var okaiDupesCleaned = {};
+  async function dedupeOkaiSpecPhotoEntries(projectId){
+    // 「同期する」ボタンの連打や、反映トグルと同期の同時実行などで、
+    // 同じ写真がおうちノートへ2重に送信されてしまうことがあった。
+    // 既に2重登録されてしまった分を、項目・内容が同じもの同士でまとめて
+    // 一番古い1件だけ残し、残りを削除する。
+    if(okaiDupesCleaned[projectId]) return;
+    okaiDupesCleaned[projectId] = true;
+    try{
+      var res = await okaiBridgeFetch('?projectId='+encodeURIComponent(projectId)+'&resource=inbox');
+      if(!res.ok) return;
+      var entries = (res.body && res.body.entries) || [];
+      var groups = {};
+      entries.forEach(function(e){
+        if(!e || e.type!=="staff_document") return;
+        var kind = e.meta && e.meta.kind;
+        if(kind!=="spec_photo" && kind!=="planboard") return;
+        var key = kind+"|"+(e.meta&&e.meta.category||"")+"|"+(e.text||"")+"|"+((e.attachments&&e.attachments[0]&&e.attachments[0].name)||"");
+        (groups[key] = groups[key]||[]).push(e);
+      });
+      var toDelete = [];
+      Object.keys(groups).forEach(function(key){
+        var list = groups[key];
+        if(list.length<2) return;
+        list.sort(function(a,b){ return String(a.createdAt||"").localeCompare(String(b.createdAt||"")); });
+        toDelete = toDelete.concat(list.slice(1).map(function(e){ return e.id; }));
+      });
+      for(var i=0;i<toDelete.length;i++){
+        try{
+          await okaiBridgeFetch('', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ action:'deleteInboxEntry', projectId: projectId, id: toDelete[i] })
+          });
+        }catch(e){ /* 1件失敗しても他は続行する */ }
+      }
+    }catch(e){ /* 片付けに失敗しても反映処理自体は続行する */ }
+  }
   var OKAI_UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // おうちノート側（customer-inbox.mts）の上限に合わせる
   async function ensureUnderOkaiSizeLimit(blob){
     // 住まいるアプリ内では原寸のまま保管している仕様写真も、HEIC→JPEG変換等で
@@ -2565,8 +2602,12 @@
     try{ out = await compressImageFile(out, 900, 0.6); }catch(e){}
     return out;
   }
+  var okaiPushInFlight = {};
   async function pushSpecPhotoToOkai(proj, p){
-    if(!proj || !p || p.okaiPushedAt) return;
+    // 同期ボタンの連打や、反映トグルと同期の同時実行などで同じ写真が
+    // 2重に送信されないよう、送信中は即座にフラグを立てて他の呼び出しを弾く。
+    if(!proj || !p || p.okaiPushedAt || okaiPushInFlight[p.id]) return;
+    okaiPushInFlight[p.id] = true;
     try{
       await cleanupStaleOkaiCategories(proj.id);
       var mapped = okaiCategoryFor(p.scope, p.category);
@@ -2589,6 +2630,7 @@
       p.okaiPushedAt = nowIso();
       await saveDoc("specPhotos", p.id, p);
     }catch(e){ toast("おうちノートへの反映に失敗しました（"+(p.fileName||"写真")+"）："+(e&&e.message||e)); }
+    finally{ delete okaiPushInFlight[p.id]; }
   }
   async function pushMeetingNotesToOkai(proj){
     if(!proj) return;
@@ -2627,17 +2669,23 @@
       }
     }catch(e){ toast("打合せ記録のおうちノート反映に失敗しました"); }
   }
+  var okaiSyncInFlight = {};
   async function syncAllToOkaiNote(){
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
+    if(okaiSyncInFlight[proj.id]){ toast("同期処理中です。しばらくお待ちください"); return; }
+    okaiSyncInFlight[proj.id] = true;
+    try{
     toast("おうちノートへ同期中…");
     await pushMeetingNotesToOkai(proj);
     await cleanupStaleOkaiCategories(proj.id);
+    await dedupeOkaiSpecPhotoEntries(proj.id);
     migrateOkaiSpecPhotoCategories(proj);
     var pending = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.reflected && !p.okaiPushedAt; });
     for(var i=0;i<pending.length;i++){ await pushSpecPhotoToOkai(proj, pending[i]); }
     render();
     toast("✅ おうちノートに同期しました");
+    }finally{ delete okaiSyncInFlight[proj.id]; }
   }
 
   function deleteSpecPhoto(id){
