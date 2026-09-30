@@ -2461,7 +2461,7 @@
   // 新しい項目として追加する。
   var OKAI_BUILTIN_CATEGORY_MAP = {
     "exterior|外壁":"exterior", "exterior|外壁アクセント":"exterior", "exterior|屋根":"exterior",
-    "exterior|破風":"exterior", "exterior|鼻隠し":"exterior", "exterior|玄関ドア":"entrance",
+    "exterior|破風":"exterior", "exterior|鼻隠し":"exterior", "exterior|玄関ドア":"exterior",
     "facility|キッチン":"kitchen", "facility|お風呂":"bath", "facility|洗面":"wash",
     "facility|1階トイレ":"toilet1", "facility|2階トイレ":"toilet2", "facility|脱衣室":"wash",
     "interiorColor|メインクロス":"interior", "interiorColor|ドア":"interior", "interiorColor|床":"interior",
@@ -2539,16 +2539,20 @@
     }catch(e){ /* 片付けに失敗しても反映処理自体は続行する */ }
   }
   function migrateOkaiSpecPhotoCategories(proj){
-    // 修正前は「送信済み」のまま旧カテゴリー（例：exterior_屋根）に固定されていた写真を、
-    // 既存テンプレート項目（例：外部）へ載せ直すため、未送信状態に戻して再送信させる。
+    // 送信済みの写真が、現在のカテゴリー対応（OKAI_BUILTIN_CATEGORY_MAP）と
+    // 違う項目に固定されたままになっていたら、載せ直すため未送信状態に戻す。
+    // （例：以前は「玄関ドア」の写真を「玄関」へ送っていたが、「外部」に変更した場合など、
+    // 対応表を後から変えても、既に送信済みの写真が自動的に正しい項目へ移る）
     if(!proj) return;
     liveSpecPhotos()
-      .filter(function(p){ return p.projectId===proj.id && p.reflected && p.okaiPushedAt && !p.okaiCategoryMigrated; })
+      .filter(function(p){ return p.projectId===proj.id && p.reflected && p.okaiPushedAt; })
       .forEach(function(p){
         var mapped = okaiCategoryFor(p.scope, p.category);
-        p.okaiCategoryMigrated = true;
-        if(!mapped.isCustom){ p.okaiPushedAt = null; }
-        saveDoc("specPhotos", p.id, p);
+        if(!mapped.isCustom && p.okaiLastCategoryId !== mapped.id){
+          p.okaiLastCategoryId = mapped.id;
+          p.okaiPushedAt = null;
+          saveDoc("specPhotos", p.id, p);
+        }
       });
   }
   var okaiDupesCleaned = {};
@@ -2626,13 +2630,25 @@
         return;
       }
       var dataBase64 = await blobToBase64(blob);
-      await okaiPostInboxEntry(proj.id, proj.customer||proj.name, {
+      if(p.okaiInboxEntryId){
+        // カテゴリー対応の変更などで載せ直す場合、古い方のエントリーを先に削除しておく
+        // （削除に失敗しても、新しい方の送信は続行する）
+        try{
+          await okaiBridgeFetch('', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ action:'deleteInboxEntry', projectId: proj.id, id: p.okaiInboxEntryId })
+          });
+        }catch(e){}
+      }
+      var postResult = await okaiPostInboxEntry(proj.id, proj.customer||proj.name, {
         type: "staff_document",
         text: p.category||"",
         meta: { kind: (p.kind==="planboard"?"planboard":"spec_photo"), category: mapped.id },
         images: [{ name: p.fileName||"photo.jpg", contentType: (blob&&blob.type)||p.contentType||"image/jpeg", dataBase64: dataBase64 }]
       });
       p.okaiPushedAt = nowIso();
+      p.okaiLastCategoryId = mapped.id;
+      p.okaiInboxEntryId = postResult && postResult.id;
       await saveDoc("specPhotos", p.id, p);
     }catch(e){ toast("おうちノートへの反映に失敗しました（"+(p.fileName||"写真")+"）："+(e&&e.message||e)); }
     finally{ delete okaiPushInFlight[p.id]; }
