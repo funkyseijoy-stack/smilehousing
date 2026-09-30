@@ -2538,6 +2538,19 @@
       }
     }catch(e){ /* 片付けに失敗しても反映処理自体は続行する */ }
   }
+  function migrateOkaiSpecPhotoCategories(proj){
+    // 修正前は「送信済み」のまま旧カテゴリー（例：exterior_屋根）に固定されていた写真を、
+    // 既存テンプレート項目（例：外部）へ載せ直すため、未送信状態に戻して再送信させる。
+    if(!proj) return;
+    liveSpecPhotos()
+      .filter(function(p){ return p.projectId===proj.id && p.reflected && p.okaiPushedAt && !p.okaiCategoryMigrated; })
+      .forEach(function(p){
+        var mapped = okaiCategoryFor(p.scope, p.category);
+        p.okaiCategoryMigrated = true;
+        if(!mapped.isCustom){ p.okaiPushedAt = null; }
+        saveDoc("specPhotos", p.id, p);
+      });
+  }
   async function pushSpecPhotoToOkai(proj, p){
     if(!proj || !p || p.okaiPushedAt) return;
     try{
@@ -2600,6 +2613,8 @@
     if(!proj){ toast("案件を選択してください"); return; }
     toast("おうちノートへ同期中…");
     await pushMeetingNotesToOkai(proj);
+    await cleanupStaleOkaiCategories(proj.id);
+    migrateOkaiSpecPhotoCategories(proj);
     var pending = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.reflected && !p.okaiPushedAt; });
     for(var i=0;i<pending.length;i++){ await pushSpecPhotoToOkai(proj, pending[i]); }
     render();
