@@ -234,6 +234,9 @@
   /* ---- spec management (仕様) ---- */
   .speccat{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:10px; }
   .speccat h4{ margin:0 0 8px; font-size:.82rem; }
+  .extspecvalues-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
+  .extspecvalue-field{ display:flex; flex-direction:column; gap:3px; font-size:.72rem; color:var(--muted); font-weight:700; }
+  .extspecvalue-field input{ font-size:.82rem; font-weight:400; color:var(--text); padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); }
   .specphotos{ display:flex; flex-wrap:wrap; gap:8px; }
   .specphoto{ position:relative; width:72px; height:72px; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface); flex-shrink:0; }
   .specphoto img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -1047,6 +1050,23 @@
   // ================= state =================
   var STATUS_ORDER = ["未着手","対応中","対応済み","お客様へ連絡済み"];
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
+  // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
+  // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
+  var EXTERIOR_SPEC_VALUE_FIELDS = [
+    ["mainWall","メイン外壁"],
+    ["mainWallNote","メイン外壁の品番・補足"],
+    ["accentWall","アクセント外壁"],
+    ["accentWallNote","アクセント外壁の品番・補足"],
+    ["roofColor","屋根の色"],
+    ["roofNote","屋根・破風の比較補足"],
+    ["roofPhotoNote","屋根の写真・品番"],
+    ["fasciaColor","破風・鼻隠しの色"],
+    ["fasciaPhotoNote","破風・鼻隠しの写真・品番"],
+    ["sashOutside","サッシ外観色"],
+    ["sashInside","室内側の窓枠色"],
+    ["glass","ガラス"],
+    ["fogPlace","くもりガラスの場所"]
+  ];
   var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室"];
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
@@ -1870,11 +1890,26 @@
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.exteriorNotes) || {};
-    wrap.innerHTML = EXTERIOR_CATS.map(function(cat){
+    var specValues = (proj && proj.exteriorSpecValues) || {};
+    var valuesBlockHtml = '<div class="speccat">'+
+      '<h4>色・仕様（サッシ・ガラスなど）</h4>'+
+      '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
+      '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
+      '<button type="button" class="btn secondary small" id="btnReflectExteriorSpecValues">🌐 おうちノートに反映する</button>'+
+      '</div>'+
+      '<div class="extspecvalues-grid">'+
+      EXTERIOR_SPEC_VALUE_FIELDS.map(function(f){
+        return '<label class="extspecvalue-field"><span>'+escapeHtml(f[1])+'</span>'+
+          '<input type="text" data-extspecvalue="'+f[0]+'" value="'+escapeHtml(specValues[f[0]]||"")+'"></label>';
+      }).join("")+
+      '</div></div>';
+    wrap.innerHTML = valuesBlockHtml + EXTERIOR_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("exterior",cat,null,null)+
         '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         '</div>';
     }).join("");
+    var reflectBtn = document.getElementById("btnReflectExteriorSpecValues");
+    if(reflectBtn) reflectBtn.addEventListener("click", function(){ pushExteriorSpecValuesToOkai(proj); });
   }
   async function updateExteriorNote(cat, value){
     var proj = projectById(state.currentProjectId);
@@ -1882,6 +1917,38 @@
     proj.exteriorNotes = proj.exteriorNotes || {};
     proj.exteriorNotes[cat] = value;
     await saveDoc("projects", proj.id, proj);
+  }
+  async function updateExteriorSpecValue(key, value){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    proj.exteriorSpecValues = proj.exteriorSpecValues || {};
+    proj.exteriorSpecValues[key] = value;
+    await saveDoc("projects", proj.id, proj);
+  }
+  async function pushExteriorSpecValuesToOkai(proj){
+    if(!proj){ toast("案件を選択してください"); return; }
+    try{
+      await getOrIssueOkaiLink(proj);
+      var customer = await okaiFetchCustomerData(proj.id);
+      var existingDetail = (customer && customer.specDetails && customer.specDetails.exterior) || {};
+      var mergedValues = Object.assign({}, existingDetail.values||{}, proj.exteriorSpecValues||{});
+      var res = await okaiBridgeFetch('', {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ projectId: proj.id, patch: { specDetails: { exterior: {
+          values: mergedValues,
+          photos: existingDetail.photos||{},
+          rooms: existingDetail.rooms||[]
+        } } } })
+      });
+      if(!res.ok) throw new Error("patch_failed");
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      toast("✅ 外部の色・仕様をおうちノートに反映しました");
+      logActivity("外部の色・仕様をおうちノートに反映しました");
+    }catch(e){
+      toast("❌ おうちノートへの反映に失敗しました（"+(e&&e.message?e.message:"unknown")+"）");
+    }
   }
   function renderSpecFacility(){
     var wrap = document.getElementById("specFacilityWrap");
@@ -4851,6 +4918,8 @@
         if(note){ updateRoomNote(note.dataset.roomnote, note.value); return; }
         var extNote = e.target.closest("[data-exteriornote]");
         if(extNote){ updateExteriorNote(extNote.dataset.exteriornote, extNote.value); return; }
+        var extSpecVal = e.target.closest("[data-extspecvalue]");
+        if(extSpecVal){ updateExteriorSpecValue(extSpecVal.dataset.extspecvalue, extSpecVal.value); return; }
         var facNote = e.target.closest("[data-facilitynote]");
         if(facNote){ updateFacilityNote(facNote.dataset.facilitynote, facNote.value); return; }
       });
