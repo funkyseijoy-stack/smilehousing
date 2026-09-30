@@ -2551,6 +2551,20 @@
         saveDoc("specPhotos", p.id, p);
       });
   }
+  var OKAI_UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // おうちノート側（customer-inbox.mts）の上限に合わせる
+  async function ensureUnderOkaiSizeLimit(blob){
+    // 住まいるアプリ内では原寸のまま保管している仕様写真も、HEIC→JPEG変換等で
+    // おうちノートの上限（4MB）を超える場合があるため、送信直前だけ縮小する
+    // （住まいるアプリ側の元データはそのまま残る）。
+    if(!blob || blob.size <= OKAI_UPLOAD_MAX_BYTES || String(blob.type||"").indexOf("image")!==0) return blob;
+    var out = blob;
+    try{ out = await compressImageFile(blob, 1600, 0.8); }catch(e){}
+    if(out && out.size <= OKAI_UPLOAD_MAX_BYTES) return out;
+    try{ out = await compressImageFile(out, 1200, 0.7); }catch(e){}
+    if(out && out.size <= OKAI_UPLOAD_MAX_BYTES) return out;
+    try{ out = await compressImageFile(out, 900, 0.6); }catch(e){}
+    return out;
+  }
   async function pushSpecPhotoToOkai(proj, p){
     if(!proj || !p || p.okaiPushedAt) return;
     try{
@@ -2560,12 +2574,17 @@
         await ensureOkaiSpecCategory(proj.id, mapped.id, p.category||p.scope||"仕様");
       }
       var blob = await blobForAsset(p.assetId, p.url);
+      blob = await ensureUnderOkaiSizeLimit(blob);
+      if(blob && blob.size > OKAI_UPLOAD_MAX_BYTES){
+        toast("おうちノートへの反映に失敗しました（"+(p.fileName||"写真")+"）：写真の容量が大きすぎるため縮小しても4MBに収まりませんでした");
+        return;
+      }
       var dataBase64 = await blobToBase64(blob);
       await okaiPostInboxEntry(proj.id, proj.customer||proj.name, {
         type: "staff_document",
         text: p.category||"",
         meta: { kind: (p.kind==="planboard"?"planboard":"spec_photo"), category: mapped.id },
-        images: [{ name: p.fileName||"photo.jpg", contentType: p.contentType||"image/jpeg", dataBase64: dataBase64 }]
+        images: [{ name: p.fileName||"photo.jpg", contentType: (blob&&blob.type)||p.contentType||"image/jpeg", dataBase64: dataBase64 }]
       });
       p.okaiPushedAt = nowIso();
       await saveDoc("specPhotos", p.id, p);
