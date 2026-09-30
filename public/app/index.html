@@ -1021,6 +1021,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1733,14 +1734,23 @@
     }).join("");
   }
 
+  // 図面/プランボードの一覧チップ。タップで編集（表示）、⬇でダウンロード
+  // （GoodNotesなど他アプリへ取り込む用）、×でゴミ箱に削除できる。
+  function planChipHtml(a){
+    var dlAttr = a.url ? ' href="'+escapeHtml(a.url)+'" download="'+escapeHtml(a.name)+'"' : '';
+    var dlDisabled = a.url ? "" : ' style="opacity:.4; pointer-events:none;" title="この図面はダウンロードできません"';
+    return '<div class="pbsourcechip-row" style="display:flex; align-items:center; gap:4px;">'+
+      '<div class="pbsourcechip" data-openplan="'+a.id+'" title="タップして開く（表示・書き込み）">🗂️ '+escapeHtml(a.name)+'</div>'+
+      '<a class="btn secondary small" target="_blank" rel="noopener"'+dlAttr+dlDisabled+' title="ダウンロード（GoodNotesなど他アプリで開けます）">⬇</a>'+
+      '<button class="btn danger-ghost small" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button>'+
+      '</div>';
+  }
   function renderPlanSourceList(){
     var wrap = document.getElementById("planSourceList");
     var empty = document.getElementById("planSourceEmpty");
     var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
     empty.hidden = rows.length !== 0;
-    wrap.innerHTML = rows.map(function(a){
-      return '<div class="pbsourcechip" data-openplan="'+a.id+'">🗂️ '+escapeHtml(a.name)+'</div>';
-    }).join("");
+    wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
   function renderDrawingsList(){
@@ -1749,9 +1759,7 @@
     if(!wrap) return;
     var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
     empty.hidden = rows.length !== 0;
-    wrap.innerHTML = rows.map(function(a){
-      return '<div class="pbsourcechip" data-openplan="'+a.id+'" title="タップして開く（表示・書き込み）">🗂️ '+escapeHtml(a.name)+'</div>';
-    }).join("");
+    wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
   function renderMeetingNotes(){
@@ -4156,6 +4164,66 @@
     });
   }
 
+  // 複数ページのPDFから、書き出したいページを自由に選べる簡易ピッカー。
+  // チェックを入れたページ番号の配列（昇順）を返す。キャンセル時はnull。
+  function askPagePicker(title, numPages, defaultPage, callback){
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:340px;width:100%;box-shadow:var(--shadow);";
+    var checks = [];
+    for(var i=1;i<=numPages;i++){ checks.push(i); }
+    box.innerHTML = '<h3 style="margin:0 0 8px;">'+escapeHtml(title)+'</h3>'+
+      '<p class="muted" style="margin:0 0 10px; font-size:.8rem;">選んだページは1つのファイルにまとめて保存されます。</p>'+
+      '<div style="display:flex; gap:8px; margin-block-end:10px;">'+
+      '<button class="btn secondary small" id="ppSelectAll" type="button">全て選択</button>'+
+      '<button class="btn secondary small" id="ppSelectNone" type="button">全て解除</button>'+
+      '</div>'+
+      '<div style="max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-block-end:14px;">'+
+      checks.map(function(p){
+        return '<label style="display:flex; align-items:center; gap:8px; font-size:.85rem;">'+
+          '<input type="checkbox" class="ppcheck" value="'+p+'"'+(p===defaultPage?" checked":"")+'> ページ '+p+
+          '</label>';
+      }).join("")+
+      '</div>'+
+      '<div style="display:flex; flex-direction:column; gap:8px;">'+
+      '<button class="btn" id="ppOk" style="width:100%;">保存する</button>'+
+      '<button class="btn secondary" id="ppCancel" style="width:100%;">キャンセル</button>'+
+      '</div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    function cleanup(){ overlay.remove(); }
+    box.querySelector("#ppSelectAll").addEventListener("click", function(){
+      box.querySelectorAll(".ppcheck").forEach(function(c){ c.checked = true; });
+    });
+    box.querySelector("#ppSelectNone").addEventListener("click", function(){
+      box.querySelectorAll(".ppcheck").forEach(function(c){ c.checked = false; });
+    });
+    box.querySelector("#ppOk").addEventListener("click", function(){
+      var picked = Array.prototype.slice.call(box.querySelectorAll(".ppcheck:checked")).map(function(c){ return parseInt(c.value,10); }).sort(function(a,b){return a-b;});
+      cleanup();
+      if(!picked.length){ toast("ページを1つ以上選んでください"); callback(null); return; }
+      callback(picked);
+    });
+    box.querySelector("#ppCancel").addEventListener("click", function(){ cleanup(); callback(null); });
+  }
+
+  // 複数枚のPNG blobを1つのPDF（1ページ=1画像）にまとめる。GoodNotesなど
+  // 他アプリでも開いて書き込めるよう、バラバラのPNGではなく1ファイルにする。
+  async function combinePngBlobsToPdf(blobs){
+    if(typeof PDFLib === "undefined") throw new Error("pdf-lib not loaded");
+    var pdfDoc = await PDFLib.PDFDocument.create();
+    for(var i=0;i<blobs.length;i++){
+      if(!blobs[i]) continue;
+      var buf = await blobs[i].arrayBuffer();
+      var img = await pdfDoc.embedPng(buf);
+      var page = pdfDoc.addPage([img.width, img.height]);
+      page.drawImage(img, {x:0, y:0, width:img.width, height:img.height});
+    }
+    var bytes = await pdfDoc.save();
+    return new Blob([bytes], {type:"application/pdf"});
+  }
+
   function promptPickMeetingNote(callback){
     var notes = liveNotes().filter(function(n){ return n.projectId===state.currentProjectId; })
       .slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); }).slice(0,8);
@@ -4165,13 +4233,15 @@
     choices.push({label:"新しい打合せ記録を作って添付", value:"__new__"});
     askChoice("どの打合せ記録に添付しますか？", "", choices, callback);
   }
-  async function attachBlobsToMeetingNote(noteId, blobs, baseName){
+  async function attachBlobsToMeetingNote(noteId, blobs, baseName, contentType){
+    contentType = contentType || "image/png";
+    var ext = contentType === "application/pdf" ? ".pdf" : ".png";
     var uploaded = [];
     for(var i=0;i<blobs.length;i++){
       if(!blobs[i]) continue;
-      var res = await assets.upload(blobs[i], {type:"image/png"});
+      var res = await assets.upload(blobs[i], {type:contentType});
       blobCache[res.id] = blobs[i];
-      uploaded.push({ id: res.id, url: res.url, contentType:"image/png", name: baseName+(blobs.length>1?("_p"+(i+1)):"")+".png" });
+      uploaded.push({ id: res.id, url: res.url, contentType:contentType, name: baseName+(blobs.length>1?("_p"+(i+1)):"")+ext });
     }
     if(noteId === "__new__"){
       var n = { id:uid("note"), projectId: state.currentProjectId, content: baseName, date: todayStr(), files: uploaded, author: state.currentUser||"", createdAt: nowIso() };
@@ -4719,35 +4789,48 @@
         });
         if(dest===null){ return; }
 
-        var range = await new Promise(function(resolve){
+        var pages = await new Promise(function(resolve){
           if(pb.pdfDoc && pb.pdfNumPages>1){
-            askChoice("書き出す範囲を選んでください", "このページには今の書き込み内容が反映されます。他のページは元の図面のまま書き出されます。", [
-              {label:"このページのみ", value:"current"},
-              {label:"全ページを書き出す（"+pb.pdfNumPages+"ページ）", value:"all"}
-            ], function(v){ resolve(v); });
-          } else { resolve("current"); }
+            askPagePicker("書き出すページを選んでください（"+pb.pdfNumPages+"ページ中）", pb.pdfNumPages, pb.pdfPage, function(v){ resolve(v); });
+          } else { resolve([1]); }
         });
-        if(range===null){ return; }
+        if(pages===null){ return; }
 
-        var blobs = [blob];
-        if(range==="all" && pb.pdfDoc){
-          blobs = [];
-          for(var p=1; p<=pb.pdfNumPages; p++){
-            if(p === pb.pdfPage){ blobs.push(blob); }
-            else { blobs.push(await pbRenderPdfPageToBlob(p)); }
-          }
+        var blobs = [];
+        for(var pi=0; pi<pages.length; pi++){
+          var pnum = pages[pi];
+          if(pnum === pb.pdfPage || !pb.pdfDoc){ blobs.push(blob); }
+          else { blobs.push(await pbRenderPdfPageToBlob(pnum)); }
+        }
+
+        // 複数ページを選んだ場合は、バラバラのPNGにせず1つのPDFにまとめる
+        // （案件の資料が散らからず、GoodNotesなど他アプリでもそのまま開いて書き込める）。
+        var bundleAsPdf = blobs.length > 1;
+        var mergedBlob = null;
+        if(bundleAsPdf){
+          try{ mergedBlob = await combinePngBlobsToPdf(blobs); }
+          catch(e){ bundleAsPdf = false; /* pdf-lib不調時は従来通りPNG複数枚にフォールバック */ }
         }
 
         if(dest==="attachment"){
-          for(var bi=0; bi<blobs.length; bi++){
-            if(!blobs[bi]) continue;
-            var res = await assets.upload(blobs[bi], {type:"image/png"});
-            var attName = baseName+(blobs.length>1?("_p"+(bi+1)):"")+".png";
-            var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:attName,
-              contentType:"image/png", sizeBytes: res.sizeBytes||blobs[bi].size, uploadedAt: todayStr(), kind:"plan" };
-            blobCache[res.id] = blobs[bi];
-            state.attachments.push(att);
-            await saveDoc("attachments", att.id, att);
+          if(bundleAsPdf && mergedBlob){
+            var resPdf = await assets.upload(mergedBlob, {type:"application/pdf"});
+            var attPdf = { id:uid("att"), projectId: state.currentProjectId, assetId: resPdf.id, name: baseName+".pdf", url: resPdf.url,
+              contentType:"application/pdf", sizeBytes: resPdf.sizeBytes||mergedBlob.size, uploadedAt: todayStr(), kind:"plan" };
+            blobCache[resPdf.id] = mergedBlob;
+            state.attachments.push(attPdf);
+            await saveDoc("attachments", attPdf.id, attPdf);
+          } else {
+            for(var bi=0; bi<blobs.length; bi++){
+              if(!blobs[bi]) continue;
+              var res = await assets.upload(blobs[bi], {type:"image/png"});
+              var attName = baseName+(blobs.length>1?("_p"+(bi+1)):"")+".png";
+              var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:attName, url: res.url,
+                contentType:"image/png", sizeBytes: res.sizeBytes||blobs[bi].size, uploadedAt: todayStr(), kind:"plan" };
+              blobCache[res.id] = blobs[bi];
+              state.attachments.push(att);
+              await saveDoc("attachments", att.id, att);
+            }
           }
           render();
           logActivity("プランボードを保存しました（"+baseName+"）");
@@ -4756,7 +4839,11 @@
         } else if(dest==="meeting"){
           var noteId = await new Promise(function(resolve){ promptPickMeetingNote(function(v){ resolve(v); }); });
           if(noteId===null){ return; }
-          await attachBlobsToMeetingNote(noteId, blobs, baseName);
+          if(bundleAsPdf && mergedBlob){
+            await attachBlobsToMeetingNote(noteId, [mergedBlob], baseName, "application/pdf");
+          } else {
+            await attachBlobsToMeetingNote(noteId, blobs, baseName, "image/png");
+          }
           logActivity("プランボードを打合せ記録に添付しました");
           toast("打合せ記録に添付しました");
           closePlanBoard();
@@ -4958,11 +5045,15 @@
       pbLoadFromBlob(f, isPdf);
     });
     document.getElementById("planSourceList").addEventListener("click", function(e){
+      var delBtn = e.target.closest("[data-act='delattachment']");
+      if(delBtn){ if(confirm2()) deleteAttachment(delBtn.dataset.id); return; }
       var chip = e.target.closest("[data-openplan]");
       if(!chip) return;
       openPlanBoard(chip.dataset.openplan);
     });
     document.getElementById("drawingsList").addEventListener("click", function(e){
+      var delBtn = e.target.closest("[data-act='delattachment']");
+      if(delBtn){ if(confirm2()) deleteAttachment(delBtn.dataset.id); return; }
       var chip = e.target.closest("[data-openplan]");
       if(!chip) return;
       openPlanBoard(chip.dataset.openplan);
