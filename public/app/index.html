@@ -2454,8 +2454,25 @@
   // （以前はpushToOkaiNote/save-noteという別系統の仕組みを使っており、
   // 実際にお客様が見るおうちノートには繋がっていなかった。橋渡し関数
   // okainote-bridge.mts経由で、customer-data / customer-inbox に直接書き込む。）
-  function slugForOkaiCategory(scope, category){
-    return String(scope||"cat")+"_"+String(category||"").replace(/[^0-9A-Za-z一-龠ぁ-んァ-ヶー]+/g, "").slice(0,40);
+  // おうちノート側の「設備仕様一覧」は、あらかじめ決まった11項目（外部・玄関・
+  // キッチン…）のテンプレートを持っている。住まいるアプリ側のカテゴリー名は
+  // それより細かく分かれているため、対応するテンプレート項目が分かるものは
+  // そちらにまとめて反映し（例：外壁・屋根・破風→「外部」）、対応が無いものだけ
+  // 新しい項目として追加する。
+  var OKAI_BUILTIN_CATEGORY_MAP = {
+    "exterior|外壁":"exterior", "exterior|外壁アクセント":"exterior", "exterior|屋根":"exterior",
+    "exterior|破風":"exterior", "exterior|鼻隠し":"exterior", "exterior|玄関ドア":"entrance",
+    "facility|キッチン":"kitchen", "facility|お風呂":"bath", "facility|洗面":"wash",
+    "facility|1階トイレ":"toilet1", "facility|2階トイレ":"toilet2", "facility|脱衣室":"wash",
+    "interiorColor|メインクロス":"interior", "interiorColor|ドア":"interior", "interiorColor|床":"interior",
+    "interiorColor|巾木":"interior", "interiorColor|笠木":"interior",
+    "interiorColor|玄関枠":"entrance", "interiorColor|浴室枠":"bath",
+  };
+  function okaiCategoryFor(scope, category){
+    var mapped = OKAI_BUILTIN_CATEGORY_MAP[String(scope||"")+"|"+String(category||"")];
+    if(mapped) return { id: mapped, isCustom:false };
+    if(scope==="room") return { id: "rooms", isCustom:false };
+    return { id: String(scope||"cat")+"_"+String(category||"").replace(/[^0-9A-Za-z一-龠ぁ-んァ-ヶー]+/g, "").slice(0,40), isCustom:true };
   }
   async function okaiFetchCustomerData(projectId){
     var res = await okaiBridgeFetch('?projectId='+encodeURIComponent(projectId)+'&resource=data');
@@ -2495,17 +2512,46 @@
     if(!res.ok) throw new Error("postInboxEntry_failed");
     return res.body;
   }
+  var okaiStaleCategoriesCleaned = {};
+  async function cleanupStaleOkaiCategories(projectId){
+    // 以前のバージョンでは、住まいるアプリの細かいカテゴリー名をそのまま
+    // 新規項目としておうちノートに追加していた（テンプレートと噛み合わず、
+    // 一覧が細切れに増えてしまう）。今はテンプレートの既存項目にまとめて
+    // 反映するので、その旧方式で作られた項目が残っていれば片付ける。
+    if(okaiStaleCategoriesCleaned[projectId]) return;
+    okaiStaleCategoriesCleaned[projectId] = true;
+    try{
+      var customer = await okaiFetchCustomerData(projectId);
+      var existing = (customer && customer.customSpecCategories) || [];
+      var staleIds = {};
+      Object.keys(OKAI_BUILTIN_CATEGORY_MAP).forEach(function(key){
+        var parts = key.split("|");
+        staleIds[parts[0]+"_"+parts[1].replace(/[^0-9A-Za-z一-龠ぁ-んァ-ヶー]+/g,"").slice(0,40)] = true;
+      });
+      var filtered = existing.filter(function(c){ return !staleIds[c.id]; });
+      if(filtered.length !== existing.length){
+        var res = await okaiBridgeFetch('', {
+          method:'PATCH', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ projectId: projectId, patch: { customSpecCategories: filtered } })
+        });
+        if(res.ok){ okaiBridgeCache[projectId]=okaiBridgeCache[projectId]||{}; okaiBridgeCache[projectId].customer=res.body.customer; }
+      }
+    }catch(e){ /* 片付けに失敗しても反映処理自体は続行する */ }
+  }
   async function pushSpecPhotoToOkai(proj, p){
     if(!proj || !p || p.okaiPushedAt) return;
     try{
-      var categoryId = slugForOkaiCategory(p.scope, p.category);
-      await ensureOkaiSpecCategory(proj.id, categoryId, p.category||p.scope||"仕様");
+      await cleanupStaleOkaiCategories(proj.id);
+      var mapped = okaiCategoryFor(p.scope, p.category);
+      if(mapped.isCustom){
+        await ensureOkaiSpecCategory(proj.id, mapped.id, p.category||p.scope||"仕様");
+      }
       var blob = await blobForAsset(p.assetId, p.url);
       var dataBase64 = await blobToBase64(blob);
       await okaiPostInboxEntry(proj.id, proj.customer||proj.name, {
         type: "staff_document",
         text: p.category||"",
-        meta: { kind: (p.kind==="planboard"?"planboard":"spec_photo"), category: categoryId },
+        meta: { kind: (p.kind==="planboard"?"planboard":"spec_photo"), category: mapped.id },
         images: [{ name: p.fileName||"photo.jpg", contentType: p.contentType||"image/jpeg", dataBase64: dataBase64 }]
       });
       p.okaiPushedAt = nowIso();
