@@ -398,6 +398,7 @@
 
       <div class="subtabs">
         <button class="sub-btn active" data-sub="overview">概要</button>
+        <button class="sub-btn" data-sub="sitecheck">現場確認</button>
         <button class="sub-btn" data-sub="customer">お客様情報</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
         <button class="sub-btn" data-sub="spec">設備仕様</button>
@@ -415,6 +416,15 @@
         <div class="card">
           <h3>この案件の概要</h3>
           <div id="overviewBody" style="font-size:.85rem; line-height:1.9;"></div>
+        </div>
+      </div>
+
+      <!-- 現場確認 subpanel -->
+      <div class="subpanel" id="sub-sitecheck">
+        <div class="card">
+          <h3>現場確認</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">現場で確認・決定する項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
+          <div id="specSiteCheckWrap"></div>
         </div>
       </div>
 
@@ -1085,6 +1095,7 @@
   };
   var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室"];
   var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
+  var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口","ポスト","ランドリーバー"];
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
@@ -1574,7 +1585,7 @@
     renderProjectDetail();
     renderProjectTable(); renderAttachments(); renderVendorCheckboxList();
     renderPlanSourceList(); renderDrawingsList(); renderMeetingNotes();
-    renderOverview(); renderCustomerInfo(); renderMessages(); renderSpecTab(); renderConfirmTab(); renderPhotosTab(); renderReservationTab();
+    renderOverview(); renderCustomerInfo(); renderMessages(); renderSpecTab(); renderSpecSiteCheck(); renderConfirmTab(); renderPhotosTab(); renderReservationTab();
   }
   function closeProjectDetail(){
     document.getElementById("projectDetailView").hidden = true;
@@ -2018,6 +2029,24 @@
     if(!proj) return;
     proj.equipmentNotes = proj.equipmentNotes || {};
     proj.equipmentNotes[cat] = value;
+    await saveDoc("projects", proj.id, proj);
+  }
+  function renderSpecSiteCheck(){
+    var wrap = document.getElementById("specSiteCheckWrap");
+    if(!wrap) return;
+    var proj = projectById(state.currentProjectId);
+    var notes = (proj && proj.siteCheckNotes) || {};
+    wrap.innerHTML = SITECHECK_CATS.map(function(cat){
+      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("siteCheck",cat,null,null)+
+        '<textarea class="siteCheckNote" data-sitechecknote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+        '</div>';
+    }).join("");
+  }
+  async function updateSiteCheckNote(cat, value){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    proj.siteCheckNotes = proj.siteCheckNotes || {};
+    proj.siteCheckNotes[cat] = value;
     await saveDoc("projects", proj.id, proj);
   }
   function interiorColorCatsFor(proj){
@@ -4931,7 +4960,7 @@
     });
     document.getElementById("btnSendMessage").addEventListener("click", sendMessage);
 
-    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specInteriorWrap","specRoomsWrap"].forEach(function(wrapId){
+    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specSiteCheckWrap","specInteriorWrap","specRoomsWrap"].forEach(function(wrapId){
       var wrap = document.getElementById(wrapId);
       if(!wrap) return;
       wrap.addEventListener("change", function(e){
@@ -5005,6 +5034,8 @@
         if(facNote){ updateFacilityNote(facNote.dataset.facilitynote, facNote.value); return; }
         var equipNote = e.target.closest("[data-equipmentnote]");
         if(equipNote){ updateEquipmentNote(equipNote.dataset.equipmentnote, equipNote.value); return; }
+        var siteCheckNote = e.target.closest("[data-sitechecknote]");
+        if(siteCheckNote){ updateSiteCheckNote(siteCheckNote.dataset.sitechecknote, siteCheckNote.value); return; }
       });
     });
     document.getElementById("btnAddRoom").addEventListener("click", addRoom);
