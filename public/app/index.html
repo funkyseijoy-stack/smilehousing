@@ -194,7 +194,7 @@
   .swatch{ width:22px; height:22px; border-radius:999px; border:2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); cursor:pointer; flex-shrink:0; }
   .swatch.active{ box-shadow: 0 0 0 2px var(--ink); }
   select.sizeSelect{ font-family:inherit; font-size:.78rem; padding:6px 7px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
-  .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; justify-content:center; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; }
+  .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; justify-content:center; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
   #pbStageInner{ position:relative; line-height:0; }
   #pbImageCanvas, #pbOverlayCanvas{ border-radius:8px; max-width:100%; height:auto; display:block; }
   #pbImageCanvas{ background:var(--canvas-bg); }
@@ -4179,6 +4179,43 @@
     pb.overlayCtx = pb.overlayCanvas.getContext("2d");
   }
 
+  // iOS Safari implements two-finger pinch as a page-level viewport gesture
+  // (its own proprietary gesturestart/gesturechange events), independent of
+  // touch-action CSS and independent of our own pointer-based pinch handler.
+  // While the plan-board modal is open we temporarily pin the page's own
+  // scale so the browser's native zoom never fights with pb.zoom, and we
+  // also swallow the Safari-only gesture events as a second safety net.
+  var pbViewportLockCount = 0;
+  function pbLockPageZoom(){
+    pbViewportLockCount++;
+    if(pbViewportLockCount > 1) return;
+    var meta = document.querySelector('meta[name="viewport"]');
+    if(meta){
+      pb._prevViewportContent = meta.getAttribute("content");
+      meta.setAttribute("content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover");
+    }
+  }
+  function pbUnlockPageZoom(){
+    if(pbViewportLockCount === 0) return;
+    pbViewportLockCount--;
+    if(pbViewportLockCount > 0) return;
+    var meta = document.querySelector('meta[name="viewport"]');
+    if(meta && pb._prevViewportContent){ meta.setAttribute("content", pb._prevViewportContent); }
+  }
+  function pbSwallowGesture(e){ e.preventDefault(); }
+  function pbWatchModalZoomLock(modalId){
+    var modal = document.getElementById(modalId);
+    if(!modal) return;
+    var wasHidden = modal.hidden;
+    if(!wasHidden) pbLockPageZoom();
+    new MutationObserver(function(){
+      var isHidden = modal.hidden;
+      if(isHidden === wasHidden) return;
+      wasHidden = isHidden;
+      if(isHidden) pbUnlockPageZoom(); else pbLockPageZoom();
+    }).observe(modal, { attributes:true, attributeFilter:["hidden"] });
+  }
+
   function pbRenderSwatches(){
     var group = document.getElementById("pbColorGroup");
     group.innerHTML = "";
@@ -5102,6 +5139,11 @@
 
     // ---- plan board modal wiring ----
     pbInitCanvasRefs();
+    pbWatchModalZoomLock("pbModal");
+    ["gesturestart","gesturechange","gestureend"].forEach(function(evt){
+      pb.overlayCanvas.addEventListener(evt, pbSwallowGesture);
+      document.querySelector(".pbstage").addEventListener(evt, pbSwallowGesture);
+    });
     document.querySelectorAll("#pbModal button[data-pbmode]").forEach(function(b){ b.addEventListener("click", function(){ pbSetMode(b.dataset.pbmode); }); });
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.addEventListener("click", function(){ pbSetTool(b.dataset.pbtool); }); });
     document.querySelectorAll("#pbModal button[data-pbshape]").forEach(function(b){ b.addEventListener("click", function(){ pbSetShape(b.dataset.pbshape); }); });
