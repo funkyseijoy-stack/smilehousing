@@ -1067,6 +1067,17 @@
     ["glass","ガラス"],
     ["fogPlace","くもりガラスの場所"]
   ];
+  // 各カテゴリーの「メモ（自由記述）」欄（exteriorNotes）を、おうちノート反映時に
+  // 色・仕様の値として一緒に送るためのキー対応表。customer app.js側のlabelsにも
+  // 同じキー名で追加が必要。
+  var EXTERIOR_CAT_NOTE_VALUE_KEYS = {
+    "外壁":"wallCatNote",
+    "外壁アクセント":"accentWallCatNote",
+    "屋根":"roofCatNote",
+    "破風":"fasciaCatNote",
+    "鼻隠し":"hanakakushiCatNote",
+    "玄関ドア":"entranceDoorCatNote"
+  };
   var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室"];
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
@@ -1894,7 +1905,7 @@
     var valuesBlockHtml = '<div class="speccat">'+
       '<h4>色・仕様（サッシ・ガラスなど）</h4>'+
       '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
-      '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
+      '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容と、下の各カテゴリーの「メモ（自由記述）」が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
       '<button type="button" class="btn secondary small" id="btnReflectExteriorSpecValues">🌐 おうちノートに反映する</button>'+
       '</div>'+
       '<div class="extspecvalues-grid">'+
@@ -1931,7 +1942,13 @@
       await getOrIssueOkaiLink(proj);
       var customer = await okaiFetchCustomerData(proj.id);
       var existingDetail = (customer && customer.specDetails && customer.specDetails.exterior) || {};
-      var mergedValues = Object.assign({}, existingDetail.values||{}, proj.exteriorSpecValues||{});
+      var catNotes = proj.exteriorNotes || {};
+      var catNoteValues = {};
+      Object.keys(EXTERIOR_CAT_NOTE_VALUE_KEYS).forEach(function(cat){
+        var noteText = catNotes[cat];
+        if(noteText) catNoteValues[EXTERIOR_CAT_NOTE_VALUE_KEYS[cat]] = noteText;
+      });
+      var mergedValues = Object.assign({}, existingDetail.values||{}, proj.exteriorSpecValues||{}, catNoteValues);
       var res = await okaiBridgeFetch('', {
         method:'PATCH',
         headers:{'Content-Type':'application/json'},
