@@ -659,12 +659,9 @@
 
         <div class="card">
           <h3>家づくりリスト（お客様・スタッフ共有の検討項目）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここには直接追加できません。「打合せ記録」から「確認事項・検討中」タブの検討中に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
           <div id="okaiConsiderList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiConsiderEmpty" hidden>まだ項目がありません。</div>
-          <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
-            <label class="field">内容<input type="text" id="okaiConsiderTitle" placeholder="例：カーテンの色"></label>
-            <button class="btn secondary" id="btnOkaiAddConsider">追加</button>
-          </div>
         </div>
 
         <div class="card">
@@ -1779,7 +1776,6 @@
         '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→検討中へ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="houselist" data-id="'+n.id+'">→家づくりリストへ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
         '</div></div>';
     }).join("");
@@ -2460,27 +2456,6 @@
     }).catch(function(){ toast("追加見積りの送信に失敗しました"); });
   }
 
-  function okaiAddConsider(){
-    var proj = projectById(state.currentProjectId);
-    if(!proj) return;
-    var title = document.getElementById("okaiConsiderTitle").value.trim();
-    if(!title){ toast("内容を入力してください"); return; }
-    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.considerations) || [];
-    var next = current.concat([{ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,8)), title: title, note: "", status: "検討中", createdAt: new Date().toISOString() }]);
-    okaiBridgeFetch('', {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
-    }).then(function(res){
-      if(!res.ok){ toast("追加に失敗しました"); return; }
-      document.getElementById("okaiConsiderTitle").value = "";
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = res.body.customer;
-      renderOkaiConsider(res.body.customer);
-      toast("✅ 家づくりリストに追加しました");
-    }).catch(function(){ toast("追加に失敗しました"); });
-  }
-
   function okaiDateLabel(dateStr){
     try{
       var d = new Date(dateStr+"T00:00:00+09:00");
@@ -3046,24 +3021,6 @@
       return;
     }
 
-    if(taskType === "houselist"){
-      var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.considerations) || [];
-      var next = current.concat([{ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,8)), title: content.slice(0,160), note: "", status: "検討中", createdAt: new Date().toISOString() }]);
-      okaiBridgeFetch('', {
-        method:'PATCH',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
-      }).then(function(res){
-        if(!res.ok){ toast("家づくりリストへの追加に失敗しました"); return; }
-        okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-        okaiBridgeCache[proj.id].customer = res.body.customer;
-        if(currentSub === "okainote") renderOkaiConsider(res.body.customer);
-        logActivity("打合せ記録から家づくりリスト「"+content.slice(0,20)+"」を作成しました");
-        toast("✅ 家づくりリストに追加しました");
-      }).catch(function(){ toast("家づくりリストへの追加に失敗しました"); });
-      return;
-    }
-
     if(taskType === "companytask"){
       var t = {
         id: uid("task"), projectId: proj.id, content: content,
@@ -3093,6 +3050,44 @@
     render();
     await saveDoc("confirmItems", id, item);
     logActivity("「"+(item.content||"").slice(0,20)+"」を"+next+"にしました");
+  }
+  // 社内の「検討中」項目を、お客様のおうちノートの「家づくりリスト」に反映する。
+  // 一度反映した項目は okaiConsiderationId で紐付けておき、再度押すと
+  // （内容やステータスが変わっていれば）同じ項目を上書き更新する。
+  async function reflectConsiderToHouseList(id){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    var it = state.confirmItems.find(function(x){ return x.id===id && x.kind==="consider"; });
+    if(!it){ toast("項目が見つかりません"); return; }
+    try{
+      await getOrIssueOkaiLink(proj);
+      var customer = await okaiFetchCustomerData(proj.id);
+      var current = (customer && customer.considerations) || [];
+      var mappedStatus = (it.status==="決定") ? "完了" : "検討中";
+      var next, newId;
+      if(it.okaiConsiderationId && current.some(function(c){ return c.id===it.okaiConsiderationId; })){
+        next = current.map(function(c){
+          return c.id===it.okaiConsiderationId ? Object.assign({}, c, { title:(it.content||"").slice(0,160), status:mappedStatus }) : c;
+        });
+      } else {
+        newId = (Date.now().toString(36)+Math.random().toString(36).slice(2,8));
+        next = current.concat([{ id:newId, title:(it.content||"").slice(0,160), note:"", status:mappedStatus, createdAt:new Date().toISOString() }]);
+      }
+      var res = await okaiBridgeFetch('', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
+      });
+      if(!res.ok) throw new Error("patch_failed");
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      if(newId) it.okaiConsiderationId = newId;
+      render();
+      await saveDoc("confirmItems", it.id, it);
+      logActivity("検討中「"+(it.content||"").slice(0,20)+"」を家づくりリストに反映しました");
+      toast("✅ 家づくりリストに反映しました");
+    }catch(e){
+      toast("❌ 家づくりリストへの反映に失敗しました（"+(e&&e.message?e.message:"unknown")+"）");
+    }
   }
   function renderConfirmList(){
     var wrap = document.getElementById("confirmList");
@@ -3148,6 +3143,7 @@
         '<div class="row" style="align-items:center; gap:8px; margin-block:6px; flex-wrap:wrap;">'+
           '<span class="pill '+pillClass+'">'+escapeHtml(status)+'</span>'+
           (nextLabel ? '<button class="btn small secondary" data-advanceconsider="'+it.id+'">'+nextLabel+'へ進める</button>' : "")+
+          '<button class="pill reflect'+(it.okaiConsiderationId?" on":"")+'" data-reflectconsider="'+it.id+'">'+(it.okaiConsiderationId?"家づくりリストに反映済み（更新）":"→家づくりリストへ反映")+'</button>'+
           confirmAttachmentsHtml(it.attachments)+
         '</div>'+
         '<div>'+historyHtml+'</div>'+
@@ -4972,7 +4968,6 @@
       okaiDeleteBooking(btn.dataset.okaiDelBooking);
     });
     document.getElementById("btnOkaiAddEstimate").addEventListener("click", okaiAddEstimate);
-    document.getElementById("btnOkaiAddConsider").addEventListener("click", okaiAddConsider);
     document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
     document.getElementById("okaiInboxList").addEventListener("click", function(e){
       var btn = e.target.closest("[data-okai-read]");
@@ -5177,6 +5172,8 @@
       if(del){ if(confirm2()) deleteConfirmItem(del.dataset.delconfirm); return; }
       var adv = e.target.closest("[data-advanceconsider]");
       if(adv){ advanceConsiderStatus(adv.dataset.advanceconsider); return; }
+      var refl = e.target.closest("[data-reflectconsider]");
+      if(refl){ reflectConsiderToHouseList(refl.dataset.reflectconsider); return; }
     });
 
     document.getElementById("btnAddRefCat").addEventListener("click", function(){ addPhotoCategory("reference","refCatInput"); });
