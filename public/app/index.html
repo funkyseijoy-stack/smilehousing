@@ -1772,6 +1772,7 @@
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→検討中へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="houselist" data-id="'+n.id+'">→家づくりリストへ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
         '</div></div>';
     }).join("");
   }
@@ -3052,6 +3053,25 @@
         logActivity("打合せ記録から家づくりリスト「"+content.slice(0,20)+"」を作成しました");
         toast("✅ 家づくりリストに追加しました");
       }).catch(function(){ toast("家づくりリストへの追加に失敗しました"); });
+      return;
+    }
+
+    if(taskType === "companytask"){
+      var t = {
+        id: uid("task"), projectId: proj.id, content: content,
+        assignee: "", instructor: "", creator: state.currentUser||"",
+        hasDeadline: false, deadline: "",
+        requestTo: "", requestMethod: "",
+        attachmentAssetIds: [],
+        private: false,
+        status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
+      };
+      state.tasks.push(t);
+      render();
+      await saveDoc("tasks", t.id, t);
+      logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました");
+      toast("✅ 社内タスクに追加しました");
+      return;
     }
   }
   async function advanceConsiderStatus(id){
