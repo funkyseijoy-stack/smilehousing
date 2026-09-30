@@ -402,7 +402,7 @@
         <button class="sub-btn" data-sub="customer">お客様情報</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
         <button class="sub-btn" data-sub="spec">設備仕様</button>
-        <button class="sub-btn" data-sub="confirm">確認事項・検討中</button>
+        <button class="sub-btn" data-sub="confirm">確認事項・お客様の検討事項</button>
         <button class="sub-btn" data-sub="quote">見積</button>
         <button class="sub-btn" data-sub="photos">写真・アルバム</button>
         <button class="sub-btn" data-sub="plan">図面</button>
@@ -493,7 +493,7 @@
         </div>
       </div>
 
-      <!-- 確認事項・検討中 subpanel -->
+      <!-- 確認事項・お客様の検討事項 subpanel -->
       <div class="subpanel" id="sub-confirm">
         <div class="card">
           <h3>確認事項</h3>
@@ -519,10 +519,10 @@
           </div>
         </div>
         <div class="card">
-          <h3>検討中</h3>
+          <h3>お客様の検討事項</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.76rem;">検討中 → 仮決定 → 決定の順に進めます。これまでの経過は残ります。</p>
           <div id="considerList" style="display:flex; flex-direction:column; gap:8px;"></div>
-          <div class="empty" id="considerEmpty" hidden>まだ検討中の項目がありません。</div>
+          <div class="empty" id="considerEmpty" hidden>まだお客様の検討事項がありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
             <label class="field">内容<input type="text" id="conContent" placeholder="例：勝手口の位置"></label>
             <label class="field">添付（任意）<input type="file" id="conAttachment" multiple></label>
@@ -659,7 +659,7 @@
 
         <div class="card">
           <h3>家づくりリスト（お客様・スタッフ共有の検討項目）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここには直接追加できません。「打合せ記録」から「確認事項・検討中」タブの検討中に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここには直接追加できません。「打合せ記録」から「確認事項・お客様の検討事項」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
           <div id="okaiConsiderList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiConsiderEmpty" hidden>まだ項目がありません。</div>
         </div>
@@ -1485,6 +1485,7 @@
         return '<div class="kancard" data-taskid="'+t.id+'">'+
           '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+(t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.68rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+          (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+confirmAttachmentsHtml(t.attachments)+'</div>' : "")+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
             (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
@@ -1775,7 +1776,7 @@
         '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
         '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→検討中へ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
         '</div></div>';
     }).join("");
@@ -2916,7 +2917,7 @@
     await saveDoc("projects", proj.id, proj);
   }
 
-  // ================= 確認事項・検討中 =================
+  // ================= 確認事項・お客様の検討事項 =================
   var CONSIDER_STATUS_ORDER = ["検討中","仮決定","決定"];
   async function uploadFilesAsAttachmentsArray(fileList){
     if(!assets) return [];
@@ -2970,7 +2971,7 @@
   }
   function deleteConfirmItem(id){
     var it = state.confirmItems.find(function(x){ return x.id===id; });
-    var label = (it && it.kind==="consider" ? "検討中" : "確認事項") + "「"+(it?(it.content||"").slice(0,20):"")+"」";
+    var label = (it && it.kind==="consider" ? "お客様の検討事項" : "確認事項") + "「"+(it?(it.content||"").slice(0,20):"")+"」";
     softDelete("confirmItems","confirmItems", id, label);
   }
   async function addConsiderItem(){
@@ -2987,7 +2988,7 @@
     contentEl.value = ""; fileInput.value = "";
     render();
     await saveDoc("confirmItems", doc.id, doc);
-    logActivity("検討中「"+content.slice(0,20)+"」を追加しました");
+    logActivity("お客様の検討事項「"+content.slice(0,20)+"」を追加しました");
   }
   async function createTaskFromNote(noteId, taskType){
     var proj = projectById(state.currentProjectId);
@@ -3000,7 +3001,7 @@
     if(taskType === "confirm"){
       var doc1 = { id: uid("cf"), projectId: proj.id, kind:"confirm", content: content,
         responseType: "自由入力", options: [], answer: null, answeredAt: null,
-        hasDeadline: false, deadline: null, attachments: [], createdAt: nowIso() };
+        hasDeadline: false, deadline: null, attachments: (note.files||[]).slice(), createdAt: nowIso() };
       state.confirmItems.push(doc1);
       render();
       await saveDoc("confirmItems", doc1.id, doc1);
@@ -3012,12 +3013,12 @@
     if(taskType === "consider"){
       var doc2 = { id: uid("cs"), projectId: proj.id, kind:"consider", content: content,
         status: "検討中", statusHistory: [{status:"検討中", ts: nowIso(), actor: state.currentUser||""}],
-        attachments: [], createdAt: nowIso() };
+        attachments: (note.files||[]).slice(), createdAt: nowIso() };
       state.confirmItems.push(doc2);
       render();
       await saveDoc("confirmItems", doc2.id, doc2);
-      logActivity("打合せ記録から検討中「"+content.slice(0,20)+"」を作成しました");
-      toast("✅ 検討中に追加しました");
+      logActivity("打合せ記録からお客様の検討事項「"+content.slice(0,20)+"」を作成しました");
+      toast("✅ お客様の検討事項に追加しました");
       return;
     }
 
@@ -3028,6 +3029,7 @@
         hasDeadline: false, deadline: "",
         requestTo: "", requestMethod: "",
         attachmentAssetIds: [],
+        attachments: (note.files||[]).slice(),
         private: false,
         status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
       };
@@ -3051,7 +3053,7 @@
     await saveDoc("confirmItems", id, item);
     logActivity("「"+(item.content||"").slice(0,20)+"」を"+next+"にしました");
   }
-  // 社内の「検討中」項目を、お客様のおうちノートの「家づくりリスト」に反映する。
+  // 社内の「お客様の検討事項」を、お客様のおうちノートの「家づくりリスト」に反映する。
   // 一度反映した項目は okaiConsiderationId で紐付けておき、再度押すと
   // （内容やステータスが変わっていれば）同じ項目を上書き更新する。
   async function reflectConsiderToHouseList(id){
@@ -3083,7 +3085,7 @@
       if(newId) it.okaiConsiderationId = newId;
       render();
       await saveDoc("confirmItems", it.id, it);
-      logActivity("検討中「"+(it.content||"").slice(0,20)+"」を家づくりリストに反映しました");
+      logActivity("お客様の検討事項「"+(it.content||"").slice(0,20)+"」を家づくりリストに反映しました");
       toast("✅ 家づくりリストに反映しました");
     }catch(e){
       toast("❌ 家づくりリストへの反映に失敗しました（"+(e&&e.message?e.message:"unknown")+"）");
@@ -3432,7 +3434,7 @@
     state.meetingNotes.filter(function(n){return n.deletedAt;}).forEach(function(n){ items.push({kind:"打合せ記録", label:(n.content||"").slice(0,20), ts:n.deletedAt, restore:function(){restoreItem("meetingNotes","meetingNotes",n.id,"打合せ記録");}, purge:function(){purgeItem("meetingNotes","meetingNotes",n.id,"打合せ記録");}}); });
     state.tasks.filter(function(t){return t.deletedAt;}).forEach(function(t){ items.push({kind:"タスク", label:(t.content||"").slice(0,20), ts:t.deletedAt, restore:function(){restoreItem("tasks","tasks",t.id,"タスク");}, purge:function(){purgeItem("tasks","tasks",t.id,"タスク");}}); });
     state.specPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ items.push({kind:"仕様写真", label:(p.category||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("specPhotos","specPhotos",p.id,"仕様写真");}, purge:function(){purgeItem("specPhotos","specPhotos",p.id,"仕様写真");}}); });
-    state.confirmItems.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="confirm"?"確認事項":"検討中")+"「"+(p.content||"").slice(0,20)+"」"; items.push({kind:(p.kind==="confirm"?"確認事項":"検討中"), label:(p.content||"").slice(0,20), ts:p.deletedAt, restore:function(){restoreItem("confirmItems","confirmItems",p.id,label);}, purge:function(){purgeItem("confirmItems","confirmItems",p.id,label);}}); });
+    state.confirmItems.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="confirm"?"確認事項":"お客様の検討事項")+"「"+(p.content||"").slice(0,20)+"」"; items.push({kind:(p.kind==="confirm"?"確認事項":"お客様の検討事項"), label:(p.content||"").slice(0,20), ts:p.deletedAt, restore:function(){restoreItem("confirmItems","confirmItems",p.id,label);}, purge:function(){purgeItem("confirmItems","confirmItems",p.id,label);}}); });
     state.albumPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="reference"?"参考写真":"アルバム写真"); items.push({kind:label, label:(p.fileName||""), ts:p.deletedAt, restore:function(){restoreItem("albumPhotos","albumPhotos",p.id,label);}, purge:function(){purgeItem("albumPhotos","albumPhotos",p.id,label);}}); });
     state.reservations.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="予約「"+(p.type||"")+" "+(p.date||"")+"」"; items.push({kind:"予約", label:(p.type||"")+" "+(p.date||""), ts:p.deletedAt, restore:function(){restoreItem("reservations","reservations",p.id,label);}, purge:function(){purgeItem("reservations","reservations",p.id,label);}}); });
     items.sort(function(a,b){ return (b.ts||"").localeCompare(a.ts||""); });
@@ -4001,9 +4003,15 @@
     var files = document.getElementById("tfAttachment").files;
 
     var attachmentAssetIds = [];
+    var taskAttachments = [];
     if(assets && files && files.length){
       for(var i=0;i<files.length;i++){
-        try{ var res = await assets.upload(files[i]); attachmentAssetIds.push(res.id); blobCache[res.id] = files[i]; }
+        try{
+          var res = await assets.upload(files[i]);
+          attachmentAssetIds.push(res.id);
+          blobCache[res.id] = files[i];
+          taskAttachments.push({ id: res.id, url: res.url, contentType: res.contentType||files[i].type, name: files[i].name });
+        }
         catch(e){ toast(files[i].name+" の添付に失敗しました"); }
       }
     }
@@ -4014,6 +4022,7 @@
       hasDeadline: hasDeadline, deadline: hasDeadline?deadline:"",
       requestTo: requestTo||"", requestMethod: method,
       attachmentAssetIds: attachmentAssetIds,
+      attachments: taskAttachments,
       private: isPrivate,
       status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
