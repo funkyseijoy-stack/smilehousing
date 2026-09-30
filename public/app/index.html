@@ -444,6 +444,11 @@
           <div id="specFacilityWrap"></div>
         </div>
         <div class="card">
+          <h3>暖房・換気・電気設備</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+          <div id="specEquipmentWrap"></div>
+        </div>
+        <div class="card">
           <h3>インテリア基本色</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.76rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px;">
@@ -1079,6 +1084,7 @@
     "玄関ドア":"entranceDoorCatNote"
   };
   var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室"];
+  var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
@@ -1996,6 +2002,24 @@
     proj.facilityNotes[cat] = value;
     await saveDoc("projects", proj.id, proj);
   }
+  function renderSpecEquipment(){
+    var wrap = document.getElementById("specEquipmentWrap");
+    if(!wrap) return;
+    var proj = projectById(state.currentProjectId);
+    var notes = (proj && proj.equipmentNotes) || {};
+    wrap.innerHTML = EQUIPMENT_CATS.map(function(cat){
+      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
+        '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+        '</div>';
+    }).join("");
+  }
+  async function updateEquipmentNote(cat, value){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    proj.equipmentNotes = proj.equipmentNotes || {};
+    proj.equipmentNotes[cat] = value;
+    await saveDoc("projects", proj.id, proj);
+  }
   function interiorColorCatsFor(proj){
     var custom = (proj && proj.interiorColorCatsCustom) || [];
     return INTERIOR_COLOR_CATS.map(function(name){ return {name:name, custom:false}; })
@@ -2089,6 +2113,7 @@
   function renderSpecTab(){
     renderSpecExterior();
     renderSpecFacility();
+    renderSpecEquipment();
     renderSpecInterior();
     renderSpecRooms();
   }
@@ -2551,6 +2576,8 @@
     "interiorColor|メインクロス":"interior", "interiorColor|ドア":"interior", "interiorColor|床":"interior",
     "interiorColor|巾木":"interior", "interiorColor|笠木":"interior",
     "interiorColor|玄関枠":"entrance", "interiorColor|浴室枠":"bath",
+    "equipment|暖房設備":"heating", "equipment|換気設備":"ventilation",
+    "equipment|電気配線":"wiring", "equipment|あかりプラン":"lighting",
   };
   function okaiCategoryFor(scope, category){
     var mapped = OKAI_BUILTIN_CATEGORY_MAP[String(scope||"")+"|"+String(category||"")];
@@ -4867,7 +4894,7 @@
     });
     document.getElementById("btnSendMessage").addEventListener("click", sendMessage);
 
-    ["specExteriorWrap","specFacilityWrap","specInteriorWrap","specRoomsWrap"].forEach(function(wrapId){
+    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specInteriorWrap","specRoomsWrap"].forEach(function(wrapId){
       var wrap = document.getElementById(wrapId);
       if(!wrap) return;
       wrap.addEventListener("change", function(e){
@@ -4939,6 +4966,8 @@
         if(extSpecVal){ updateExteriorSpecValue(extSpecVal.dataset.extspecvalue, extSpecVal.value); return; }
         var facNote = e.target.closest("[data-facilitynote]");
         if(facNote){ updateFacilityNote(facNote.dataset.facilitynote, facNote.value); return; }
+        var equipNote = e.target.closest("[data-equipmentnote]");
+        if(equipNote){ updateEquipmentNote(equipNote.dataset.equipmentnote, equipNote.value); return; }
       });
     });
     document.getElementById("btnAddRoom").addEventListener("click", addRoom);
