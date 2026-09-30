@@ -259,6 +259,9 @@
   .pbentry-meta .splabel2{ font-size:.68rem; color:var(--muted); width:100%; }
   .pill.reflect{ background:var(--gray-soft); color:var(--muted); cursor:pointer; border:none; font-family:inherit; }
   .pill.reflect.on{ background:var(--accent-soft); color:var(--accent-ink); }
+  .pill.estimate-承認{ background:var(--blue-soft); color:var(--blue); }
+  .pill.estimate-見送り{ background:var(--danger-soft); color:var(--danger); }
+  .pill.estimate-未回答{ background:var(--gray-soft); color:var(--muted); }
   .pill.status-未依頼, .pill.status-依頼済み, .pill.status-受領済み{ cursor:pointer; border:none; font-family:inherit; }
   .specsideswrap{ display:flex; gap:18px; flex-wrap:wrap; }
   .specside .sidelabel{ display:block; font-size:.68rem; color:var(--muted); font-weight:700; margin-block-end:5px; }
@@ -641,7 +644,8 @@
 
         <div class="card">
           <h3>追加見積り</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">住まいるから追加見積りを送ると、お客様がおうちノートで「承認／見送り」を選べます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">住まいるから追加見積りを送ると、お客様がおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面と「投稿」欄に届きます。</p>
+          <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.8rem; font-weight:700;" hidden></p>
           <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -2329,7 +2333,7 @@
       return '<div>'+escapeOkai(k)+'：<strong>'+escapeOkai(status[k])+'</strong></div>';
     }).join("");
   }
-  var OKAI_INBOX_LABELS = {sample_request:"サンプル請求", photo_share:"写真共有", spec_decision:"仕様の仮決定・決定", consideration_attachment:"検討項目の添付", staff_photo:"スタッフ写真", staff_document:"スタッフ資料"};
+  var OKAI_INBOX_LABELS = {sample_request:"サンプル請求", photo_share:"写真共有", spec_decision:"仕様の仮決定・決定", consideration_attachment:"検討項目の添付", staff_photo:"スタッフ写真", staff_document:"スタッフ資料", estimate_response:"追加見積りの回答"};
   function renderOkaiInbox(entries){
     var list = document.getElementById("okaiInboxList");
     var empty = document.getElementById("okaiInboxEmpty");
@@ -2349,12 +2353,33 @@
         '</div>';
     }).join("");
   }
+  function okaiEstimateAmountNumber(amount){
+    var n = Number(String(amount||"").replace(/[^0-9.]/g, ""));
+    return isFinite(n) ? n : 0;
+  }
+  function okaiEstimateResponsePill(response){
+    var r = response || "未回答";
+    var cls = r === "承認" ? "estimate-承認" : (r === "見送り" ? "estimate-見送り" : "estimate-未回答");
+    var label = r === "承認" ? "承認済み" : r;
+    return '<span class="pill '+cls+'">'+escapeOkai(label)+'</span>';
+  }
   function renderOkaiEstimates(customer){
     var list = document.getElementById("okaiEstimateList");
     var empty = document.getElementById("okaiEstimateEmpty");
+    var totalEl = document.getElementById("okaiEstimateTotal");
     var items = (customer && customer.customerEstimates) || [];
-    if(!items.length){ list.innerHTML = ""; empty.hidden = false; return; }
+    if(!items.length){
+      list.innerHTML = "";
+      empty.hidden = false;
+      if(totalEl) totalEl.hidden = true;
+      return;
+    }
     empty.hidden = true;
+    if(totalEl){
+      var total = items.reduce(function(sum, it){ return sum + okaiEstimateAmountNumber(it.amount); }, 0);
+      totalEl.hidden = false;
+      totalEl.textContent = "合計金額：¥" + total.toLocaleString("ja-JP") + "（" + items.length + "件）";
+    }
     list.innerHTML = items.map(function(it){
       return '<div class="card" style="padding:8px 10px;">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
@@ -2362,7 +2387,9 @@
         '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
         '</div>'+
         (it.note?'<div class="muted" style="font-size:.8rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
-        '<div style="margin-block-start:6px;">お客様の回答：<strong>'+escapeOkai(it.customerResponse||"未回答")+'</strong></div>'+
+        '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">お客様の回答：'+okaiEstimateResponsePill(it.customerResponse)+
+        (it.customerRespondedAt?'<span class="muted" style="font-size:.7rem;">'+escapeOkai(new Date(it.customerRespondedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}))+'</span>':'')+
+        '</div>'+
         '</div>';
     }).join("");
   }
