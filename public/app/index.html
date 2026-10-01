@@ -251,8 +251,10 @@
   .specphoto-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
   .specphoto-checkbox{ position:absolute; top:2px; left:2px; z-index:2; background:rgba(255,255,255,.85); border-radius:5px; width:18px; height:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .specphoto-checkbox input{ width:14px; height:14px; margin:0; cursor:pointer; }
-  .specmergebar{ width:100%; margin-block-start:8px; }
+  .specmergebar{ width:100%; margin-block-start:8px; display:flex; gap:6px; flex-wrap:wrap; }
   .specmergebar .btn{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
+  .specscopemergebar{ margin-block-end:12px; }
+  .specscopemergebar .btn{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); width:100%; white-space:normal; line-height:1.4; padding:10px 12px; }
   .pill.small{ padding:2px 7px; font-size:.6rem; }
   .pbentrylist{ display:flex; flex-direction:column; gap:8px; }
   .pbentry{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:7px; }
@@ -2029,6 +2031,41 @@
     logActivity(label+"の写真"+photos.length+"枚を1つの打ち合わせ記録にまとめました");
     toast("✅ "+photos.length+"枚を1つの打ち合わせ記録にまとめました");
   }
+  // 「外部仕様」「設備仕様」のように、複数のカテゴリーをまとめ持つ仕様グループ全体の
+  // 「手動で追加」写真を、カテゴリーをまたいで1件の打ち合わせ記録にまとめる。
+  // （個別カテゴリーごとにまとめる mergeSpecPhotosToNote とは別の、グループ単位のまとめ機能）
+  function scopeManualPhotoCount(scope){
+    return liveSpecPhotos().filter(function(p){
+      return p.projectId===state.currentProjectId && p.scope===scope && !p.roomId && !p.side && (p.kind||"photo")==="photo";
+    }).length;
+  }
+  async function mergeScopePhotosToNote(scope){
+    if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var photos = liveSpecPhotos().filter(function(p){
+      return p.projectId===state.currentProjectId && p.scope===scope && !p.roomId && !p.side && (p.kind||"photo")==="photo";
+    });
+    if(!photos.length){ toast("候補写真がありません"); return; }
+    photos.sort(function(a,b){ return (a.category||"").localeCompare(b.category||"")||(a.createdAt||"").localeCompare(b.createdAt||""); });
+    var label = specPartGroupLabel(scope);
+    var files = photos.map(function(p){ return { id: p.assetId||p.id, url: p.url, contentType: p.contentType, name: (p.category?p.category+"：":"")+(p.fileName||"") }; });
+    var n = { id: uid("note"), projectId: state.currentProjectId, content: "（"+label+"の候補写真"+photos.length+"枚をまとめました）",
+      date: todayStr(), files: files, author: state.currentUser||"", createdAt: nowIso(),
+      specPart: { scope: scope, category: null, roomId: null, side: null, label: label } };
+    state.meetingNotes.push(n);
+    for(var i=0;i<photos.length;i++){
+      await softDelete("specPhotos", "specPhotos", photos[i].id, "手動で追加した写真");
+    }
+    render();
+    await saveDoc("meetingNotes", n.id, n);
+    logActivity(label+"全体の写真"+photos.length+"枚を1つの打ち合わせ記録にまとめました");
+    toast("✅ "+label+"の写真"+photos.length+"枚を1つの打ち合わせ記録にまとめました（打合せ記録一覧でご確認ください）");
+  }
+  function scopeMergeBarHtml(scope){
+    var n = scopeManualPhotoCount(scope);
+    if(!n) return "";
+    return '<div class="specscopemergebar"><button type="button" class="btn small" data-mergescopephotos="'+scope+'">'+
+      specPartGroupLabel(scope)+'の「手動で追加」写真'+n+'枚を、カテゴリーをまたいで1つの打ち合わせ記録にまとめる</button></div>';
+  }
   function buildSpecGallery(scope, category, roomId, side, opts){
     opts = opts || {};
     // 変更履歴タイムライン用の「メモのみ」項目（kind:"note"）は写真グリッドには出さない。
@@ -2120,7 +2157,7 @@
           '<input type="text" data-extspecvalue="'+f[0]+'" value="'+escapeHtml(specValues[f[0]]||"")+'"></label>';
       }).join("")+
       '</div></div>';
-    wrap.innerHTML = valuesBlockHtml + EXTERIOR_CATS.map(function(cat){
+    wrap.innerHTML = valuesBlockHtml + scopeMergeBarHtml("exterior") + EXTERIOR_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("exterior",cat,null,null)+
         '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("exterior",cat,null,null)+
@@ -2179,7 +2216,7 @@
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.facilityNotes) || {};
-    wrap.innerHTML = FACILITY_CATS.map(function(cat){
+    wrap.innerHTML = scopeMergeBarHtml("facility") + FACILITY_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
         '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
         buildSpecGallery("facility",cat,null,null,{kind:"photo"})+
@@ -2209,7 +2246,7 @@
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.equipmentNotes) || {};
-    wrap.innerHTML = EQUIPMENT_CATS.map(function(cat){
+    wrap.innerHTML = scopeMergeBarHtml("equipment") + EQUIPMENT_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
         '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("equipment",cat,null,null)+
@@ -2228,7 +2265,7 @@
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.siteCheckNotes) || {};
-    wrap.innerHTML = SITECHECK_CATS.map(function(cat){
+    wrap.innerHTML = scopeMergeBarHtml("siteCheck") + SITECHECK_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("siteCheck",cat,null,null)+
         '<textarea class="siteCheckNote" data-sitechecknote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("siteCheck",cat,null,null)+
@@ -5535,6 +5572,11 @@
         // data-openspec（拡大表示）を発火させない。これがあると、チェックを入れる
         // たびに写真が全画面表示されてしまい、2枚目以降を選べなくなる。
         if(e.target.closest(".specphoto-checkbox")) return;
+        var scopeMergeBtn = e.target.closest("[data-mergescopephotos]");
+        if(scopeMergeBtn){
+          if(confirm2()) mergeScopePhotosToNote(scopeMergeBtn.dataset.mergescopephotos);
+          return;
+        }
         var selectAllBtn = e.target.closest("[data-mergeselectall]");
         if(selectAllBtn){
           selectAllBtn.dataset.mergeselectall.split(",").filter(Boolean).forEach(function(id){ specMergeSelected[id] = true; });
