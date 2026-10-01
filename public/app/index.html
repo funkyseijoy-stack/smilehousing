@@ -257,6 +257,14 @@
   .pbentry-latest{ position:absolute; top:0; left:0; background:var(--accent); color:#fff; font-size:.58rem; font-weight:700; padding:1px 5px; border-radius:0 0 6px 0; }
   .pbentry-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1; min-width:0; }
   .pbentry-meta .splabel2{ font-size:.68rem; color:var(--muted); width:100%; }
+  .spectl{ display:flex; flex-direction:column; gap:0; margin-block-start:6px; }
+  .spectl-arrow{ text-align:center; color:var(--muted); font-size:.85rem; line-height:1.4; }
+  .spectl-card{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
+  .spectl-thumb{ width:46px; height:46px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+  .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .pill.spectl-type-note{ background:var(--blue-soft); color:var(--blue); }
+  .pill.spectl-type-vendor{ background:var(--orange-soft); color:var(--orange); }
+  .pill.spectl-type-manual{ background:var(--gray-soft); color:var(--muted); }
   .pill.reflect{ background:var(--gray-soft); color:var(--muted); cursor:pointer; border:none; font-family:inherit; }
   .pill.reflect.on{ background:var(--accent-soft); color:var(--accent-ink); }
   .pill.estimate-承認{ background:var(--blue-soft); color:var(--blue); }
@@ -2363,29 +2371,53 @@
     var rows = specPhotosFor(scope, category, roomId, side).slice();
     if(!rows.length) return "";
     rows.sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
-    var items = rows.map(function(p, i){
+    var cards = rows.map(function(p, i){
       var isLatest = i === rows.length-1;
-      var sourceLine = "";
+      var typeLabel, typeClass, snippet;
       if(p.kind==="note"){
-        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">打ち合わせ記録：'+escapeHtml(p.source.noteSnippet)+'</div>';
+        typeLabel = "打ち合わせ記録"; typeClass = "spectl-type-note";
+        snippet = (p.source && p.source.noteSnippet) || "";
       } else if(p.source && p.source.vendor){
-        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">受領PDF（'+escapeHtml(p.source.vendor)+'）：'+escapeHtml(p.source.noteSnippet||"")+'</div>';
+        typeLabel = "受領PDF"; typeClass = "spectl-type-vendor";
+        snippet = (p.source.vendor?p.source.vendor+"より：":"")+(p.source.noteSnippet||"");
       } else if(p.source && p.source.noteSnippet){
-        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">打ち合わせから：'+escapeHtml(p.source.noteSnippet)+'</div>';
+        typeLabel = "打ち合わせから"; typeClass = "spectl-type-note";
+        snippet = p.source.noteSnippet;
       } else {
-        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">手動で追加</div>';
+        typeLabel = "手動で追加"; typeClass = "spectl-type-manual";
+        snippet = "";
       }
-      return '<div class="row" style="align-items:flex-start; gap:8px; padding:6px 0; border-block-start:1px solid var(--border);">'+
+      var ct = p.contentType||"";
+      var isPdfPhoto = ct.indexOf("pdf")>=0;
+      var isVideoPhoto = ct.indexOf("video")>=0;
+      var thumbHtml;
+      if(p.kind==="note"){
+        thumbHtml = '<div class="spectl-thumb">💬</div>';
+      } else if(isPdfPhoto){
+        thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">📄</div>';
+      } else if(isVideoPhoto){
+        thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">▶</div>';
+      } else if(p.url){
+        thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;"><img src="'+p.url+'" alt="'+escapeHtml(category)+'"></div>';
+      } else {
+        thumbHtml = '<div class="spectl-thumb">—</div>';
+      }
+      return '<div class="spectl-card">'+
+        thumbHtml+
         '<div style="flex-grow:1; min-width:0;">'+
-        '<div style="font-size:.76rem; font-weight:700;">'+fmtTs(p.createdAt)+
-        (isLatest?' <span class="pill tag small">最新</span>':'')+
-        (p.decided?' <span class="pill status-受領済み small">決定</span>':'')+
-        '</div>'+sourceLine+
+        '<div class="row" style="gap:5px;">'+
+        '<span class="pill small '+typeClass+'">'+typeLabel+'</span>'+
+        (isLatest?'<span class="pill tag small">最新</span>':'')+
+        (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
         '</div>'+
-        '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>'+
+        '<div style="font-size:.76rem; font-weight:700; margin-block-start:3px;">'+fmtTs(p.createdAt)+'</div>'+
+        (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'')+
+        '</div>'+
+        '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>'+
         '</div>';
-    }).join("");
-    return '<details style="margin-block-start:8px;"><summary style="font-size:.74rem; color:var(--muted); cursor:pointer;">変更履歴（打ち合わせ→依頼→受領→決定）を見る</summary>'+items+'</details>';
+    });
+    var html = cards.map(function(c, i){ return (i>0?'<div class="spectl-arrow">↓</div>':'')+c; }).join("");
+    return '<details style="margin-block-start:8px;"><summary style="font-size:.74rem; color:var(--muted); cursor:pointer;">変更履歴（打ち合わせ→依頼→受領→決定）を見る</summary><div class="spectl">'+html+'</div></details>';
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
