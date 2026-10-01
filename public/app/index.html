@@ -261,6 +261,10 @@
   .spectl-card{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
   .spectl-thumb{ width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
   .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
+  .spectl-thumbmini{ width:42px; height:42px; border-radius:7px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; text-decoration:none; color:inherit; }
+  .spectl-thumbmini img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .spectl-thumbmini-more{ color:var(--muted); font-weight:700; font-size:.76rem; }
   .pill.spectl-type-note{ background:var(--blue-soft); color:var(--blue); }
   .pill.spectl-type-vendor{ background:var(--orange-soft); color:var(--orange); }
   .pill.spectl-type-manual{ background:var(--gray-soft); color:var(--muted); }
@@ -2393,7 +2397,21 @@
       var isVideoPhoto = ct.indexOf("video")>=0;
       var thumbHtml;
       if(p.kind==="note"){
-        thumbHtml = '<div class="spectl-thumb">💬</div>';
+        var relatedNote = state.meetingNotes.find(function(n){ return n.id===(p.source&&p.source.noteId); });
+        var noteFiles = (relatedNote && relatedNote.files) || [];
+        if(noteFiles.length){
+          // 打合せ記録に複数の候補写真が添付されている場合は、1枚の大きな写真ではなく
+          // このカードの中に候補写真をまとめて並べる（お客様に見せる「1つの打ち合わせ」の単位）。
+          thumbHtml = '<div class="spectl-thumbgroup">'+noteFiles.slice(0,4).map(function(f){
+            var fct = f.contentType||"";
+            var inner = fct.indexOf("pdf")>=0 ? '📄' : (fct.indexOf("video")>=0 ? '▶' : '<img src="'+f.url+'" alt="">');
+            return '<a href="'+f.url+'" target="_blank" rel="noopener" class="spectl-thumbmini">'+inner+'</a>';
+          }).join("")+
+          (noteFiles.length>4 ? '<div class="spectl-thumbmini spectl-thumbmini-more">+'+(noteFiles.length-4)+'</div>' : '')+
+          '</div>';
+        } else {
+          thumbHtml = '<div class="spectl-thumb">💬</div>';
+        }
       } else if(isPdfPhoto){
         thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">📄</div>';
       } else if(isVideoPhoto){
