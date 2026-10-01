@@ -416,7 +416,6 @@
         <button class="sub-btn" data-sub="sitecheck">現場確認</button>
         <button class="sub-btn" data-sub="customer">お客様情報</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
-        <button class="sub-btn" data-sub="spec">設備仕様</button>
         <button class="sub-btn" data-sub="confirm">確認事項・お客様の検討事項</button>
         <button class="sub-btn" data-sub="quote">見積</button>
         <button class="sub-btn" data-sub="photos">写真・アルバム</button>
@@ -453,57 +452,6 @@
             <label class="field">項目名<input type="text" id="ciLabel" placeholder="例：ご家族構成"></label>
             <label class="field">内容<input type="text" id="ciValue" placeholder="例：ご夫婦＋お子様2人"></label>
             <button class="btn secondary small" id="btnAddCustomerInfo">追加</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 仕様 subpanel -->
-      <div class="subpanel" id="sub-spec">
-        <div class="card">
-          <h3>外部仕様</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
-          <div id="specExteriorWrap"></div>
-        </div>
-        <div class="card">
-          <h3>設備仕様</h3>
-          <div id="specFacilityWrap"></div>
-        </div>
-        <div class="card">
-          <h3>暖房・換気・電気設備</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
-          <div id="specEquipmentWrap"></div>
-        </div>
-        <div class="card">
-          <h3>インテリア基本色</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
-          <div class="row" style="margin-block-end:10px; gap:6px;">
-            <input type="text" id="interiorColorCatInput" placeholder="例：手すり">
-            <button class="btn secondary small" id="btnAddInteriorColorCat">＋ カテゴリー追加</button>
-          </div>
-          <div id="specInteriorWrap"></div>
-        </div>
-        <div class="card">
-          <h3>部屋別クロス</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
-          <div class="row" style="margin-block-end:10px; gap:6px;">
-            <input type="text" id="roomCatInput" placeholder="例：造作収納">
-            <button class="btn secondary small" id="btnAddRoomCat">＋ 項目を追加</button>
-          </div>
-          <div class="row" style="margin-block-end:10px;">
-            <input type="text" id="newRoomName" placeholder="例：リビング">
-            <button class="btn secondary small" id="btnAddRoom">部屋を追加</button>
-          </div>
-          <div id="specRoomsWrap"></div>
-          <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
-        </div>
-        <div class="card">
-          <h3>プランボード</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
-          <div class="pbsourcelist" id="planSourceList"></div>
-          <div class="empty" id="planSourceEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
-          <div class="row" style="margin-block-start:10px;">
-            <label class="btn secondary small" for="planUploadInput" style="cursor:pointer;">新しい図面をアップロードして開く</label>
-            <input type="file" id="planUploadInput" accept="image/*,application/pdf" hidden>
           </div>
         </div>
       </div>
@@ -779,6 +727,55 @@
           <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
           <div class="notelist" id="meetingNoteList"></div>
           <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
+        </div>
+
+        <!-- 部位ごとの仕様（旧：設備仕様タブ）。打合せ記録に統合。 -->
+        <div class="card">
+          <h3>外部仕様</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+          <div id="specExteriorWrap"></div>
+        </div>
+        <div class="card">
+          <h3>設備仕様</h3>
+          <div id="specFacilityWrap"></div>
+        </div>
+        <div class="card">
+          <h3>暖房・換気・電気設備</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+          <div id="specEquipmentWrap"></div>
+        </div>
+        <div class="card">
+          <h3>インテリア基本色</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
+          <div class="row" style="margin-block-end:10px; gap:6px;">
+            <input type="text" id="interiorColorCatInput" placeholder="例：手すり">
+            <button class="btn secondary small" id="btnAddInteriorColorCat">＋ カテゴリー追加</button>
+          </div>
+          <div id="specInteriorWrap"></div>
+        </div>
+        <div class="card">
+          <h3>部屋別クロス</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
+          <div class="row" style="margin-block-end:10px; gap:6px;">
+            <input type="text" id="roomCatInput" placeholder="例：造作収納">
+            <button class="btn secondary small" id="btnAddRoomCat">＋ 項目を追加</button>
+          </div>
+          <div class="row" style="margin-block-end:10px;">
+            <input type="text" id="newRoomName" placeholder="例：リビング">
+            <button class="btn secondary small" id="btnAddRoom">部屋を追加</button>
+          </div>
+          <div id="specRoomsWrap"></div>
+          <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
+        </div>
+        <div class="card">
+          <h3>プランボード</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
+          <div class="pbsourcelist" id="planSourceList"></div>
+          <div class="empty" id="planSourceEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
+          <div class="row" style="margin-block-start:10px;">
+            <label class="btn secondary small" for="planUploadInput" style="cursor:pointer;">新しい図面をアップロードして開く</label>
+            <input type="file" id="planUploadInput" accept="image/*,application/pdf" hidden>
+          </div>
         </div>
       </div>
     </div>
