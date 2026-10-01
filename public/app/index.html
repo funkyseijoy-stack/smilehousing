@@ -255,6 +255,9 @@
   .specmergebar .btn{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   .specscopemergebar{ margin-block-end:12px; }
   .specscopemergebar .btn{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); width:100%; white-space:normal; line-height:1.4; padding:10px 12px; }
+  .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
+  .notefiletile{ border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; text-decoration:none; color:inherit; }
+  .notefiletile img, .notefiletile video{ width:100%; height:100%; object-fit:cover; display:block; }
   .pill.small{ padding:2px 7px; font-size:.6rem; }
   .pbentrylist{ display:flex; flex-direction:column; gap:8px; }
   .pbentry{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:7px; }
@@ -265,6 +268,7 @@
   .pbentry-meta .splabel2{ font-size:.68rem; color:var(--muted); width:100%; }
   .spectl{ display:flex; flex-direction:column; gap:8px; margin-block-start:6px; }
   .spectl-card{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
+  .spectl-card-row{ flex-direction:column; align-items:stretch; gap:8px; }
   .spectl-thumb{ width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
   .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
@@ -1852,7 +1856,7 @@
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(n){
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
-      var filesHtml = (n.files && n.files.length) ? '<div class="row" style="margin-block-start:6px; flex-wrap:wrap; gap:6px;">'+confirmAttachmentsHtml(n.files)+'</div>' : "";
+      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml(n.files)+'</div>' : "";
       var specHtml = n.specPart ?
         '<span class="pill" style="background:var(--orange-soft); color:var(--orange); margin-inline-end:6px;">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
       return '<div class="noteitem"><div class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</div>'+
@@ -2103,10 +2107,7 @@
         (isVideoPhoto ?
           '<video src="'+p.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
           '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
-      var checkboxHtml = '<label class="specphoto-checkbox" title="選んで「1つの打ち合わせ記録にまとめる」に使う">'+
-        '<input type="checkbox" data-mergecheck="'+p.id+'"'+(specMergeSelected[p.id]?" checked":"")+'></label>';
       var tileHtml = '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
-        checkboxHtml+
         thumbInner+
         '<span class="splabel">'+fmtTs(p.createdAt)+'</span>'+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
@@ -2120,24 +2121,7 @@
         'data-spec-scope="'+scope+'" data-spec-cat="'+escapeHtml(category)+'"'+
         (roomId?' data-spec-room="'+roomId+'"':'')+(side?' data-spec-side="'+escapeHtml(side)+'"':'')+'>';
     }
-    var selectedHere = photos.filter(function(p){ return specMergeSelected[p.id]; }).map(function(p){ return p.id; });
-    var allIdsHere = photos.map(function(p){ return p.id; });
-    var mergeBarHtml = "";
-    if(photos.length >= 2){
-      mergeBarHtml += '<div class="specmergebar">'+
-        '<button type="button" class="btn small secondary" data-mergeselectall="'+allIdsHere.join(",")+'">全て選択</button>'+
-        (selectedHere.length ? '<button type="button" class="btn small" data-mergespec="'+selectedHere.join(",")+'" data-mergescope="'+scope+'" data-mergecat="'+escapeHtml(category)+'"'+
-          (roomId?' data-mergeroom="'+roomId+'"':'')+(side?' data-mergeside="'+escapeHtml(side)+'"':'')+
-          '">選んだ'+selectedHere.length+'枚を1つの打ち合わせ記録にまとめる</button>' : '')+
-        '</div>';
-    } else if(selectedHere.length){
-      mergeBarHtml += '<div class="specmergebar">'+
-        '<button type="button" class="btn small" data-mergespec="'+selectedHere.join(",")+'" data-mergescope="'+scope+'" data-mergecat="'+escapeHtml(category)+'"'+
-        (roomId?' data-mergeroom="'+roomId+'"':'')+(side?' data-mergeside="'+escapeHtml(side)+'"':'')+
-        '">選んだ'+selectedHere.length+'枚を1つの打ち合わせ記録にまとめる</button>'+
-        '</div>';
-    }
-    return '<div class="specphotos">'+html+'</div>'+mergeBarHtml;
+    return '<div class="specphotos">'+html+'</div>';
   }
   function renderSpecExterior(){
     var wrap = document.getElementById("specExteriorWrap");
@@ -2488,22 +2472,11 @@
       var isPdfPhoto = ct.indexOf("pdf")>=0;
       var isVideoPhoto = ct.indexOf("video")>=0;
       var thumbHtml;
+      var noteFiles = null;
       if(p.kind==="note"){
         var relatedNote = state.meetingNotes.find(function(n){ return n.id===(p.source&&p.source.noteId); });
-        var noteFiles = (relatedNote && relatedNote.files) || [];
-        if(noteFiles.length){
-          // 打合せ記録に複数の候補写真が添付されている場合は、1枚の大きな写真ではなく
-          // このカードの中に候補写真をまとめて並べる（お客様に見せる「1つの打ち合わせ」の単位）。
-          thumbHtml = '<div class="spectl-thumbgroup">'+noteFiles.slice(0,4).map(function(f){
-            var fct = f.contentType||"";
-            var inner = fct.indexOf("pdf")>=0 ? '📄' : (fct.indexOf("video")>=0 ? '▶' : '<img src="'+f.url+'" alt="">');
-            return '<a href="'+f.url+'" target="_blank" rel="noopener" class="spectl-thumbmini">'+inner+'</a>';
-          }).join("")+
-          (noteFiles.length>4 ? '<div class="spectl-thumbmini spectl-thumbmini-more">+'+(noteFiles.length-4)+'</div>' : '')+
-          '</div>';
-        } else {
-          thumbHtml = '<div class="spectl-thumb">💬</div>';
-        }
+        noteFiles = (relatedNote && relatedNote.files) || [];
+        if(!noteFiles.length) thumbHtml = '<div class="spectl-thumb">💬</div>';
       } else if(isPdfPhoto){
         thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">📄</div>';
       } else if(isVideoPhoto){
@@ -2513,18 +2486,30 @@
       } else {
         thumbHtml = '<div class="spectl-thumb">—</div>';
       }
-      return '<div class="spectl-card">'+
-        thumbHtml+
-        '<div style="flex-grow:1; min-width:0;">'+
-        '<div class="row" style="gap:5px;">'+
+      var metaHtml = '<div class="row" style="gap:5px;">'+
         '<span class="pill small '+typeClass+'">'+typeLabel+'</span>'+
         (isLatest?'<span class="pill tag small">最新</span>':'')+
         (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
         '</div>'+
         '<div style="font-size:.76rem; font-weight:700; margin-block-start:3px;">'+fmtTs(p.createdAt)+'</div>'+
-        (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'')+
-        '</div>'+
-        '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>'+
+        (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
+      var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
+      // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
+      // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
+      // サムネイル1枚＋テキストを横並びで表示する。
+      if(noteFiles && noteFiles.length){
+        return '<div class="spectl-card spectl-card-row">'+
+          '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px;">'+
+          '<div style="flex-grow:1; min-width:0;">'+metaHtml+'</div>'+
+          decideBtnHtml+
+          '</div>'+
+          fileThumbRowHtml(noteFiles, 84)+
+          '</div>';
+      }
+      return '<div class="spectl-card">'+
+        thumbHtml+
+        '<div style="flex-grow:1; min-width:0;">'+metaHtml+'</div>'+
+        decideBtnHtml+
         '</div>';
     });
     var html = cards.join("");
@@ -3270,6 +3255,23 @@
     return (atts||[]).map(function(a){
       return '<a href="'+a.url+'" target="_blank" rel="noopener" class="pill method">📎 '+escapeHtml(a.name||"添付")+'</a>';
     }).join(" ");
+  }
+  // 打ち合わせ記録に添付された写真・PDF・動画を、横一列の大きめサムネイルで表示する
+  // （件数が多い時は横スクロール）。1つの打ち合わせ記録＝複数の候補写真、という
+  // まとめ方を分かりやすく見せるための共通パーツ。
+  function fileThumbRowHtml(files, size){
+    files = files || [];
+    if(!files.length) return "";
+    var px = size || 84;
+    return '<div class="notefilerow">'+files.map(function(f){
+      var ct = f.contentType||"";
+      var isPdf = ct.indexOf("pdf")>=0;
+      var isVideo = ct.indexOf("video")>=0;
+      var inner = isPdf ? '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>' :
+        (isVideo ? '<video src="'+f.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
+        '<img src="'+f.url+'" alt="">');
+      return '<a href="'+f.url+'" target="_blank" rel="noopener" class="notefiletile" style="width:'+px+'px; height:'+px+'px;" title="'+escapeHtml(f.name||"")+'">'+inner+'</a>';
+    }).join("")+'</div>';
   }
   async function addConfirmItem(){
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
@@ -5528,14 +5530,6 @@
       var wrap = document.getElementById(wrapId);
       if(!wrap) return;
       wrap.addEventListener("change", function(e){
-        var mergecheck = e.target.closest("input[type=checkbox][data-mergecheck]");
-        if(mergecheck){
-          var mcId = mergecheck.dataset.mergecheck;
-          if(mergecheck.checked){ specMergeSelected[mcId] = true; } else { delete specMergeSelected[mcId]; }
-          renderSpecTab();
-          renderSpecSiteCheck();
-          return;
-        }
         var input = e.target.closest("input[type=file][data-spec-scope]");
         if(input){
           uploadSpecPhotos(input.dataset.specScope, input.dataset.specCat, input.dataset.specRoom||null, input.dataset.specSide||null, input.files);
@@ -5568,26 +5562,9 @@
         }
       });
       wrap.addEventListener("click", function(e){
-        // チェックボックス（まとめる用の選択）をクリックした時は、親の写真タイルの
-        // data-openspec（拡大表示）を発火させない。これがあると、チェックを入れる
-        // たびに写真が全画面表示されてしまい、2枚目以降を選べなくなる。
-        if(e.target.closest(".specphoto-checkbox")) return;
         var scopeMergeBtn = e.target.closest("[data-mergescopephotos]");
         if(scopeMergeBtn){
           if(confirm2()) mergeScopePhotosToNote(scopeMergeBtn.dataset.mergescopephotos);
-          return;
-        }
-        var selectAllBtn = e.target.closest("[data-mergeselectall]");
-        if(selectAllBtn){
-          selectAllBtn.dataset.mergeselectall.split(",").filter(Boolean).forEach(function(id){ specMergeSelected[id] = true; });
-          renderSpecTab();
-          renderSpecSiteCheck();
-          return;
-        }
-        var mergebtn = e.target.closest("[data-mergespec]");
-        if(mergebtn){
-          var mergeIds = mergebtn.dataset.mergespec.split(",").filter(Boolean);
-          if(mergeIds.length && confirm2()) mergeSpecPhotosToNote(mergebtn.dataset.mergescope, mergebtn.dataset.mergecat, mergebtn.dataset.mergeroom||null, mergebtn.dataset.mergeside||null, mergeIds);
           return;
         }
         var del = e.target.closest("[data-delspec]");
