@@ -1854,15 +1854,45 @@
         '</div></div>';
     }).join("");
   }
+  // 打合せ記録に部位を設定したとき、該当の「仕様」タブ（設備・外観・インテリア等）の
+  // 変更履歴タイムラインにも、写真なしの「メモのみ」項目（kind:"note"）として反映する。
+  // そうしないと、記録一覧側でタグ付けしただけでは仕様タブ側の時系列には並ばないため。
+  function upsertNoteSpecEntry(note){
+    var existing = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===note.id; });
+    var part = note.specPart;
+    var usable = part && part.scope!=="general" && part.category;
+    if(!usable){
+      if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
+      return;
+    }
+    var sameSpot = existing && existing.scope===part.scope && existing.category===part.category &&
+      (existing.roomId||null)===(part.roomId||null) && (existing.side||null)===(part.side||null);
+    if(sameSpot){
+      existing.source = { noteId: note.id, noteSnippet: (note.content||"").slice(0,40) };
+      saveDoc("specPhotos", existing.id, existing);
+      return;
+    }
+    if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
+    var doc = {
+      id: uid("sp"), projectId: note.projectId, scope: part.scope, category: part.category,
+      roomId: part.roomId||null, side: part.side||null, kind: "note",
+      createdAt: note.date ? (note.date+"T00:00:00.000Z") : (note.createdAt||nowIso()),
+      source: { noteId: note.id, noteSnippet: (note.content||"").slice(0,40) },
+      decided: false
+    };
+    state.specPhotos.push(doc);
+    saveDoc("specPhotos", doc.id, doc);
+  }
   function setNoteSpecPart(noteId){
     var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
     if(!note) return;
     askSpecPart(function(part){
       if(!part) return;
       note.specPart = part;
+      upsertNoteSpecEntry(note);
       render();
       saveDoc("meetingNotes", note.id, note);
-      logActivity("打合せ記録に部位「"+part.label+"」を設定しました");
+      logActivity("打合せ記録に部位「"+part.label+"」を設定しました"+(part.scope==="general" ? "" : "（仕様タブの時系列にも反映）"));
     });
   }
 
@@ -1953,7 +1983,8 @@
   }
   function buildSpecGallery(scope, category, roomId, side, opts){
     opts = opts || {};
-    var photos = specPhotosFor(scope, category, roomId, side, opts.kind);
+    // 変更履歴タイムライン用の「メモのみ」項目（kind:"note"）は写真グリッドには出さない。
+    var photos = specPhotosFor(scope, category, roomId, side, opts.kind || "photo");
     if(opts.newestFirst) photos = photos.slice().reverse();
     if(opts.kind==="planboard" && opts.newestFirst){
       var html2 = photos.length ? '<div class="pbentrylist">'+photos.map(function(p,i){
@@ -3216,7 +3247,7 @@
             status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
           };
           state.tasks.push(t3);
-          if(!note.specPart){ note.specPart = part; saveDoc("meetingNotes", note.id, note); }
+          if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); saveDoc("meetingNotes", note.id, note); }
           render();
           saveDoc("tasks", t3.id, t3);
           logActivity("打合せ記録から業者タスク「"+content.slice(0,20)+"」を作成しました（部位："+part.label+"）");
@@ -4154,6 +4185,8 @@
   }
   async function deleteMeetingNote(id){
     if(editingMeetingNoteId === id) cancelEditMeetingNote();
+    var specEntry = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===id; });
+    if(specEntry) await softDelete("specPhotos","specPhotos", specEntry.id, "打合せ記録の仕様タイムライン項目");
     await softDelete("meetingNotes","meetingNotes", id, "打合せ記録");
   }
 
