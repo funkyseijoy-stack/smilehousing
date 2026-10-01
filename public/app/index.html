@@ -1116,14 +1116,16 @@
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
   // 業者タスクに紐付ける「部位」のグループ一覧。仕様タブの各カテゴリーをそのまま使う。
+  // ラベルは仕様タブの各カードの見出しと完全に一致させること（部位選択→仕様タブの
+  // 変更履歴が同じ名前で連動していると分かるようにするため）。
   var SPEC_PART_GROUPS = [
     {label:"総合（部位を限定しない）", value:"general"},
     {label:"外部仕様", value:"exterior"},
-    {label:"設備（水回り）", value:"facility"},
-    {label:"暖房・換気・電気", value:"equipment"},
-    {label:"現場確認項目", value:"siteCheck"},
+    {label:"設備仕様", value:"facility"},
+    {label:"暖房・換気・電気設備", value:"equipment"},
+    {label:"現場確認", value:"siteCheck"},
     {label:"インテリア基本色", value:"interiorColor"},
-    {label:"部屋別仕様（天井・壁・アクセント）", value:"room"}
+    {label:"部屋別クロス", value:"room"}
   ];
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
