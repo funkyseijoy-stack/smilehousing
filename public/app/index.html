@@ -2366,8 +2366,12 @@
     var items = rows.map(function(p, i){
       var isLatest = i === rows.length-1;
       var sourceLine = "";
-      if(p.source && p.source.noteSnippet){
-        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">打ち合わせ：'+escapeHtml(p.source.noteSnippet)+(p.source.vendor?'（'+escapeHtml(p.source.vendor)+'）':'')+'</div>';
+      if(p.kind==="note"){
+        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">打ち合わせ記録：'+escapeHtml(p.source.noteSnippet)+'</div>';
+      } else if(p.source && p.source.vendor){
+        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">受領PDF（'+escapeHtml(p.source.vendor)+'）：'+escapeHtml(p.source.noteSnippet||"")+'</div>';
+      } else if(p.source && p.source.noteSnippet){
+        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">打ち合わせから：'+escapeHtml(p.source.noteSnippet)+'</div>';
       } else {
         sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">手動で追加</div>';
       }
@@ -2381,7 +2385,7 @@
         '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>'+
         '</div>';
     }).join("");
-    return '<details style="margin-block-start:8px;"><summary style="font-size:.74rem; color:var(--muted); cursor:pointer;">変更履歴（打ち合わせ→変更→最新）を見る</summary>'+items+'</details>';
+    return '<details style="margin-block-start:8px;"><summary style="font-size:.74rem; color:var(--muted); cursor:pointer;">変更履歴（打ち合わせ→依頼→受領→決定）を見る</summary>'+items+'</details>';
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
