@@ -1110,6 +1110,7 @@
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
   // 業者タスクに紐付ける「部位」のグループ一覧。仕様タブの各カテゴリーをそのまま使う。
   var SPEC_PART_GROUPS = [
+    {label:"総合（部位を限定しない）", value:"general"},
     {label:"外観", value:"exterior"},
     {label:"設備（水回り）", value:"facility"},
     {label:"暖房・換気・電気", value:"equipment"},
@@ -1118,6 +1119,7 @@
     {label:"部屋別仕様（天井・壁・アクセント）", value:"room"}
   ];
   function specPartGroupLabel(scope){
+    if(scope==="general") return "総合";
     var g = SPEC_PART_GROUPS.find(function(x){ return x.value===scope; });
     return g ? g.label : scope;
   }
@@ -4262,7 +4264,7 @@
     await saveDoc("tasks", t.id, t);
     logActivity("業者タスク「"+(t.content||"").slice(0,20)+"」に受領内容を添付しました");
     toast("✅ 添付しました");
-    if(t.vendorSpec){
+    if(t.vendorSpec && t.vendorSpec.scope!=="general"){
       var vs = t.vendorSpec;
       var source = { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) };
       await uploadSpecPhotos(vs.scope, vs.category, vs.roomId||null, vs.side||null, files, source);
@@ -4401,6 +4403,10 @@
     var proj = projectById(state.currentProjectId);
     askChoice("部位を選択", "受領した変更内容を、どの部位の仕様に反映しますか？", SPEC_PART_GROUPS, function(scope){
       if(!scope){ callback(null); return; }
+      if(scope==="general"){
+        callback({scope:"general", category:null, roomId:null, side:null, label:"総合"});
+        return;
+      }
       if(scope==="room"){
         var rooms = (proj && proj.rooms) || [];
         if(!rooms.length){ toast("この案件にはまだ部屋が登録されていません"); callback(null); return; }
