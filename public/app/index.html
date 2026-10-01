@@ -249,6 +249,10 @@
   .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.56rem; text-align:center; padding:1px 0; pointer-events:none; }
   .specphoto.specadd{ display:flex; align-items:center; justify-content:center; cursor:pointer; border-style:dashed; color:var(--muted); font-size:1.3rem; }
   .specphoto-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .specphoto-checkbox{ position:absolute; top:2px; left:2px; z-index:2; background:rgba(255,255,255,.85); border-radius:5px; width:18px; height:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .specphoto-checkbox input{ width:14px; height:14px; margin:0; cursor:pointer; }
+  .specmergebar{ width:100%; margin-block-start:8px; }
+  .specmergebar .btn{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   .pill.small{ padding:2px 7px; font-size:.6rem; }
   .pbentrylist{ display:flex; flex-direction:column; gap:8px; }
   .pbentry{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:7px; }
@@ -1991,6 +1995,40 @@
     rows.sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     return rows;
   }
+  // 「手動で追加」写真をまとめて1つの打ち合わせ記録にする機能用の、選択中の写真ID（一時的なUI状態。保存はしない）。
+  var specMergeSelected = {};
+  function specPartLabelFor(scope, category, roomId, side){
+    var proj = projectById(state.currentProjectId);
+    if(scope==="room"){
+      var rooms = (proj && proj.rooms) || [];
+      var room = rooms.find(function(r){ return r.id===roomId; });
+      var rc = roomCatsFor(proj).find(function(x){ return x.id===category; });
+      return (room?room.name:"部屋")+"・"+(rc?rc.label:category);
+    }
+    if(scope==="interiorColor") return specPartGroupLabel(scope)+"・"+category+(side?"（"+side+"）":"");
+    return specPartGroupLabel(scope)+"・"+category;
+  }
+  async function mergeSpecPhotosToNote(scope, category, roomId, side, ids){
+    if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var photos = ids.map(function(id){ return state.specPhotos.find(function(p){ return p.id===id; }); }).filter(Boolean);
+    if(!photos.length) return;
+    photos.sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
+    var label = specPartLabelFor(scope, category, roomId, side);
+    var files = photos.map(function(p){ return { id: p.assetId||p.id, url: p.url, contentType: p.contentType, name: p.fileName||"" }; });
+    var n = { id: uid("note"), projectId: state.currentProjectId, content: "（"+label+"の候補写真"+photos.length+"枚をまとめました）",
+      date: todayStr(), files: files, author: state.currentUser||"", createdAt: nowIso(),
+      specPart: { scope: scope, category: category, roomId: roomId||null, side: side||null, label: label } };
+    state.meetingNotes.push(n);
+    for(var i=0;i<photos.length;i++){
+      delete specMergeSelected[photos[i].id];
+      await softDelete("specPhotos", "specPhotos", photos[i].id, "手動で追加した写真");
+    }
+    render();
+    await saveDoc("meetingNotes", n.id, n);
+    upsertNoteSpecEntry(n);
+    logActivity(label+"の写真"+photos.length+"枚を1つの打ち合わせ記録にまとめました");
+    toast("✅ "+photos.length+"枚を1つの打ち合わせ記録にまとめました");
+  }
   function buildSpecGallery(scope, category, roomId, side, opts){
     opts = opts || {};
     // 変更履歴タイムライン用の「メモのみ」項目（kind:"note"）は写真グリッドには出さない。
@@ -2028,7 +2066,10 @@
         (isVideoPhoto ?
           '<video src="'+p.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
           '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
+      var checkboxHtml = '<label class="specphoto-checkbox" title="選んで「1つの打ち合わせ記録にまとめる」に使う">'+
+        '<input type="checkbox" data-mergecheck="'+p.id+'"'+(specMergeSelected[p.id]?" checked":"")+'></label>';
       var tileHtml = '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
+        checkboxHtml+
         thumbInner+
         '<span class="splabel">'+fmtTs(p.createdAt)+'</span>'+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
@@ -2042,7 +2083,14 @@
         'data-spec-scope="'+scope+'" data-spec-cat="'+escapeHtml(category)+'"'+
         (roomId?' data-spec-room="'+roomId+'"':'')+(side?' data-spec-side="'+escapeHtml(side)+'"':'')+'>';
     }
-    return '<div class="specphotos">'+html+'</div>';
+    var selectedHere = photos.filter(function(p){ return specMergeSelected[p.id]; }).map(function(p){ return p.id; });
+    var mergeBarHtml = selectedHere.length ?
+      '<div class="specmergebar">'+
+      '<button type="button" class="btn small" data-mergespec="'+selectedHere.join(",")+'" data-mergescope="'+scope+'" data-mergecat="'+escapeHtml(category)+'"'+
+      (roomId?' data-mergeroom="'+roomId+'"':'')+(side?' data-mergeside="'+escapeHtml(side)+'"':'')+
+      '">選んだ'+selectedHere.length+'枚を1つの打ち合わせ記録にまとめる</button>'+
+      '</div>' : '';
+    return '<div class="specphotos">'+html+'</div>'+mergeBarHtml;
   }
   function renderSpecExterior(){
     var wrap = document.getElementById("specExteriorWrap");
@@ -5433,6 +5481,14 @@
       var wrap = document.getElementById(wrapId);
       if(!wrap) return;
       wrap.addEventListener("change", function(e){
+        var mergecheck = e.target.closest("input[type=checkbox][data-mergecheck]");
+        if(mergecheck){
+          var mcId = mergecheck.dataset.mergecheck;
+          if(mergecheck.checked){ specMergeSelected[mcId] = true; } else { delete specMergeSelected[mcId]; }
+          renderSpecTab();
+          renderSpecSiteCheck();
+          return;
+        }
         var input = e.target.closest("input[type=file][data-spec-scope]");
         if(input){
           uploadSpecPhotos(input.dataset.specScope, input.dataset.specCat, input.dataset.specRoom||null, input.dataset.specSide||null, input.files);
@@ -5465,6 +5521,12 @@
         }
       });
       wrap.addEventListener("click", function(e){
+        var mergebtn = e.target.closest("[data-mergespec]");
+        if(mergebtn){
+          var mergeIds = mergebtn.dataset.mergespec.split(",").filter(Boolean);
+          if(mergeIds.length && confirm2()) mergeSpecPhotosToNote(mergebtn.dataset.mergescope, mergebtn.dataset.mergecat, mergebtn.dataset.mergeroom||null, mergebtn.dataset.mergeside||null, mergeIds);
+          return;
+        }
         var del = e.target.closest("[data-delspec]");
         if(del){ if(confirm2()) deleteSpecPhoto(del.dataset.delspec); return; }
         var delroom = e.target.closest("[data-delroom]");
