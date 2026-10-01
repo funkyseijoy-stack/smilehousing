@@ -764,6 +764,8 @@
         </div>
         <div class="card">
           <h3>これまでの記録</h3>
+          <p class="muted" style="margin:0 0 8px; font-size:.76rem;">部位で絞り込むと、打ち合わせ→変更が古い順（時系列）に並びます。</p>
+          <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
           <div class="notelist" id="meetingNoteList"></div>
           <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
         </div>
@@ -1128,6 +1130,7 @@
     progressFilter: null,
     projectTypeFilter: null,
     taskKindFilter: null,
+    noteSpecFilter: null,
     editingProject: false
   };
   var uiSelectedVendors = {};
@@ -1801,27 +1804,64 @@
     wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
+  function specPartsEqual(a, b){
+    if(!a || !b) return false;
+    return a.scope===b.scope && a.category===b.category && (a.roomId||null)===(b.roomId||null) && (a.side||null)===(b.side||null);
+  }
+  function renderNoteSpecFilterBar(){
+    var bar = document.getElementById("noteSpecFilterBar");
+    if(!bar) return;
+    var f = state.noteSpecFilter;
+    bar.innerHTML =
+      '<span class="tagchip'+(!f?" active":"")+'" data-notespecfilter="all">すべて</span>'+
+      (f ? '<span class="tagchip active" data-notespecfilter="current">'+escapeHtml(f.label)+' ×</span>' : '')+
+      '<span class="tagchip" data-notespecfilter="pick">部位で絞り込む…</span>';
+  }
   function renderMeetingNotes(){
     var dateInput = document.getElementById("meetingNoteDate");
     if(dateInput && !dateInput.value) dateInput.value = todayStr();
     var wrap = document.getElementById("meetingNoteList");
     var empty = document.getElementById("meetingNoteEmpty");
-    var rows = liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; }).slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
+    renderNoteSpecFilterBar();
+    var filter = state.noteSpecFilter;
+    var rows = liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; })
+      .filter(function(n){ return filter ? specPartsEqual(n.specPart, filter) : true; })
+      .slice()
+      .sort(function(a,b){
+        // 部位で絞り込み中は「打ち合わせ→変更」の流れが追えるよう古い順、未絞り込みは従来どおり新しい順。
+        return filter ? (a.createdAt||"").localeCompare(b.createdAt||"") : (b.createdAt||"").localeCompare(a.createdAt||"");
+      });
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(n){
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
       var filesHtml = (n.files && n.files.length) ? '<div class="row" style="margin-block-start:6px; flex-wrap:wrap; gap:6px;">'+confirmAttachmentsHtml(n.files)+'</div>' : "";
-      return '<div class="noteitem"><div class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</div><div class="ntext">'+escapeHtml(n.content)+'</div>'+
+      var specHtml = n.specPart ?
+        '<span class="pill" style="background:var(--orange-soft); color:var(--orange); margin-inline-end:6px;">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
+      return '<div class="noteitem"><div class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</div>'+
+        (specHtml ? '<div style="margin-block-end:4px;">'+specHtml+'</div>' : '')+
+        '<div class="ntext">'+escapeHtml(n.content)+'</div>'+
         filesHtml+
         '<div class="row" style="margin-block-start:6px; flex-wrap:wrap;">'+
         '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
         '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
+        '<button class="btn ghost small" data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
         '</div></div>';
     }).join("");
+  }
+  function setNoteSpecPart(noteId){
+    var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
+    if(!note) return;
+    askSpecPart(function(part){
+      if(!part) return;
+      note.specPart = part;
+      render();
+      saveDoc("meetingNotes", note.id, note);
+      logActivity("打合せ記録に部位「"+part.label+"」を設定しました");
+    });
   }
 
   function renderOverview(){
@@ -3174,6 +3214,7 @@
             status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
           };
           state.tasks.push(t3);
+          if(!note.specPart){ note.specPart = part; saveDoc("meetingNotes", note.id, note); }
           render();
           saveDoc("tasks", t3.id, t3);
           logActivity("打合せ記録から業者タスク「"+content.slice(0,20)+"」を作成しました（部位："+part.label+"）");
@@ -5473,6 +5514,22 @@
       state.taskKindFilter = chip.dataset.taskkindfilter || null;
       renderKanban();
     });
+    var noteSpecFilterBarEl = document.getElementById("noteSpecFilterBar");
+    if(noteSpecFilterBarEl) noteSpecFilterBarEl.addEventListener("click", function(e){
+      var chip = e.target.closest("[data-notespecfilter]");
+      if(!chip) return;
+      var kind = chip.dataset.notespecfilter;
+      if(kind==="all" || kind==="current"){
+        state.noteSpecFilter = null;
+        renderMeetingNotes();
+      } else if(kind==="pick"){
+        askSpecPart(function(part){
+          if(!part) return;
+          state.noteSpecFilter = part;
+          renderMeetingNotes();
+        });
+      }
+    });
 
     document.getElementById("btnAddTag").addEventListener("click", addProgressTag);
     document.getElementById("settingsTagList").addEventListener("click", function(e){
@@ -5504,6 +5561,7 @@
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
+      else if(act==="setnotespec"){ setNoteSpecPart(id); }
     }
     document.getElementById("projectTableBody").addEventListener("click", handleTableClick);
     document.getElementById("pendingTableBody").addEventListener("click", handleTableClick);
