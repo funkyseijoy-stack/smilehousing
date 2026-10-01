@@ -2417,7 +2417,7 @@
         '</div>';
     });
     var html = cards.map(function(c, i){ return (i>0?'<div class="spectl-arrow">↓</div>':'')+c; }).join("");
-    return '<details style="margin-block-start:8px;"><summary style="font-size:.74rem; color:var(--muted); cursor:pointer;">変更履歴（打ち合わせ→依頼→受領→決定）を見る</summary><div class="spectl">'+html+'</div></details>';
+    return '<div style="margin-block-start:10px;"><div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
