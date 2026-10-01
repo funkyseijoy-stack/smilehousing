@@ -325,6 +325,7 @@
         <h2 style="margin:0;">社内タスク【最重要】</h2>
         <button class="btn small" id="btnNewTask">＋ タスク追加</button>
       </div>
+      <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
       <div class="kanbanwrap" id="kanbanWrap"></div>
     </div>
     <div class="statrow">
@@ -1004,6 +1005,10 @@
         <label class="field">依頼先（業者・任意）<select id="tfVendor"><option value="">なし</option></select></label>
         <label class="field">依頼方法<select id="tfMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option><option value="other">その他</option></select></label>
       </div>
+      <div class="row" style="align-items:center; gap:8px;">
+        <button type="button" class="btn secondary small" id="btnPickVendorSpec">部位を選ぶ（業者タスクの場合）</button>
+        <span class="muted" id="tfVendorSpecLabel" style="font-size:.78rem;">未選択</span>
+      </div>
       <div class="row">
         <label class="field" style="flex-direction:row; align-items:center; gap:6px;"><input type="checkbox" id="tfHasDeadline"> 期限あり</label>
         <label class="field">期限<input type="date" id="tfDeadline"></label>
@@ -1101,6 +1106,19 @@
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
+  // 業者タスクに紐付ける「部位」のグループ一覧。仕様タブの各カテゴリーをそのまま使う。
+  var SPEC_PART_GROUPS = [
+    {label:"外観", value:"exterior"},
+    {label:"設備（水回り）", value:"facility"},
+    {label:"暖房・換気・電気", value:"equipment"},
+    {label:"現場確認項目", value:"siteCheck"},
+    {label:"インテリア基本色", value:"interiorColor"},
+    {label:"部屋別仕様（天井・壁・アクセント）", value:"room"}
+  ];
+  function specPartGroupLabel(scope){
+    var g = SPEC_PART_GROUPS.find(function(x){ return x.value===scope; });
+    return g ? g.label : scope;
+  }
   var state = {
     projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [],
     settings: { progressTags: ["契約前","契約後","着工","上棟","引渡し"], staffList: ["社長","朋子","山本","渡邊"], pin: "0000" },
@@ -1109,6 +1127,7 @@
     quoteUnlocked: false,
     progressFilter: null,
     projectTypeFilter: null,
+    taskKindFilter: null,
     editingProject: false
   };
   var uiSelectedVendors = {};
@@ -1477,18 +1496,35 @@
     var soon = days !== null && days >= -2;
     return '<span class="'+(soon?"due-soon":"")+'">期限 '+t.deadline+'</span>';
   }
+  function renderTaskKindFilterBar(){
+    var bar = document.getElementById("taskKindFilterBar");
+    if(!bar) return;
+    var opts = [{label:"すべて", value:null},{label:"社内", value:"internal"},{label:"業者", value:"vendor"}];
+    bar.innerHTML = opts.map(function(o){
+      return '<span class="tagchip'+(state.taskKindFilter===o.value?" active":"")+'" data-taskkindfilter="'+(o.value||"")+'">'+o.label+'</span>';
+    }).join("");
+  }
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
-    var tasks = liveTasks();
+    renderTaskKindFilterBar();
+    var tasks = liveTasks().filter(function(t){
+      if(state.taskKindFilter==="vendor") return !!t.requestTo;
+      if(state.taskKindFilter==="internal") return !t.requestTo;
+      return true;
+    });
     wrap.innerHTML = STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
       var cards = rows.map(function(t){
         var proj = projectById(t.projectId);
         var canForward = STATUS_ORDER.indexOf(status) < STATUS_ORDER.length-1;
         var canBack = STATUS_ORDER.indexOf(status) > 0;
+        var isVendor = !!t.requestTo;
         return '<div class="kancard" data-taskid="'+t.id+'">'+
-          '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+(t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.68rem;">🔒自分だけ</span>':'')+'</div>'+
+          '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+
+            (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
+            (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.68rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+          (t.vendorSpec?'<div class="muted" style="font-size:.7rem; margin-block-end:4px;">部位：'+escapeHtml(t.vendorSpec.label||"")+'</div>':'')+
           (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+confirmAttachmentsHtml(t.attachments)+'</div>' : "")+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
@@ -1497,6 +1533,7 @@
             fmtDeadline(t)+
           '</div>'+
           '<div class="kc-actions">'+
+            (isVendor && t.vendorSpec ? '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 受領内容を添付</label><input type="file" id="kcattach_'+t.id+'" accept="image/*,application/pdf,video/*" multiple hidden data-kcattach="'+t.id+'">' : '')+
             (canBack?'<button class="btn small secondary" data-taskact="back" data-id="'+t.id+'">←戻す</button>':'')+
             (canForward?'<button class="btn small" data-taskact="forward" data-id="'+t.id+'">次へ→</button>':'')+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
@@ -1782,6 +1819,7 @@
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
         '</div></div>';
     }).join("");
   }
@@ -1944,6 +1982,7 @@
     wrap.innerHTML = valuesBlockHtml + EXTERIOR_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("exterior",cat,null,null)+
         '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+        renderSpecTimeline("exterior",cat,null,null)+
         '</div>';
     }).join("");
     var reflectBtn = document.getElementById("btnReflectExteriorSpecValues");
@@ -2013,6 +2052,7 @@
         '</span>'+
         '</div>'+
         buildSpecGallery("facility",cat,null,null,{kind:"planboard", newestFirst:true, noAdd:true})+
+        renderSpecTimeline("facility",cat,null,null)+
         '</div>';
     }).join("");
   }
@@ -2031,6 +2071,7 @@
     wrap.innerHTML = EQUIPMENT_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
         '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+        renderSpecTimeline("equipment",cat,null,null)+
         '</div>';
     }).join("");
   }
@@ -2049,6 +2090,7 @@
     wrap.innerHTML = SITECHECK_CATS.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("siteCheck",cat,null,null)+
         '<textarea class="siteCheckNote" data-sitechecknote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+        renderSpecTimeline("siteCheck",cat,null,null)+
         '</div>';
     }).join("");
   }
@@ -2120,8 +2162,8 @@
         (c.custom ? ' <button class="btn danger-ghost small" data-delintcat="'+escapeHtml(c.name)+'" style="margin-inline-start:6px;">削除</button>' : '')+
         '</h4>'+
         '<div class="specsideswrap">'+
-        '<div class="specside"><span class="sidelabel">表</span>'+buildSpecGallery("interiorColor",c.name,null,"表")+'</div>'+
-        '<div class="specside"><span class="sidelabel">裏</span>'+buildSpecGallery("interiorColor",c.name,null,"裏")+'</div>'+
+        '<div class="specside"><span class="sidelabel">表</span>'+buildSpecGallery("interiorColor",c.name,null,"表")+renderSpecTimeline("interiorColor",c.name,null,"表")+'</div>'+
+        '<div class="specside"><span class="sidelabel">裏</span>'+buildSpecGallery("interiorColor",c.name,null,"裏")+renderSpecTimeline("interiorColor",c.name,null,"裏")+'</div>'+
         '</div></div>';
     }).join("");
   }
@@ -2144,7 +2186,7 @@
             '<input type="text" class="roomAccentNote" data-roomnote="'+r.id+'" placeholder="アクセント位置のメモ（例：リビング北側の壁）" value="'+escapeHtml(r.accentNote||"")+'">' : "";
           return '<div class="speccat"><h4>'+escapeHtml(rc.label)+
             (rc.custom ? ' <button class="btn danger-ghost small" data-delroomcat="'+rc.id+'" style="margin-inline-start:6px;">削除</button>' : '')+
-            '</h4>'+buildSpecGallery("room",rc.id,r.id,null)+noteHtml+'</div>';
+            '</h4>'+buildSpecGallery("room",rc.id,r.id,null)+noteHtml+renderSpecTimeline("room",rc.id,r.id,null)+'</div>';
         }).join("")+
         '</div>';
     }).join("");
@@ -2157,7 +2199,7 @@
     renderSpecRooms();
   }
   var SPEC_UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // サーバー関数のリクエストサイズ上限に合わせた安全値
-  async function uploadSpecPhotos(scope, category, roomId, side, fileList){
+  async function uploadSpecPhotos(scope, category, roomId, side, fileList, source){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var files = Array.prototype.slice.call(fileList||[]);
@@ -2172,6 +2214,7 @@
         var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: scope, category: category,
           roomId: roomId || null, side: side || null, assetId: res.id, url: res.url, kind: "photo",
           contentType: res.contentType || f.type, fileName: f.name, createdAt: nowIso() };
+        if(source){ doc.source = source; }
         blobCache[res.id] = f;
         state.specPhotos.push(doc);
         await saveDoc("specPhotos", doc.id, doc);
@@ -2222,6 +2265,50 @@
       var proj = projectById(p.projectId);
       if(proj) pushSpecPhotoToOkai(proj, p).then(function(){ render(); });
     }
+  }
+  // 仕様写真・図面を「決定」としてマークする。同じ部位（scope/category/roomId/side）の
+  // 中では「決定」は常に1件だけになるよう、他のdecidedは解除する。
+  function toggleSpecDecided(id){
+    var p = state.specPhotos.find(function(x){ return x.id===id; });
+    if(!p) return;
+    var makeDecided = !p.decided;
+    liveSpecPhotos().filter(function(x){
+      return x.projectId===p.projectId && x.scope===p.scope && x.category===p.category &&
+        (x.roomId||null)===(p.roomId||null) && (x.side||null)===(p.side||null);
+    }).forEach(function(x){
+      if(x.id===p.id) return;
+      if(x.decided){ x.decided = false; saveDoc("specPhotos", x.id, x); }
+    });
+    p.decided = makeDecided;
+    render();
+    saveDoc("specPhotos", p.id, p);
+    logActivity((p.category||"")+"を"+(p.decided?"「決定」にしました":"「決定」を解除しました"));
+  }
+  // 部位（仕様カテゴリー）ごとの「打ち合わせ→変更→最新／決定」の時系列表示。
+  // 自動振り分け（業者タスクへの添付）で記録されたsource情報があれば、元の打合せも表示する。
+  function renderSpecTimeline(scope, category, roomId, side){
+    var rows = specPhotosFor(scope, category, roomId, side).slice();
+    if(!rows.length) return "";
+    rows.sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
+    var items = rows.map(function(p, i){
+      var isLatest = i === rows.length-1;
+      var sourceLine = "";
+      if(p.source && p.source.noteSnippet){
+        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">打ち合わせ：'+escapeHtml(p.source.noteSnippet)+(p.source.vendor?'（'+escapeHtml(p.source.vendor)+'）':'')+'</div>';
+      } else {
+        sourceLine = '<div class="muted" style="font-size:.7rem; margin-block-start:2px;">手動で追加</div>';
+      }
+      return '<div class="row" style="align-items:flex-start; gap:8px; padding:6px 0; border-block-start:1px solid var(--border);">'+
+        '<div style="flex-grow:1; min-width:0;">'+
+        '<div style="font-size:.76rem; font-weight:700;">'+fmtTs(p.createdAt)+
+        (isLatest?' <span class="pill tag small">最新</span>':'')+
+        (p.decided?' <span class="pill status-受領済み small">決定</span>':'')+
+        '</div>'+sourceLine+
+        '</div>'+
+        '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>'+
+        '</div>';
+    }).join("");
+    return '<details style="margin-block-start:8px;"><summary style="font-size:.74rem; color:var(--muted); cursor:pointer;">変更履歴（打ち合わせ→変更→最新）を見る</summary>'+items+'</details>';
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
@@ -3065,6 +3152,34 @@
       await saveDoc("tasks", t.id, t);
       logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました");
       toast("✅ 社内タスクに追加しました");
+      return;
+    }
+
+    if(taskType === "vendortask"){
+      var vendorChoices = liveVendors().map(function(v){ return {label:v.name, value:v.name}; })
+        .concat([{label:"（業者未定・あとで入力）", value:""}]);
+      askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorName){
+        if(vendorName===null) return;
+        askSpecPart(function(part){
+          if(!part){ toast("部位が選択されなかったため、作成を中止しました"); return; }
+          var t3 = {
+            id: uid("task"), projectId: proj.id, content: content,
+            assignee: "", instructor: "", creator: state.currentUser||"",
+            hasDeadline: false, deadline: "",
+            requestTo: vendorName||"", requestMethod: "",
+            attachmentAssetIds: [],
+            attachments: (note.files||[]).slice(),
+            vendorSpec: part,
+            private: false,
+            status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
+          };
+          state.tasks.push(t3);
+          render();
+          saveDoc("tasks", t3.id, t3);
+          logActivity("打合せ記録から業者タスク「"+content.slice(0,20)+"」を作成しました（部位："+part.label+"）");
+          toast("✅ 業者タスクに追加しました");
+        });
+      });
       return;
     }
   }
@@ -4000,6 +4115,7 @@
   }
 
   // ================= tasks (社内タスク管理・最重要) =================
+  var taskFormVendorSpec = null;
   function openTaskForm(){
     var projSel = document.getElementById("tfProject");
     projSel.innerHTML = liveProjects().map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; }).join("") || '<option value="">案件がありません</option>';
@@ -4012,6 +4128,8 @@
     document.getElementById("tfDeadline").value = "";
     document.getElementById("tfPrivate").checked = false;
     document.getElementById("tfAttachment").value = "";
+    taskFormVendorSpec = null;
+    document.getElementById("tfVendorSpecLabel").textContent = "未選択";
     document.getElementById("taskFormModal").hidden = false;
   }
   function closeTaskForm(){ document.getElementById("taskFormModal").hidden = true; }
@@ -4050,6 +4168,7 @@
       requestTo: requestTo||"", requestMethod: method,
       attachmentAssetIds: attachmentAssetIds,
       attachments: taskAttachments,
+      vendorSpec: (requestTo ? taskFormVendorSpec : null),
       private: isPrivate,
       status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
@@ -4077,6 +4196,37 @@
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t) return;
     await softDelete("tasks","tasks", id, "タスク「"+(t.content||"").slice(0,20)+"」");
+  }
+  // 業者タスクに「受領内容」を添付する。タスク自体の添付として保存すると同時に、
+  // タスクに紐付いた部位（vendorSpec）の仕様写真としても自動で登録する。
+  async function attachVendorTaskFiles(taskId, fileList){
+    var files = Array.prototype.slice.call(fileList||[]);
+    if(!files.length) return;
+    var t = state.tasks.find(function(x){ return x.id===taskId; });
+    if(!t){ toast("タスクが見つかりません"); return; }
+    if(!assets){ toast("この画面では添付が利用できません"); return; }
+    t.attachments = t.attachments || [];
+    t.attachmentAssetIds = t.attachmentAssetIds || [];
+    for(var i=0;i<files.length;i++){
+      var f = files[i];
+      try{
+        var res = await assets.upload(f);
+        blobCache[res.id] = f;
+        t.attachmentAssetIds.push(res.id);
+        t.attachments.push({ id: res.id, url: res.url, contentType: res.contentType||f.type, name: f.name });
+      }catch(e){ toast(f.name+" の添付に失敗しました"); }
+    }
+    t.updatedAt = nowIso();
+    render();
+    await saveDoc("tasks", t.id, t);
+    logActivity("業者タスク「"+(t.content||"").slice(0,20)+"」に受領内容を添付しました");
+    toast("✅ 添付しました");
+    if(t.vendorSpec){
+      var vs = t.vendorSpec;
+      var source = { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) };
+      await uploadSpecPhotos(vs.scope, vs.category, vs.roomId||null, vs.side||null, files, source);
+      toast("✅ 「"+(vs.label||"")+"」の仕様にも自動反映しました");
+    }
   }
 
   // ================= settings (⑨カスタマイズ / ⑤PIN) =================
@@ -4193,6 +4343,51 @@
       cleanup();
       if(v==="cancel"){ callback(null); return; }
       callback(choices[parseInt(v,10)].value);
+    });
+  }
+
+  // 業者タスクに紐付ける「部位」を、仕様タブの既存カテゴリーから選ばせる。
+  // callback には {scope, category, roomId, side, label} かキャンセル時はnullが渡る。
+  function specPartCategoryList(scope, proj){
+    if(scope==="exterior") return EXTERIOR_CATS;
+    if(scope==="facility") return FACILITY_CATS;
+    if(scope==="equipment") return EQUIPMENT_CATS;
+    if(scope==="siteCheck") return SITECHECK_CATS;
+    if(scope==="interiorColor") return interiorColorCatsFor(proj).map(function(c){ return c.name; });
+    return [];
+  }
+  function askSpecPart(callback){
+    var proj = projectById(state.currentProjectId);
+    askChoice("部位を選択", "受領した変更内容を、どの部位の仕様に反映しますか？", SPEC_PART_GROUPS, function(scope){
+      if(!scope){ callback(null); return; }
+      if(scope==="room"){
+        var rooms = (proj && proj.rooms) || [];
+        if(!rooms.length){ toast("この案件にはまだ部屋が登録されていません"); callback(null); return; }
+        askChoice("部屋を選択", "", rooms.map(function(r){ return {label:r.name, value:r.id}; }), function(roomId){
+          if(!roomId){ callback(null); return; }
+          var roomCats = roomCatsFor(proj);
+          askChoice("項目を選択", "", roomCats.map(function(rc){ return {label:rc.label, value:rc.id}; }), function(catId){
+            if(!catId){ callback(null); return; }
+            var rc = roomCats.find(function(x){ return x.id===catId; });
+            var roomName = (rooms.find(function(r){ return r.id===roomId; })||{}).name || "";
+            callback({scope:"room", category:catId, roomId:roomId, side:null, label:roomName+"・"+(rc?rc.label:catId)});
+          });
+        });
+        return;
+      }
+      var cats = specPartCategoryList(scope, proj);
+      if(!cats.length){ toast("選べるカテゴリーがありません"); callback(null); return; }
+      askChoice("カテゴリーを選択", "", cats.map(function(c){ return {label:c, value:c}; }), function(cat){
+        if(!cat){ callback(null); return; }
+        if(scope==="interiorColor"){
+          askChoice("表・裏を選択", "", [{label:"表", value:"表"},{label:"裏", value:"裏"}], function(side){
+            if(!side){ callback(null); return; }
+            callback({scope:scope, category:cat, roomId:null, side:side, label:specPartGroupLabel(scope)+"・"+cat+"（"+side+"）"});
+          });
+          return;
+        }
+        callback({scope:scope, category:cat, roomId:null, side:null, label:specPartGroupLabel(scope)+"・"+cat});
+      });
     });
   }
 
@@ -5148,6 +5343,8 @@
         if(cyclereq){ cyclePbReqStatus(cyclereq.dataset.cyclereq); return; }
         var togglereflect = e.target.closest("[data-togglereflect]");
         if(togglereflect){ togglePbReflected(togglereflect.dataset.togglereflect); return; }
+        var specdecide = e.target.closest("[data-spec-decide]");
+        if(specdecide){ toggleSpecDecided(specdecide.dataset.specDecide); return; }
         var openspec = e.target.closest("[data-openspec]");
         if(openspec){
           var openspecId = openspec.dataset.openspec;
@@ -5249,6 +5446,13 @@
     document.getElementById("btnNewTask").addEventListener("click", openTaskForm);
     document.getElementById("tfCancel").addEventListener("click", closeTaskForm);
     document.getElementById("tfSubmit").addEventListener("click", submitTaskForm);
+    document.getElementById("btnPickVendorSpec").addEventListener("click", function(){
+      askSpecPart(function(part){
+        if(!part) return;
+        taskFormVendorSpec = part;
+        document.getElementById("tfVendorSpecLabel").textContent = part.label;
+      });
+    });
     document.getElementById("kanbanWrap").addEventListener("click", function(e){
       var btn = e.target.closest("button[data-taskact]");
       if(!btn) return;
@@ -5256,6 +5460,18 @@
       if(act==="forward") moveTask(id,"forward");
       else if(act==="back") moveTask(id,"back");
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
+    });
+    document.getElementById("kanbanWrap").addEventListener("change", function(e){
+      var input = e.target.closest("input[type=file][data-kcattach]");
+      if(!input) return;
+      attachVendorTaskFiles(input.dataset.kcattach, input.files);
+      input.value = "";
+    });
+    document.getElementById("taskKindFilterBar").addEventListener("click", function(e){
+      var chip = e.target.closest("[data-taskkindfilter]");
+      if(!chip) return;
+      state.taskKindFilter = chip.dataset.taskkindfilter || null;
+      renderKanban();
     });
 
     document.getElementById("btnAddTag").addEventListener("click", addProgressTag);
