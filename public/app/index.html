@@ -2084,12 +2084,22 @@
         (roomId?' data-spec-room="'+roomId+'"':'')+(side?' data-spec-side="'+escapeHtml(side)+'"':'')+'>';
     }
     var selectedHere = photos.filter(function(p){ return specMergeSelected[p.id]; }).map(function(p){ return p.id; });
-    var mergeBarHtml = selectedHere.length ?
-      '<div class="specmergebar">'+
-      '<button type="button" class="btn small" data-mergespec="'+selectedHere.join(",")+'" data-mergescope="'+scope+'" data-mergecat="'+escapeHtml(category)+'"'+
-      (roomId?' data-mergeroom="'+roomId+'"':'')+(side?' data-mergeside="'+escapeHtml(side)+'"':'')+
-      '">選んだ'+selectedHere.length+'枚を1つの打ち合わせ記録にまとめる</button>'+
-      '</div>' : '';
+    var allIdsHere = photos.map(function(p){ return p.id; });
+    var mergeBarHtml = "";
+    if(photos.length >= 2){
+      mergeBarHtml += '<div class="specmergebar">'+
+        '<button type="button" class="btn small secondary" data-mergeselectall="'+allIdsHere.join(",")+'">全て選択</button>'+
+        (selectedHere.length ? '<button type="button" class="btn small" data-mergespec="'+selectedHere.join(",")+'" data-mergescope="'+scope+'" data-mergecat="'+escapeHtml(category)+'"'+
+          (roomId?' data-mergeroom="'+roomId+'"':'')+(side?' data-mergeside="'+escapeHtml(side)+'"':'')+
+          '">選んだ'+selectedHere.length+'枚を1つの打ち合わせ記録にまとめる</button>' : '')+
+        '</div>';
+    } else if(selectedHere.length){
+      mergeBarHtml += '<div class="specmergebar">'+
+        '<button type="button" class="btn small" data-mergespec="'+selectedHere.join(",")+'" data-mergescope="'+scope+'" data-mergecat="'+escapeHtml(category)+'"'+
+        (roomId?' data-mergeroom="'+roomId+'"':'')+(side?' data-mergeside="'+escapeHtml(side)+'"':'')+
+        '">選んだ'+selectedHere.length+'枚を1つの打ち合わせ記録にまとめる</button>'+
+        '</div>';
+    }
     return '<div class="specphotos">'+html+'</div>'+mergeBarHtml;
   }
   function renderSpecExterior(){
@@ -5521,6 +5531,17 @@
         }
       });
       wrap.addEventListener("click", function(e){
+        // チェックボックス（まとめる用の選択）をクリックした時は、親の写真タイルの
+        // data-openspec（拡大表示）を発火させない。これがあると、チェックを入れる
+        // たびに写真が全画面表示されてしまい、2枚目以降を選べなくなる。
+        if(e.target.closest(".specphoto-checkbox")) return;
+        var selectAllBtn = e.target.closest("[data-mergeselectall]");
+        if(selectAllBtn){
+          selectAllBtn.dataset.mergeselectall.split(",").filter(Boolean).forEach(function(id){ specMergeSelected[id] = true; });
+          renderSpecTab();
+          renderSpecSiteCheck();
+          return;
+        }
         var mergebtn = e.target.closest("[data-mergespec]");
         if(mergebtn){
           var mergeIds = mergebtn.dataset.mergespec.split(",").filter(Boolean);
