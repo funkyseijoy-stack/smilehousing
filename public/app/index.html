@@ -1041,7 +1041,7 @@
         <label class="field">依頼方法<select id="tfMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option><option value="other">その他</option></select></label>
       </div>
       <div class="row" style="align-items:center; gap:8px;">
-        <button type="button" class="btn secondary small" id="btnPickVendorSpec">部位を選ぶ（業者タスクの場合）</button>
+        <button type="button" class="btn secondary small" id="btnPickVendorSpec">部位を選ぶ（任意）</button>
         <span class="muted" id="tfVendorSpecLabel" style="font-size:.78rem;">未選択</span>
       </div>
       <div class="row">
@@ -1573,7 +1573,7 @@
             fmtDeadline(t)+
           '</div>'+
           '<div class="kc-actions">'+
-            (isVendor && t.vendorSpec ? '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 受領内容を添付</label><input type="file" id="kcattach_'+t.id+'" accept="image/*,application/pdf,video/*" multiple hidden data-kcattach="'+t.id+'">' : '')+
+            (t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category ? '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="image/*,application/pdf,video/*" multiple hidden data-kcattach="'+t.id+'">' : '')+
             (canBack?'<button class="btn small secondary" data-taskact="back" data-id="'+t.id+'">←戻す</button>':'')+
             (canForward?'<button class="btn small" data-taskact="forward" data-id="'+t.id+'">次へ→</button>':'')+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
@@ -3432,21 +3432,25 @@
     }
 
     if(taskType === "companytask"){
-      var t = {
-        id: uid("task"), projectId: proj.id, content: content,
-        assignee: "", instructor: "", creator: state.currentUser||"",
-        hasDeadline: false, deadline: "",
-        requestTo: "", requestMethod: "",
-        attachmentAssetIds: [],
-        attachments: (note.files||[]).slice(),
-        private: false,
-        status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
-      };
-      state.tasks.push(t);
-      render();
-      await saveDoc("tasks", t.id, t);
-      logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました");
-      toast("✅ 社内タスクに追加しました");
+      askSpecPart(function(part){
+        var t = {
+          id: uid("task"), projectId: proj.id, content: content,
+          assignee: "", instructor: "", creator: state.currentUser||"",
+          hasDeadline: false, deadline: "",
+          requestTo: "", requestMethod: "",
+          attachmentAssetIds: [],
+          attachments: (note.files||[]).slice(),
+          vendorSpec: part || null,
+          private: false,
+          status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
+        };
+        state.tasks.push(t);
+        if(part && part.scope!=="general" && !note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); saveDoc("meetingNotes", note.id, note); }
+        render();
+        saveDoc("tasks", t.id, t);
+        logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました"+(part?"（部位："+part.label+"）":""));
+        toast("✅ 社内タスクに追加しました");
+      });
       return;
     }
 
@@ -4516,7 +4520,7 @@
       requestTo: requestTo||"", requestMethod: method,
       attachmentAssetIds: attachmentAssetIds,
       attachments: taskAttachments,
-      vendorSpec: (requestTo ? taskFormVendorSpec : null),
+      vendorSpec: taskFormVendorSpec || null,
       private: isPrivate,
       status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
@@ -4567,9 +4571,9 @@
     t.updatedAt = nowIso();
     render();
     await saveDoc("tasks", t.id, t);
-    logActivity("業者タスク「"+(t.content||"").slice(0,20)+"」に受領内容を添付しました");
+    logActivity((t.requestTo?"業者タスク":"社内タスク")+"「"+(t.content||"").slice(0,20)+"」に資料を添付しました");
     toast("✅ 添付しました");
-    if(t.vendorSpec && t.vendorSpec.scope!=="general"){
+    if(t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category){
       var vs = t.vendorSpec;
       var source = { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) };
       await uploadSpecPhotos(vs.scope, vs.category, vs.roomId||null, vs.side||null, files, source);
