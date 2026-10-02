@@ -170,7 +170,7 @@
   .meetingsubpane{ display:none; }
   .meetingsubpane.active{ display:block; }
   .speccatgrid{ display:flex; flex-wrap:nowrap; gap:10px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
-  .speccatgrid .speccat{ flex:0 0 260px; width:260px; margin-block-end:0; }
+  .speccatgrid .speccat{ flex:0 0 320px; width:320px; margin-block-end:0; }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
@@ -285,8 +285,10 @@
   .pbentry-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1; min-width:0; }
   .pbentry-meta .splabel2{ font-size:.68rem; color:var(--muted); width:100%; }
   .spectl{ display:flex; flex-direction:column; gap:8px; margin-block-start:6px; }
-  .spectl-card{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
+  .spectl-card{ display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
   .spectl-card-row{ flex-direction:column; align-items:stretch; gap:8px; }
+  .spectl-meta{ flex-grow:1; min-width:120px; }
+  .spectl-actions{ display:flex; gap:6px; flex-shrink:0; margin-inline-start:auto; }
   .spectl-thumb{ width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
   .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
@@ -2647,17 +2649,17 @@
       // サムネイル1枚＋テキストを横並びで表示する。
       if(noteFiles && noteFiles.length){
         return '<div class="spectl-card spectl-card-row">'+
-          '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px;">'+
-          '<div style="flex-grow:1; min-width:0;">'+metaHtml+'</div>'+
-          decideBtnHtml+delBtnHtml+
+          '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">'+
+          '<div class="spectl-meta">'+metaHtml+'</div>'+
+          '<div class="spectl-actions">'+decideBtnHtml+delBtnHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
           '</div>';
       }
       return '<div class="spectl-card">'+
         thumbHtml+
-        '<div style="flex-grow:1; min-width:0;">'+metaHtml+'</div>'+
-        decideBtnHtml+delBtnHtml+
+        '<div class="spectl-meta">'+metaHtml+'</div>'+
+        '<div class="spectl-actions">'+decideBtnHtml+delBtnHtml+'</div>'+
         '</div>';
     });
     var html = cards.join("");
