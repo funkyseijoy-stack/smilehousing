@@ -5652,7 +5652,7 @@
         if(!input) return;
         var kind = input.dataset.photoKind;
         var categoryId = input.dataset.photoCat || null;
-        var files = input.files;
+        var files = Array.prototype.slice.call(input.files||[]);
         input.value = "";
         uploadAlbumPhotos(kind, files, categoryId);
       });
