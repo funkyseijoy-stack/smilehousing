@@ -168,9 +168,20 @@
   .subpanel.active{ display:block; }
 
   .notelist{ display:flex; flex-direction:column; gap:10px; }
-  .noteitem{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
-  .noteitem .ndate{ font-size:.68rem; color:var(--muted); font-weight:700; margin-block-end:4px; }
+  .noteitem{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .noteitem .ndate{ font-size:.7rem; color:var(--muted); font-weight:700; }
+  .noteitem .ntitle{ font-size:.92rem; font-weight:700; }
+  .noteitem .nhead{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
   .noteitem .ntext{ font-size:.85rem; white-space:pre-wrap; }
+  .noteitem .nbox{ border-radius:10px; padding:8px 10px; margin-block-end:8px; }
+  .noteitem .nbox .nboxlabel{ font-size:.68rem; font-weight:700; margin-block-end:3px; }
+  .noteitem .nbox.decided{ background:var(--accent-soft); }
+  .noteitem .nbox.decided .nboxlabel{ color:var(--accent-ink); }
+  .noteitem .nbox.open{ background:var(--orange-soft); }
+  .noteitem .nbox.open .nboxlabel{ color:var(--orange); }
+  .noteitem .nbtnrow{ display:flex; gap:6px; flex-wrap:wrap; padding-block-start:8px; }
+  .noteitem .nbtnrow + .nbtnrow{ margin-block-start:6px; border-block-start:1px dashed var(--border); padding-block-start:8px; }
+  .noteitem .nbtnrow:first-of-type{ border-block-start:1px dashed var(--border); padding-block-start:8px; margin-block-start:4px; }
 
   .lockbox{ display:flex; align-items:center; gap:8px; background:var(--gold-soft); color:var(--gold); border-radius:10px; padding:8px 10px; font-size:.78rem; font-weight:700; }
   .pinrow input{ width:110px; letter-spacing:.15em; }
@@ -684,6 +695,8 @@
             <label class="field">依頼方法（選んだ業者すべてに適用）
               <select id="reqMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option></select>
             </label>
+            <label class="field">回答期限（任意）<input type="date" id="reqDueDate"></label>
+            <label class="field">依頼者<select id="reqRequestedBy"></select></label>
             <button class="btn" id="btnAddRequest">選んだ業者に依頼を追加</button>
           </div>
         </div>
@@ -694,7 +707,7 @@
             <button class="btn small secondary" id="btnBulkRequest">選択した業者に依頼する</button>
           </div>
           <div class="tablewrap">
-            <table><thead><tr><th><input type="checkbox" id="selectAllPending"></th><th>業者</th><th>方法</th><th>状況</th><th>依頼日</th><th>受領日</th><th>経過</th><th></th></tr></thead>
+            <table><thead><tr><th><input type="checkbox" id="selectAllPending"></th><th>業者</th><th>方法</th><th>状況</th><th>依頼者</th><th>依頼日</th><th>回答期限</th><th>受領者</th><th>受領日</th><th>経過</th><th></th></tr></thead>
               <tbody id="projectTableBody"></tbody>
             </table>
           </div>
@@ -726,10 +739,12 @@
         <div class="card">
           <h3>打合せ内容を記録</h3>
           <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
-          <textarea id="meetingNoteInput" rows="4" placeholder="打合せの内容を入力してください"></textarea>
+          <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
+          <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
+          <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
           <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
           <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
-          <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">追加</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
+          <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
         </div>
         <div class="card">
           <h3>これまでの記録</h3>
@@ -1717,6 +1732,13 @@
       var checked = !!uiSelectedVendors[v.id];
       return '<label class="vendorchip"><input type="checkbox" data-vendor-id="'+v.id+'" '+(checked?"checked":"")+'><span>'+escapeHtml(v.name)+'</span>'+(v.category?'<span class="vc-cat">'+escapeHtml(v.category)+'</span>':'')+'</label>';
     }).join("");
+    var reqBySel = document.getElementById("reqRequestedBy");
+    if(reqBySel){
+      var staff = state.settings.staffList || [];
+      var prev = reqBySel.value;
+      reqBySel.innerHTML = '<option value="">（未設定）</option>'+staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
+      if(staff.indexOf(prev)!==-1 || prev==="") reqBySel.value = prev;
+    }
   }
 
   function statusPill(status){ return '<span class="pill status-'+status+'">'+status+'</span>'; }
@@ -1738,8 +1760,14 @@
       else actionHtml = '<button class="btn small ghost" data-act="reopen" data-id="'+r.id+'">再依頼</button>';
       actionHtml += ' <button class="btn danger-ghost" data-act="delrequest" data-id="'+r.id+'" title="削除">×</button>';
       var checkboxHtml = r.status==="未依頼" ? '<input type="checkbox" data-req-id="'+r.id+'" '+(uiSelectedRequests[r.id]?"checked":"")+'>' : "";
+      var dueDays = r.dueDate ? daysSince(r.dueDate) : null;
+      var isOverdue = r.status!=="受領済み" && dueDays!==null && dueDays>=0;
+      var dueHtml = r.dueDate ? '<span class="'+(isOverdue?"due-soon":"")+'">'+escapeHtml(r.dueDate)+(isOverdue?"（期限超過）":"")+'</span>' : '<span class="muted">—</span>';
       return '<tr><td>'+checkboxHtml+'</td><td class="cellname">'+escapeHtml(v.name)+'</td><td>'+methodPill(r.method)+'</td><td>'+statusPill(r.status)+'</td>'+
-        '<td class="tabular">'+fmtDate(r.requestedAt)+'</td><td class="tabular">'+fmtDate(r.receivedAt)+'</td><td class="tabular muted">'+elapsed+'</td>'+
+        '<td class="muted">'+escapeHtml(r.requestedBy||"—")+'</td>'+
+        '<td class="tabular">'+fmtDate(r.requestedAt)+'</td><td class="tabular">'+dueHtml+'</td>'+
+        '<td class="muted">'+escapeHtml(r.receivedBy||"—")+'</td>'+
+        '<td class="tabular">'+fmtDate(r.receivedAt)+'</td><td class="tabular muted">'+elapsed+'</td>'+
         '<td class="row" style="gap:4px;flex-wrap:nowrap;">'+actionHtml+'</td></tr>';
     }).join("");
   }
@@ -1856,23 +1884,66 @@
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(n){
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
-      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml(n.files)+'</div>' : "";
+      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files)+'</div>' : "";
       var specHtml = n.specPart ?
-        '<span class="pill" style="background:var(--orange-soft); color:var(--orange); margin-inline-end:6px;">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
-      return '<div class="noteitem"><div class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</div>'+
-        (specHtml ? '<div style="margin-block-end:4px;">'+specHtml+'</div>' : '')+
-        '<div class="ntext">'+escapeHtml(n.content)+'</div>'+
+        '<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
+      var decided = n.decided!=null ? n.decided : (n.content||"");
+      var open = n.open!=null ? n.open : "";
+      var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">未決・お客様に確認すること</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
+      return '<div class="noteitem">'+
+        '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
+        (specHtml ? specHtml : '')+
+        (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
+        '</div>'+
+        '<div class="nbox decided"><div class="nboxlabel">決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>'+
+        openHtml+
         filesHtml+
-        '<div class="row" style="margin-block-start:6px; flex-wrap:wrap;">'+
-        '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
-        '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button><button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
+        '<div class="nbtnrow">'+
+        '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button>'+
+        '<button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
         '<button class="btn ghost small" data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
+        '</div>'+
+        '<div class="nbtnrow">'+
+        '<button class="btn ghost small" data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
+        '<button class="btn ghost small" data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
+        '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
+        '</div>'+
+        '<div class="nbtnrow">'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
-        '</div></div>';
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
+        '</div>'+
+        '</div>';
     }).join("");
+  }
+  function meetingNoteShareText(n){
+    var lines = [];
+    lines.push((n.date||fmtTs(n.createdAt))+(n.title?"　"+n.title:""));
+    if(n.specPart && n.specPart.label) lines.push("部位："+n.specPart.label);
+    lines.push("");
+    lines.push("【決定事項】");
+    lines.push(n.decided!=null ? (n.decided||"（なし）") : (n.content||"（なし）"));
+    if(n.open){
+      lines.push("");
+      lines.push("【未決・お客様に確認すること】");
+      lines.push(n.open);
+    }
+    return lines.join("\n");
+  }
+  function copyMeetingNote(id){
+    var n = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!n){ toast("記録が見つかりませんでした"); return; }
+    var text = meetingNoteShareText(n);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ toast("共有文をコピーしました"); }, function(){ toast(text); });
+    } else { toast(text); }
+  }
+  function lineMeetingNote(id){
+    var n = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!n){ toast("記録が見つかりませんでした"); return; }
+    var text = meetingNoteShareText(n);
+    window.open("https://line.me/R/msg/text/?"+encodeURIComponent(text), "_blank");
   }
   // 打合せ記録に部位を設定したとき、該当の「仕様」タブ（設備・外観・インテリア等）の
   // 変更履歴タイムラインにも、写真なしの「メモのみ」項目（kind:"note"）として反映する。
@@ -3378,17 +3449,18 @@
     }
 
     if(taskType === "vendortask"){
-      var vendorChoices = liveVendors().map(function(v){ return {label:v.name, value:v.name}; })
+      var vendorChoices = liveVendors().map(function(v){ return {label:v.name, value:v.id}; })
         .concat([{label:"（業者未定・あとで入力）", value:""}]);
-      askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorName){
-        if(vendorName===null) return;
+      askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorId){
+        if(vendorId===null) return;
+        var vendor = vendorId ? vendorById(vendorId) : null;
         askSpecPart(function(part){
           if(!part){ toast("部位が選択されなかったため、作成を中止しました"); return; }
           var t3 = {
             id: uid("task"), projectId: proj.id, content: content,
             assignee: "", instructor: "", creator: state.currentUser||"",
             hasDeadline: false, deadline: "",
-            requestTo: vendorName||"", requestMethod: "",
+            requestTo: vendor ? vendor.name : "", requestMethod: "",
             attachmentAssetIds: [],
             attachments: (note.files||[]).slice(),
             vendorSpec: part,
@@ -3401,6 +3473,19 @@
           saveDoc("tasks", t3.id, t3);
           logActivity("打合せ記録から業者タスク「"+content.slice(0,20)+"」を作成しました（部位："+part.label+"）");
           toast("✅ 業者タスクに追加しました");
+
+          // 業者が指定されていれば、見積依頼状況にも「未依頼」として自動登録する。
+          if(vendor){
+            var already = liveRequests().some(function(r){ return r.projectId===proj.id && r.vendorId===vendor.id && r.status==="未依頼"; });
+            if(!already){
+              var req = { id:uid("req"), projectId: proj.id, vendorId: vendor.id, method:"", status:"未依頼",
+                requestedAt:"", receivedAt:"", note:"打合せ記録「"+content.slice(0,20)+"」より自動登録", dueDate:"", requestedBy:"", receivedBy:"" };
+              state.requests.push(req);
+              render();
+              saveDoc("requests", req.id, req);
+              toast("✅ 見積依頼状況にも「"+vendor.name+"」を未依頼として追加しました");
+            }
+          }
         });
       });
       return;
@@ -4169,12 +4254,18 @@
     var vendorIds = Object.keys(uiSelectedVendors).filter(function(id){ return uiSelectedVendors[id]; });
     if(vendorIds.length===0){ toast("業者を1つ以上選択してください"); return; }
     var method = document.getElementById("reqMethod").value;
+    var dueDateInput = document.getElementById("reqDueDate");
+    var dueDate = (dueDateInput && dueDateInput.value) || "";
+    var requestedBySel = document.getElementById("reqRequestedBy");
+    var requestedBy = (requestedBySel && requestedBySel.value) || "";
     var created = [];
     vendorIds.forEach(function(vendorId){
-      var r = { id:uid("req"), projectId: state.currentProjectId, vendorId:vendorId, method:method, status:"未依頼", requestedAt:"", receivedAt:"", note:"" };
+      var r = { id:uid("req"), projectId: state.currentProjectId, vendorId:vendorId, method:method, status:"未依頼",
+        requestedAt:"", receivedAt:"", note:"", dueDate:dueDate, requestedBy:requestedBy, receivedBy:"" };
       state.requests.push(r); created.push(r);
     });
     uiSelectedVendors = {};
+    if(dueDateInput) dueDateInput.value = "";
     render();
     for(var i=0;i<created.length;i++){ await saveDoc("requests", created[i].id, created[i]); }
     logActivity(created.length+"件の見積依頼を追加しました");
@@ -4208,14 +4299,23 @@
     render();
     for(var i=0;i<allRows.length;i++){ await saveDoc("requests", allRows[i].id, allRows[i]); }
   }
-  async function markReceived(id){
-    var r = state.requests.find(function(x){ return x.id===id; });
-    if(!r) return;
-    r.status="受領済み"; r.receivedAt=todayStr(); r.replyDetected=false; r.replySnippet=""; r.replyDate="";
+  function markReceivedFinish(r, receivedBy){
+    r.status="受領済み"; r.receivedAt=todayStr(); r.receivedBy=receivedBy||""; r.replyDetected=false; r.replySnippet=""; r.replyDate="";
     render();
-    await saveDoc("requests", r.id, r);
+    saveDoc("requests", r.id, r);
     logActivity("見積を受領登録しました");
     toast("受領済みに更新しました");
+  }
+  function markReceived(id){
+    var r = state.requests.find(function(x){ return x.id===id; });
+    if(!r) return;
+    var staff = state.settings.staffList || [];
+    if(staff.length===0){ markReceivedFinish(r, ""); return; }
+    var choices = staff.map(function(s){ return {label:s, value:s}; }).concat([{label:"（未設定のまま進める）", value:""}]);
+    askChoice("受領者を選択", "", choices, function(name){
+      if(name===null) return;
+      markReceivedFinish(r, name);
+    });
   }
   async function reopenRequest(id){
     var r = state.requests.find(function(x){ return x.id===id; });
@@ -4266,10 +4366,21 @@
 
   // ================= meeting notes (⑧) =================
   var editingMeetingNoteId = null;
+  function meetingNoteDerivedContent(decided, open){
+    // 旧 content フィールドを参照する箇所（部位タイムライン反映・業者/社内タスク化など）向けの後方互換テキスト。
+    var parts = [];
+    if(decided) parts.push(decided);
+    if(open) parts.push("（未決）"+open);
+    return parts.join("\n");
+  }
   async function addMeetingNote(){
-    var input = document.getElementById("meetingNoteInput");
-    var content = input.value.trim();
-    if(!content){ toast("内容を入力してください"); return; }
+    var titleInput = document.getElementById("meetingNoteTitle");
+    var decidedInput = document.getElementById("meetingNoteDecided");
+    var openInput = document.getElementById("meetingNoteOpen");
+    var title = (titleInput && titleInput.value || "").trim();
+    var decided = (decidedInput && decidedInput.value || "").trim();
+    var open = (openInput && openInput.value || "").trim();
+    if(!decided && !open){ toast("決定事項または未決事項を入力してください"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var dateInput = document.getElementById("meetingNoteDate");
     var noteDate = (dateInput && dateInput.value) ? dateInput.value : todayStr();
@@ -4279,7 +4390,10 @@
     if(editingMeetingNoteId){
       var existing = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
       if(!existing){ toast("記録が見つかりませんでした"); cancelEditMeetingNote(); return; }
-      existing.content = content;
+      existing.title = title;
+      existing.decided = decided;
+      existing.open = open;
+      existing.content = meetingNoteDerivedContent(decided, open);
       existing.date = noteDate;
       if(newFiles.length) existing.files = (existing.files||[]).concat(newFiles);
       existing.updatedAt = nowIso();
@@ -4290,11 +4404,10 @@
       return;
     }
 
-    var n = { id:uid("note"), projectId: state.currentProjectId, content:content, date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso() };
+    var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open,
+      content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso() };
     state.meetingNotes.push(n);
-    input.value = "";
-    if(fileInput) fileInput.value = "";
-    if(dateInput) dateInput.value = todayStr();
+    cancelEditMeetingNote();
     render();
     await saveDoc("meetingNotes", n.id, n);
     logActivity("打合せ内容を記録しました");
@@ -4303,10 +4416,14 @@
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
     if(!n){ toast("記録が見つかりませんでした"); return; }
     editingMeetingNoteId = id;
-    var input = document.getElementById("meetingNoteInput");
+    var titleInput = document.getElementById("meetingNoteTitle");
+    var decidedInput = document.getElementById("meetingNoteDecided");
+    var openInput = document.getElementById("meetingNoteOpen");
     var dateInput = document.getElementById("meetingNoteDate");
     var fileInput = document.getElementById("meetingNoteFile");
-    if(input) input.value = n.content || "";
+    if(titleInput) titleInput.value = n.title || "";
+    if(decidedInput) decidedInput.value = (n.decided!=null ? n.decided : (n.content||""));
+    if(openInput) openInput.value = n.open || "";
     if(dateInput) dateInput.value = n.date || todayStr();
     if(fileInput) fileInput.value = "";
     var btn = document.getElementById("btnAddMeetingNote");
@@ -4315,18 +4432,22 @@
     if(cancelBtn) cancelBtn.hidden = false;
     var hint = document.getElementById("meetingNoteEditHint");
     if(hint) hint.hidden = false;
-    if(input) input.scrollIntoView({behavior:"smooth", block:"center"});
+    if(titleInput) titleInput.scrollIntoView({behavior:"smooth", block:"center"});
   }
   function cancelEditMeetingNote(){
     editingMeetingNoteId = null;
-    var input = document.getElementById("meetingNoteInput");
+    var titleInput = document.getElementById("meetingNoteTitle");
+    var decidedInput = document.getElementById("meetingNoteDecided");
+    var openInput = document.getElementById("meetingNoteOpen");
     var dateInput = document.getElementById("meetingNoteDate");
     var fileInput = document.getElementById("meetingNoteFile");
-    if(input) input.value = "";
+    if(titleInput) titleInput.value = "";
+    if(decidedInput) decidedInput.value = "";
+    if(openInput) openInput.value = "";
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
     var btn = document.getElementById("btnAddMeetingNote");
-    if(btn) btn.textContent = "追加";
+    if(btn) btn.textContent = "記録する";
     var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
     if(cancelBtn) cancelBtn.hidden = true;
     var hint = document.getElementById("meetingNoteEditHint");
@@ -5755,6 +5876,8 @@
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
+      else if(act==="copynote"){ copyMeetingNote(id); }
+      else if(act==="linenote"){ lineMeetingNote(id); }
     }
     document.getElementById("projectTableBody").addEventListener("click", handleTableClick);
     document.getElementById("pendingTableBody").addEventListener("click", handleTableClick);
