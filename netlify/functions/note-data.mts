@@ -160,6 +160,8 @@ export default async (req: Request, context: Context) => {
       at: p.createdAt || "",
       label: p.category || "",
       file: fileOf(p),
+      source: p.source || null,
+      contentType: p.contentType || "",
     });
   }
   for (const n of reflectedNotes) {
