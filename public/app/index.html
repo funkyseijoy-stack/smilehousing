@@ -2764,9 +2764,13 @@
     }).join("");
   }
   var OKAI_INBOX_LABELS = {sample_request:"サンプル請求", photo_share:"写真共有", spec_decision:"仕様の仮決定・決定", consideration_attachment:"検討項目の添付", staff_photo:"スタッフ写真", staff_document:"スタッフ資料", estimate_response:"追加見積りの回答"};
-  function renderOkaiInbox(entries){
+  var OKAI_INBOX_STAFF_TYPES = {staff_photo:true, staff_document:true};
+  function renderOkaiInbox(allEntries){
     var list = document.getElementById("okaiInboxList");
     var empty = document.getElementById("okaiInboxEmpty");
+    // このセクションは「お客様からの投稿」のみを表示する。スタッフ側がおうちノートに
+    // 資料・写真を送った記録（staff_photo/staff_document）は対象外にする。
+    var entries = (allEntries||[]).filter(function(e){ return !OKAI_INBOX_STAFF_TYPES[e.type]; });
     if(!entries || !entries.length){ list.innerHTML = ""; empty.hidden = false; return; }
     empty.hidden = true;
     list.innerHTML = entries.map(function(e){
