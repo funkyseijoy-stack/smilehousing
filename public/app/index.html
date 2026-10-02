@@ -284,7 +284,7 @@
   .specscopemergebar{ margin-block-end:12px; }
   .specscopemergebar .btn{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); width:100%; white-space:normal; line-height:1.4; padding:10px 12px; }
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
-  .notefiletile{ border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; text-decoration:none; color:inherit; }
+  .notefiletile{ position:relative; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; text-decoration:none; color:inherit; }
   .notefiletile img, .notefiletile video{ width:100%; height:100%; object-fit:cover; display:block; }
   .pill.small{ padding:2px 7px; font-size:.6rem; }
   .pbentrylist{ display:flex; flex-direction:column; gap:8px; }
@@ -294,12 +294,17 @@
   .pbentry-latest{ position:absolute; top:0; left:0; background:var(--accent); color:#fff; font-size:.58rem; font-weight:700; padding:1px 5px; border-radius:0 0 6px 0; }
   .pbentry-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1; min-width:0; }
   .pbentry-meta .splabel2{ font-size:.68rem; color:var(--muted); width:100%; }
-  .spectl{ display:flex; flex-direction:column; gap:8px; margin-block-start:6px; }
-  .spectl-card{ display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
+  .spectl{ display:flex; flex-direction:column; gap:14px; margin-block-start:6px; }
+  .spectl-dategroup{ display:flex; flex-direction:column; gap:8px; }
+  .spectl-datehead{ font-size:.72rem; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:6px; }
+  .spectl-card{ display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-inline-start:3px solid var(--border); border-radius:12px; padding:8px 10px 8px 9px; }
   .spectl-card-row{ flex-direction:column; align-items:stretch; gap:8px; }
+  .spectl-card.spectl-type-note-border{ border-inline-start-color:var(--blue); }
+  .spectl-card.spectl-type-vendor-border{ border-inline-start-color:var(--orange); }
+  .spectl-card.spectl-type-manual-border{ border-inline-start-color:var(--border); }
   .spectl-meta{ flex-grow:1; min-width:120px; }
   .spectl-actions{ display:flex; gap:6px; flex-shrink:0; margin-inline-start:auto; }
-  .spectl-thumb{ width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
+  .spectl-thumb{ position:relative; width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
   .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
   .spectl-thumbmini{ width:42px; height:42px; border-radius:7px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; text-decoration:none; color:inherit; }
@@ -308,6 +313,7 @@
   .pill.spectl-type-note{ background:var(--blue-soft); color:var(--blue); }
   .pill.spectl-type-vendor{ background:var(--orange-soft); color:var(--orange); }
   .pill.spectl-type-manual{ background:var(--gray-soft); color:var(--muted); }
+  .pdfbadge{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.62); color:#fff; font-size:.56rem; font-weight:700; text-align:center; padding:1px 0; pointer-events:none; letter-spacing:.02em; }
   .pill.reflect{ background:var(--gray-soft); color:var(--muted); cursor:pointer; border:none; font-family:inherit; }
   .pill.reflect.on{ background:var(--accent-soft); color:var(--accent-ink); }
   .pill.estimate-承認{ background:var(--blue-soft); color:var(--blue); }
@@ -319,6 +325,25 @@
   .roomcard{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:10px; }
   .roomcard .rname{ font-weight:700; font-size:.85rem; }
   .roomAccentNote{ width:100%; font-family:inherit; font-size:.78rem; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); margin-block-start:6px; }
+
+  /* ---- バッジ（契約時仕様／見積もり仕様／次に誰が対応するか） ---- */
+  .badgegroup-wrap{ margin-block-start:8px; }
+  .badgegrouplabel{ font-size:.68rem; color:var(--muted); font-weight:700; margin-block-end:3px; }
+  .badgegroup{ display:flex; flex-wrap:wrap; gap:6px; margin-block-end:4px; }
+  .badgepill{ display:inline-flex; align-items:center; gap:3px; padding:3px 9px; border-radius:999px; font-size:.68rem; font-weight:700; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; font-family:inherit; line-height:1.4; }
+  .badgepill.on.b-contract{ background:var(--gold-soft); color:var(--gold); border-color:var(--gold); }
+  .badgepill.on.b-quote{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
+  .badgepill.on.b-companytask{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); }
+  .badgepill.on.b-vendortask{ background:var(--orange-soft); color:var(--orange); border-color:var(--orange); }
+  .badgepill.on.b-confirm{ background:var(--gray-soft); color:var(--ink); border-color:var(--border); }
+  .badgepill.on.b-consider{ background:var(--danger-soft); color:var(--danger); border-color:var(--danger); }
+  .badgepill.readonly{ cursor:default; }
+
+  /* ---- 決定事項サマリー（カテゴリーカードの最上部にピン留め表示） ---- */
+  .decidedsummary{ margin:0 0 10px; padding:8px 10px; border-radius:10px; background:var(--accent-soft); border:1px solid var(--accent); }
+  .decidedsummary-label{ font-size:.66rem; font-weight:700; color:var(--accent-ink); margin-block-end:3px; }
+  .decidedsummary-item{ font-size:.8rem; color:var(--ink); display:flex; align-items:flex-start; gap:6px; margin-block-end:2px; }
+  .decidedsummary-item:last-child{ margin-block-end:0; }
 
   /* ---- Gmail inbox viewer ---- */
   .gmailrow{ display:flex; flex-direction:column; gap:2px; padding:10px 12px; border-radius:11px; background:var(--surface); border:1px solid var(--border); margin-block-end:8px; cursor:pointer; text-decoration:none; color:inherit; }
@@ -789,6 +814,7 @@
               <span id="meetingNoteSpecPartLabel" style="font-size:.82rem; font-weight:700;">（未設定）</span>
               <button type="button" class="btn secondary small" id="btnSetMeetingNoteSpecPart">部位を選択</button>
             </div>
+            <div id="meetingNoteBadgePicker"></div>
             <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
           </div>
@@ -1214,6 +1240,16 @@
     "鼻隠し":"hanakakushiCatNote",
     "玄関ドア":"entranceDoorCatNote"
   };
+  // 打合せ記録・仕様写真に付ける「バッジ」。spec系＝分類のみ、next系＝次の対応先への自動登録まで行う。
+  var BADGE_DEFS = [
+    {key:"contract", label:"契約時仕様", cls:"b-contract", group:"spec"},
+    {key:"quote", label:"見積もり仕様", cls:"b-quote", group:"spec"},
+    {key:"companytask", label:"社内タスク", cls:"b-companytask", group:"next"},
+    {key:"vendortask", label:"業者タスク", cls:"b-vendortask", group:"next"},
+    {key:"confirm", label:"確認事項", cls:"b-confirm", group:"next"},
+    {key:"consider", label:"お客様に検討してもらうこと", cls:"b-consider", group:"next"}
+  ];
+  var BADGE_AUTO_KEYS = ["companytask","vendortask","confirm","consider"]; // 自動登録を伴うバッジ
   var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室"];
   var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
   var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口","ポスト","ランドリーバー"];
@@ -2453,7 +2489,7 @@
       var isVideoPhoto = ct.indexOf("video")>=0;
       var thumbTitle = isPlan ? "クリックして編集（Gmail添付もできます）" : (isPdfPhoto ? "クリックしてプランボードで開く（版として保存）" : (isVideoPhoto ? "クリックして再生" : "クリックして拡大表示（編集も可能です）"));
       var thumbInner = isPdfPhoto ?
-        '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>' :
+        pdfThumbInnerHtml(p.url) :
         (isVideoPhoto ?
           '<video src="'+p.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
           '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
@@ -2500,18 +2536,16 @@
     // 同じ内容は上の「色・仕様」欄で入力できるため、入力先はそちらに一本化している。
     var catsGridHtml = '<div class="speccatgrid">'+exteriorCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
-        '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
-        buildSpecGallery("exterior",cat,null,null,{kind:"photo"})+
-        '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml((proj && proj.exteriorNotes && proj.exteriorNotes[cat])||"")+'</textarea>'+
+        decidedSummaryHtml("exterior",cat,null,null)+
+        '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml((proj && proj.exteriorNotes && proj.exteriorNotes[cat])||"")+'</textarea>'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-start:12px; margin-block-end:5px; flex-wrap:wrap; gap:6px;">'+
-        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">プランボード・図面（新しい順）</span>'+
+        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">写真・プランボード・図面の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</span>'+
         '<span class="row" style="gap:6px;">'+
         '<label class="btn secondary small" for="exteriorPbUploadInput_'+encodeURIComponent(cat)+'" style="cursor:pointer;">＋ 図面を取り込む</label>'+
         '<input type="file" id="exteriorPbUploadInput_'+encodeURIComponent(cat)+'" accept="image/*,application/pdf" hidden data-exterior-pb-cat="'+escapeHtml(cat)+'">'+
         '<button class="btn secondary small" data-openexteriorpb="'+escapeHtml(cat)+'">白紙から新規作成</button>'+
         '</span>'+
         '</div>'+
-        buildSpecGallery("exterior",cat,null,null,{kind:"planboard", newestFirst:true, noAdd:true})+
         renderSpecTimeline("exterior",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
@@ -2588,18 +2622,16 @@
       '</div>';
     var catsGridHtml = '<div class="speccatgrid">'+facilityCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("facility",cat)+'</h4>'+
-        '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
-        buildSpecGallery("facility",cat,null,null,{kind:"photo"})+
-        '<textarea class="facilityNote" data-facilitynote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+        decidedSummaryHtml("facility",cat,null,null)+
+        '<textarea class="facilityNote" data-facilitynote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-start:12px; margin-block-end:5px; flex-wrap:wrap; gap:6px;">'+
-        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">プランボード・図面（新しい順）</span>'+
+        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">写真・プランボード・図面の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</span>'+
         '<span class="row" style="gap:6px;">'+
         '<label class="btn secondary small" for="facilityPbUploadInput_'+encodeURIComponent(cat)+'" style="cursor:pointer;">＋ 図面を取り込む</label>'+
         '<input type="file" id="facilityPbUploadInput_'+encodeURIComponent(cat)+'" accept="image/*,application/pdf" hidden data-facility-pb-cat="'+escapeHtml(cat)+'">'+
         '<button class="btn secondary small" data-openfacilitypb="'+escapeHtml(cat)+'">白紙から新規作成</button>'+
         '</span>'+
         '</div>'+
-        buildSpecGallery("facility",cat,null,null,{kind:"planboard", newestFirst:true, noAdd:true})+
         renderSpecTimeline("facility",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
@@ -2648,8 +2680,10 @@
       equipmentCatsToShow = catsSortedByRecentActivity("equipment", equipmentCatsToShow);
     }
     var catsGridHtml = '<div class="speccatgrid">'+equipmentCatsToShow.map(function(cat){
-      return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("equipment",cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
-        '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
+      return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("equipment",cat)+'</h4>'+
+        decidedSummaryHtml("equipment",cat,null,null)+
+        '<div style="font-size:.72rem; color:var(--muted); margin-block-end:6px;">写真の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</div>'+
+        '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("equipment",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
@@ -2874,12 +2908,202 @@
   }
   // 部位（仕様カテゴリー）ごとの「打ち合わせ→変更→最新／決定」の時系列表示。
   // 自動振り分け（業者タスクへの添付）で記録されたsource情報があれば、元の打合せも表示する。
+  // ---- バッジ共通ヘルパー ----
+  function badgePickerHtml(ref, badges){
+    badges = badges || {};
+    function group(g){
+      return BADGE_DEFS.filter(function(b){ return b.group===g; }).map(function(b){
+        return '<button type="button" class="badgepill '+b.cls+(badges[b.key]?" on":"")+'" data-badgepick="'+ref+'" data-badgekey="'+b.key+'">'+escapeHtml(b.label)+'</button>';
+      }).join("");
+    }
+    return '<div class="badgegroup-wrap">'+
+      '<div class="badgegrouplabel">仕様の種類</div><div class="badgegroup">'+group("spec")+'</div>'+
+      '<div class="badgegrouplabel">次に誰が対応するか</div><div class="badgegroup">'+group("next")+'</div>'+
+      '</div>';
+  }
+  function badgePillsHtml(badges, onlyGroup){
+    if(!badges) return "";
+    var defs = BADGE_DEFS.filter(function(b){ return badges[b.key] && (!onlyGroup || b.group===onlyGroup); });
+    if(!defs.length) return "";
+    return '<span class="badgegroup" style="display:inline-flex;">'+defs.map(function(b){
+      return '<span class="badgepill on readonly '+b.cls+'">'+escapeHtml(b.label)+'</span>';
+    }).join("")+'</span>';
+  }
+  function badgeTogglePillsHtml(ref, badges, onlyGroup){
+    badges = badges || {};
+    var defs = BADGE_DEFS.filter(function(b){ return !onlyGroup || b.group===onlyGroup; });
+    return '<span class="badgegroup" style="display:inline-flex;">'+defs.map(function(b){
+      return '<button type="button" class="badgepill'+(badges[b.key]?" on":"")+' '+b.cls+'" data-badgepick="'+ref+'" data-badgekey="'+b.key+'">'+escapeHtml(b.label)+'</button>';
+    }).join("")+'</span>';
+  }
+  // 業者タスクバッジをONにする時だけ依頼先の選択を挟む。それ以外は即トグル。
+  function askVendorForBadge(cb){
+    var vendorChoices = liveVendors().map(function(v){ return {label:v.name, value:v.id}; })
+      .concat([{label:"（業者未定・あとで入力）", value:""}]);
+    askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorId){
+      cb(vendorId===null ? null : (vendorId||""));
+    });
+  }
+  // 打合せ記録・仕様写真から、バッジに応じて社内タスク／業者タスク／確認事項／
+  // お客様の検討事項を自動登録する（既存の createTaskFromNote と同じデータ形）。
+  async function autoCreateLinkedItem(ctx, badgeType, vendorId){
+    var proj = projectById(ctx.projectId);
+    if(!proj) return;
+    var content = (ctx.content||"").trim();
+    if(!content) return;
+    var part = ctx.part || null;
+    var files = ctx.files || [];
+    if(badgeType==="confirm"){
+      var doc1 = { id: uid("cf"), projectId: proj.id, kind:"confirm", content: content,
+        responseType: "自由入力", options: [], answer: null, answeredAt: null,
+        hasDeadline: false, deadline: null, attachments: files.slice(), createdAt: nowIso() };
+      state.confirmItems.push(doc1);
+      await saveDoc("confirmItems", doc1.id, doc1);
+      logActivity(ctx.sourceLabel+"から確認事項「"+content.slice(0,20)+"」を作成しました");
+      return;
+    }
+    if(badgeType==="consider"){
+      var doc2 = { id: uid("cs"), projectId: proj.id, kind:"consider", content: content,
+        status:"検討中", statusHistory:[{status:"検討中", ts: nowIso(), actor: state.currentUser||""}],
+        attachments: files.slice(), createdAt: nowIso() };
+      state.confirmItems.push(doc2);
+      await saveDoc("confirmItems", doc2.id, doc2);
+      logActivity(ctx.sourceLabel+"からお客様の検討事項「"+content.slice(0,20)+"」を作成しました");
+      return;
+    }
+    if(badgeType==="companytask"){
+      var t = { id: uid("task"), projectId: proj.id, content: content,
+        assignee:"", instructor:"", creator: state.currentUser||"",
+        hasDeadline:false, deadline:"", requestTo:"", requestMethod:"",
+        attachmentAssetIds:[], attachments: files.slice(),
+        vendorSpec: part||null, private:false, reflected:false, reflectedAt:null,
+        status:"未着手", createdAt: nowIso(), updatedAt: nowIso() };
+      state.tasks.push(t);
+      await saveDoc("tasks", t.id, t);
+      logActivity(ctx.sourceLabel+"から社内タスク「"+content.slice(0,20)+"」を作成しました"+(part?"（部位："+part.label+"）":""));
+      return;
+    }
+    if(badgeType==="vendortask"){
+      var vendor = vendorId ? vendorById(vendorId) : null;
+      var t3 = { id: uid("task"), projectId: proj.id, content: content,
+        assignee:"", instructor:"", creator: state.currentUser||"",
+        hasDeadline:false, deadline:"", requestTo: vendor?vendor.name:"", requestMethod:"",
+        attachmentAssetIds:[], attachments: files.slice(),
+        vendorSpec: part||null, private:false, reflected:false, reflectedAt:null,
+        status:"未着手", createdAt: nowIso(), updatedAt: nowIso() };
+      state.tasks.push(t3);
+      await saveDoc("tasks", t3.id, t3);
+      logActivity(ctx.sourceLabel+"から業者タスク「"+content.slice(0,20)+"」を作成しました");
+      if(vendor){
+        var already = liveRequests().some(function(r){ return r.projectId===proj.id && r.vendorId===vendor.id && r.status==="未依頼"; });
+        if(!already){
+          var req = { id:uid("req"), projectId: proj.id, vendorId: vendor.id, method:"", status:"未依頼",
+            requestedAt:"", receivedAt:"", note: ctx.sourceLabel+"「"+content.slice(0,20)+"」より自動登録", dueDate:"", requestedBy:"", receivedBy:"" };
+          state.requests.push(req);
+          await saveDoc("requests", req.id, req);
+        }
+      }
+      return;
+    }
+  }
+  // 登録フォームで新規に保存した/編集した打合せ記録に対して、まだ自動登録していない
+  // バッジ（社内タスク・業者タスク・確認事項・お客様の検討事項）があれば作成する。
+  async function applyNewlyOnBadges(note, badges, vendorId){
+    note.autoCreated = note.autoCreated || {};
+    var ran = false;
+    for(var i=0;i<BADGE_AUTO_KEYS.length;i++){
+      var key = BADGE_AUTO_KEYS[i];
+      if(badges[key] && !note.autoCreated[key]){
+        await autoCreateLinkedItem({ projectId:note.projectId, content:(note.content||note.decided||note.title||""), part:note.specPart, files:note.files, sourceLabel:"打合せ記録" }, key, key==="vendortask" ? vendorId : null);
+        note.autoCreated[key] = true;
+        ran = true;
+      }
+    }
+    if(ran){ render(); await saveDoc("meetingNotes", note.id, note); }
+  }
+  // ---- 打合せ記録のバッジ（タイムライン・編集画面どちらからもトグル可能） ----
+  async function toggleMeetingNoteBadge(noteId, key){
+    var n = state.meetingNotes.find(function(x){ return x.id===noteId; });
+    if(!n) return;
+    n.badges = n.badges || {};
+    n.autoCreated = n.autoCreated || {};
+    function applyOn(vendorId){
+      n.badges[key] = true;
+      render();
+      saveDoc("meetingNotes", n.id, n);
+      if(BADGE_AUTO_KEYS.indexOf(key)>=0 && !n.autoCreated[key]){
+        n.autoCreated[key] = true;
+        autoCreateLinkedItem({ projectId:n.projectId, content:(n.content||n.decided||n.title||""), part:n.specPart, files:n.files, sourceLabel:"打合せ記録" }, key, vendorId).then(function(){ render(); saveDoc("meetingNotes", n.id, n); });
+      }
+    }
+    if(!n.badges[key] && key==="vendortask"){
+      askVendorForBadge(function(vendorId){ if(vendorId===null) return; applyOn(vendorId); });
+      return;
+    }
+    if(n.badges[key]){
+      n.badges[key] = false;
+      render();
+      saveDoc("meetingNotes", n.id, n);
+      return;
+    }
+    applyOn(null);
+  }
+  // ---- 仕様写真・プランボードのバッジ（分類のみ：契約時仕様／見積もり仕様） ----
+  function toggleSpecPhotoBadge(spId, key){
+    var p = state.specPhotos.find(function(x){ return x.id===spId; });
+    if(!p) return;
+    p.badges = p.badges || {};
+    p.badges[key] = !p.badges[key];
+    render();
+    saveDoc("specPhotos", p.id, p);
+  }
+  // ---- 「打合せ内容を記録」フォーム（新規登録前）のバッジ下書き ----
+  var newMeetingNoteBadges = {};
+  var newMeetingNoteBadgeVendorId = null;
+  function renderMeetingNoteBadgePicker(){
+    var el = document.getElementById("meetingNoteBadgePicker");
+    if(el) el.innerHTML = badgePickerHtml("newnote", newMeetingNoteBadges);
+  }
+  function toggleNewNoteBadge(key){
+    if(!newMeetingNoteBadges[key] && key==="vendortask"){
+      askVendorForBadge(function(vendorId){
+        if(vendorId===null) return;
+        newMeetingNoteBadgeVendorId = vendorId;
+        newMeetingNoteBadges[key] = true;
+        renderMeetingNoteBadgePicker();
+      });
+      return;
+    }
+    newMeetingNoteBadges[key] = !newMeetingNoteBadges[key];
+    if(key==="vendortask" && !newMeetingNoteBadges[key]) newMeetingNoteBadgeVendorId = null;
+    renderMeetingNoteBadgePicker();
+  }
+  function handleBadgePickClick(target){
+    var ref = target.dataset.badgepick, key = target.dataset.badgekey;
+    if(!ref || !key) return;
+    if(ref==="newnote"){ toggleNewNoteBadge(key); return; }
+    if(ref.indexOf("note:")===0){ toggleMeetingNoteBadge(ref.slice(5), key); return; }
+    if(ref.indexOf("sp:")===0){ toggleSpecPhotoBadge(ref.slice(3), key); return; }
+  }
+  // 現在「決定」になっている項目を、カテゴリーカードの一番上にサマリー表示する。
+  function decidedSummaryHtml(scope, category, roomId, side){
+    var rows = specPhotosFor(scope, category, roomId, side).filter(function(p){ return p.decided; });
+    if(!rows.length) return "";
+    rows.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
+    var itemsHtml = rows.map(function(p){
+      var snippet = (p.source && p.source.noteSnippet) || p.fileName || "";
+      return '<div class="decidedsummary-item"><span class="pill status-受領済み small" style="flex-shrink:0;">決定</span>'+
+        (snippet ? '<span>'+escapeHtml(snippet)+'</span>' : '<span class="muted">（内容なし）</span>')+'</div>';
+    }).join("");
+    return '<div class="decidedsummary"><div class="decidedsummary-label">現在の決定事項</div>'+itemsHtml+'</div>';
+  }
   function renderSpecTimeline(scope, category, roomId, side){
     var rows = specPhotosFor(scope, category, roomId, side).slice();
     if(!rows.length) return "";
-    rows.sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
-    var cards = rows.map(function(p, i){
-      var isLatest = i === rows.length-1;
+    // 新しい順（降順）。経緯を追うには時系列のつながりが大事なので、並び替えは
+    // するが「日付でグループ化して見やすくする」だけに留め、時系列自体は崩さない。
+    rows.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
+    var cards = rows.map(function(p){
       var typeLabel, typeClass, snippet;
       if(p.kind==="note"){
         typeLabel = "打ち合わせ記録"; typeClass = "spectl-type-note";
@@ -2904,7 +3128,7 @@
         noteFiles = (relatedNote && relatedNote.files) || [];
         if(!noteFiles.length) thumbHtml = '<div class="spectl-thumb">💬</div>';
       } else if(isPdfPhoto){
-        thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">📄</div>';
+        thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">'+pdfThumbInnerHtml(p.url)+'</div>';
       } else if(isVideoPhoto){
         thumbHtml = '<div class="spectl-thumb" data-openspec="'+p.id+'" style="cursor:pointer;">▶</div>';
       } else if(p.url){
@@ -2914,31 +3138,60 @@
       }
       var metaHtml = '<div class="row" style="gap:5px;">'+
         '<span class="pill small '+typeClass+'">'+typeLabel+'</span>'+
-        (isLatest?'<span class="pill tag small">最新</span>':'')+
         (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
         '</div>'+
         (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
       var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
       var delBtnHtml = '<button class="spdel" data-delspec="'+p.id+'" title="この履歴を削除">×</button>';
+      // 旧「写真」「プランボード・図面」ギャラリーに付いていた「依頼状況」「おうちノートに反映」
+      // ボタンは、ギャラリーを廃止してもこのタイムラインから引き続き操作できるようにする
+      // （打ち合わせ記録由来＝kind:"note" はメモそのものなので対象外）。
+      var reqBtnHtml = (p.kind==="planboard") ? '<button class="pill status-'+(p.reqStatus||"未依頼")+'" style="cursor:pointer; border:none; font-family:inherit;" data-cyclereq="'+p.id+'">'+(p.reqStatus||"未依頼")+'</button>' : '';
+      var reflectBtnHtml = (p.kind!=="note") ? '<button class="pill reflect small'+(p.reflected?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-togglereflect="'+p.id+'">'+(p.reflected?"反映済み":"おうちノートに反映")+'</button>' : '';
+      // バッジ（打合せ記録は6種類すべて、写真・プランボードは分類用の2種類のみ、トグル可能）。
+      var badgeRowHtml = (p.kind==="note")
+        ? (relatedNote ? '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("note:"+relatedNote.id, relatedNote.badges)+'</div>' : "")
+        : '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("sp:"+p.id, p.badges, "spec")+'</div>';
+      var cardClass = "spectl-card "+typeClass+"-border";
       // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
       // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
       // サムネイル1枚＋テキストを横並びで表示する。
       if(noteFiles && noteFiles.length){
-        return '<div class="spectl-card spectl-card-row">'+
+        return '<div class="'+cardClass+' spectl-card-row">'+
           '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">'+
           '<div class="spectl-meta">'+metaHtml+'</div>'+
-          '<div class="spectl-actions">'+decideBtnHtml+delBtnHtml+'</div>'+
+          '<div class="spectl-actions">'+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
+          badgeRowHtml+
           '</div>';
       }
-      return '<div class="spectl-card">'+
+      return '<div class="'+cardClass+'">'+
         thumbHtml+
         '<div class="spectl-meta">'+metaHtml+'</div>'+
-        '<div class="spectl-actions">'+decideBtnHtml+delBtnHtml+'</div>'+
+        '<div class="spectl-actions">'+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+        badgeRowHtml+
         '</div>';
     });
-    var html = cards.join("");
+    // 日付ごとにグループ化し、見出しを立てる（並びは新しい順のまま）。
+    // 一番新しいグループの見出しにだけ「最新」バッジを付ける。
+    var dateGroups = [];
+    rows.forEach(function(p, i){
+      var d = (p.createdAt||"").slice(0,10);
+      var group = dateGroups.length ? dateGroups[dateGroups.length-1] : null;
+      if(!group || group.date !== d){
+        group = {date:d, cards:[]};
+        dateGroups.push(group);
+      }
+      group.cards.push(cards[i]);
+    });
+    var html = dateGroups.map(function(g, gi){
+      var dateLabel = g.date ? g.date.replace(/-/g,".") : "日付不明";
+      return '<div class="spectl-dategroup">'+
+        '<div class="spectl-datehead">'+escapeHtml(dateLabel)+(gi===0?'<span class="pill tag small">最新</span>':'')+'</div>'+
+        g.cards.join("")+
+        '</div>';
+    }).join("");
     return '<div style="margin-block-start:10px;"><div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
   }
   function toggleMeetingReflected(id){
@@ -3694,6 +3947,43 @@
       '</div>';
     }).join(" ");
   }
+  // PDF・図面のサムネイルを「本物の1ページ目プレビュー画像」として見せるための
+  // 共通ヘルパー。初回呼び出し時はファイルアイコンを即座に返しつつ裏でpdf.jsに
+  // 1ページ目をレンダリングさせ、できあがった画像をURL単位でキャッシュする。
+  // 完了したら render() を呼んで画面を更新する（同じURLを何度も作り直さない）。
+  var pdfThumbCache = {};
+  function pdfThumbInnerHtml(url){
+    if(!url) return '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>';
+    var cached = pdfThumbCache[url];
+    if(cached && cached.status==="done"){
+      return '<img src="'+cached.dataUrl+'" alt="PDF">'+'<span class="pdfbadge">PDF</span>';
+    }
+    if(!cached){
+      pdfThumbCache[url] = {status:"pending"};
+      loadPdfThumb(url);
+    }
+    return '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>';
+  }
+  async function loadPdfThumb(url){
+    try{
+      if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
+      var doc = await pdfjsLib.getDocument(url).promise;
+      var page = await doc.getPage(1);
+      var baseViewport = page.getViewport({scale:1});
+      var scale = 200 / Math.max(baseViewport.width, baseViewport.height);
+      if(!(scale>0)) scale = 1;
+      var viewport = page.getViewport({scale:scale});
+      var canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      var ctx = canvas.getContext("2d");
+      await page.render({canvasContext:ctx, viewport:viewport}).promise;
+      pdfThumbCache[url] = {status:"done", dataUrl:canvas.toDataURL("image/png")};
+    }catch(e){
+      pdfThumbCache[url] = {status:"error"};
+    }
+    render();
+  }
   // 打ち合わせ記録に添付された写真・PDF・動画を、横一列の大きめサムネイルで表示する
   // （件数が多い時は横スクロール）。1つの打ち合わせ記録＝複数の候補写真、という
   // まとめ方を分かりやすく見せるための共通パーツ。
@@ -3705,7 +3995,7 @@
       var ct = f.contentType||"";
       var isPdf = ct.indexOf("pdf")>=0;
       var isVideo = ct.indexOf("video")>=0;
-      var inner = isPdf ? '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>' :
+      var inner = isPdf ? pdfThumbInnerHtml(f.url) :
         (isVideo ? '<video src="'+f.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
         '<img src="'+f.url+'" alt="">');
       return '<a href="'+f.url+'" target="_blank" rel="noopener" class="notefiletile" style="width:'+px+'px; height:'+px+'px;" title="'+escapeHtml(f.name||"")+'">'+inner+'</a>';
@@ -4753,6 +5043,9 @@
   }
   // 「打合せ内容を記録」フォームで、保存前にあらかじめ選んでおく部位（任意）。
   var newMeetingNoteSpecPart = null;
+  // 部位選択で自動入力した題名（これと一致している間だけ、部位を変えると題名も追従させる。
+  // 手で書き換えた後は上書きしない）。
+  var lastAutoFilledMeetingNoteTitle = "";
   function updateMeetingNoteSpecPartLabel(){
     var label = document.getElementById("meetingNoteSpecPartLabel");
     if(label) label.textContent = newMeetingNoteSpecPart ? newMeetingNoteSpecPart.label : "（未設定）";
@@ -4771,6 +5064,10 @@
     var fileInput = document.getElementById("meetingNoteFile");
     var newFiles = await uploadFilesAsAttachmentsArray(fileInput ? fileInput.files : null);
 
+    // cancelEditMeetingNote() で下書き（バッジ・業者選択）がリセットされる前に控えておく。
+    var badgesToApply = Object.assign({}, newMeetingNoteBadges);
+    var vendorIdToApply = newMeetingNoteBadgeVendorId;
+
     if(editingMeetingNoteId){
       var existing = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
       if(!existing){ toast("記録が見つかりませんでした"); cancelEditMeetingNote(); return; }
@@ -4781,23 +5078,27 @@
       existing.date = noteDate;
       if(newFiles.length) existing.files = (existing.files||[]).concat(newFiles);
       if(newMeetingNoteSpecPart) existing.specPart = newMeetingNoteSpecPart;
+      existing.badges = badgesToApply;
+      existing.autoCreated = existing.autoCreated || {};
       existing.updatedAt = nowIso();
       cancelEditMeetingNote();
       render();
       await saveDoc("meetingNotes", existing.id, existing);
       if(existing.specPart) upsertNoteSpecEntry(existing);
+      await applyNewlyOnBadges(existing, badgesToApply, vendorIdToApply);
       logActivity("打合せ内容を編集しました");
       return;
     }
 
     var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
-      specPart: newMeetingNoteSpecPart || null };
+      specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
     cancelEditMeetingNote();
     render();
     await saveDoc("meetingNotes", n.id, n);
     if(n.specPart) upsertNoteSpecEntry(n);
+    await applyNewlyOnBadges(n, badgesToApply, vendorIdToApply);
     logActivity("打合せ内容を記録しました");
   }
   function editMeetingNote(id){
@@ -4816,6 +5117,10 @@
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = n.specPart || null;
     updateMeetingNoteSpecPartLabel();
+    lastAutoFilledMeetingNoteTitle = "";
+    newMeetingNoteBadges = Object.assign({}, n.badges||{});
+    newMeetingNoteBadgeVendorId = null;
+    renderMeetingNoteBadgePicker();
     var btn = document.getElementById("btnAddMeetingNote");
     if(btn) btn.textContent = "更新";
     var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
@@ -4838,6 +5143,10 @@
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = null;
     updateMeetingNoteSpecPartLabel();
+    lastAutoFilledMeetingNoteTitle = "";
+    newMeetingNoteBadges = {};
+    newMeetingNoteBadgeVendorId = null;
+    renderMeetingNoteBadgePicker();
     var btn = document.getElementById("btnAddMeetingNote");
     if(btn) btn.textContent = "記録する";
     var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
@@ -6104,7 +6413,20 @@
         if(!part) return;
         newMeetingNoteSpecPart = part;
         updateMeetingNoteSpecPartLabel();
+        var titleInput = document.getElementById("meetingNoteTitle");
+        if(titleInput){
+          var cur = titleInput.value.trim();
+          if(!cur || cur === lastAutoFilledMeetingNoteTitle){
+            titleInput.value = part.label || "";
+            lastAutoFilledMeetingNoteTitle = titleInput.value;
+          }
+        }
       });
+    });
+    renderMeetingNoteBadgePicker();
+    document.getElementById("meetingsubpane-record").addEventListener("click", function(e){
+      var bp = e.target.closest("[data-badgepick]");
+      if(bp) handleBadgePickClick(bp);
     });
 
     document.getElementById("btnAddCustomerInfo").addEventListener("click", addCustomerInfo);
@@ -6164,6 +6486,8 @@
         }
       });
       wrap.addEventListener("click", function(e){
+        var badgepick = e.target.closest("[data-badgepick]");
+        if(badgepick){ handleBadgePickClick(badgepick); return; }
         var scopeMergeBtn = e.target.closest("[data-mergescopephotos]");
         if(scopeMergeBtn){
           if(confirm2()) mergeScopePhotosToNote(scopeMergeBtn.dataset.mergescopephotos);
