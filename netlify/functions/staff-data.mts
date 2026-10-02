@@ -19,6 +19,8 @@ const ALLOWED_COLLECTIONS = [
   "projects", "requests", "attachments", "activity", "tasks",
   "messages", "specPhotos", "confirmItems", "albumPhotos",
   "reservations", "settings",
+  // 新おうちノート（/note/）用：お客様の仮決定・決定、お知らせ・豆知識
+  "noteDecisions", "noteNotices",
 ];
 
 function genId() {

@@ -603,6 +603,17 @@
 
       <!-- おうちノート連携 subpanel -->
       <div class="subpanel" id="sub-okainote">
+        <div class="card" style="border:2px solid var(--accent);">
+          <h3 style="margin:0;">新しいおうちノート（試作版）</h3>
+          <p class="muted" style="margin:6px 0 10px; font-size:.76rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。お客様は各項目を「仮決定」「決定」できます。今のおうちノートとは別のページなので、確認してから切り替えられます。</p>
+          <div id="newNoteLinkArea" style="font-size:.8rem; word-break:break-all;"></div>
+          <div class="row" style="margin-block-start:10px; gap:6px; flex-wrap:wrap;">
+            <button class="btn small" id="btnNewNoteIssue">リンクを発行する</button>
+            <button class="btn secondary small" id="btnNewNoteCopy" hidden>リンクをコピー</button>
+            <button class="btn secondary small" id="btnNewNoteOpen" hidden>開いて確認</button>
+          </div>
+          <div id="newNoteDecisions" style="margin-block-start:12px;"></div>
+        </div>
         <div class="card">
           <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <h3 style="margin:0;">お客様用リンク</h3>
@@ -889,6 +900,26 @@
       <h2 style="margin:0 0 10px;">業者一覧</h2>
       <div class="tablewrap"><table><thead><tr><th>業者名</th><th>カテゴリ</th><th>方法</th><th>メール</th><th></th></tr></thead><tbody id="vendorTableBody"></tbody></table></div>
       <div class="empty" id="vendorEmpty" hidden>業者が登録されていません。</div>
+    </div>
+
+    <div class="card">
+      <h3>おうちノートの「お知らせ・豆知識」</h3>
+      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここで登録した内容は、すべてのお客様の新しいおうちノート（ホーム画面）に表示されます。</p>
+      <div class="addform">
+        <label class="field">表示場所<select id="ntcKind">
+          <option value="notice">お知らせ・豆知識</option>
+          <option value="process">契約後に知っておきたいこと</option>
+          <option value="service">ご利用中のサービス（アイコン）</option>
+        </select></label>
+        <label class="field">見出しタグ<input type="text" id="ntcTag" placeholder="例：参考情報／工程（任意）"></label>
+        <label class="field">題名<input type="text" id="ntcTitle" placeholder="例：地鎮祭とは？"></label>
+        <label class="field">本文<textarea id="ntcBody" rows="3" placeholder="お客様向けの説明文"></textarea></label>
+        <label class="field">リンクの文言<input type="text" id="ntcLinkLabel" placeholder="例：地鎮祭のご案内を見る（任意）"></label>
+        <label class="field">リンクURL<input type="url" id="ntcLinkUrl" placeholder="https://...（任意）"></label>
+        <label class="field">並び順<input type="number" id="ntcOrder" value="10"></label>
+        <div class="row" style="gap:6px;"><button class="btn" id="btnNtcSave">登録する</button><button class="btn secondary" id="btnNtcCancel" hidden>編集をやめる</button></div>
+      </div>
+      <div id="ntcList" style="display:flex; flex-direction:column; gap:6px; margin-block-start:12px;"></div>
     </div>
 
     <div class="card">
@@ -1207,7 +1238,7 @@
     return g ? g.label : scope;
   }
   var state = {
-    projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [],
+    projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [], noteDecisions: [], noteNotices: [],
     settings: { progressTags: ["契約前","契約後","着工","上棟","引渡し"], staffList: ["社長","朋子","山本","渡邊"], pin: "0000" },
     currentProjectId: null,
     currentUser: null,
@@ -1230,7 +1261,7 @@
   var gmailNextPageToken = null;
   var gmailCurrentQuery = "";
   var STAFF_TOKEN_KEY = "sumairu_staff_token";
-  var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations"];
+  var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations","noteDecisions","noteNotices"];
 
   // ================= persistent local user pick (per-viewer convenience) =================
   function loadLocalUser(){
@@ -1556,8 +1587,141 @@
     renderReservationTab();
     renderSettingsTags();
     renderSettingsStaff();
+    renderNewNotePanel();
+    renderNoticeEditor();
     renderTrash();
     renderActivity();
+  }
+
+  // ================= 新おうちノート（/note/） =================
+  // お客様画面の項目IDとの対応（netlify/functions/note-data.mts の noteCatFor と同じ内容）
+  function noteCatIdFor(scope, category){
+    if(scope==="exterior") return "exterior";
+    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"wash","1階トイレ":"toilet1","2階トイレ":"toilet2"})[category] || null;
+    if(scope==="equipment") return ({"暖房設備":"heating","換気設備":"ventilation","電気配線":"wiring","あかりプラン":"lighting"})[category] || null;
+    if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
+    if(scope==="room") return "interior";
+    return null;
+  }
+  var NOTE_CAT_NAMES = { plan:"平面図", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", toilet1:"1階トイレ", toilet2:"2階トイレ",
+    heating:"暖房設備", ventilation:"換気設備", wiring:"電気配線", lighting:"あかりプラン", interior:"インテリアメイン" };
+  function noteDecisionFor(catId){
+    if(!catId || !state.currentProjectId) return null;
+    return (state.noteDecisions||[]).find(function(d){ return d.projectId===state.currentProjectId && d.category===catId && !d.deletedAt; }) || null;
+  }
+  function noteDecisionPill(scope, category){
+    var d = noteDecisionFor(noteCatIdFor(scope, category));
+    if(!d || d.status==="検討中") return "";
+    var on = d.status==="決定";
+    return ' <span class="pill" style="font-size:.66rem; '+(on?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'" title="お客様がおうちノートで選択（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）">お客様：'+escapeHtml(d.status)+'</span>';
+  }
+  function newNoteUrl(proj){
+    return location.origin + "/note/?p=" + encodeURIComponent(proj.id) + "&t=" + encodeURIComponent(proj.noteToken);
+  }
+  function renderNewNotePanel(){
+    var area = document.getElementById("newNoteLinkArea");
+    if(!area) return;
+    var proj = projectById(state.currentProjectId);
+    var issueBtn = document.getElementById("btnNewNoteIssue");
+    var copyBtn = document.getElementById("btnNewNoteCopy");
+    var openBtn = document.getElementById("btnNewNoteOpen");
+    var has = !!(proj && proj.noteToken);
+    area.innerHTML = has ? '<span class="muted">お客様用リンク：</span><br>'+escapeHtml(newNoteUrl(proj)) : '<span class="muted">まだ発行されていません。</span>';
+    issueBtn.textContent = has ? "リンクを作り直す（古いリンクは無効になります）" : "リンクを発行する";
+    copyBtn.hidden = !has; openBtn.hidden = !has;
+    var dWrap = document.getElementById("newNoteDecisions");
+    var ds = (state.noteDecisions||[]).filter(function(d){ return proj && d.projectId===proj.id && !d.deletedAt && d.status!=="検討中"; })
+      .sort(function(a,b){ return (b.decidedAt||"").localeCompare(a.decidedAt||""); });
+    dWrap.innerHTML = ds.length ? '<div style="font-size:.76rem; font-weight:700; margin-block-end:4px;">お客様の決定状況</div>'+ds.map(function(d){
+      return '<div class="row" style="gap:6px; font-size:.8rem;"><span class="pill" style="'+(d.status==="決定"?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'">'+escapeHtml(d.status)+'</span>'+
+        escapeHtml(NOTE_CAT_NAMES[d.category]||d.category)+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
+    }).join("") : "";
+  }
+  async function issueNewNoteLink(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    if(proj.noteToken && !confirm("リンクを作り直すと、お客様にお送りした古いリンクは開けなくなります。作り直しますか？")) return;
+    var arr = new Uint8Array(18);
+    (window.crypto||window.msCrypto).getRandomValues(arr);
+    proj.noteToken = Array.prototype.map.call(arr, function(b){ return ("0"+b.toString(16)).slice(-2); }).join("");
+    render();
+    var ok = await saveDoc("projects", proj.id, proj);
+    if(ok){ logActivity("新しいおうちノートのリンクを発行しました"); toast("✅ リンクを発行しました"); }
+  }
+  function copyNewNoteLink(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj || !proj.noteToken) return;
+    var url = newNoteUrl(proj);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){ toast("リンクをコピーしました"); }, function(){ toast(url); });
+    } else toast(url);
+  }
+  var editingNoticeId = null;
+  var NOTICE_KIND_LABELS = { notice:"お知らせ・豆知識", process:"契約後に知っておきたいこと", service:"ご利用中のサービス" };
+  function renderNoticeEditor(){
+    var wrap = document.getElementById("ntcList");
+    if(!wrap) return;
+    var rows = (state.noteNotices||[]).filter(function(n){ return !n.deletedAt; })
+      .sort(function(a,b){ return (a.kind||"").localeCompare(b.kind||"") || (Number(a.order||0)-Number(b.order||0)); });
+    wrap.innerHTML = rows.length ? rows.map(function(n){
+      return '<div class="row" style="justify-content:space-between; gap:8px; background:var(--surface-2); border-radius:9px; padding:8px 10px; flex-wrap:wrap;">'+
+        '<span style="font-size:.82rem;"><span class="pill" style="font-size:.66rem;">'+escapeHtml(NOTICE_KIND_LABELS[n.kind]||n.kind)+'</span> '+
+        (n.tag?'<span class="muted">['+escapeHtml(n.tag)+']</span> ':'')+'<strong>'+escapeHtml(n.title||"")+'</strong>'+(n.linkUrl?' 🔗':'')+'</span>'+
+        '<span class="row" style="gap:4px;"><button class="btn secondary small" data-editntc="'+n.id+'">編集</button><button class="btn danger-ghost small" data-delntc="'+n.id+'">削除</button></span></div>';
+    }).join("") : '<div class="empty">まだ登録がありません。</div>';
+  }
+  function resetNoticeForm(){
+    editingNoticeId = null;
+    ["ntcTag","ntcTitle","ntcBody","ntcLinkLabel","ntcLinkUrl"].forEach(function(id){ document.getElementById(id).value = ""; });
+    document.getElementById("ntcOrder").value = "10";
+    document.getElementById("ntcKind").value = "notice";
+    document.getElementById("btnNtcSave").textContent = "登録する";
+    document.getElementById("btnNtcCancel").hidden = true;
+  }
+  async function saveNotice(){
+    var title = document.getElementById("ntcTitle").value.trim();
+    if(!title){ toast("題名を入力してください"); return; }
+    var linkUrl = document.getElementById("ntcLinkUrl").value.trim();
+    if(linkUrl && !/^https?:\/\//i.test(linkUrl)){ toast("リンクURLは https:// から始まる形で入力してください"); return; }
+    var existing = editingNoticeId ? state.noteNotices.find(function(x){ return x.id===editingNoticeId; }) : null;
+    var doc = existing || { id: uid("ntc"), createdAt: nowIso() };
+    doc.kind = document.getElementById("ntcKind").value;
+    doc.tag = document.getElementById("ntcTag").value.trim();
+    doc.title = title;
+    doc.body = document.getElementById("ntcBody").value.trim();
+    doc.linkLabel = document.getElementById("ntcLinkLabel").value.trim();
+    doc.linkUrl = linkUrl;
+    doc.order = Number(document.getElementById("ntcOrder").value || 0);
+    doc.published = true;
+    doc.updatedAt = nowIso();
+    if(!existing) state.noteNotices.push(doc);
+    resetNoticeForm();
+    render();
+    var ok = await saveDoc("noteNotices", doc.id, doc);
+    if(ok){ logActivity("おうちノートのお知らせ「"+title+"」を"+(existing?"更新":"登録")+"しました"); toast("✅ "+(existing?"更新":"登録")+"しました"); }
+  }
+  function editNotice(id){
+    var n = state.noteNotices.find(function(x){ return x.id===id; });
+    if(!n) return;
+    editingNoticeId = id;
+    document.getElementById("ntcKind").value = n.kind || "notice";
+    document.getElementById("ntcTag").value = n.tag || "";
+    document.getElementById("ntcTitle").value = n.title || "";
+    document.getElementById("ntcBody").value = n.body || "";
+    document.getElementById("ntcLinkLabel").value = n.linkLabel || "";
+    document.getElementById("ntcLinkUrl").value = n.linkUrl || "";
+    document.getElementById("ntcOrder").value = n.order!=null ? n.order : 10;
+    document.getElementById("btnNtcSave").textContent = "更新する";
+    document.getElementById("btnNtcCancel").hidden = false;
+    document.getElementById("ntcTitle").scrollIntoView({behavior:"smooth", block:"center"});
+  }
+  async function deleteNotice(id){
+    var n = state.noteNotices.find(function(x){ return x.id===id; });
+    if(!n) return;
+    state.noteNotices = state.noteNotices.filter(function(x){ return x.id!==id; });
+    render();
+    var ok = await hardDeleteDoc("noteNotices", id);
+    if(ok) logActivity("おうちノートのお知らせ「"+(n.title||"")+"」を削除しました");
   }
 
   function renderStats(){
@@ -2309,7 +2473,7 @@
     var proj = projectById(state.currentProjectId);
     var specValues = (proj && proj.exteriorSpecValues) || {};
     var valuesBlockHtml = '<div class="speccat">'+
-      '<h4>色・仕様（サッシ・ガラスなど）</h4>'+
+      '<h4>色・仕様（サッシ・ガラスなど）'+noteDecisionPill("exterior",null)+'</h4>'+
       '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
       '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
       '<button type="button" class="btn secondary small" id="btnReflectExteriorSpecValues">🌐 おうちノートに反映する</button>'+
@@ -2413,7 +2577,7 @@
       '<button type="button" class="btn secondary small" id="btnReflectAllFacility">🌐 未反映の写真をすべておうちノートに反映する'+(facilityUnreflectedCount?'（'+facilityUnreflectedCount+'件）':'')+'</button>'+
       '</div>';
     var catsGridHtml = '<div class="speccatgrid">'+facilityCatsToShow.map(function(cat){
-      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
+      return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("facility",cat)+'</h4>'+
         '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
         buildSpecGallery("facility",cat,null,null,{kind:"photo"})+
         '<textarea class="facilityNote" data-facilitynote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
@@ -2474,7 +2638,7 @@
       equipmentCatsToShow = catsSortedByRecentActivity("equipment", equipmentCatsToShow);
     }
     var catsGridHtml = '<div class="speccatgrid">'+equipmentCatsToShow.map(function(cat){
-      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
+      return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("equipment",cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
         '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("equipment",cat,null,null)+
         '</div>';
@@ -5880,6 +6044,18 @@
       if(confirm2()) deleteCustomerInfo(btn.dataset.delci);
     });
     document.getElementById("btnSendMessage").addEventListener("click", sendMessage);
+    document.getElementById("btnNewNoteIssue").addEventListener("click", issueNewNoteLink);
+    document.getElementById("btnNewNoteCopy").addEventListener("click", copyNewNoteLink);
+    document.getElementById("btnNewNoteOpen").addEventListener("click", function(){
+      var proj = projectById(state.currentProjectId);
+      if(proj && proj.noteToken) window.open(newNoteUrl(proj), "_blank", "noopener");
+    });
+    document.getElementById("btnNtcSave").addEventListener("click", saveNotice);
+    document.getElementById("btnNtcCancel").addEventListener("click", resetNoticeForm);
+    document.getElementById("ntcList").addEventListener("click", function(e){
+      var ed = e.target.closest("[data-editntc]"); if(ed){ editNotice(ed.dataset.editntc); return; }
+      var dl = e.target.closest("[data-delntc]"); if(dl){ if(confirm2()) deleteNotice(dl.dataset.delntc); return; }
+    });
 
     ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specSiteCheckWrap","specInteriorWrap","specRoomsWrap"].forEach(function(wrapId){
       var wrap = document.getElementById(wrapId);

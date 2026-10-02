@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5d5049">
+<title>おうちノート</title>
+<link rel="icon" href="/app/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
+<style>
+  :root{
+    --page:#efe9e2; --bg:#f7f3ee; --card:#fffdfa; --line:#e9e2da; --line2:#ded5cb;
+    --ink:#2f2925; --ink2:#5c534d; --muted:#9a9089; --brown:#5d5049; --brown2:#7a6a60;
+    --chip:#efe9e3; --green:#e3efe7; --green-ink:#4f7a5f; --rose:#b45b6a; --tape:#e8cfc8;
+    --kari:#f6ead6; --kari-ink:#9a6b1f; --kettei:#5d5049;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--page); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    -webkit-font-smoothing:antialiased; }
+  button{ font-family:inherit; }
+  .app{ max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); position:relative; padding-bottom:calc(84px + env(safe-area-inset-bottom)); }
+  @media (min-width:560px){ .app{ margin:16px auto; min-height:calc(100vh - 32px); border-radius:34px; border:8px solid #2b2522; overflow:hidden; } }
+
+  /* header */
+  .hd{ display:flex; align-items:center; gap:12px; padding:18px 18px 14px; background:var(--card); }
+  .hd .logo{ width:52px; height:52px; border-radius:14px; background:#8a6e5c; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .hd .logo svg{ width:30px; height:30px; }
+  .hd .co{ font-size:.72rem; color:var(--muted); letter-spacing:.12em; }
+  .hd .ttl{ font-size:1.45rem; letter-spacing:.32em; font-weight:500; margin-top:2px; }
+  .hd .mail{ margin-left:auto; width:46px; height:46px; border-radius:50%; background:var(--chip); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
+  .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
+  .band .st{ font-weight:700; margin-top:2px; }
+  .band .next{ margin-left:auto; border:1px solid rgba(255,255,255,.5); border-radius:999px; padding:6px 12px; font-size:.74rem; white-space:nowrap; }
+
+  .wrap{ padding:18px 16px 8px; }
+  h2.big{ font-size:1.45rem; margin:6px 0 6px; letter-spacing:.02em; }
+  .sub{ color:var(--muted); font-size:.82rem; letter-spacing:.04em; margin:0 0 16px; }
+  .sechd{ display:flex; align-items:center; justify-content:space-between; margin:26px 0 10px; }
+  .sechd h3{ margin:0; font-size:1.02rem; }
+  .sechd .more{ font-size:.8rem; color:var(--muted); background:none; border:none; cursor:pointer; letter-spacing:.06em; }
+  .countpill{ background:var(--green); color:var(--green-ink); font-size:.72rem; border-radius:999px; padding:4px 10px; }
+  .empty{ color:var(--muted); font-size:.85rem; text-align:center; padding:22px 8px; background:var(--card); border:1px dashed var(--line2); border-radius:14px; }
+
+  /* segmented tabs */
+  .seg{ display:flex; background:#ebe4dc; border-radius:999px; padding:5px; margin-bottom:18px; }
+  .seg button{ flex:1; border:none; background:none; padding:11px 4px; border-radius:999px; font-size:.92rem; font-weight:700; color:var(--ink2); cursor:pointer; }
+  .seg button.on{ background:#fff; color:var(--ink); box-shadow:0 2px 6px rgba(0,0,0,.08); }
+
+  /* category list */
+  .catlist{ display:flex; flex-direction:column; gap:12px; }
+  .cat{ display:flex; align-items:center; gap:14px; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:12px 14px; cursor:pointer; text-align:left; width:100%; }
+  .cat .ic{ width:56px; height:56px; border-radius:12px; background:var(--chip); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--brown); }
+  .cat .ic svg{ width:30px; height:30px; }
+  .cat .nm{ font-weight:700; font-size:1rem; color:var(--ink); }
+  .cat .sb{ font-size:.74rem; color:var(--muted); margin-top:4px; letter-spacing:.06em; }
+  .cat .cnt{ font-size:.7rem; color:var(--brown2); margin-top:3px; }
+  .status{ margin-left:auto; flex-shrink:0; font-size:.74rem; border-radius:999px; padding:6px 12px; background:var(--chip); color:var(--muted); font-style:italic; }
+  .status.s-仮決定{ background:var(--kari); color:var(--kari-ink); font-style:normal; font-weight:700; }
+  .status.s-決定{ background:var(--kettei); color:#fff; font-style:normal; font-weight:700; }
+  .status.s-準備中{ background:transparent; border:1px dashed var(--line2); }
+
+  /* detail */
+  .back{ border:none; background:none; color:var(--ink2); font-size:.86rem; padding:4px 0; cursor:pointer; }
+  .dhd{ display:flex; align-items:center; gap:12px; margin:8px 0 4px; }
+  .dhd .ic{ width:48px; height:48px; border-radius:12px; background:var(--chip); display:flex; align-items:center; justify-content:center; color:var(--brown); }
+  .dhd .ic svg{ width:26px; height:26px; }
+  .speclist{ display:flex; flex-direction:column; gap:12px; margin-bottom:6px; }
+  .spec{ display:flex; align-items:center; gap:14px; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .spec .num{ width:64px; height:64px; border-radius:12px; background:linear-gradient(135deg,#7b6d66,#b3a69c); color:#fff; font-size:.72rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .spec .k{ font-weight:700; }
+  .spec .v{ font-size:.82rem; color:var(--ink2); margin-top:4px; letter-spacing:.06em; white-space:pre-wrap; }
+
+  .tl{ position:relative; display:flex; flex-direction:column; gap:14px; padding-left:18px; }
+  .tl::before{ content:""; position:absolute; left:6px; top:6px; bottom:6px; width:2px; background:var(--line2); }
+  .tli{ position:relative; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .tli::before{ content:""; position:absolute; left:-17px; top:18px; width:10px; height:10px; border-radius:50%; background:var(--brown2); border:2px solid var(--bg); }
+  .tli.latest::before{ background:var(--rose); }
+  .tli.flat::before{ display:none; }
+  .tlh{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .tlh .d{ font-size:.74rem; color:var(--muted); font-weight:700; }
+  .tag{ font-size:.68rem; border-radius:999px; padding:3px 9px; background:var(--chip); color:var(--ink2); }
+  .tag.note{ background:#e9eef5; color:#4e6585; }
+  .tag.pb{ background:#f3e6ec; color:#9a4f68; }
+  .tag.ph{ background:var(--green); color:var(--green-ink); }
+  .tag.new{ background:var(--rose); color:#fff; }
+  .tlt{ font-weight:700; margin-bottom:6px; }
+  .box{ border-radius:10px; padding:8px 10px; font-size:.86rem; white-space:pre-wrap; margin-bottom:6px; }
+  .box .bl{ font-size:.68rem; font-weight:700; margin-bottom:2px; }
+  .box.dec{ background:#eef3ef; } .box.dec .bl{ color:var(--green-ink); }
+  .box.opn{ background:#f8eee4; } .box.opn .bl{ color:#a8682c; }
+  .thumbs{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .thumbs.one{ grid-template-columns:1fr; }
+  .th{ position:relative; border-radius:12px; overflow:hidden; background:#eee6de; aspect-ratio:1/1; cursor:pointer; border:none; padding:0; }
+  .th img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .th.pdf{ text-decoration:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--brown); font-size:.78rem; }
+  .th.pdf .pi{ font-size:2rem; }
+  .th .cap{ position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent,rgba(0,0,0,.55)); color:#fff; font-size:.7rem; padding:14px 8px 6px; text-align:left; }
+  .decide{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; margin-top:18px; }
+  .decide .now{ font-size:.82rem; color:var(--ink2); margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .btns{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .btn{ border-radius:14px; padding:15px 6px; font-size:1rem; font-weight:700; letter-spacing:.08em; cursor:pointer; }
+  .btn.ol{ background:var(--card); border:1.5px solid var(--line2); color:var(--ink2); }
+  .btn.dk{ background:var(--brown); border:1.5px solid var(--brown); color:#fff; }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  .linkbtn{ background:none; border:none; color:var(--brown2); text-decoration:underline; cursor:pointer; font-size:.8rem; padding:0; margin-top:8px; }
+
+  /* home */
+  .greet{ font-size:1.5rem; font-weight:700; margin:4px 0 6px; letter-spacing:.04em; }
+  .newmsg{ color:var(--rose); font-weight:700; font-size:.92rem; margin:-2px 0 12px; letter-spacing:.06em; }
+  .polas{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .pola{ background:#fff; padding:8px 8px 10px; border-radius:6px; box-shadow:0 3px 10px rgba(0,0,0,.08); position:relative; border:none; cursor:pointer; text-align:left; }
+  .pola:nth-child(3n+1){ transform:rotate(-1.5deg); } .pola:nth-child(3n+2){ transform:rotate(1.2deg); } .pola:nth-child(3n){ transform:rotate(-.6deg); }
+  .pola::before{ content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:44%; height:16px; background:var(--tape); opacity:.9; }
+  .pola .im{ aspect-ratio:1/1; background:#f0ebe5; overflow:hidden; }
+  .pola .im img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .pola .pc{ font-size:.66rem; color:var(--ink2); margin-top:6px; line-height:1.35; }
+  .prog{ background:linear-gradient(135deg,#f4ebe6,#eadbd3); border-radius:18px; padding:18px; margin-top:26px; }
+  .prog .l{ font-size:.76rem; color:var(--ink2); letter-spacing:.06em; }
+  .prog .t{ font-size:1.25rem; font-weight:700; margin:8px 0 6px; }
+  .prog .d{ font-size:.82rem; color:var(--ink2); }
+  .bar{ height:8px; background:rgba(255,255,255,.75); border-radius:999px; margin:14px 0 8px; overflow:hidden; }
+  .bar i{ display:block; height:100%; background:var(--brown2); border-radius:999px; }
+  .prog .r{ display:flex; justify-content:space-between; font-size:.74rem; color:var(--ink2); }
+  .svcs{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .svc{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px 10px; display:flex; flex-direction:column; align-items:center; gap:10px; text-decoration:none; color:var(--ink); font-weight:700; font-size:.84rem; }
+  .svc .si{ width:64px; height:64px; border-radius:16px; background:var(--chip); display:flex; align-items:center; justify-content:center; color:var(--brown); }
+  .svc .si svg{ width:30px; height:30px; }
+  .ntc-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:420px){ .ntc-grid.two{ grid-template-columns:1fr 1fr; } }
+  .ntc-wrap .ntag{ display:inline-block; font-size:.68rem; background:var(--green); color:var(--green-ink); border-radius:6px 6px 0 0; padding:3px 9px; }
+  .ntc-wrap .ntag.proc{ background:#f3e7df; color:#9a6a4f; }
+  .ntc{ background:var(--card); border:1.5px solid var(--line); border-radius:0 14px 14px 14px; padding:14px; }
+  .ntc .nt{ font-weight:700; margin-bottom:6px; }
+  .ntc .nb{ font-size:.84rem; color:var(--ink2); line-height:1.6; white-space:pre-wrap; }
+  .ntc .nl{ margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; text-decoration:none; color:var(--ink); }
+  .ntc .nl b{ font-size:.86rem; } .ntc .nl span{ font-size:.72rem; color:var(--muted); display:block; }
+  .ntc .nl .op{ background:var(--green); color:var(--green-ink); border-radius:999px; padding:6px 12px; font-size:.76rem; flex-shrink:0; }
+
+  /* album */
+  .agrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .agrid .th{ border-radius:8px; }
+
+  /* messages */
+  .msgs{ display:flex; flex-direction:column; gap:10px; }
+  .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.88rem; white-space:pre-wrap; line-height:1.55; }
+  .msg .mm{ font-size:.66rem; opacity:.65; margin-bottom:3px; }
+  .msg.staff{ background:var(--card); border:1.5px solid var(--line); align-self:flex-start; border-bottom-left-radius:4px; }
+  .msg.me{ background:var(--brown); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+  .composer{ position:sticky; bottom:calc(76px + env(safe-area-inset-bottom)); display:flex; gap:8px; margin-top:16px; background:var(--bg); padding:8px 0; }
+  .composer textarea{ flex:1; border:1.5px solid var(--line2); border-radius:14px; padding:10px 12px; font:inherit; font-size:.9rem; resize:none; min-height:46px; background:#fff; }
+  .composer button{ border:none; background:var(--brown); color:#fff; border-radius:14px; padding:0 18px; font-weight:700; cursor:pointer; }
+
+  /* reservations */
+  .rv{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; display:flex; gap:14px; align-items:center; }
+  .rv .dt{ text-align:center; min-width:58px; }
+  .rv .dt .m{ font-size:.7rem; color:var(--muted); } .rv .dt .dd{ font-size:1.5rem; font-weight:700; line-height:1.1; } .rv .dt .w{ font-size:.7rem; color:var(--muted); }
+  .rv .ty{ font-weight:700; } .rv .tm{ font-size:.8rem; color:var(--ink2); margin-top:3px; }
+  .rv.past{ opacity:.6; }
+
+  /* bottom nav */
+  .nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:520px; background:var(--card); border-top:1px solid var(--line); display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom)); z-index:10; }
+  @media (min-width:560px){ .nav{ max-width:504px; bottom:24px; border-radius:0 0 26px 26px; } }
+  .nav button{ flex:1; border:none; background:none; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:.68rem; color:var(--muted); cursor:pointer; padding:4px 0; letter-spacing:.06em; }
+  .nav .ni{ width:44px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+  .nav .ni svg{ width:24px; height:24px; }
+  .nav button.on{ color:var(--ink); font-weight:700; }
+  .nav button.on .ni{ background:var(--brown); color:#fff; }
+
+  /* lightbox */
+  .lb{ position:fixed; inset:0; background:rgba(20,16,14,.92); z-index:50; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .lb[hidden]{ display:none; }
+  .lb img{ max-width:100%; max-height:88vh; border-radius:8px; }
+  .lb .x{ position:absolute; top:14px; right:14px; width:42px; height:42px; border-radius:50%; border:none; background:rgba(255,255,255,.15); color:#fff; font-size:1.3rem; cursor:pointer; }
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom)); background:var(--ink); color:#fff; padding:10px 16px; border-radius:999px; font-size:.84rem; z-index:60; }
+  .toast[hidden]{ display:none; }
+  .center{ text-align:center; padding:80px 24px; color:var(--ink2); line-height:1.8; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="hd">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none"><path d="M5 15 16 6l11 9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13v12h16V13" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><rect x="14" y="18" width="4" height="7" rx="1" fill="#e8cfc8"/><rect x="10.5" y="15.5" width="3" height="3" rx=".5" fill="#fff"/><rect x="18.5" y="15.5" width="3" height="3" rx=".5" fill="#fff"/></svg>
+    </div>
+    <div>
+      <div class="co">住まいるハウジング</div>
+      <div class="ttl">おうちノート</div>
+    </div>
+    <button class="mail" id="btnMail" aria-label="メッセージ">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9a9089" stroke-width="1.6"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
+    </button>
+  </header>
+  <div class="band">
+    <div><div class="who" id="bandWho">お客様のおうち</div><div class="st" id="bandSt">家づくり進行中</div></div>
+    <div class="next" id="bandNext" hidden></div>
+  </div>
+  <main id="main"><div class="center">読み込み中…</div></main>
+</div>
+
+<nav class="nav" id="nav" hidden>
+  <button data-tab="home"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg></span>ホーム</button>
+  <button data-tab="album"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>アルバム</button>
+  <button data-tab="msg"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span>メッセージ</button>
+  <button data-tab="resv"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M8 14h3M13 14h3M8 17h3"/></svg></span>予約</button>
+  <button data-tab="build"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 5.5a4 4 0 0 0 4.9 4.9l-9 9a2 2 0 0 1-2.8-2.8l9-9a4 4 0 0 0-2.1-2.1z"/></svg></span>家づくり</button>
+</nav>
+
+<div class="lb" id="lb" hidden><button class="x" id="lbX" aria-label="閉じる">×</button><img id="lbImg" alt=""></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+  var ICONS = {
+    plan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    house:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg>',
+    kitchen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="9" width="18" height="11" rx="1"/><path d="M3 14h18M12 9v11M8 5h3M13 5h3M9.5 5v4M14.5 5v4"/></svg>',
+    bath:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 12h16v2a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M7 12V6a2 2 0 0 1 4 0M7 19l-1 2M17 19l1 2"/></svg>',
+    wash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="6" y="3" width="12" height="8" rx="1"/><path d="M4 13h16v3H4zM7 16v5M17 16v5M10 21h4"/></svg>',
+    toilet:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M7 3h7v7H7zM5 10h12a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5zM9 15l-1 5h8l-1-5"/></svg>',
+    heating:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 10h16v8H4zM7 10v8M10 10v8M13 10v8M16 10v8M8 4c0 2 2 2 2 4M14 4c0 2 2 2 2 4M5 18v2M19 18v2"/></svg>',
+    fan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="1.5"/><path d="M12 10.5C9 9 8 4 11 3.5s3 4 1 7M13.5 12c1.5-3 6.5-4 7-1s-4 3-7 1M12 13.5c3 1.5 4 6.5 1 7s-3-4-1-7M10.5 12c-1.5 3-6.5 4-7 1s4-3 7-1"/></svg>',
+    plug:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>',
+    light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>',
+    sofa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 11V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/><path d="M4 11a2 2 0 0 1 2 2v1h12v-1a2 2 0 1 1 2 2v3H4v-3a2 2 0 0 1 0-4zM6 18v2M18 18v2"/></svg>',
+    card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M6 15h5"/><path d="m16.5 13 .8 1.6 1.7.2-1.3 1.2.4 1.7-1.6-.9-1.6.9.4-1.7-1.3-1.2 1.7-.2z"/></svg>',
+    link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg>'
+  };
+  var EXT_LABELS = [["mainWall","メイン外壁"],["mainWallNote","メイン外壁の品番・補足"],["accentWall","アクセント外壁"],["accentWallNote","アクセント外壁の品番・補足"],["roofColor","屋根の色"],["roofNote","屋根・破風の補足"],["roofPhotoNote","屋根の写真・品番"],["fasciaColor","破風・鼻隠しの色"],["fasciaPhotoNote","破風・鼻隠しの写真・品番"],["sashOutside","サッシ外観色"],["sashInside","室内側の窓枠色"],["glass","ガラス"],["fogPlace","くもりガラスの場所"]];
+  var WD = ["日","月","火","水","木","金","土"];
+
+  var P = "", T = "";
+  try{
+    var qs = new URLSearchParams(location.search);
+    P = qs.get("p") || ""; T = qs.get("t") || "";
+    if(P && T){ try{ localStorage.setItem("okainote_link", JSON.stringify({p:P,t:T})); }catch(e){} }
+    else { try{ var s = JSON.parse(localStorage.getItem("okainote_link")||"null"); if(s){ P=s.p; T=s.t; } }catch(e){} }
+  }catch(e){}
+
+  var data = null;
+  var view = { tab:"home", buildSeg:"spec", cat:null };
+  var main = document.getElementById("main");
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function fmtD(d){ if(!d) return ""; var p = String(d).slice(0,10).split("-"); return p.length===3 ? Number(p[0])+"."+Number(p[1])+"."+Number(p[2]) : d; }
+  function md(d){ if(!d) return ""; var dt = new Date(String(d).slice(0,10)+"T00:00:00"); return (dt.getMonth()+1)+"/"+dt.getDate()+"("+WD[dt.getDay()]+")"; }
+  function isImg(f){ return (f.contentType||"").indexOf("image")===0 || /\.(jpe?g|png|gif|webp)$/i.test(f.name||""); }
+  function isPdf(f){ return (f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||""); }
+  function toast(t){ var el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function(){ el.hidden = true; }, 2400); }
+
+  function thumbHtml(f, cap){
+    if(!f || !f.url) return "";
+    if(isImg(f)){
+      return '<button class="th" data-img="'+esc(f.url)+'"><img loading="lazy" src="'+esc(f.url)+'" alt="">'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</button>';
+    }
+    return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">'+(isPdf(f)?"📄":"📎")+'</span><span>'+(isPdf(f)?"PDFを開く":"ファイルを開く")+'</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+  }
+
+  async function load(){
+    if(!P || !T){
+      main.innerHTML = '<div class="center">このページは、住まいるハウジングからお送りした<br>専用リンクから開いてください。</div>';
+      return;
+    }
+    try{
+      var res = await fetch("/api/note-data?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T), {cache:"no-store"});
+      var j = await res.json();
+      if(!res.ok){
+        main.innerHTML = '<div class="center">リンクが無効になっています。<br>お手数ですが、住まいるハウジングまでお問い合わせください。</div>';
+        return;
+      }
+      data = j;
+      document.getElementById("nav").hidden = false;
+      render();
+    }catch(e){
+      main.innerHTML = '<div class="center">読み込みに失敗しました。<br>通信状況をご確認のうえ、もう一度開いてください。</div>';
+    }
+  }
+
+  function renderBand(){
+    var name = (data.project.customer || data.project.name || "お客様").replace(/様$/, "");
+    document.getElementById("bandWho").textContent = name + "様のおうち";
+    document.getElementById("bandSt").textContent = data.project.progressTag ? ("家づくり進行中・"+data.project.progressTag) : "家づくり進行中";
+    var nx = document.getElementById("bandNext");
+    if(data.nextReservation){ nx.hidden = false; nx.textContent = "次回 "+md(data.nextReservation.date)+" "+(data.nextReservation.startTime||""); }
+    else nx.hidden = true;
+  }
+
+  function render(){
+    renderBand();
+    Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function(b){ b.classList.toggle("on", b.dataset.tab===view.tab); });
+    var html = "";
+    if(view.tab==="home") html = homeHtml();
+    else if(view.tab==="album") html = albumHtml();
+    else if(view.tab==="msg") html = msgHtml();
+    else if(view.tab==="resv") html = resvHtml();
+    else html = view.cat ? catDetailHtml(view.cat) : buildHtml();
+    main.innerHTML = '<div class="wrap">'+html+'</div>';
+    if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
+  }
+
+  // ---------- ホーム ----------
+  function progress(){
+    var cats = data.categories.filter(function(c){ return c.id!=="plan" && c.status!=="準備中"; });
+    var done = cats.filter(function(c){ return c.status==="決定"; }).length;
+    return { total:cats.length, done:done, pct: cats.length ? Math.round(done*100/cats.length) : 0 };
+  }
+  function homeHtml(){
+    var h = new Date().getHours();
+    var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
+    var name = (data.project.customer || "お客様").replace(/様$/, "");
+    var album = data.album.filter(function(a){ return isImg(a); });
+    var weekAgo = new Date(Date.now()-7*86400000).toISOString();
+    var newCount = album.filter(function(a){ return a.createdAt >= weekAgo; }).length;
+    var pg = progress();
+    var out = '<div class="greet">'+greet+'、'+esc(name)+'様</div>'+
+      '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
+    out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
+    if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
+    if(album.length){
+      out += '<div class="polas">'+album.slice(0,3).map(function(a){
+        // キャプションはファイル名・部位名ではなく、日付と「アルバムの写真」だけにする
+        return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt)+'<br>'+(a.kind==="reference"?"参考写真":"アルバムの写真")+'</div></button>';
+      }).join("")+'</div>';
+    } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
+
+    out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
+      '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+
+      '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
+      '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div></div>';
+
+    var svcs = data.notices.filter(function(n){ return n.kind==="service"; });
+    if(svcs.length){
+      out += '<div class="sechd"><h3>ご利用中のサービス</h3></div><div class="svcs">'+svcs.map(function(s){
+        var ic = /ポイント/.test(s.title) ? ICONS.card : (/3D|3d/.test(s.title) ? ICONS.house : ICONS.link);
+        return '<a class="svc" '+(s.linkUrl?'href="'+esc(s.linkUrl)+'" target="_blank" rel="noopener"':'')+'><span class="si">'+ic+'</span>'+esc(s.title)+'</a>';
+      }).join("")+'</div>';
+    }
+    var ntcs = data.notices.filter(function(n){ return n.kind==="notice"; });
+    if(ntcs.length) out += '<div class="sechd"><h3>お知らせ・豆知識</h3></div><div class="ntc-grid">'+ntcs.map(noticeHtml).join("")+'</div>';
+    var procs = data.notices.filter(function(n){ return n.kind==="process"; });
+    if(procs.length) out += '<div class="sechd"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
+    return out;
+  }
+  function noticeHtml(n){
+    return '<div class="ntc-wrap">'+(n.tag?'<span class="ntag'+(n.kind==="process"?" proc":"")+'">'+esc(n.tag)+'</span>':'')+
+      '<div class="ntc"'+(n.tag?'':' style="border-radius:14px;"')+'><div class="nt">'+esc(n.title)+'</div>'+
+      (n.body?'<div class="nb">'+esc(n.body)+'</div>':'')+
+      (n.linkUrl?'<a class="nl" href="'+esc(n.linkUrl)+'" target="_blank" rel="noopener"><div><b>'+esc(n.linkLabel||"詳しく見る")+'</b><span>案内資料</span></div><span class="op">開く</span></a>':'')+
+      '</div></div>';
+  }
+
+  // ---------- アルバム ----------
+  function albumHtml(){
+    var album = data.album.filter(function(a){ return isImg(a); });
+    var mine = album.filter(function(a){ return a.kind!=="reference"; });
+    var ref = album.filter(function(a){ return a.kind==="reference"; });
+    var out = '<h2 class="big">わが家のアルバム</h2><p class="sub">住まいるハウジングからお届けした写真です。タップで大きく表示します。</p>';
+    out += mine.length ? '<div class="agrid">'+mine.map(function(a){ return thumbHtml(a, fmtD(a.createdAt)); }).join("")+'</div>' : '<div class="empty">まだ写真はありません。</div>';
+    if(ref.length) out += '<div class="sechd"><h3>家づくりの参考写真</h3></div><div class="agrid">'+ref.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div>';
+    return out;
+  }
+
+  // ---------- メッセージ ----------
+  function msgHtml(){
+    var out = '<h2 class="big">メッセージ</h2><p class="sub">ご質問・ご相談・ご予約の変更などはこちらからどうぞ。</p>';
+    out += data.messages.length ? '<div class="msgs">'+data.messages.map(function(m){
+      var me = m.fromCustomer;
+      return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+fmtD(m.createdAt)+'</div>'+esc(m.content)+'</div>';
+    }).join("")+'</div>' : '<div class="empty">まだメッセージはありません。</div>';
+    out += '<div id="msgEnd"></div><div class="composer"><textarea id="msgInput" rows="2" placeholder="メッセージを入力"></textarea><button id="msgSend">送信</button></div>';
+    return out;
+  }
+  async function sendMsg(){
+    var ta = document.getElementById("msgInput");
+    var text = (ta.value||"").trim();
+    if(!text) return;
+    var btn = document.getElementById("msgSend"); btn.disabled = true;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:text }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.messages.push({ content:text, sender:"", fromCustomer:true, createdAt:j.message.createdAt });
+      render(); toast("送信しました");
+    }catch(e){ btn.disabled = false; toast("送信できませんでした。もう一度お試しください"); }
+  }
+
+  // ---------- 予約 ----------
+  function resvHtml(){
+    var up = data.reservations.filter(function(r){ return r.date >= data.today; });
+    var past = data.reservations.filter(function(r){ return r.date < data.today; }).reverse();
+    function card(r, isPast){
+      var dt = new Date(r.date+"T00:00:00");
+      return '<div class="rv'+(isPast?" past":"")+'"><div class="dt"><div class="m">'+(dt.getMonth()+1)+'月</div><div class="dd">'+dt.getDate()+'</div><div class="w">'+WD[dt.getDay()]+'曜日</div></div>'+
+        '<div><div class="ty">'+esc(r.type||"お打合せ")+'</div><div class="tm">'+esc(r.startTime||"")+(r.endTime?"〜"+esc(r.endTime):"")+(r.staff?"　担当："+esc(r.staff):"")+'</div></div></div>';
+    }
+    var out = '<h2 class="big">ご予約</h2><p class="sub">お打合せ・ご来場の予定です。ご予約やご変更はメッセージでお知らせください。</p>';
+    out += up.length ? '<div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>' : '<div class="empty">予定されているご予約はありません。</div>';
+    if(past.length) out += '<div class="sechd"><h3>これまでのご予約</h3></div><div class="catlist">'+past.slice(0,10).map(function(r){ return card(r,true); }).join("")+'</div>';
+    out += '<div style="margin-top:16px;"><button class="btn ol" style="width:100%;" data-go="msg">メッセージで予約・変更を相談する</button></div>';
+    return out;
+  }
+
+  // ---------- 家づくり ----------
+  function buildHtml(){
+    var out = '<div class="seg"><button data-seg="spec" class="'+(view.buildSeg==="spec"?"on":"")+'">🔧 設備仕様</button><button data-seg="notes" class="'+(view.buildSeg==="notes"?"on":"")+'">🗒 打合せ記録</button><button data-seg="docs" class="'+(view.buildSeg==="docs"?"on":"")+'">📄 資料</button></div>';
+    if(view.buildSeg==="spec"){
+      out += '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;"><h2 class="big">わが家の設備仕様</h2><span class="countpill" style="margin-top:10px;">'+data.categories.length+'項目</span></div>'+
+        '<p class="sub">写真・プランボード・打合せの内容を、時系列で確認できます</p>';
+      out += '<div class="catlist">'+data.categories.map(function(c){
+        return '<button class="cat" data-cat="'+esc(c.id)+'"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span>'+
+          '<span><div class="nm">'+esc(c.name)+'</div><div class="sb">'+esc(c.sub)+'</div>'+(c.count?'<div class="cnt">'+c.count+'件の記録</div>':'')+'</span>'+
+          '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></button>';
+      }).join("")+'</div>';
+    } else if(view.buildSeg==="notes"){
+      out += '<h2 class="big">打合せ記録</h2><p class="sub">お打合せで決まったこと・確認したいことの記録です（新しい順）。</p>';
+      out += data.notes.length ? '<div class="catlist">'+data.notes.map(function(n){
+        return '<div class="tli flat">'+noteBody(n, true)+'</div>';
+      }).join("")+'</div>' : '<div class="empty">まだ記録はありません。</div>';
+    } else {
+      var files = [];
+      data.plans.forEach(function(f){ files.push({f:f, cap:"平面図"}); });
+      data.notes.forEach(function(n){ (n.files||[]).forEach(function(f){ files.push({f:f, cap:n.title||fmtD(n.date)}); }); });
+      out += '<h2 class="big">資料</h2><p class="sub">図面や、お打合せでお渡しした資料です。</p>';
+      out += files.length ? '<div class="thumbs">'+files.map(function(x){ return thumbHtml(x.f, x.cap); }).join("")+'</div>' : '<div class="empty">まだ資料はありません。</div>';
+    }
+    return out;
+  }
+  function noteBody(n, showPart){
+    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+'</div>'+
+      (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
+      (n.decided?'<div class="box dec"><div class="bl">決定したこと</div>'+esc(n.decided)+'</div>':'')+
+      (n.open?'<div class="box opn"><div class="bl">確認したいこと</div>'+esc(n.open)+'</div>':'')+
+      ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
+  }
+  function catDetailHtml(catId){
+    var c = data.categories.find(function(x){ return x.id===catId; });
+    if(!c){ view.cat = null; return buildHtml(); }
+    var out = '<button class="back" data-back="1">← 設備仕様の一覧へ</button>'+
+      '<div class="dhd"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span><div><h2 class="big" style="margin:0;">'+esc(c.name)+'</h2><div class="sub" style="margin:2px 0 0;">'+esc(c.sub)+'</div></div>'+
+      '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></div>';
+
+    if(c.id==="plan"){
+      out += '<div class="sechd"><h3>平面図</h3></div>';
+      out += data.plans.length ? '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.map(function(f){ return thumbHtml(f, fmtD(f.date)); }).join("")+'</div>'
+        : '<div class="empty">図面が登録されると、ここに表示されます。</div>';
+      return out;
+    }
+
+    if(c.id==="exterior"){
+      var vals = data.project.exteriorSpecValues || {};
+      var rows = EXT_LABELS.filter(function(l){ return vals[l[0]]; });
+      if(rows.length){
+        out += '<div class="sechd"><h3>色・仕様</h3></div><div class="speclist">'+rows.map(function(l, i){
+          return '<div class="spec"><div class="num">'+(i<9?"0":"")+(i+1)+'</div><div><div class="k">'+esc(l[1])+'</div><div class="v">'+esc(vals[l[0]])+'</div></div></div>';
+        }).join("")+'</div>';
+      }
+    }
+
+    var items = c.items || [];
+    var pbs = items.filter(function(x){ return x.type==="planboard"; });
+    if(pbs.length){
+      out += '<div class="sechd"><h3>プランボード</h3><span class="countpill">'+pbs.length+'件</span></div>'+
+        '<div class="thumbs">'+pbs.slice().reverse().map(function(x, i){ return thumbHtml(x.file, (i===0?"最新・":"")+fmtD(x.at)); }).join("")+'</div>';
+    }
+    out += '<div class="sechd"><h3>これまでの経過</h3><span class="countpill">時系列</span></div>';
+    if(items.length){
+      out += '<div class="tl">'+items.map(function(x, i){
+        var latest = i===items.length-1;
+        if(x.type==="note") return '<div class="tli'+(latest?" latest":"")+'">'+noteBody(x,false).replace('<span class="tag note">打合せ記録</span>', '<span class="tag note">打合せ記録</span>'+(latest?'<span class="tag new">最新</span>':''))+'</div>';
+        var tagCls = x.type==="planboard" ? "pb" : "ph";
+        var tagLbl = x.type==="planboard" ? "プランボード" : "写真";
+        return '<div class="tli'+(latest?" latest":"")+'"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+tagCls+'">'+tagLbl+'</span>'+(x.label&&x.label!==c.name?'<span class="tag">'+esc(x.label)+'</span>':'')+(latest?'<span class="tag new">最新</span>':'')+'</div>'+
+          '<div class="thumbs one" style="max-width:150px;">'+thumbHtml(x.file,"")+'</div></div>';
+      }).join("")+'</div>';
+    } else {
+      out += '<div class="empty">打合せが進むと、写真やプランボード・記録がここに時系列で並びます。</div>';
+    }
+
+    out += '<div class="decide"><div class="now">いまの状態：<span class="status s-'+esc(c.status)+'" style="margin-left:0;">'+esc(c.status)+'</span>'+
+      (c.decidedAt?'<span style="font-size:.74rem; color:var(--muted);">（'+fmtD(c.decidedAt)+' 更新）</span>':'')+'</div>'+
+      '<div class="btns"><button class="btn ol" data-decide="仮決定"'+(c.status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
+      '<button class="btn dk" data-decide="決定"'+(c.status==="決定"?" disabled":"")+'>決定する</button></div>'+
+      ((c.status==="仮決定"||c.status==="決定")?'<button class="linkbtn" data-decide="検討中">検討中に戻す</button>':'')+
+      '</div>';
+    return out;
+  }
+  async function decide(status){
+    var c = data.categories.find(function(x){ return x.id===view.cat; });
+    if(!c) return;
+    var msg = status==="決定" ? "「"+c.name+"」をこの内容で決定します。よろしいですか？" :
+      (status==="仮決定" ? "「"+c.name+"」を仮決定にします。よろしいですか？" : "「"+c.name+"」を検討中に戻します。よろしいですか？");
+    if(!window.confirm(msg)) return;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:c.id, status:status }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      c.status = status; c.decidedAt = j.decision.decidedAt;
+      render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
+    }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
+  }
+
+  // ---------- イベント ----------
+  document.getElementById("nav").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-tab]"); if(!b) return;
+    view.tab = b.dataset.tab; if(view.tab!=="build") view.cat = null;
+    render(); window.scrollTo(0,0);
+  });
+  document.getElementById("btnMail").addEventListener("click", function(){ if(!data) return; view.tab="msg"; render(); });
+  main.addEventListener("click", function(e){
+    var img = e.target.closest("[data-img]");
+    if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
+    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
+    var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
+    var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
+    var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
+    var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide); return; }
+    if(e.target.closest("#msgSend")){ sendMsg(); return; }
+  });
+  function closeLb(){ document.getElementById("lb").hidden = true; document.getElementById("lbImg").src = ""; }
+  document.getElementById("lbX").addEventListener("click", closeLb);
+  document.getElementById("lb").addEventListener("click", function(e){ if(e.target.id==="lb") closeLb(); });
+
+  load();
+})();
+</script>
+</body>
+</html>

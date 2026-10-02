@@ -9,3 +9,9 @@
 
 /note.html
   Cache-Control: no-cache, must-revalidate
+
+/note/*
+  Cache-Control: no-cache, must-revalidate
+
+/note/
+  Cache-Control: no-cache, must-revalidate
