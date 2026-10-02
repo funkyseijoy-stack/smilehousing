@@ -2254,12 +2254,11 @@
     var wrap = document.getElementById("specExteriorWrap");
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
-    var notes = (proj && proj.exteriorNotes) || {};
     var specValues = (proj && proj.exteriorSpecValues) || {};
     var valuesBlockHtml = '<div class="speccat">'+
       '<h4>色・仕様（サッシ・ガラスなど）</h4>'+
       '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
-      '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容と、下の各カテゴリーの「メモ（自由記述）」が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
+      '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
       '<button type="button" class="btn secondary small" id="btnReflectExteriorSpecValues">🌐 おうちノートに反映する</button>'+
       '</div>'+
       '<div class="extspecvalues-grid">'+
@@ -2272,9 +2271,10 @@
     if(state.noteSpecFilter && state.noteSpecFilter.scope==="exterior" && state.noteSpecFilter.category){
       exteriorCatsToShow = EXTERIOR_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
     }
+    // カテゴリーごとの「メモ（自由記述）」欄は削除（横一列で見やすくするため）。
+    // 同じ内容は上の「色・仕様」欄で入力できるため、入力先はそちらに一本化している。
     var catsGridHtml = '<div class="speccatgrid">'+exteriorCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("exterior",cat,null,null)+
-        '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("exterior",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
