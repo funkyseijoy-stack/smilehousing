@@ -1802,7 +1802,7 @@
             (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.68rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
           (t.vendorSpec?'<div class="muted" style="font-size:.7rem; margin-block-end:4px;">部位：'+escapeHtml(t.vendorSpec.label||"")+'</div>':'')+
-          (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+confirmAttachmentsHtml(t.attachments)+'</div>' : "")+
+          (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
             (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
@@ -3686,6 +3686,14 @@
       return '<a href="'+a.url+'" target="_blank" rel="noopener" class="pill method">📎 '+escapeHtml(a.name||"添付")+'</a>';
     }).join(" ");
   }
+  function taskAttachmentsHtml(taskId, atts){
+    return (atts||[]).map(function(a){
+      return '<div style="display:inline-flex; align-items:center; gap:4px; background:var(--surface-2); padding:2px 8px; border-radius:4px; font-size:.75rem;">'+
+        '<a href="'+a.url+'" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">📎 '+escapeHtml(a.name||"添付")+'</a>'+
+        '<button data-delattach="'+taskId+'" data-attid="'+escapeHtml(a.id)+'" style="background:none; border:none; color:var(--muted); cursor:pointer; padding:0; font-size:.8rem; line-height:1;">✕</button>'+
+      '</div>';
+    }).join(" ");
+  }
   // 打ち合わせ記録に添付された写真・PDF・動画を、横一列の大きめサムネイルで表示する
   // （件数が多い時は横スクロール）。1つの打ち合わせ記録＝複数の候補写真、という
   // まとめ方を分かりやすく見せるための共通パーツ。
@@ -4981,6 +4989,18 @@
     saveDoc("tasks", t.id, t);
     logActivity("タスク「"+(t.content||"").slice(0,20)+"」を"+(t.reflected?"おうちノートに反映しました":"反映解除しました"));
   }
+  async function deleteTaskAttachment(taskId, attId){
+    var t = state.tasks.find(function(x){ return x.id===taskId; });
+    if(!t){ toast("タスクが見つかりません"); return; }
+    if(!attId){ toast("ファイルが見つかりません"); return; }
+    t.attachments = (t.attachments||[]).filter(function(a){ return a.id!==attId; });
+    t.attachmentAssetIds = (t.attachmentAssetIds||[]).filter(function(id){ return id!==attId; });
+    t.updatedAt = nowIso();
+    render();
+    await saveDoc("tasks", t.id, t);
+    logActivity("タスク「"+(t.content||"").slice(0,20)+"」の添付ファイルを削除しました");
+    toast("✅ 削除しました");
+  }
 
   // ================= settings (⑨カスタマイズ / ⑤PIN) =================
   async function persistSettings(){
@@ -6244,6 +6264,8 @@
       });
     });
     document.getElementById("kanbanWrap").addEventListener("click", function(e){
+      var delAttachBtn = e.target.closest("button[data-delattach]");
+      if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
       var btn = e.target.closest("button[data-taskact]");
       if(!btn) return;
       var act = btn.dataset.taskact, id = btn.dataset.id;
