@@ -164,6 +164,11 @@
   .subtabs{ display:flex; gap:4px; margin-block-end:12px; flex-wrap:wrap; }
   .subtabs button{ font-family:"Zen Maru Gothic",sans-serif; font-size:.78rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; }
   .subtabs button.active{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
+  .meetingsubtabs{ display:flex; gap:4px; margin-block-end:12px; flex-wrap:wrap; }
+  .meetingsub-btn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.74rem; font-weight:700; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; }
+  .meetingsub-btn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .meetingsubpane{ display:none; }
+  .meetingsubpane.active{ display:block; }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
@@ -736,70 +741,94 @@
 
       <!-- 打合せ内容 subpanel -->
       <div class="subpanel" id="sub-meeting">
-        <div class="card">
-          <h3>打合せ内容を記録</h3>
-          <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
-          <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
-          <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
-          <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
-          <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
-          <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
-          <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
+        <div class="meetingsubtabs" id="meetingSubTabBar">
+          <button class="meetingsub-btn active" data-meetingsub="record">記録</button>
+          <button class="meetingsub-btn" data-meetingsub="exterior">外部仕様</button>
+          <button class="meetingsub-btn" data-meetingsub="facility">設備仕様</button>
+          <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
+          <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア基本色</button>
+          <button class="meetingsub-btn" data-meetingsub="room">部屋別クロス</button>
+          <button class="meetingsub-btn" data-meetingsub="planboard">プランボード</button>
         </div>
-        <div class="card">
-          <h3>これまでの記録</h3>
-          <p class="muted" style="margin:0 0 8px; font-size:.76rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認できます。</p>
-          <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
-          <div class="notelist" id="meetingNoteList"></div>
-          <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
+
+        <div class="meetingsubpane active" id="meetingsubpane-record">
+          <div class="card">
+            <h3>打合せ内容を記録</h3>
+            <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
+            <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
+            <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
+            <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
+            <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
+            <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
+            <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
+          </div>
+          <div class="card">
+            <h3>これまでの記録</h3>
+            <p class="muted" style="margin:0 0 8px; font-size:.76rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認でき、該当する仕様タブに自動で切り替わります。</p>
+            <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
+            <div class="notelist" id="meetingNoteList"></div>
+            <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
+          </div>
         </div>
 
         <!-- 部位ごとの仕様（旧：設備仕様タブ）。打合せ記録に統合。 -->
-        <div class="card">
-          <h3>外部仕様</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
-          <div id="specExteriorWrap"></div>
-        </div>
-        <div class="card">
-          <h3>設備仕様</h3>
-          <div id="specFacilityWrap"></div>
-        </div>
-        <div class="card">
-          <h3>暖房・換気・電気設備</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
-          <div id="specEquipmentWrap"></div>
-        </div>
-        <div class="card">
-          <h3>インテリア基本色</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
-          <div class="row" style="margin-block-end:10px; gap:6px;">
-            <input type="text" id="interiorColorCatInput" placeholder="例：手すり">
-            <button class="btn secondary small" id="btnAddInteriorColorCat">＋ カテゴリー追加</button>
+        <div class="meetingsubpane" id="meetingsubpane-exterior">
+          <div class="card">
+            <h3>外部仕様</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+            <div id="specExteriorWrap"></div>
           </div>
-          <div id="specInteriorWrap"></div>
         </div>
-        <div class="card">
-          <h3>部屋別クロス</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
-          <div class="row" style="margin-block-end:10px; gap:6px;">
-            <input type="text" id="roomCatInput" placeholder="例：造作収納">
-            <button class="btn secondary small" id="btnAddRoomCat">＋ 項目を追加</button>
+        <div class="meetingsubpane" id="meetingsubpane-facility">
+          <div class="card">
+            <h3>設備仕様</h3>
+            <div id="specFacilityWrap"></div>
           </div>
-          <div class="row" style="margin-block-end:10px;">
-            <input type="text" id="newRoomName" placeholder="例：リビング">
-            <button class="btn secondary small" id="btnAddRoom">部屋を追加</button>
-          </div>
-          <div id="specRoomsWrap"></div>
-          <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
         </div>
-        <div class="card">
-          <h3>プランボード</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
-          <div class="pbsourcelist" id="planSourceList"></div>
-          <div class="empty" id="planSourceEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
-          <div class="row" style="margin-block-start:10px;">
-            <label class="btn secondary small" for="planUploadInput" style="cursor:pointer;">新しい図面をアップロードして開く</label>
-            <input type="file" id="planUploadInput" accept="image/*,application/pdf" hidden>
+        <div class="meetingsubpane" id="meetingsubpane-equipment">
+          <div class="card">
+            <h3>暖房・換気・電気設備</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+            <div id="specEquipmentWrap"></div>
+          </div>
+        </div>
+        <div class="meetingsubpane" id="meetingsubpane-interiorColor">
+          <div class="card">
+            <h3>インテリア基本色</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
+            <div class="row" style="margin-block-end:10px; gap:6px;">
+              <input type="text" id="interiorColorCatInput" placeholder="例：手すり">
+              <button class="btn secondary small" id="btnAddInteriorColorCat">＋ カテゴリー追加</button>
+            </div>
+            <div id="specInteriorWrap"></div>
+          </div>
+        </div>
+        <div class="meetingsubpane" id="meetingsubpane-room">
+          <div class="card">
+            <h3>部屋別クロス</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
+            <div class="row" style="margin-block-end:10px; gap:6px;">
+              <input type="text" id="roomCatInput" placeholder="例：造作収納">
+              <button class="btn secondary small" id="btnAddRoomCat">＋ 項目を追加</button>
+            </div>
+            <div class="row" style="margin-block-end:10px;">
+              <input type="text" id="newRoomName" placeholder="例：リビング">
+              <button class="btn secondary small" id="btnAddRoom">部屋を追加</button>
+            </div>
+            <div id="specRoomsWrap"></div>
+            <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
+          </div>
+        </div>
+        <div class="meetingsubpane" id="meetingsubpane-planboard">
+          <div class="card">
+            <h3>プランボード</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
+            <div class="pbsourcelist" id="planSourceList"></div>
+            <div class="empty" id="planSourceEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
+            <div class="row" style="margin-block-start:10px;">
+              <label class="btn secondary small" for="planUploadInput" style="cursor:pointer;">新しい図面をアップロードして開く</label>
+              <input type="file" id="planUploadInput" accept="image/*,application/pdf" hidden>
+            </div>
           </div>
         </div>
       </div>
@@ -1168,6 +1197,7 @@
     projectTypeFilter: null,
     taskKindFilter: null,
     noteSpecFilter: null,
+    meetingSubTab: "record",
     editingProject: false
   };
   var uiSelectedVendors = {};
@@ -1660,12 +1690,14 @@
   function openProjectDetail(id){
     state.currentProjectId = id;
     state.editingProject = false;
+    state.noteSpecFilter = null;
     document.getElementById("projectListView").hidden = true;
     document.getElementById("projectDetailView").hidden = false;
     renderProjectDetail();
     renderProjectTable(); renderAttachments(); renderVendorCheckboxList();
     renderPlanSourceList(); renderDrawingsList(); renderMeetingNotes();
     renderOverview(); renderCustomerInfo(); renderMessages(); renderSpecTab(); renderSpecSiteCheck(); renderConfirmTab(); renderPhotosTab(); renderReservationTab();
+    switchMeetingSubTab("record");
   }
   function closeProjectDetail(){
     document.getElementById("projectDetailView").hidden = true;
@@ -1854,6 +1886,14 @@
     wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
+  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room" };
+  function switchMeetingSubTab(key){
+    var bar = document.getElementById("meetingSubTabBar");
+    if(!bar) return;
+    state.meetingSubTab = key;
+    bar.querySelectorAll(".meetingsub-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.meetingsub===key); });
+    document.querySelectorAll(".meetingsubpane").forEach(function(p){ p.classList.toggle("active", p.id==="meetingsubpane-"+key); });
+  }
   function specPartsEqual(a, b){
     if(!a || !b) return false;
     return a.scope===b.scope && a.category===b.category && (a.roomId||null)===(b.roomId||null) && (a.side||null)===(b.side||null);
@@ -2214,7 +2254,11 @@
           '<input type="text" data-extspecvalue="'+f[0]+'" value="'+escapeHtml(specValues[f[0]]||"")+'"></label>';
       }).join("")+
       '</div></div>';
-    wrap.innerHTML = valuesBlockHtml + scopeMergeBarHtml("exterior") + EXTERIOR_CATS.map(function(cat){
+    var exteriorCatsToShow = EXTERIOR_CATS;
+    if(state.noteSpecFilter && state.noteSpecFilter.scope==="exterior" && state.noteSpecFilter.category){
+      exteriorCatsToShow = EXTERIOR_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    }
+    wrap.innerHTML = valuesBlockHtml + scopeMergeBarHtml("exterior") + exteriorCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("exterior",cat,null,null)+
         '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("exterior",cat,null,null)+
@@ -2273,7 +2317,11 @@
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.facilityNotes) || {};
-    wrap.innerHTML = scopeMergeBarHtml("facility") + FACILITY_CATS.map(function(cat){
+    var facilityCatsToShow = FACILITY_CATS;
+    if(state.noteSpecFilter && state.noteSpecFilter.scope==="facility" && state.noteSpecFilter.category){
+      facilityCatsToShow = FACILITY_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    }
+    wrap.innerHTML = scopeMergeBarHtml("facility") + facilityCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
         '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
         buildSpecGallery("facility",cat,null,null,{kind:"photo"})+
@@ -2303,7 +2351,11 @@
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.equipmentNotes) || {};
-    wrap.innerHTML = scopeMergeBarHtml("equipment") + EQUIPMENT_CATS.map(function(cat){
+    var equipmentCatsToShow = EQUIPMENT_CATS;
+    if(state.noteSpecFilter && state.noteSpecFilter.scope==="equipment" && state.noteSpecFilter.category){
+      equipmentCatsToShow = EQUIPMENT_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    }
+    wrap.innerHTML = scopeMergeBarHtml("equipment") + equipmentCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
         '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("equipment",cat,null,null)+
@@ -2392,7 +2444,11 @@
     var wrap = document.getElementById("specInteriorWrap");
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
-    wrap.innerHTML = interiorColorCatsFor(proj).map(function(c){
+    var interiorCatsToShow = interiorColorCatsFor(proj);
+    if(state.noteSpecFilter && state.noteSpecFilter.scope==="interiorColor" && state.noteSpecFilter.category){
+      interiorCatsToShow = interiorCatsToShow.filter(function(c){ return c.name===state.noteSpecFilter.category; });
+    }
+    wrap.innerHTML = interiorCatsToShow.map(function(c){
       return '<div class="speccat"><h4>'+escapeHtml(c.name)+
         (c.custom ? ' <button class="btn danger-ghost small" data-delintcat="'+escapeHtml(c.name)+'" style="margin-inline-start:6px;">削除</button>' : '')+
         '</h4>'+
@@ -2409,14 +2465,17 @@
     var proj = projectById(state.currentProjectId);
     var rooms = (proj && proj.rooms) || [];
     var roomCats = roomCatsFor(proj);
+    var roomFilter = (state.noteSpecFilter && state.noteSpecFilter.scope==="room") ? state.noteSpecFilter : null;
+    var roomsToShow = (roomFilter && roomFilter.roomId) ? rooms.filter(function(r){ return r.id===roomFilter.roomId; }) : rooms;
     if(empty) empty.hidden = rooms.length !== 0;
-    wrap.innerHTML = rooms.map(function(r){
+    wrap.innerHTML = roomsToShow.map(function(r){
+      var roomCatsToShow = (roomFilter && roomFilter.category) ? roomCats.filter(function(rc){ return rc.id===roomFilter.category; }) : roomCats;
       return '<div class="roomcard">'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px;">'+
         '<span class="rname">'+escapeHtml(r.name)+'</span>'+
         '<button class="btn danger-ghost small" data-delroom="'+r.id+'">部屋を削除</button>'+
         '</div>'+
-        roomCats.map(function(rc){
+        roomCatsToShow.map(function(rc){
           var noteHtml = rc.id==="accent" ?
             '<input type="text" class="roomAccentNote" data-roomnote="'+r.id+'" placeholder="アクセント位置のメモ（例：リビング北側の壁）" value="'+escapeHtml(r.accentNote||"")+'">' : "";
           return '<div class="speccat"><h4>'+escapeHtml(rc.label)+
@@ -5848,13 +5907,23 @@
       if(kind==="all" || kind==="current"){
         state.noteSpecFilter = null;
         renderMeetingNotes();
+        renderSpecTab();
       } else if(kind==="pick"){
         askSpecPart(function(part){
           if(!part) return;
           state.noteSpecFilter = part;
           renderMeetingNotes();
+          renderSpecTab();
+          var subKey = MEETING_SUBTAB_BY_SCOPE[part.scope];
+          if(subKey) switchMeetingSubTab(subKey);
         });
       }
+    });
+    var meetingSubTabBarEl = document.getElementById("meetingSubTabBar");
+    if(meetingSubTabBarEl) meetingSubTabBarEl.addEventListener("click", function(e){
+      var btn = e.target.closest("[data-meetingsub]");
+      if(!btn) return;
+      switchMeetingSubTab(btn.dataset.meetingsub);
     });
 
     document.getElementById("btnAddTag").addEventListener("click", addProgressTag);
