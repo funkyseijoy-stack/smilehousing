@@ -93,8 +93,17 @@ export default async (req: Request, context: Context) => {
   if (!projectId || !token) return json({ error: "missing_link" }, 400);
 
   const project: any = await store.get(`projects/${projectId}`, { type: "json" });
-  if (!project || project.deletedAt || !project.noteToken || project.noteToken !== token) {
-    return json({ error: "invalid_link" }, 403);
+  if (!project) {
+    return json({ error: "project_not_found", debug: { projectId } }, 403);
+  }
+  if (project.deletedAt) {
+    return json({ error: "project_deleted" }, 403);
+  }
+  if (!project.noteToken) {
+    return json({ error: "token_not_set", debug: { projectId, hasToken: !!project.noteToken } }, 403);
+  }
+  if (project.noteToken !== token) {
+    return json({ error: "token_mismatch", debug: { projectId, expected: project.noteToken?.slice(0, 8), got: token?.slice(0, 8) } }, 403);
   }
 
   // ---------- お客様からの書き込み ----------
