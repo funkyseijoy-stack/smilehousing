@@ -4725,6 +4725,12 @@
         });
         return;
       }
+      if(scope==="exterior"){
+        // 外壁・屋根・破風…の細かい項目選択は行わず、「外部仕様」のみで確定する。
+        // （この場合、仕様タブの外部仕様・該当項目タイムラインへの自動反映は行われない）
+        callback({scope:"exterior", category:null, roomId:null, side:null, label:"外部仕様"});
+        return;
+      }
       var cats = specPartCategoryList(scope, proj);
       if(!cats.length){ toast("選べるカテゴリーがありません"); callback(null); return; }
       askChoice("カテゴリーを選択", "", cats.map(function(c){ return {label:c, value:c}; }), function(cat){
