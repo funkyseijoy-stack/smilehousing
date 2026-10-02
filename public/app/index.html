@@ -189,6 +189,16 @@
   .noteitem .nbtnrow{ display:flex; gap:6px; flex-wrap:wrap; padding-block-start:8px; }
   .noteitem .nbtnrow + .nbtnrow{ margin-block-start:6px; border-block-start:1px dashed var(--border); padding-block-start:8px; }
   .noteitem .nbtnrow:first-of-type{ border-block-start:1px dashed var(--border); padding-block-start:8px; margin-block-start:4px; }
+  /* カードをすっきりさせるため、操作ボタンは「操作」メニューにまとめる */
+  .noteitem{ position:relative; }
+  .notemenu-trigger{ margin-inline-start:auto; flex-shrink:0; }
+  .notemenu{ display:none; position:absolute; inset-inline-end:12px; top:40px; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.14); padding:6px; min-width:210px; }
+  .noteitem.notemenu-open .notemenu{ display:block; }
+  .notemenu button{ display:block; width:100%; text-align:start; background:none; border:none; font:inherit; padding:8px 8px; border-radius:7px; cursor:pointer; color:var(--ink); }
+  .notemenu button:hover{ background:var(--surface-2); }
+  .notemenu button.danger{ color:var(--red, #c0392b); }
+  .notemenu button.on{ color:var(--accent-ink); font-weight:700; }
+  .notemenu-divider{ border-block-start:1px dashed var(--border); margin:5px 2px; }
 
   .lockbox{ display:flex; align-items:center; gap:8px; background:var(--gold-soft); color:var(--gold); border-radius:10px; padding:8px 10px; font-size:.78rem; font-weight:700; }
   .pinrow input{ width:110px; letter-spacing:.15em; }
@@ -763,6 +773,11 @@
             <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
             <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
+            <div class="row" style="align-items:center; gap:8px; margin-block-start:4px;">
+              <span class="muted" style="font-size:.76rem;">部位：</span>
+              <span id="meetingNoteSpecPartLabel" style="font-size:.82rem; font-weight:700;">（未設定）</span>
+              <button type="button" class="btn secondary small" id="btnSetMeetingNoteSpecPart">部位を選択</button>
+            </div>
             <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
           </div>
@@ -1921,6 +1936,12 @@
       (f ? '<span class="tagchip active" data-notespecfilter="current">'+escapeHtml(f.label)+' ×</span>' : '')+
       '<span class="tagchip" data-notespecfilter="pick">部位で絞り込む…</span>';
   }
+  // 打合せ記録カードの「⋮ 操作」メニューを開いているノートのID（1つだけ開く）。
+  var openNoteMenuId = null;
+  function toggleNoteMenu(id){
+    openNoteMenuId = (openNoteMenuId === id) ? null : id;
+    renderMeetingNotes();
+  }
   function renderMeetingNotes(){
     var dateInput = document.getElementById("meetingNoteDate");
     if(dateInput && !dateInput.value) dateInput.value = todayStr();
@@ -1948,30 +1969,32 @@
       var decided = n.decided!=null ? n.decided : (n.content||"");
       var open = n.open!=null ? n.open : "";
       var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">未決・お客様に確認すること</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
-      return '<div class="noteitem">'+
+      var menuOpen = openNoteMenuId === n.id;
+      var menuHtml = '<div class="notemenu">'+
+        '<button data-act="editnote" data-id="'+n.id+'">編集</button>'+
+        '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
+        '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
+        '<div class="notemenu-divider"></div>'+
+        '<button data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
+        '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
+        '<div class="notemenu-divider"></div>'+
+        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
+        '<div class="notemenu-divider"></div>'+
+        '<button data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
+        '<button data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
+        '<button data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→お客様への確認へ</button>'+
+        '<button data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
+        '</div>';
+      return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
         (specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
+        '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
         '<div class="nbox decided"><div class="nboxlabel">決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>'+
         openHtml+
         filesHtml+
-        '<div class="nbtnrow">'+
-        '<button class="btn secondary" data-act="editnote" data-id="'+n.id+'">編集</button>'+
-        '<button class="btn danger-ghost" data-act="delnote" data-id="'+n.id+'">削除</button>'+
-        '<button class="btn ghost small" data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
-        '</div>'+
-        '<div class="nbtnrow">'+
-        '<button class="btn ghost small" data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
-        '<button class="btn ghost small" data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
-        '<button class="pill reflect'+(n.reflected?" on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
-        '</div>'+
-        '<div class="nbtnrow">'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→お客様への確認へ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
-        '</div>'+
+        menuHtml+
         '</div>';
     }).join("");
   }
@@ -4533,6 +4556,12 @@
     if(open) parts.push("（未決）"+open);
     return parts.join("\n");
   }
+  // 「打合せ内容を記録」フォームで、保存前にあらかじめ選んでおく部位（任意）。
+  var newMeetingNoteSpecPart = null;
+  function updateMeetingNoteSpecPartLabel(){
+    var label = document.getElementById("meetingNoteSpecPartLabel");
+    if(label) label.textContent = newMeetingNoteSpecPart ? newMeetingNoteSpecPart.label : "（未設定）";
+  }
   async function addMeetingNote(){
     var titleInput = document.getElementById("meetingNoteTitle");
     var decidedInput = document.getElementById("meetingNoteDecided");
@@ -4556,20 +4585,24 @@
       existing.content = meetingNoteDerivedContent(decided, open);
       existing.date = noteDate;
       if(newFiles.length) existing.files = (existing.files||[]).concat(newFiles);
+      if(newMeetingNoteSpecPart) existing.specPart = newMeetingNoteSpecPart;
       existing.updatedAt = nowIso();
       cancelEditMeetingNote();
       render();
       await saveDoc("meetingNotes", existing.id, existing);
+      if(existing.specPart) upsertNoteSpecEntry(existing);
       logActivity("打合せ内容を編集しました");
       return;
     }
 
     var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open,
-      content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso() };
+      content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
+      specPart: newMeetingNoteSpecPart || null };
     state.meetingNotes.push(n);
     cancelEditMeetingNote();
     render();
     await saveDoc("meetingNotes", n.id, n);
+    if(n.specPart) upsertNoteSpecEntry(n);
     logActivity("打合せ内容を記録しました");
   }
   function editMeetingNote(id){
@@ -4586,6 +4619,8 @@
     if(openInput) openInput.value = n.open || "";
     if(dateInput) dateInput.value = n.date || todayStr();
     if(fileInput) fileInput.value = "";
+    newMeetingNoteSpecPart = n.specPart || null;
+    updateMeetingNoteSpecPartLabel();
     var btn = document.getElementById("btnAddMeetingNote");
     if(btn) btn.textContent = "更新";
     var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
@@ -4606,6 +4641,8 @@
     if(openInput) openInput.value = "";
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
+    newMeetingNoteSpecPart = null;
+    updateMeetingNoteSpecPartLabel();
     var btn = document.getElementById("btnAddMeetingNote");
     if(btn) btn.textContent = "記録する";
     var cancelBtn = document.getElementById("btnCancelEditMeetingNote");
@@ -5804,6 +5841,13 @@
     document.getElementById("meetingNoteInput");
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
+    document.getElementById("btnSetMeetingNoteSpecPart").addEventListener("click", function(){
+      askSpecPart(function(part){
+        if(!part) return;
+        newMeetingNoteSpecPart = part;
+        updateMeetingNoteSpecPartLabel();
+      });
+    });
 
     document.getElementById("btnAddCustomerInfo").addEventListener("click", addCustomerInfo);
     document.getElementById("customerInfoList").addEventListener("click", function(e){
@@ -6055,6 +6099,7 @@
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
+      else if(act==="togglenotemenu"){ e.stopPropagation(); toggleNoteMenu(id); }
       else if(act==="copynote"){ copyMeetingNote(id); }
       else if(act==="linenote"){ lineMeetingNote(id); }
     }
@@ -6063,6 +6108,13 @@
     document.getElementById("vendorTableBody").addEventListener("click", handleTableClick);
     var meetingNoteListEl = document.getElementById("meetingNoteList");
     if(meetingNoteListEl) meetingNoteListEl.addEventListener("click", handleTableClick);
+    // カード内以外をクリックしたら「⋮ 操作」メニューを閉じる
+    document.addEventListener("click", function(e){
+      if(openNoteMenuId==null) return;
+      if(e.target.closest(".noteitem")) return;
+      openNoteMenuId = null;
+      renderMeetingNotes();
+    });
     document.getElementById("attachmentList").addEventListener("click", function(e){
       var openEl = e.target.closest("[data-openatt]");
       if(openEl){ openAttachment(openEl.dataset.openatt); return; }
