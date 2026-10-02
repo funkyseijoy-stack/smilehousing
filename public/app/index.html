@@ -2130,6 +2130,25 @@
     rows.sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     return rows;
   }
+  // カテゴリーの一覧（例：設備仕様のキッチン・お風呂…）を、そのカテゴリーの
+  // 一番新しい写真・プランボードの更新日時が新しい順に並べ替える。
+  // 更新が無いカテゴリーは、元の並び順のまま最後にまとめる。
+  function catsSortedByRecentActivity(scope, cats){
+    var withDate = cats.map(function(cat, idx){
+      var rows = liveSpecPhotos().filter(function(p){
+        return p.projectId===state.currentProjectId && p.scope===scope && p.category===cat;
+      });
+      var latest = rows.reduce(function(max, p){ return (p.createdAt||"") > max ? (p.createdAt||"") : max; }, "");
+      return { cat: cat, idx: idx, latest: latest };
+    });
+    withDate.sort(function(a,b){
+      if(a.latest && b.latest) return a.latest < b.latest ? 1 : (a.latest > b.latest ? -1 : a.idx-b.idx);
+      if(a.latest && !b.latest) return -1;
+      if(!a.latest && b.latest) return 1;
+      return a.idx - b.idx;
+    });
+    return withDate.map(function(x){ return x.cat; });
+  }
   // 「手動で追加」写真をまとめて1つの打ち合わせ記録にする機能用の、選択中の写真ID（一時的なUI状態。保存はしない）。
   var specMergeSelected = {};
   function specPartLabelFor(scope, category, roomId, side){
@@ -2270,11 +2289,25 @@
     var exteriorCatsToShow = EXTERIOR_CATS;
     if(state.noteSpecFilter && state.noteSpecFilter.scope==="exterior" && state.noteSpecFilter.category){
       exteriorCatsToShow = EXTERIOR_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    } else {
+      // 動きがあったカテゴリーが上に来るよう、時系列（最新の更新順）に並べ替える。
+      exteriorCatsToShow = catsSortedByRecentActivity("exterior", exteriorCatsToShow);
     }
     // カテゴリーごとの「メモ（自由記述）」欄は削除（横一列で見やすくするため）。
     // 同じ内容は上の「色・仕様」欄で入力できるため、入力先はそちらに一本化している。
     var catsGridHtml = '<div class="speccatgrid">'+exteriorCatsToShow.map(function(cat){
-      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("exterior",cat,null,null)+
+      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
+        '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
+        buildSpecGallery("exterior",cat,null,null,{kind:"photo"})+
+        '<div class="row" style="justify-content:space-between; align-items:center; margin-block-start:12px; margin-block-end:5px; flex-wrap:wrap; gap:6px;">'+
+        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">プランボード・図面（新しい順）</span>'+
+        '<span class="row" style="gap:6px;">'+
+        '<label class="btn secondary small" for="exteriorPbUploadInput_'+encodeURIComponent(cat)+'" style="cursor:pointer;">＋ 図面を取り込む</label>'+
+        '<input type="file" id="exteriorPbUploadInput_'+encodeURIComponent(cat)+'" accept="image/*,application/pdf" hidden data-exterior-pb-cat="'+escapeHtml(cat)+'">'+
+        '<button class="btn secondary small" data-openexteriorpb="'+escapeHtml(cat)+'">白紙から新規作成</button>'+
+        '</span>'+
+        '</div>'+
+        buildSpecGallery("exterior",cat,null,null,{kind:"planboard", newestFirst:true, noAdd:true})+
         renderSpecTimeline("exterior",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
@@ -2335,7 +2368,16 @@
     var facilityCatsToShow = FACILITY_CATS;
     if(state.noteSpecFilter && state.noteSpecFilter.scope==="facility" && state.noteSpecFilter.category){
       facilityCatsToShow = FACILITY_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    } else {
+      facilityCatsToShow = catsSortedByRecentActivity("facility", facilityCatsToShow);
     }
+    var facilityUnreflectedCount = liveSpecPhotos().filter(function(p){
+      return p.projectId===state.currentProjectId && p.scope==="facility" && !p.reflected;
+    }).length;
+    var reflectAllHtml = '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
+      '<span style="font-size:.72rem; color:var(--muted);">各カテゴリーの写真・プランボードの「反映」ボタンでも個別に送れます。</span>'+
+      '<button type="button" class="btn secondary small" id="btnReflectAllFacility">🌐 未反映の写真をすべておうちノートに反映する'+(facilityUnreflectedCount?'（'+facilityUnreflectedCount+'件）':'')+'</button>'+
+      '</div>';
     var catsGridHtml = '<div class="speccatgrid">'+facilityCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
         '<div style="font-size:.72rem; color:var(--muted); font-weight:700; margin-block-end:5px;">写真</div>'+
@@ -2353,7 +2395,31 @@
         renderSpecTimeline("facility",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
-    wrap.innerHTML = scopeMergeBarHtml("facility") + catsGridHtml;
+    wrap.innerHTML = reflectAllHtml + scopeMergeBarHtml("facility") + catsGridHtml;
+    var reflectAllBtn = document.getElementById("btnReflectAllFacility");
+    if(reflectAllBtn) reflectAllBtn.addEventListener("click", function(){ reflectAllUnreflectedSpecPhotos("facility"); });
+  }
+  // scope内のまだ未反映（reflected=false）の写真・プランボードをまとめて
+  // おうちノートへ反映する（個別の「反映」ボタンを1件ずつ押す手間を省く）。
+  async function reflectAllUnreflectedSpecPhotos(scope){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    var targets = liveSpecPhotos().filter(function(p){
+      return p.projectId===state.currentProjectId && p.scope===scope && !p.reflected;
+    });
+    if(!targets.length){ toast("未反映の写真はありません"); return; }
+    targets.forEach(function(p){
+      p.reflected = true;
+      p.reflectedAt = nowIso();
+      saveDoc("specPhotos", p.id, p);
+    });
+    render();
+    logActivity(specPartGroupLabel(scope)+"の写真"+targets.length+"件をまとめておうちノートに反映しました");
+    toast("✅ "+targets.length+"件をおうちノートに反映中です…");
+    for(var i=0;i<targets.length;i++){
+      await pushSpecPhotoToOkai(proj, targets[i]);
+    }
+    render();
   }
   async function updateFacilityNote(cat, value){
     var proj = projectById(state.currentProjectId);
@@ -2370,6 +2436,8 @@
     var equipmentCatsToShow = EQUIPMENT_CATS;
     if(state.noteSpecFilter && state.noteSpecFilter.scope==="equipment" && state.noteSpecFilter.category){
       equipmentCatsToShow = EQUIPMENT_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    } else {
+      equipmentCatsToShow = catsSortedByRecentActivity("equipment", equipmentCatsToShow);
     }
     var catsGridHtml = '<div class="speccatgrid">'+equipmentCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("equipment",cat,null,null)+
@@ -5755,10 +5823,11 @@
           input.value = "";
           return;
         }
-        var pbInput = e.target.closest("input[type=file][data-facility-pb-cat]");
+        var pbInput = e.target.closest("input[type=file][data-facility-pb-cat], input[type=file][data-exterior-pb-cat]");
         if(pbInput){
           var f = pbInput.files && pbInput.files[0];
-          var category = pbInput.dataset.facilityPbCat;
+          var pbScope = pbInput.dataset.facilityPbCat!=null ? "facility" : "exterior";
+          var category = pbInput.dataset.facilityPbCat!=null ? pbInput.dataset.facilityPbCat : pbInput.dataset.exteriorPbCat;
           pbInput.value = "";
           if(!f) return;
           askChoice("取り込んだ図面をどうしますか？", "「"+category+"」に登録します。", [
@@ -5766,11 +5835,11 @@
             {label:"編集する", value:"edit"}
           ], function(choice){
             if(choice==="asis"){
-              uploadSpecPlanboardRaw("facility", category, f);
+              uploadSpecPlanboardRaw(pbScope, category, f);
             } else if(choice==="edit"){
               document.getElementById("pbModal").hidden = false;
               pb.currentAttachmentId = null;
-              pb.saveTarget = {type:"spec", scope:"facility", category: category};
+              pb.saveTarget = {type:"spec", scope:pbScope, category: category};
               document.getElementById("pbMailTo").value = "";
               document.getElementById("pbMailSubject").value = "";
               document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -5792,6 +5861,8 @@
         if(delroom){ if(confirm2()) deleteRoom(delroom.dataset.delroom); return; }
         var facpb = e.target.closest("[data-openfacilitypb]");
         if(facpb){ openPlanBoard(null, {type:"spec", scope:"facility", category:facpb.dataset.openfacilitypb}); return; }
+        var extpb = e.target.closest("[data-openexteriorpb]");
+        if(extpb){ openPlanBoard(null, {type:"spec", scope:"exterior", category:extpb.dataset.openexteriorpb}); return; }
         var cyclereq = e.target.closest("[data-cyclereq]");
         if(cyclereq){ cyclePbReqStatus(cyclereq.dataset.cyclereq); return; }
         var togglereflect = e.target.closest("[data-togglereflect]");
