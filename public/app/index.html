@@ -1263,6 +1263,16 @@
         showLoginScreen("認証エラー（保存: " + collection + "）。もう一度ログインしてください");
         return false;
       }
+      // ステータスを確認せずtrueを返していたため、サーバー側で保存が失敗しても
+      // 画面上は「保存できた」ように見えてしまっていた（例：写真を追加した直後は
+      // 表示されるが、実際にはサーバーに保存されておらず、再読み込みすると消える）。
+      // 必ずres.okを確認し、失敗時はエラーを表示する。
+      if(!res.ok){
+        var detail = "";
+        try{ var j = await res.json(); detail = j && j.error ? j.error : ""; }catch(e){}
+        toast("保存に失敗しました（" + collection + (detail?"："+detail:"：HTTP "+res.status) + "）");
+        return false;
+      }
       return true;
     }catch(e){ toast("保存に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
@@ -3759,7 +3769,12 @@
           contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso() };
         blobCache[res.id] = compressed;
         state.albumPhotos.push(doc);
-        await saveDoc("albumPhotos", doc.id, doc);
+        var saved = await saveDoc("albumPhotos", doc.id, doc);
+        if(!saved){
+          // サーバー保存に失敗した場合、画面上だけ「追加済み」に見えてしまわないよう
+          // ローカルの一覧からも取り除く（saveDoc側でエラーのtoastは表示済み）。
+          state.albumPhotos = state.albumPhotos.filter(function(x){ return x.id!==doc.id; });
+        }
       }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
     }
     render();
