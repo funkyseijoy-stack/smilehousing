@@ -748,7 +748,7 @@
         </div>
         <div class="card">
           <h3>これまでの記録</h3>
-          <p class="muted" style="margin:0 0 8px; font-size:.76rem;">部位で絞り込むと、打ち合わせ→変更が古い順（時系列）に並びます。</p>
+          <p class="muted" style="margin:0 0 8px; font-size:.76rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認できます。</p>
           <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
           <div class="notelist" id="meetingNoteList"></div>
           <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
@@ -1878,8 +1878,8 @@
       .filter(function(n){ return filter ? specPartsEqual(n.specPart, filter) : true; })
       .slice()
       .sort(function(a,b){
-        // 部位で絞り込み中は「打ち合わせ→変更」の流れが追えるよう古い順、未絞り込みは従来どおり新しい順。
-        return filter ? (a.createdAt||"").localeCompare(b.createdAt||"") : (b.createdAt||"").localeCompare(a.createdAt||"");
+        // 絞り込みの有無に関わらず、常に最新（新しい記録）が上に来るようにする。
+        return (b.createdAt||"").localeCompare(a.createdAt||"");
       });
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(n){
