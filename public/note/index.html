@@ -326,6 +326,16 @@
       }).join("")+'</div>';
     } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
 
+    out += '<div class="sechd"><h3>📐 わが家の平面図</h3>';
+    if(data.plans.length){
+      out += '<button class="more" data-openplans="1">ひらく →</button></div>';
+      out += '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.slice(0,1).map(function(f){
+        return thumbHtml(f, fmtD(f.date));
+      }).join("")+'</div>';
+    } else {
+      out += '</div><div class="empty">平面図が登録されると、ここに表示されます。</div>';
+    }
+
     out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
       '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+
       '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
@@ -513,6 +523,7 @@
     var img = e.target.closest("[data-img]");
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
+    var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; render(); window.scrollTo(0,0); return; }
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
