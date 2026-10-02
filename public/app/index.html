@@ -4980,14 +4980,42 @@
       toast("✅ 「"+(vs.label||"")+"」の仕様にも自動反映しました");
     }
   }
-  function toggleTaskReflect(id){
+  async function toggleTaskReflect(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t) return;
     t.reflected = !t.reflected;
     t.reflectedAt = t.reflected ? nowIso() : null;
     render();
-    saveDoc("tasks", t.id, t);
+    await saveDoc("tasks", t.id, t);
     logActivity("タスク「"+(t.content||"").slice(0,20)+"」を"+(t.reflected?"おうちノートに反映しました":"反映解除しました"));
+
+    // 反映をONにした場合、既存のファイルも一緒に部位に反映する
+    if(t.reflected && t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category && (t.attachments||[]).length){
+      var vs = t.vendorSpec;
+      var atts = t.attachments || [];
+      for(var i=0; i<atts.length; i++){
+        var att = atts[i];
+        var existingSpec = liveSpecPhotos().find(function(sp){
+          return sp.projectId===state.currentProjectId &&
+                 sp.scope===vs.scope &&
+                 sp.category===vs.category &&
+                 (sp.roomId||null)===(vs.roomId||null) &&
+                 (sp.side||null)===(vs.side||null) &&
+                 sp.assetId===att.id;
+        });
+        if(!existingSpec){
+          var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: vs.scope, category: vs.category,
+            roomId: vs.roomId || null, side: vs.side || null, assetId: att.id, url: att.url, kind: "photo",
+            contentType: att.contentType || "application/pdf", fileName: att.name, createdAt: nowIso(),
+            source: { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) }
+          };
+          state.specPhotos.push(doc);
+          await saveDoc("specPhotos", doc.id, doc);
+        }
+      }
+      render();
+      toast("✅ 「"+(vs.label||"")+"」の仕様に自動反映しました");
+    }
   }
   async function deleteTaskAttachment(taskId, attId){
     var t = state.tasks.find(function(x){ return x.id===taskId; });
