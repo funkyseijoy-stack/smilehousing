@@ -1878,7 +1878,11 @@
       .filter(function(n){ return filter ? specPartsEqual(n.specPart, filter) : true; })
       .slice()
       .sort(function(a,b){
-        // 絞り込みの有無に関わらず、常に最新（新しい記録）が上に来るようにする。
+        // 絞り込みの有無に関わらず、常に最新が上に来るようにする。
+        // 表示している「打合せ日」を基準に並べる（登録した順ではなく、打合せ日が新しい順）。
+        var da = a.date || (a.createdAt||"").slice(0,10);
+        var db = b.date || (b.createdAt||"").slice(0,10);
+        if(da !== db) return db.localeCompare(da);
         return (b.createdAt||"").localeCompare(a.createdAt||"");
       });
     empty.hidden = rows.length !== 0;
