@@ -1,9 +1,3 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
-
-# Single-page app redirect for /note/ path
-[[redirects]]
-  from = "/note/*"
-  to = "/note/index.html"
-  status = 200
