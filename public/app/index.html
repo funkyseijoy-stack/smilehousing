@@ -1153,7 +1153,7 @@
   function confirm2(){ return true; } // confirm() is inert in the artifact viewer
 
   // ================= state =================
-  var STATUS_ORDER = ["未着手","対応中","対応済み","お客様へ連絡済み"];
+  var STATUS_ORDER = ["未着手","対応中","対応済み","お客様へ連絡済み","完了"];
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
@@ -1613,6 +1613,16 @@
     });
     wrap.innerHTML = STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
+      // 部位ごとにまとまり、各部位の中では古い→新しい（時系列）に並ぶようにする。
+      // 部位未設定のものは最後にまとめる。
+      rows.sort(function(a,b){
+        var la = (a.vendorSpec && a.vendorSpec.label) || "";
+        var lb = (b.vendorSpec && b.vendorSpec.label) || "";
+        if(!la && lb) return 1;
+        if(la && !lb) return -1;
+        if(la !== lb) return la.localeCompare(lb, "ja");
+        return (a.createdAt||"").localeCompare(b.createdAt||"");
+      });
       var cards = rows.map(function(t){
         var proj = projectById(t.projectId);
         var canForward = STATUS_ORDER.indexOf(status) < STATUS_ORDER.length-1;
@@ -1632,7 +1642,8 @@
             fmtDeadline(t)+
           '</div>'+
           '<div class="kc-actions">'+
-            (t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category ? '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="image/*,application/pdf,video/*" multiple hidden data-kcattach="'+t.id+'">' : '')+
+            '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
+            '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             (canBack?'<button class="btn small secondary" data-taskact="back" data-id="'+t.id+'">←戻す</button>':'')+
             (canForward?'<button class="btn small" data-taskact="forward" data-id="'+t.id+'">次へ→</button>':'')+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
@@ -4742,6 +4753,19 @@
   }
   // 業者タスクに「受領内容」を添付する。タスク自体の添付として保存すると同時に、
   // タスクに紐付いた部位（vendorSpec）の仕様写真としても自動で登録する。
+  // カンバンのタスクカードから直接、部位を設定・変更する（部位ごとの時系列表示に使う）。
+  function setTaskSpecPart(taskId){
+    var t = state.tasks.find(function(x){ return x.id===taskId; });
+    if(!t){ toast("タスクが見つかりません"); return; }
+    askSpecPart(function(part){
+      if(!part) return;
+      t.vendorSpec = part;
+      t.updatedAt = nowIso();
+      render();
+      saveDoc("tasks", t.id, t);
+      logActivity("タスク「"+(t.content||"").slice(0,20)+"」に部位「"+part.label+"」を設定しました");
+    });
+  }
   async function attachVendorTaskFiles(taskId, fileList){
     var files = Array.prototype.slice.call(fileList||[]);
     if(!files.length) return;
@@ -6028,6 +6052,7 @@
       if(act==="forward") moveTask(id,"forward");
       else if(act==="back") moveTask(id,"back");
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
+      else if(act==="setpart") setTaskSpecPart(id);
     });
     document.getElementById("kanbanWrap").addEventListener("change", function(e){
       var input = e.target.closest("input[type=file][data-kcattach]");
