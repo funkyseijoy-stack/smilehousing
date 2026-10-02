@@ -1093,12 +1093,6 @@
     var d = new Date(iso);
     return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
   }
-  // 写真の「追加時刻」は打合せ時刻とは限らないため、仕様写真まわりの表示では時刻を出さず日付のみにする。
-  function fmtDateOnly(iso){
-    if(!iso) return "";
-    var d = new Date(iso);
-    return (d.getMonth()+1)+"/"+d.getDate();
-  }
   function daysSince(dateStr){ if(!dateStr) return null; var a=new Date(dateStr+"T00:00:00"); var b=new Date(todayStr()+"T00:00:00"); return Math.round((b-a)/86400000); }
   function fmtDate(s){ return s || "—"; }
   function fmtSize(bytes){ if(!bytes && bytes!==0) return ""; if(bytes<1024) return bytes+"B"; if(bytes<1024*1024) return Math.round(bytes/1024)+"KB"; return (bytes/1024/1024).toFixed(1)+"MB"; }
@@ -2161,7 +2155,6 @@
           (i===0 ? '<span class="pbentry-latest">最新</span>' : '')+
           '</div>'+
           '<div class="pbentry-meta">'+
-          '<span class="splabel2">'+fmtDateOnly(p.createdAt)+'</span>'+
           '<button class="pill status-'+reqStatus+'" data-cyclereq="'+p.id+'">'+reqStatus+'</button>'+
           '<button class="pill reflect'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
           '<button class="spdel" data-delspec="'+p.id+'">×</button>'+
@@ -2186,7 +2179,6 @@
           '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
       var tileHtml = '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
         thumbInner+
-        '<span class="splabel">'+fmtDateOnly(p.createdAt)+'</span>'+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
       var reflectBtnHtml = '<button class="pill reflect small'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"反映済み":"反映")+'</button>';
       return '<div class="specphoto-wrap">'+tileHtml+reflectBtnHtml+'</div>';
@@ -2568,7 +2560,6 @@
         (isLatest?'<span class="pill tag small">最新</span>':'')+
         (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
         '</div>'+
-        '<div style="font-size:.76rem; font-weight:700; margin-block-start:3px;">'+fmtDateOnly(p.createdAt)+'</div>'+
         (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
       var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
       var delBtnHtml = '<button class="spdel" data-delspec="'+p.id+'" title="この履歴を削除">×</button>';
