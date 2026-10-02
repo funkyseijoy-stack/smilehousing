@@ -169,8 +169,8 @@
   .meetingsub-btn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
   .meetingsubpane{ display:none; }
   .meetingsubpane.active{ display:block; }
-  .speccatgrid{ display:flex; flex-wrap:wrap; gap:10px; }
-  .speccatgrid .speccat{ flex:1 1 260px; max-width:340px; margin-block-end:0; }
+  .speccatgrid{ display:flex; flex-wrap:nowrap; gap:10px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
+  .speccatgrid .speccat{ flex:0 0 260px; width:260px; margin-block-end:0; }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
