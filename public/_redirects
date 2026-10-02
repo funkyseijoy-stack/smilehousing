@@ -1,2 +1,8 @@
+# API リダイレクト
 /api/*  /.netlify/functions/:splat  200
-/note/*  /note/index.html  200
+
+# SPA リダイレクト（/note 配下のすべてのパスを /note/index.html に）
+/note/*  /note/index.html  200!
+
+# キャッチオール（その他のパス）
+/*  /index.html  200
