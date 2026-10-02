@@ -434,10 +434,10 @@
 
       <div class="subtabs">
         <button class="sub-btn active" data-sub="overview">概要</button>
-        <button class="sub-btn" data-sub="sitecheck">現場確認</button>
+        <button class="sub-btn" data-sub="sitecheck">確認事項</button>
         <button class="sub-btn" data-sub="customer">お客様情報</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
-        <button class="sub-btn" data-sub="confirm">確認事項・お客様の検討事項</button>
+        <button class="sub-btn" data-sub="confirm">お客様への確認</button>
         <button class="sub-btn" data-sub="quote">見積</button>
         <button class="sub-btn" data-sub="photos">写真・アルバム</button>
         <button class="sub-btn" data-sub="plan">図面</button>
@@ -454,10 +454,10 @@
         </div>
       </div>
 
-      <!-- 現場確認 subpanel -->
+      <!-- 確認事項 subpanel（現場で確認・決定する固定チェックリスト） -->
       <div class="subpanel" id="sub-sitecheck">
         <div class="card">
-          <h3>現場確認</h3>
+          <h3>確認事項</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.76rem;">現場で確認・決定する項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
           <div id="specSiteCheckWrap"></div>
         </div>
@@ -477,10 +477,10 @@
         </div>
       </div>
 
-      <!-- 確認事項・お客様の検討事項 subpanel -->
+      <!-- お客様への確認（Q&A）・お客様の検討事項 subpanel -->
       <div class="subpanel" id="sub-confirm">
         <div class="card">
-          <h3>確認事項</h3>
+          <h3>お客様への確認</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.76rem;">お客様への確認事項を登録し、回答を記録できます。</p>
           <div id="confirmList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="confirmEmpty" hidden>まだ確認事項がありません。</div>
@@ -644,7 +644,7 @@
 
         <div class="card">
           <h3>家づくりリスト（お客様・スタッフ共有の検討項目）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここには直接追加できません。「打合せ記録」から「確認事項・お客様の検討事項」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここには直接追加できません。「打合せ記録」から「お客様への確認」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
           <div id="okaiConsiderList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiConsiderEmpty" hidden>まだ項目がありません。</div>
         </div>
@@ -1915,7 +1915,7 @@
         '<div class="nbtnrow">'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
-        '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→確認事項へ</button>'+
+        '<button class="btn ghost small" data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→お客様への確認へ</button>'+
         '<button class="btn ghost small" data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
         '</div>'+
         '</div>';
@@ -3414,8 +3414,8 @@
       state.confirmItems.push(doc1);
       render();
       await saveDoc("confirmItems", doc1.id, doc1);
-      logActivity("打合せ記録から確認事項「"+content.slice(0,20)+"」を作成しました");
-      toast("✅ 確認事項に追加しました");
+      logActivity("打合せ記録からお客様への確認「"+content.slice(0,20)+"」を作成しました");
+      toast("✅ お客様への確認に追加しました");
       return;
     }
 
