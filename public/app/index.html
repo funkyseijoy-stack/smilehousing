@@ -1637,17 +1637,21 @@
   // お客様画面の項目IDとの対応（netlify/functions/note-data.mts の noteCatFor と同じ内容）
   function noteCatIdFor(scope, category){
     if(scope==="exterior") return "exterior";
-    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"wash","1階トイレ":"toilet1","2階トイレ":"toilet2"})[category] || null;
-    if(scope==="equipment") return ({"暖房設備":"heating","換気設備":"ventilation","電気配線":"wiring","あかりプラン":"lighting"})[category] || null;
+    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"wash","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
+    if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "interior";
     return null;
   }
-  var NOTE_CAT_NAMES = { plan:"平面図", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", toilet1:"1階トイレ", toilet2:"2階トイレ",
-    heating:"暖房設備", ventilation:"換気設備", wiring:"電気配線", lighting:"あかりプラン", interior:"インテリアメイン" };
+  var NOTE_CAT_NAMES = { exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", toilet:"トイレ",
+    climate:"暖房・換気", electric:"電気・あかり", interior:"インテリアメイン" };
+  // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
+  var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
   function noteDecisionFor(catId){
     if(!catId || !state.currentProjectId) return null;
-    return (state.noteDecisions||[]).find(function(d){ return d.projectId===state.currentProjectId && d.category===catId && !d.deletedAt; }) || null;
+    var found = (state.noteDecisions||[]).filter(function(d){ return d.projectId===state.currentProjectId && (NOTE_LEGACY_CAT[d.category]||d.category)===catId && !d.deletedAt; });
+    found.sort(function(a,b){ return String(a.decidedAt||"").localeCompare(String(b.decidedAt||"")); });
+    return found.length ? found[found.length-1] : null;
   }
   function noteDecisionPill(scope, category){
     var d = noteDecisionFor(noteCatIdFor(scope, category));
@@ -1674,7 +1678,7 @@
       .sort(function(a,b){ return (b.decidedAt||"").localeCompare(a.decidedAt||""); });
     dWrap.innerHTML = ds.length ? '<div style="font-size:.76rem; font-weight:700; margin-block-end:4px;">お客様の決定状況</div>'+ds.map(function(d){
       return '<div class="row" style="gap:6px; font-size:.8rem;"><span class="pill" style="'+(d.status==="決定"?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'">'+escapeHtml(d.status)+'</span>'+
-        escapeHtml(NOTE_CAT_NAMES[d.category]||d.category)+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
+        escapeHtml(NOTE_CAT_NAMES[NOTE_LEGACY_CAT[d.category]||d.category]||d.category)+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
     }).join("") : "";
   }
   async function issueNewNoteLink(){

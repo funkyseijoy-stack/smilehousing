@@ -47,19 +47,32 @@ async function fetchOkaiCustomerExtras(projectId: string): Promise<any> {
 // お客様画面の「設備仕様」一覧。玄関は外部に統合している。
 // match: [scope, category|null]（nullはそのscopeの全カテゴリー）
 const NOTE_CATS = [
-  { id: "plan", name: "平面図", sub: "図面を確認できます", icon: "plan" },
   { id: "exterior", name: "外部", sub: "外壁・屋根・破風・サッシ・玄関", icon: "house" },
   { id: "kitchen", name: "キッチン", sub: "プランボード・設備仕様", icon: "kitchen" },
   { id: "bath", name: "お風呂", sub: "プランボード・設備仕様", icon: "bath" },
   { id: "wash", name: "洗面", sub: "洗面台・ミラー・収納", icon: "wash" },
-  { id: "toilet1", name: "1階トイレ", sub: "商品・リモコン・床", icon: "toilet" },
-  { id: "toilet2", name: "2階トイレ", sub: "商品・リモコン・床", icon: "toilet" },
-  { id: "heating", name: "暖房設備", sub: "暖房機器・設置場所", icon: "heating" },
-  { id: "ventilation", name: "換気設備", sub: "換気方式・給排気口", icon: "fan" },
-  { id: "wiring", name: "電気配線", sub: "照明・スイッチ・コンセント", icon: "plug" },
-  { id: "lighting", name: "あかりプラン", sub: "照明計画", icon: "light" },
-  { id: "interior", name: "インテリアメイン", sub: "床・建具・クロス・配色", icon: "sofa" },
+  { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
+  { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
+  { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
+  { id: "interior", name: "インテリアメイン", sub: "床・建具・クロス・各部屋", icon: "sofa" },
 ];
+
+// 統合前（12項目だった頃）の項目IDで保存済みのお客様の「仮決定／決定」を、新しい項目IDに読み替える
+const LEGACY_CAT_MAP: Record<string, string> = {
+  toilet1: "toilet", toilet2: "toilet", heating: "climate", ventilation: "climate", wiring: "electric", lighting: "electric",
+};
+
+const ROOM_CAT_LABELS: Record<string, string> = { ceiling: "天井", wall: "壁", accent: "アクセント" };
+// 各部位の表示名。部屋別インテリアは「部屋名・天井/壁/アクセント」の形にする
+function partLabel(project: any, scope?: string, category?: string | null, roomId?: string | null): string {
+  if (scope === "room") {
+    const room = (project.rooms || []).find((r: any) => r.id === roomId);
+    const custom = (project.roomCatsCustom || []).find((c: any) => c.id === category);
+    const cl = custom ? custom.name : ROOM_CAT_LABELS[String(category)] || category || "";
+    return (room ? room.name : "部屋") + "・" + cl;
+  }
+  return category || "";
+}
 
 function noteCatFor(scope?: string, category?: string | null): string | null {
   if (!scope) return null;
@@ -68,15 +81,12 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
     if (category === "キッチン") return "kitchen";
     if (category === "お風呂") return "bath";
     if (category === "洗面" || category === "脱衣室") return "wash";
-    if (category === "1階トイレ") return "toilet1";
-    if (category === "2階トイレ") return "toilet2";
+    if (category === "1階トイレ" || category === "2階トイレ") return "toilet";
     return null;
   }
   if (scope === "equipment") {
-    if (category === "暖房設備") return "heating";
-    if (category === "換気設備") return "ventilation";
-    if (category === "電気配線") return "wiring";
-    if (category === "あかりプラン") return "lighting";
+    if (category === "暖房設備" || category === "換気設備") return "climate";
+    if (category === "電気配線" || category === "あかりプラン") return "electric";
     return null;
   }
   if (scope === "interiorColor") {
@@ -180,7 +190,7 @@ export default async (req: Request, context: Context) => {
     push(noteCatFor(p.scope, p.category), {
       type: p.kind === "planboard" ? "planboard" : "photo",
       at: p.createdAt || "",
-      label: p.category || "",
+      label: partLabel(project, p.scope, p.category, p.roomId),
       file: fileOf(p),
       source: p.source || null,
       contentType: p.contentType || "",
@@ -190,6 +200,7 @@ export default async (req: Request, context: Context) => {
     const sp = n.specPart || {};
     push(noteCatFor(sp.scope, sp.category), {
       type: "note",
+      label: partLabel(project, sp.scope, sp.category, sp.roomId),
       at: (n.date ? n.date + "T12:00:00" : "") || n.createdAt || "",
       date: n.date || (n.createdAt || "").slice(0, 10),
       title: n.title || "",
@@ -205,7 +216,9 @@ export default async (req: Request, context: Context) => {
     .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "" }));
 
   const decisionByCat: Record<string, any> = {};
-  for (const d of decisions) decisionByCat[d.category] = d;
+  for (const d of decisions.slice().sort((a, b) => String(a.decidedAt || "").localeCompare(String(b.decidedAt || "")))) {
+    decisionByCat[LEGACY_CAT_MAP[d.category] || d.category] = d; // 新しい日付のものが残る
+  }
 
   const categories = NOTE_CATS.map((c) => {
     const items = (timelineByCat[c.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));

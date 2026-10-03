@@ -59,6 +59,14 @@
   .cat .nm{ font-weight:700; font-size:1rem; color:var(--ink); }
   .cat .sb{ font-size:.74rem; color:var(--muted); margin-top:4px; letter-spacing:.06em; }
   .cat .cnt{ font-size:.7rem; color:var(--brown2); margin-top:3px; }
+  .catgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .catgrid .cat{ flex-direction:column; align-items:flex-start; gap:8px; padding:12px; }
+  .catgrid .cat .ic{ width:44px; height:44px; }
+  .catgrid .cat .ic svg{ width:26px; height:26px; }
+  .catgrid .cat .nm{ font-size:.95rem; }
+  .catgrid .cat .sb{ letter-spacing:.02em; line-height:1.4; }
+  .catgrid .cat .status{ margin-left:0; margin-top:auto; }
+  .ptag{ display:inline-block; font-size:.7rem; color:var(--brown2); background:var(--chip); border-radius:999px; padding:2px 8px; margin-right:6px; }
   .status{ margin-left:auto; flex-shrink:0; font-size:.74rem; border-radius:999px; padding:6px 12px; background:var(--chip); color:var(--muted); font-style:italic; }
   .status.s-仮決定{ background:var(--kari); color:var(--kari-ink); font-style:normal; font-weight:700; }
   .status.s-決定{ background:var(--kettei); color:#fff; font-style:normal; font-weight:700; }
@@ -561,7 +569,7 @@
     if(view.buildSeg==="spec"){
       out += '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;"><h2 class="big">わが家の設備仕様</h2><span class="countpill" style="margin-top:10px;">'+data.categories.length+'項目</span></div>'+
         '<p class="sub">写真・プランボード・打合せの内容を、時系列で確認できます</p>';
-      out += '<div class="catlist">'+data.categories.map(function(c){
+      out += '<div class="catgrid">'+data.categories.map(function(c){
         return '<button class="cat" data-cat="'+esc(c.id)+'"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span>'+
           '<span><div class="nm">'+esc(c.name)+'</div><div class="sb">'+esc(c.sub)+'</div>'+(c.count?'<div class="cnt">'+c.count+'件の記録</div>':'')+'</span>'+
           '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></button>';
@@ -587,6 +595,11 @@
       (n.open?'<div class="box opn"><div class="bl">確認したいこと</div>'+esc(n.open)+'</div>':'')+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
   }
+  // 統合した項目（トイレ・暖房換気・電気あかり）と、各部屋を含むインテリアは、
+  // 「どの部位の写真・記録か」が分かるように部位名（例：LDK・天井）を添える
+  var LABEL_CATS = ["toilet","climate","electric","interior"];
+  function partOf(c, x){ return (x.label && x.label!==c.name && LABEL_CATS.indexOf(c.id)>=0) ? x.label : ""; }
+  function capOf(c, x, base){ var l = partOf(c, x); return l ? (l+"・"+base) : base; }
   function catDetailHtml(catId){
     var c = data.categories.find(function(x){ return x.id===catId; });
     if(!c){ view.cat = null; return buildHtml(); }
@@ -624,7 +637,7 @@
         '<div class="section-header"><span class="section-icon">📐</span><span>プランボード</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         planboards.slice().reverse().map(function(x, i){
-          return thumbHtml(x.file, (i===0?"最新・":"")+fmtD(x.at));
+          return thumbHtml(x.file, capOf(c, x, (i===0?"最新・":"")+fmtD(x.at)));
         }).join("")+
         '</div></div></div>';
     }
@@ -636,7 +649,7 @@
         '<div class="section-content">'+
         notes.slice().reverse().map(function(n){
           var html = '<div class="section-item">'+
-            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+fmtD(n.date)+'</div>';
+            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+fmtD(n.date)+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
           if(n.open) html += '<div class="section-item-desc"><strong>確認：</strong>'+esc(n.open)+'</div>';
@@ -665,7 +678,7 @@
         '<div class="section-header"><span class="section-icon">📷</span><span>写真・資料</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         photos.slice().reverse().map(function(x){
-          return thumbHtml(x.file, fmtD(x.at));
+          return thumbHtml(x.file, capOf(c, x, fmtD(x.at)));
         }).join("")+
         '</div></div></div>';
     }
