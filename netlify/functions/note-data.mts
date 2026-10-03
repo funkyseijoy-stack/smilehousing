@@ -221,8 +221,22 @@ export default async (req: Request, context: Context) => {
   });
 
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  // 住まいるアプリの「予約」タブ（reservationsコレクション）に加えて、おうちノート連携タブの
+  // 「予約状況」カードから手動で追加した予約（nextBookings、旧おうちノート本体に保存）も
+  // 合わせて表示する。重複を避けるため、日付+開始時刻が同じものは1件にまとめる。
+  const okaiBookings = ((okaiCustomer && okaiCustomer.nextBookings) || []).map((b: any) => ({
+    type: b.service || "", date: b.date || "", startTime: b.time || "", endTime: b.endTime || "", staff: "",
+  }));
+  const seenResv = new Set<string>();
   const resv = reservations
     .map((r) => ({ type: r.type, date: r.date, startTime: r.startTime, endTime: r.endTime, staff: r.staff || "" }))
+    .concat(okaiBookings)
+    .filter((r) => {
+      const key = r.date + "|" + r.startTime;
+      if (seenResv.has(key)) return false;
+      seenResv.add(key);
+      return true;
+    })
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
   return json({
