@@ -2821,7 +2821,7 @@
     renderSpecRooms();
   }
   var SPEC_UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // サーバー関数のリクエストサイズ上限に合わせた安全値
-  async function uploadSpecPhotos(scope, category, roomId, side, fileList, source){
+  async function uploadSpecPhotos(scope, category, roomId, side, fileList, source, autoReflect){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var files = Array.prototype.slice.call(fileList||[]);
@@ -2844,6 +2844,9 @@
           roomId: roomId || null, side: side || null, assetId: res.id, url: res.url, kind: "photo",
           contentType: res.contentType || upFile.type || f.type, fileName: f.name, createdAt: nowIso() };
         if(source){ doc.source = source; }
+        // 業者タスクなどから「反映済み」の部位に自動登録する場合は、作成時点で
+        // reflected:true にしておく（そうしないとおうちノート側に出てこない）。
+        if(autoReflect){ doc.reflected = true; doc.reflectedAt = nowIso(); }
         blobCache[res.id] = upFile;
         state.specPhotos.push(doc);
         await saveDoc("specPhotos", doc.id, doc);
@@ -5292,7 +5295,7 @@
     if(t.reflected && t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category){
       var vs = t.vendorSpec;
       var source = { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) };
-      await uploadSpecPhotos(vs.scope, vs.category, vs.roomId||null, vs.side||null, files, source);
+      await uploadSpecPhotos(vs.scope, vs.category, vs.roomId||null, vs.side||null, files, source, true);
       toast("✅ 「"+(vs.label||"")+"」の仕様にも自動反映しました");
     }
   }
@@ -5323,7 +5326,10 @@
           var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: vs.scope, category: vs.category,
             roomId: vs.roomId || null, side: vs.side || null, assetId: att.id, url: att.url, kind: "photo",
             contentType: att.contentType || "application/pdf", fileName: att.name, createdAt: nowIso(),
-            source: { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) }
+            source: { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) },
+            // このタスク自体がすでに「反映」済みなので、ここで登録する仕様写真も
+            // 作成時点で reflected:true にする（そうしないとおうちノート側に出てこない）。
+            reflected: true, reflectedAt: nowIso()
           };
           state.specPhotos.push(doc);
           await saveDoc("specPhotos", doc.id, doc);
