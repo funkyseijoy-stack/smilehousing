@@ -3,8 +3,12 @@ import type { Context, Config } from "@netlify/functions";
 // staff-auth.mts と同じ値にしてください。
 const STAFF_PASSPHRASE = "sumairu2026";
 
-// Gmailの下書き作成 ＋ 受信箱の閲覧（検索・スレッド確認）に必要なスコープ
-const SCOPE = "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly";
+// Gmailの下書き作成 ＋ 受信箱の閲覧（検索・スレッド確認）、
+// および おうちノートの予約機能（Googleカレンダー「お客様予約」の空き確認・予定作成）に必要なスコープ。
+// 2026年10月：予約機能追加のため calendar.readonly（カレンダー一覧・空き状況の取得）と
+// calendar.events（予定の作成）を追加。既存の連携には付与されないため、再度
+// /api/google-oauth-start からの連携やり直しが必要。
+const SCOPE = "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
 
 // 最初の一回だけ、社内の代表Gmailアカウント(smilehousing8@gmail.com)でログインして
 // このアプリにGmail下書き作成の許可を与えるための入口。
