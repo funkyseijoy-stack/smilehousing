@@ -1980,7 +1980,7 @@
       var res = await fetch("/api/gmail-status", { headers: { "X-Staff-Token": getStaffToken()||"" } });
       if(res.status===401){ el.textContent = "確認できませんでした（要ログイン）"; return; }
       var data = await res.json();
-      el.textContent = data.connected ? "✅ 連携済み" : "未連携（下のボタンから連携してください）";
+      el.textContent = !data.connected ? "未連携（下のボタンから連携してください）" : (data.calendar ? "✅ 連携済み（Gmail・カレンダー）" : "⚠️ Gmailは連携済み。お客様予約に使うカレンダーの許可がまだです（下のボタンからもう一度連携してください）");
     }catch(e){ el.textContent = "確認できませんでした"; }
   }
   function connectGmail(){

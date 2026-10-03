@@ -200,6 +200,22 @@
   .rv .dt .m{ font-size:.7rem; color:var(--muted); } .rv .dt .dd{ font-size:1.5rem; font-weight:700; line-height:1.1; } .rv .dt .w{ font-size:.7rem; color:var(--muted); }
   .rv .ty{ font-weight:700; } .rv .tm{ font-size:.8rem; color:var(--ink2); margin-top:3px; }
   .rv.past{ opacity:.6; }
+  .rvstep{ font-size:.95rem; font-weight:700; margin:22px 0 10px; }
+  .rvtypes{ display:flex; flex-direction:column; gap:10px; }
+  .rvtype{ display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:15px 16px; font:inherit; cursor:pointer; color:var(--ink); }
+  .rvtype b{ font-size:1rem; } .rvtype span{ font-size:.78rem; color:var(--muted); }
+  .rvtype.on{ background:#ead9cf; border-color:var(--brown); }
+  .rvdays{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch; }
+  .rvday{ flex:0 0 74px; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:9px 4px; text-align:center; font:inherit; color:var(--ink); cursor:pointer; }
+  .rvday .a{ font-size:.66rem; color:var(--muted); } .rvday .b{ font-size:1.3rem; font-weight:700; line-height:1.25; } .rvday .c{ font-size:.66rem; color:#5c8a6f; }
+  .rvday.off{ opacity:.45; cursor:default; } .rvday.off .c{ color:var(--muted); }
+  .rvday.on{ background:var(--brown); border-color:var(--brown); color:#fff; } .rvday.on .a,.rvday.on .c{ color:#eadfd6; }
+  .rvslots{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .rvslot{ background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:12px 0; font:inherit; font-size:.95rem; color:var(--ink); cursor:pointer; }
+  .rvslot:disabled{ opacity:.4; text-decoration:line-through; cursor:default; }
+  .rvslot.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
+  .rvnote{ font-size:.74rem; color:var(--muted); text-align:center; margin-top:10px; line-height:1.6; }
+  .btn.full{ width:100%; margin-top:18px; } .btn:disabled{ opacity:.45; cursor:default; }
 
   /* bottom nav */
   /* 下部のpaddingを厚めにして、Netlifyの「Powered by Netlify」バッジ（画面下部に重なって
@@ -294,6 +310,7 @@
 
   var data = null;
   var view = { tab:"home", buildSeg:"spec", cat:null };
+  var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false };
   var main = document.getElementById("main");
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
@@ -405,6 +422,7 @@
     else html = view.cat ? catDetailHtml(view.cat) : buildHtml();
     main.innerHTML = '<div class="wrap">'+html+'</div>';
     if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
+    if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
   }
 
   // ---------- ホーム ----------
@@ -437,6 +455,10 @@
       out += '<div class="sechd"><h3>📅 次回のご予約</h3><button class="more" data-go="resv">すべて見る →</button></div>';
       out += '<div class="rv"><div class="dt"><div class="m">'+(ndt.getMonth()+1)+'月</div><div class="dd">'+ndt.getDate()+'</div><div class="w">'+WD[ndt.getDay()]+'曜日</div></div>'+
         '<div><div class="ty">'+esc(nr.type||"お打合せ")+'</div><div class="tm">'+esc(nr.startTime||"")+(nr.endTime?"〜"+esc(nr.endTime):"")+(nr.staff?"　担当："+esc(nr.staff):"")+'</div></div></div>';
+    } else {
+      out += '<div class="sechd"><h3>📅 ご予約予定</h3><button class="more" data-go="resv">予約を見る →</button></div>'+
+        '<div class="rv" style="flex-direction:column; align-items:stretch; gap:10px;"><div><div class="ty">次回予約はありません</div><div class="tm">空いている日時から予約できます</div></div>'+
+        '<button class="btn dk" data-go="resv">予約する</button></div>';
     }
 
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
@@ -555,6 +577,18 @@
   }
 
   // ---------- 予約 ----------
+  async function loadAvail(){
+    rv.loading = true; rv.error = ""; render();
+    try{
+      var res = await fetch("/api/note-calendar?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T), {cache:"no-store"});
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      rv.avail = j; rv.loaded = true;
+      if(!rv.date){ var f = j.days.filter(function(d){ return d.status==="open"; })[0]; if(f) rv.date = f.date; }
+    }catch(e){ rv.error = "unavailable"; rv.loaded = true; }
+    rv.loading = false; render();
+  }
+  function rvDay(date){ return rv.avail ? rv.avail.days.filter(function(d){ return d.date===date; })[0] : null; }
   function resvHtml(){
     var up = data.reservations.filter(function(r){ return r.date >= data.today; });
     var past = data.reservations.filter(function(r){ return r.date < data.today; }).reverse();
@@ -563,11 +597,54 @@
       return '<div class="rv'+(isPast?" past":"")+'"><div class="dt"><div class="m">'+(dt.getMonth()+1)+'月</div><div class="dd">'+dt.getDate()+'</div><div class="w">'+WD[dt.getDay()]+'曜日</div></div>'+
         '<div><div class="ty">'+esc(r.type||"お打合せ")+'</div><div class="tm">'+esc(r.startTime||"")+(r.endTime?"〜"+esc(r.endTime):"")+(r.staff?"　担当："+esc(r.staff):"")+'</div></div></div>';
     }
-    var out = '<h2 class="big">ご予約</h2><p class="sub">お打合せ・ご来場の予定です。ご予約やご変更はメッセージでお知らせください。</p>';
-    out += up.length ? '<div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>' : '<div class="empty">予定されているご予約はありません。</div>';
-    if(past.length) out += '<div class="sechd"><h3>これまでのご予約</h3></div><div class="catlist">'+past.slice(0,10).map(function(r){ return card(r,true); }).join("")+'</div>';
-    out += '<div style="margin-top:16px;"><button class="btn ol" style="width:100%;" data-go="msg">メッセージで予約・変更を相談する</button></div>';
+    var out = '<h2 class="big">打合せ予約</h2><p class="sub">空いている日時を選んで、そのまま予約できます。</p>';
+    if(up.length) out += '<div class="sechd"><h3>ご予約済み</h3></div><div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>';
+
+    out += '<div class="rvstep">1. ご希望の内容</div><div class="rvtypes">';
+    var types = (rv.avail && rv.avail.types) || ["来店","オンライン","銀行","ショールーム"];
+    out += types.map(function(t){ return '<button class="rvtype'+(rv.type===t?" on":"")+'" data-rvtype="'+esc(t)+'"><b>'+esc(t)+'</b><span>2時間</span></button>'; }).join("")+'</div>';
+
+    out += '<div class="rvstep">2. 日付</div>';
+    if(rv.loading || !rv.loaded){
+      out += '<div class="empty">空き状況を確認中です…</div>';
+    } else if(rv.error){
+      out += '<div class="empty">ただいま空き状況を表示できません。お手数ですが、メッセージでご希望の日時をお知らせください。</div>'+
+        '<div style="margin-top:12px;"><button class="btn ol" style="width:100%;" data-go="msg">メッセージで相談する</button></div>';
+      return out;
+    } else {
+      out += '<div class="rvdays">'+rv.avail.days.map(function(d){
+        var dt = new Date(d.date+"T00:00:00");
+        var label = d.status==="open" ? "空きあり" : d.status==="full" ? "満席" : (d.reason||"休み");
+        return '<button class="rvday'+(d.status==="open"?"":" off")+(rv.date===d.date?" on":"")+'" data-rvdate="'+d.date+'"'+(d.status==="open"?"":" disabled")+'>'+
+          '<div class="a">'+(dt.getMonth()+1)+'月・'+d.wd+'</div><div class="b">'+dt.getDate()+'日</div><div class="c">'+label+'</div></button>';
+      }).join("")+'</div>';
+      var day = rvDay(rv.date);
+      out += '<div class="rvstep">3. 空いている開始時間（30分単位）</div>';
+      if(!day || day.status!=="open") out += '<div class="empty">日付を選んでください。</div>';
+      else out += '<div class="rvslots">'+day.slots.map(function(sl){
+        return '<button class="rvslot'+(rv.start===sl.start?" on":"")+'" data-rvstart="'+sl.start+'"'+(sl.available?"":" disabled")+'>'+sl.start+'</button>';
+      }).join("")+'</div>';
+      out += '<button class="btn dk full" id="rvBook"'+((rv.date&&rv.start&&!rv.booking)?"":" disabled")+'>'+(rv.booking?"予約中…":"この内容で予約する")+'</button>';
+      out += '<div class="rvnote">受付時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.close)+'（最終開始 '+toHM15(rv.avail)+'）<br>日曜日・祝日は予約できません。変更・キャンセルはメッセージでお知らせください。</div>';
+    }
+    if(past.length) out += '<div class="sechd" style="margin-top:26px;"><h3>これまでのご予約</h3></div><div class="catlist">'+past.slice(0,10).map(function(r){ return card(r,true); }).join("")+'</div>';
     return out;
+  }
+  function toHM15(av){ var c = av.close.split(":"), m = parseInt(c[0],10)*60+parseInt(c[1],10)-av.durationMinutes; return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+(m%60)).slice(-2); }
+  async function bookNow(){
+    if(!rv.date || !rv.start || rv.booking) return;
+    rv.booking = true; render();
+    try{
+      var res = await fetch("/api/note-calendar", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"book", type:rv.type, date:rv.date, start:rv.start }) });
+      var j = await res.json();
+      if(res.status===409){ toast("その時間は先に埋まりました。別の時間をお選びください"); rv.start=""; rv.loaded=false; rv.booking=false; render(); return; }
+      if(!res.ok) throw new Error(j.error||"error");
+      var r = j.reservation;
+      data.reservations.push({ type:r.type, date:r.date, startTime:r.startTime, endTime:r.endTime, staff:"" });
+      data.reservations.sort(function(a,b){ return (a.date+a.startTime).localeCompare(b.date+b.startTime); });
+      data.nextReservation = data.reservations.filter(function(x){ return x.date >= data.today; })[0] || null;
+      rv.start = ""; rv.loaded = false; rv.booking = false; render(); toast("ご予約を受け付けました");
+    }catch(e){ rv.booking = false; render(); toast("予約できませんでした。もう一度お試しいただくか、メッセージでご連絡ください"); }
   }
 
   // ---------- 家づくり ----------
@@ -781,6 +858,10 @@
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
+    var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; render(); return; }
+    var rd = e.target.closest("[data-rvdate]"); if(rd){ rv.date = rd.dataset.rvdate; rv.start = ""; render(); return; }
+    var rs = e.target.closest("[data-rvstart]"); if(rs){ rv.start = rs.dataset.rvstart; render(); return; }
+    if(e.target.closest("#rvBook")){ bookNow(); return; }
   });
   function closeLb(){ document.getElementById("lb").hidden = true; document.getElementById("lbImg").src = ""; }
   document.getElementById("lbX").addEventListener("click", closeLb);

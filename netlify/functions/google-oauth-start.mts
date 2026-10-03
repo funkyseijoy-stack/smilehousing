@@ -3,8 +3,8 @@ import type { Context, Config } from "@netlify/functions";
 // staff-auth.mts と同じ値にしてください。
 const STAFF_PASSPHRASE = "sumairu2026";
 
-// Gmailの下書き作成 ＋ 受信箱の閲覧（検索・スレッド確認）に必要なスコープ
-const SCOPE = "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly";
+// Gmailの下書き作成・送信（通知メール） ＋ 受信箱の閲覧 ＋ カレンダー予定の読み書き（お客様予約）に必要なスコープ
+const SCOPE = "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events";
 
 // 最初の一回だけ、社内の代表Gmailアカウント(smilehousing8@gmail.com)でログインして
 // このアプリにGmail下書き作成の許可を与えるための入口。

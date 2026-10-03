@@ -1,4 +1,5 @@
 import type { Context, Config } from "@netlify/functions";
+import { sendNotifyMail } from "../lib/google.mts";
 import { getStore } from "@netlify/blobs";
 
 // 新おうちノート（/note/）用のお客様向けAPI。
@@ -170,6 +171,11 @@ export default async (req: Request, context: Context) => {
         fromCustomer: true, createdAt: now, updatedAt: now,
       };
       await store.setJSON(`messages/${id}`, doc);
+      // スタッフへ通知メール（失敗してもメッセージ送信自体は成功扱い）
+      await sendNotifyMail(
+        `【おうちノート】${project.customer || "お客様"}様からメッセージが届きました`,
+        `${project.customer || "お客様"}様（${project.name || ""}）から、おうちノートでメッセージが届きました。\n\n${text}\n\n住まいるアプリの「メッセージ」から返信できます。`
+      );
       return json({ ok: true, message: doc });
     }
     return json({ error: "unknown_action" }, 400);
