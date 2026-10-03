@@ -98,6 +98,13 @@
   .th.pdf{ text-decoration:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--brown); font-size:.78rem; }
   .th.pdf .pi{ font-size:2rem; }
   .th .cap{ position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent,rgba(0,0,0,.55)); color:#fff; font-size:.7rem; padding:14px 8px 6px; text-align:left; }
+  .planrow{ display:flex; align-items:center; gap:12px; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:10px 14px; cursor:pointer; }
+  .planrow .pth{ width:52px; height:52px; flex:none; border-radius:10px; overflow:hidden; background:#eee6de; display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--brown); }
+  .planrow .pth img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .planrow .pt{ flex:1; min-width:0; }
+  .planrow .pt .ty{ font-weight:700; font-size:.88rem; }
+  .planrow .pt .tm{ font-size:.76rem; color:var(--ink2); margin-top:2px; }
+  .planrow .op{ font-size:.76rem; color:var(--muted); flex:none; }
   .decide{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; margin-top:18px; }
   .decide .now{ font-size:.82rem; color:var(--ink2); margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .btns{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -327,6 +334,19 @@
     }
     return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📎</span><span>ファイルを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
   }
+  // thumbHtmlの中身だけ（ボタン/リンクで包まない版）。ホームのコンパクトな平面図カードのように、
+  // サムネイル自体をクリック可能な行の中に置きたい場合に使う。
+  function thumbInner(f){
+    if(!f || !f.url) return "";
+    if(isImg(f)) return '<img loading="lazy" src="'+esc(f.url)+'" alt="">';
+    if(isPdf(f)){
+      var cached = pdfThumbCache[f.url];
+      if(!cached) loadPdfThumb(f.url);
+      if(cached && cached.status==="done") return '<img src="'+cached.dataUrl+'" alt="PDF">';
+      return '<span class="pi">📄</span>';
+    }
+    return '<span class="pi">📎</span>';
+  }
 
   async function load(){
     if(!P || !T){
@@ -386,6 +406,13 @@
     var pg = progress();
     var out = '<div class="greet">'+greet+'、'+esc(name)+'様</div>'+
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
+    // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
+    // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
+    out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
+      '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+
+      '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
+      '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div></div>';
+
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
     if(album.length){
@@ -395,20 +422,17 @@
       }).join("")+'</div>';
     } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
 
-    out += '<div class="sechd"><h3>📐 わが家の平面図</h3>';
+    // 平面図は「暮らしの写真」とは毛色が違う資料なので、アルバムの直後ではなく、
+    // サービス・資料系のまとまりの先頭にコンパクトな1行カードとして置く。
+    out += '<div class="sechd"><h3>📐 わが家の平面図</h3>'+(data.plans.length?'<button class="more" data-openplans="1">ひらく →</button>':'')+'</div>';
     if(data.plans.length){
-      out += '<button class="more" data-openplans="1">ひらく →</button></div>';
-      out += '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.slice(0,1).map(function(f){
-        return thumbHtml(f, fmtD(f.date));
-      }).join("")+'</div>';
+      var pf = data.plans[0];
+      out += '<div class="planrow" data-openplans="1"><div class="pth">'+thumbInner(pf)+'</div>'+
+        '<div class="pt"><div class="ty">最新の平面図</div><div class="tm">'+fmtD(pf.date)+'</div></div>'+
+        '<span class="op">開く ›</span></div>';
     } else {
-      out += '</div><div class="empty">平面図が登録されると、ここに表示されます。</div>';
+      out += '<div class="empty">平面図が登録されると、ここに表示されます。</div>';
     }
-
-    out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
-      '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+
-      '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
-      '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div></div>';
 
     var svcs = data.notices.filter(function(n){ return n.kind==="service"; }).slice();
     if(data.ace3dUrl) svcs.unshift({ title:"A's 3Dで見る", linkUrl:data.ace3dUrl });
