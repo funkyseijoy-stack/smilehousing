@@ -181,7 +181,10 @@
   .rv.past{ opacity:.6; }
 
   /* bottom nav */
-  .nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:520px; background:var(--card); border-top:1px solid var(--line); display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom)); z-index:10; }
+  /* 下部のpaddingを厚めにして、Netlifyの「Powered by Netlify」バッジ（画面下部に重なって
+     表示される）でタブが押せなくならないよう余白を確保している。バッジ自体はNetlifyの
+     プラン（nf_team_dev）に紐づく表示のため、有料プランへのアップグレードまでの応急対応。 */
+  .nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:520px; background:var(--card); border-top:1px solid var(--line); display:flex; padding:8px 4px calc(56px + env(safe-area-inset-bottom)); z-index:10; }
   @media (min-width:560px){ .nav{ max-width:504px; bottom:24px; border-radius:0 0 26px 26px; } }
   .nav button{ flex:1; border:none; background:none; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:.68rem; color:var(--muted); cursor:pointer; padding:4px 0; letter-spacing:.06em; }
   .nav .ni{ width:44px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; }
