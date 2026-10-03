@@ -413,6 +413,15 @@
       '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
       '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div></div>';
 
+    // 次回のご予約。以前はヘッダーの小さな文字だけだったが、情報量が少なく
+    // 寂しい印象だったので、ホームにもカードとして表示する。
+    if(data.nextReservation){
+      var nr = data.nextReservation, ndt = new Date(nr.date+"T00:00:00");
+      out += '<div class="sechd"><h3>📅 次回のご予約</h3><button class="more" data-go="resv">すべて見る →</button></div>';
+      out += '<div class="rv"><div class="dt"><div class="m">'+(ndt.getMonth()+1)+'月</div><div class="dd">'+ndt.getDate()+'</div><div class="w">'+WD[ndt.getDay()]+'曜日</div></div>'+
+        '<div><div class="ty">'+esc(nr.type||"お打合せ")+'</div><div class="tm">'+esc(nr.startTime||"")+(nr.endTime?"〜"+esc(nr.endTime):"")+(nr.staff?"　担当："+esc(nr.staff):"")+'</div></div></div>';
+    }
+
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
     if(album.length){
@@ -421,6 +430,13 @@
         return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt)+'<br>'+(a.kind==="reference"?"参考写真":"アルバムの写真")+'</div></button>';
       }).join("")+'</div>';
     } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
+
+    // 最近のお打合せ記録（2件）。決定事項・確認事項が見える具体的な内容なので、
+    // ホームの情報量を増やすのにちょうどよい。
+    if(data.notes.length){
+      out += '<div class="sechd"><h3>🗒 最近のお打合せ記録</h3><button class="more" data-opennotes="1">すべて見る →</button></div>';
+      out += '<div class="catlist">'+data.notes.slice(0,2).map(function(n){ return '<div class="tli flat">'+noteBody(n,true)+'</div>'; }).join("")+'</div>';
+    }
 
     // 平面図は「暮らしの写真」とは毛色が違う資料なので、アルバムの直後ではなく、
     // サービス・資料系のまとまりの先頭にコンパクトな1行カードとして置く。
@@ -702,6 +718,7 @@
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; render(); window.scrollTo(0,0); return; }
+    var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
