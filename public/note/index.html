@@ -66,6 +66,9 @@
   .catgrid .cat .nm{ font-size:.95rem; }
   .catgrid .cat .sb{ letter-spacing:.02em; line-height:1.4; }
   .catgrid .cat .status{ margin-left:0; margin-top:auto; }
+  .roomhd{ display:flex; align-items:center; gap:10px; margin:24px 0 8px; }
+  .roomhd .rn{ font-weight:700; font-size:1.08rem; color:var(--ink); }
+  .roomnote{ font-size:.8rem; color:var(--ink2); margin:-2px 0 8px; }
   .ptag{ display:inline-block; font-size:.7rem; color:var(--brown2); background:var(--chip); border-radius:999px; padding:2px 8px; margin-right:6px; }
   .status{ margin-left:auto; flex-shrink:0; font-size:.74rem; border-radius:999px; padding:6px 12px; background:var(--chip); color:var(--muted); font-style:italic; }
   .status.s-仮決定{ background:var(--kari); color:var(--kari-ink); font-style:normal; font-weight:700; }
@@ -270,6 +273,7 @@
     fan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="1.5"/><path d="M12 10.5C9 9 8 4 11 3.5s3 4 1 7M13.5 12c1.5-3 6.5-4 7-1s-4 3-7 1M12 13.5c3 1.5 4 6.5 1 7s-3-4-1-7M10.5 12c-1.5 3-6.5 4-7 1s4-3 7-1"/></svg>',
     plug:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>',
     light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>',
+    room:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M4 21h16M14.5 12h.01"/></svg>',
     sofa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 11V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/><path d="M4 11a2 2 0 0 1 2 2v1h12v-1a2 2 0 1 1 2 2v3H4v-3a2 2 0 0 1 0-4zM6 18v2M18 18v2"/></svg>',
     card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M6 15h5"/><path d="m16.5 13 .8 1.6 1.7.2-1.3 1.2.4 1.7-1.6-.9-1.6.9.4-1.7-1.3-1.2 1.7-.2z"/></svg>',
     link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg>'
@@ -597,34 +601,16 @@
   }
   // 統合した項目（トイレ・暖房換気・電気あかり）と、各部屋を含むインテリアは、
   // 「どの部位の写真・記録か」が分かるように部位名（例：LDK・天井）を添える
-  var LABEL_CATS = ["toilet","climate","electric","interior"];
-  function partOf(c, x){ return (x.label && x.label!==c.name && LABEL_CATS.indexOf(c.id)>=0) ? x.label : ""; }
+  var LABEL_CATS = ["toilet","climate","electric","interior","rooms"];
+  function partOf(c, x){
+    if(!x.label || x.label===c.name || LABEL_CATS.indexOf(c.id)<0) return "";
+    if(c.id==="rooms"){ var i = x.label.indexOf("・"); return i>=0 ? x.label.slice(i+1) : ""; } // 部屋名は見出しに出すので部位名だけ
+    return x.label;
+  }
   function capOf(c, x, base){ var l = partOf(c, x); return l ? (l+"・"+base) : base; }
-  function catDetailHtml(catId){
-    var c = data.categories.find(function(x){ return x.id===catId; });
-    if(!c){ view.cat = null; return buildHtml(); }
-    var out = '<button class="back" data-back="1">← 設備仕様の一覧へ</button>'+
-      '<div class="dhd"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span><div><h2 class="big" style="margin:0;">'+esc(c.name)+'</h2><div class="sub" style="margin:2px 0 0;">'+esc(c.sub)+'</div></div>'+
-      '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></div>';
-
-    if(c.id==="plan"){
-      out += '<div class="sechd"><h3>平面図</h3></div>';
-      out += data.plans.length ? '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.map(function(f){ return thumbHtml(f, fmtD(f.date)); }).join("")+'</div>'
-        : '<div class="empty">図面が登録されると、ここに表示されます。</div>';
-      return out;
-    }
-
-    if(c.id==="exterior"){
-      var vals = data.project.exteriorSpecValues || {};
-      var rows = EXT_LABELS.filter(function(l){ return vals[l[0]]; });
-      if(rows.length){
-        out += '<div class="sechd"><h3>色・仕様</h3></div><div class="speclist">'+rows.map(function(l, i){
-          return '<div class="spec"><div class="num">'+(i<9?"0":"")+(i+1)+'</div><div><div class="k">'+esc(l[1])+'</div><div class="v">'+esc(vals[l[0]])+'</div></div></div>';
-        }).join("")+'</div>';
-      }
-    }
-
-    var items = c.items || [];
+  // 写真・プランボード・打合せ記録などを種類別のまとまりで表示する（各部屋では部屋ごとに呼ぶ）
+  function itemsSectionsHtml(c, items){
+    var out = "";
     // Organize items into sections
     var planboards = items.filter(function(x){ return x.type==="planboard"; });
     var notes = items.filter(function(x){ return x.type==="note"; });
@@ -698,25 +684,78 @@
       out += '<div class="empty">打合せが進むと、写真やプランボード・記録がここに時系列で並びます。</div>';
     }
 
-    out += '<div class="decide"><div class="now">いまの状態：<span class="status s-'+esc(c.status)+'" style="margin-left:0;">'+esc(c.status)+'</span>'+
-      (c.decidedAt?'<span style="font-size:.74rem; color:var(--muted);">（'+fmtD(c.decidedAt)+' 更新）</span>':'')+'</div>'+
-      '<div class="btns"><button class="btn ol" data-decide="仮決定"'+(c.status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
-      '<button class="btn dk" data-decide="決定"'+(c.status==="決定"?" disabled":"")+'>決定する</button></div>'+
-      ((c.status==="仮決定"||c.status==="決定")?'<button class="linkbtn" data-decide="検討中">検討中に戻す</button>':'')+
-      '</div>';
     return out;
   }
-  async function decide(status){
+  // 「仮決定／決定」のボックス。各部屋では部屋ごと（roomId あり）に表示する
+  function decideBoxHtml(name, status, decidedAt, roomId){
+    var ra = roomId ? ' data-room="'+esc(roomId)+'"' : "";
+    return '<div class="decide"><div class="now">'+(roomId?esc(name)+'の':'')+'いまの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'+
+      (decidedAt?'<span style="font-size:.74rem; color:var(--muted);">（'+fmtD(decidedAt)+' 更新）</span>':'')+'</div>'+
+      '<div class="btns"><button class="btn ol" data-decide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
+      '<button class="btn dk" data-decide="決定"'+ra+(status==="決定"?" disabled":"")+'>決定する</button></div>'+
+      ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-decide="検討中"'+ra+'>検討中に戻す</button>':'')+
+      '</div>';
+  }
+  function catDetailHtml(catId){
+    var c = data.categories.find(function(x){ return x.id===catId; });
+    if(!c){ view.cat = null; return buildHtml(); }
+    var out = '<button class="back" data-back="1">← 設備仕様の一覧へ</button>'+
+      '<div class="dhd"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span><div><h2 class="big" style="margin:0;">'+esc(c.name)+'</h2><div class="sub" style="margin:2px 0 0;">'+esc(c.sub)+'</div></div>'+
+      '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></div>';
+
+    if(c.id==="plan"){
+      out += '<div class="sechd"><h3>平面図</h3></div>';
+      out += data.plans.length ? '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.map(function(f){ return thumbHtml(f, fmtD(f.date)); }).join("")+'</div>'
+        : '<div class="empty">図面が登録されると、ここに表示されます。</div>';
+      return out;
+    }
+
+    if(c.id==="exterior"){
+      var vals = data.project.exteriorSpecValues || {};
+      var rows = EXT_LABELS.filter(function(l){ return vals[l[0]]; });
+      if(rows.length){
+        out += '<div class="sechd"><h3>色・仕様</h3></div><div class="speclist">'+rows.map(function(l, i){
+          return '<div class="spec"><div class="num">'+(i<9?"0":"")+(i+1)+'</div><div><div class="k">'+esc(l[1])+'</div><div class="v">'+esc(vals[l[0]])+'</div></div></div>';
+        }).join("")+'</div>';
+      }
+    }
+
+    if(c.id==="rooms"){
+      var rms = c.rooms || [];
+      if(!rms.length) return out + '<div class="empty">お打合せが進むと、部屋ごとの内容がここに並びます。</div>';
+      return out + rms.map(function(r){
+        return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
+          (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
+          itemsSectionsHtml(c, r.items || [])+
+          decideBoxHtml(r.name, r.status, r.decidedAt, r.id);
+      }).join("");
+    }
+
+    out += itemsSectionsHtml(c, c.items || []);
+
+    out += decideBoxHtml(c.name, c.status, c.decidedAt, "");
+    return out;
+  }
+  async function decide(status, roomId){
     var c = data.categories.find(function(x){ return x.id===view.cat; });
     if(!c) return;
-    var msg = status==="決定" ? "「"+c.name+"」をこの内容で決定します。よろしいですか？" :
-      (status==="仮決定" ? "「"+c.name+"」を仮決定にします。よろしいですか？" : "「"+c.name+"」を検討中に戻します。よろしいですか？");
+    var room = roomId ? (c.rooms||[]).find(function(r){ return r.id===roomId; }) : null;
+    if(roomId && !room) return;
+    var nm = room ? c.name+"（"+room.name+"）" : c.name;
+    var msg = status==="決定" ? "「"+nm+"」をこの内容で決定します。よろしいですか？" :
+      (status==="仮決定" ? "「"+nm+"」を仮決定にします。よろしいですか？" : "「"+nm+"」を検討中に戻します。よろしいですか？");
     if(!window.confirm(msg)) return;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:c.id, status:status }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:c.id, status:status, roomId:roomId||undefined }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
-      c.status = status; c.decidedAt = j.decision.decidedAt;
+      if(room){
+        room.status = status; room.decidedAt = j.decision.decidedAt;
+        // 各部屋カード全体の状態と表示（○/○部屋 決定）も更新する
+        var rs = c.rooms, n = rs.filter(function(r){ return r.status==="決定"; }).length;
+        c.status = n===rs.length ? "決定" : (n===0 && rs.some(function(r){ return r.status==="仮決定"; }) ? "仮決定" : "検討中");
+        c.sub = n+"/"+rs.length+"部屋 決定";
+      } else { c.status = status; c.decidedAt = j.decision.decidedAt; }
       render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
@@ -737,7 +776,7 @@
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
-    var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide); return; }
+    var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
   });
   function closeLb(){ document.getElementById("lb").hidden = true; document.getElementById("lbImg").src = ""; }

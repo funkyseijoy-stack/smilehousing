@@ -1640,21 +1640,32 @@
     if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"wash","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
-    if(scope==="room") return "interior";
+    if(scope==="room") return "rooms";
     return null;
   }
   var NOTE_CAT_NAMES = { exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", toilet:"トイレ",
-    climate:"暖房・換気", electric:"電気・あかり", interior:"インテリアメイン" };
+    climate:"暖房・換気", electric:"電気・あかり", interior:"インテリアメイン", rooms:"各部屋" };
   // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
   var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
-  function noteDecisionFor(catId){
+  function noteDecisionFor(catId, roomId){
     if(!catId || !state.currentProjectId) return null;
-    var found = (state.noteDecisions||[]).filter(function(d){ return d.projectId===state.currentProjectId && (NOTE_LEGACY_CAT[d.category]||d.category)===catId && !d.deletedAt; });
+    if(catId==="rooms" && !roomId) return null; // 各部屋は部屋ごとに決定する
+    var found = (state.noteDecisions||[]).filter(function(d){ return d.projectId===state.currentProjectId && (NOTE_LEGACY_CAT[d.category]||d.category)===catId && (catId!=="rooms" || d.roomId===roomId) && !d.deletedAt; });
     found.sort(function(a,b){ return String(a.decidedAt||"").localeCompare(String(b.decidedAt||"")); });
     return found.length ? found[found.length-1] : null;
   }
-  function noteDecisionPill(scope, category){
-    var d = noteDecisionFor(noteCatIdFor(scope, category));
+  // 決定状況の表示名。各部屋は「各部屋・LDK」のように部屋名を添える
+  function noteDecisionName(proj, d){
+    var key = NOTE_LEGACY_CAT[d.category]||d.category;
+    var nm = NOTE_CAT_NAMES[key]||d.category;
+    if(key==="rooms"){
+      var room = ((proj && proj.rooms)||[]).find(function(r){ return r.id===d.roomId; });
+      return nm+"・"+(room?room.name:"部屋");
+    }
+    return nm;
+  }
+  function noteDecisionPill(scope, category, roomId){
+    var d = noteDecisionFor(noteCatIdFor(scope, category), roomId);
     if(!d || d.status==="検討中") return "";
     var on = d.status==="決定";
     return ' <span class="pill" style="font-size:.66rem; '+(on?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'" title="お客様がおうちノートで選択（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）">お客様：'+escapeHtml(d.status)+'</span>';
@@ -1678,7 +1689,7 @@
       .sort(function(a,b){ return (b.decidedAt||"").localeCompare(a.decidedAt||""); });
     dWrap.innerHTML = ds.length ? '<div style="font-size:.76rem; font-weight:700; margin-block-end:4px;">お客様の決定状況</div>'+ds.map(function(d){
       return '<div class="row" style="gap:6px; font-size:.8rem;"><span class="pill" style="'+(d.status==="決定"?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'">'+escapeHtml(d.status)+'</span>'+
-        escapeHtml(NOTE_CAT_NAMES[NOTE_LEGACY_CAT[d.category]||d.category]||d.category)+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
+        escapeHtml(noteDecisionName(proj, d))+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
     }).join("") : "";
   }
   async function issueNewNoteLink(){
@@ -2804,7 +2815,7 @@
       var roomCatsToShow = (roomFilter && roomFilter.category) ? roomCats.filter(function(rc){ return rc.id===roomFilter.category; }) : roomCats;
       return '<div class="roomcard">'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px;">'+
-        '<span class="rname">'+escapeHtml(r.name)+'</span>'+
+        '<span class="rname">'+escapeHtml(r.name)+noteDecisionPill("room",null,r.id)+'</span>'+
         '<button class="btn danger-ghost small" data-delroom="'+r.id+'">部屋を削除</button>'+
         '</div>'+
         '<div class="speccatgrid">'+roomCatsToShow.map(function(rc){

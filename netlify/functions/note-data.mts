@@ -54,7 +54,9 @@ const NOTE_CATS = [
   { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
   { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
   { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
-  { id: "interior", name: "インテリアメイン", sub: "床・建具・クロス・各部屋", icon: "sofa" },
+  { id: "interior", name: "インテリアメイン", sub: "床・建具・クロス・配色", icon: "sofa" },
+  // 部屋別インテリア。部屋ごとに分けて表示し、「仮決定／決定」も部屋単位で受け付ける
+  { id: "rooms", name: "各部屋", sub: "天井・壁・アクセント", icon: "room" },
 ];
 
 // 統合前（12項目だった頃）の項目IDで保存済みのお客様の「仮決定／決定」を、新しい項目IDに読み替える
@@ -94,7 +96,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
     if (category === "玄関枠") return "exterior";
     return "interior";
   }
-  if (scope === "room") return "interior";
+  if (scope === "room") return "rooms";
   return null;
 }
 
@@ -144,9 +146,17 @@ export default async (req: Request, context: Context) => {
       const status = String(body.status || "");
       if (!NOTE_CATS.some((c) => c.id === cat)) return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
-      const id = `${projectId}__${cat}`;
       const now = new Date().toISOString();
-      const doc = { id, projectId, category: cat, status, by: "お客様", decidedAt: now, updatedAt: now };
+      let id = `${projectId}__${cat}`;
+      let roomId: string | null = null;
+      if (cat === "rooms") {
+        // 各部屋は部屋ごとに決定する（部屋IDがこの案件の部屋であることを確認する）
+        roomId = String(body.roomId || "");
+        if (!(project.rooms || []).some((r: any) => r.id === roomId)) return json({ error: "unknown_room" }, 400);
+        id = `${projectId}__rooms__${roomId}`;
+      }
+      const doc: any = { id, projectId, category: cat, status, by: "お客様", decidedAt: now, updatedAt: now };
+      if (roomId) doc.roomId = roomId;
       await store.setJSON(`noteDecisions/${id}`, doc);
       return json({ ok: true, decision: doc });
     }
@@ -191,6 +201,7 @@ export default async (req: Request, context: Context) => {
       type: p.kind === "planboard" ? "planboard" : "photo",
       at: p.createdAt || "",
       label: partLabel(project, p.scope, p.category, p.roomId),
+      roomId: p.roomId || null,
       file: fileOf(p),
       source: p.source || null,
       contentType: p.contentType || "",
@@ -201,6 +212,7 @@ export default async (req: Request, context: Context) => {
     push(noteCatFor(sp.scope, sp.category), {
       type: "note",
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
+      roomId: sp.roomId || null,
       at: (n.date ? n.date + "T12:00:00" : "") || n.createdAt || "",
       date: n.date || (n.createdAt || "").slice(0, 10),
       title: n.title || "",
@@ -220,7 +232,42 @@ export default async (req: Request, context: Context) => {
     decisionByCat[LEGACY_CAT_MAP[d.category] || d.category] = d; // 新しい日付のものが残る
   }
 
+  // 各部屋：部屋ごとに写真・記録と決定状況をまとめる（内容のある部屋だけをお客様に見せる）
+  const roomDecisionById: Record<string, any> = {};
+  for (const d of decisions) if (d.category === "rooms" && d.roomId) roomDecisionById[d.roomId] = d;
+  const roomItemsById: Record<string, any[]> = {};
+  for (const it of timelineByCat["rooms"] || []) {
+    if (!it.roomId) continue;
+    (roomItemsById[it.roomId] = roomItemsById[it.roomId] || []).push(it);
+  }
+  const buildRoomsCategory = (c: any) => {
+    const rooms = (project.rooms || [])
+      .map((r: any) => {
+        const items = (roomItemsById[r.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+        const d = roomDecisionById[r.id];
+        return {
+          id: r.id, name: r.name || "部屋", accentNote: r.accentNote || "",
+          items, count: items.length,
+          status: d ? d.status : items.length ? "検討中" : "準備中",
+          decidedAt: d ? d.decidedAt : null,
+        };
+      })
+      .filter((r: any) => r.status !== "準備中");
+    const decidedN = rooms.filter((r: any) => r.status === "決定").length;
+    const status = !rooms.length ? "準備中"
+      : decidedN === rooms.length ? "決定"
+      : decidedN === 0 && rooms.some((r: any) => r.status === "仮決定") ? "仮決定"
+      : "検討中";
+    return {
+      ...c,
+      sub: rooms.length ? `${decidedN}/${rooms.length}部屋 決定` : c.sub,
+      status, decidedAt: null, items: [], rooms,
+      count: rooms.reduce((n: number, r: any) => n + r.count, 0),
+    };
+  };
+
   const categories = NOTE_CATS.map((c) => {
+    if (c.id === "rooms") return buildRoomsCategory(c);
     const items = (timelineByCat[c.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
     const hasContent = c.id === "plan" ? plans.length > 0 : items.length > 0;
     const d = decisionByCat[c.id];
