@@ -797,7 +797,7 @@
           <button class="meetingsub-btn" data-meetingsub="facility">設備仕様</button>
           <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
           <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア基本色</button>
-          <button class="meetingsub-btn" data-meetingsub="room">部屋別クロス</button>
+          <button class="meetingsub-btn" data-meetingsub="room">部屋別インテリア</button>
           <button class="meetingsub-btn" data-meetingsub="planboard">プランボード</button>
         </div>
 
@@ -861,7 +861,7 @@
         </div>
         <div class="meetingsubpane" id="meetingsubpane-room">
           <div class="card">
-            <h3>部屋別クロス</h3>
+            <h3>部屋別インテリア</h3>
             <p class="muted" style="margin:0 0 10px; font-size:.76rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
             <div class="row" style="margin-block-end:10px; gap:6px;">
               <input type="text" id="roomCatInput" placeholder="例：造作収納">
@@ -1266,7 +1266,7 @@
     {label:"暖房・換気・電気設備", value:"equipment"},
     {label:"現場確認", value:"siteCheck"},
     {label:"インテリア基本色", value:"interiorColor"},
-    {label:"部屋別クロス", value:"room"}
+    {label:"部屋別インテリア", value:"room"}
   ];
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
@@ -2358,7 +2358,7 @@
     await saveDoc("messages", m.id, m);
   }
 
-  // ================= 仕様管理（外部・設備・インテリア・部屋別クロス） =================
+  // ================= 仕様管理（外部・設備・インテリア・部屋別インテリア） =================
   function specPhotosFor(scope, category, roomId, side, kind){
     var rows = liveSpecPhotos().filter(function(p){
       return p.projectId===state.currentProjectId && p.scope===scope && p.category===category &&
@@ -2756,7 +2756,7 @@
     input.value = "";
     render();
     await saveDoc("projects", proj.id, proj);
-    logActivity("部屋別クロスの項目「"+name+"」を追加しました");
+    logActivity("部屋別インテリアの項目「"+name+"」を追加しました");
   }
   async function deleteRoomCategory(catId){
     var proj = projectById(state.currentProjectId);
@@ -2765,7 +2765,7 @@
     proj.roomCatsCustom = (proj.roomCatsCustom||[]).filter(function(c){ return c.id!==catId; });
     render();
     await saveDoc("projects", proj.id, proj);
-    logActivity("部屋別クロスの項目を削除しました");
+    logActivity("部屋別インテリアの項目を削除しました");
   }
   function renderSpecInterior(){
     var wrap = document.getElementById("specInteriorWrap");
@@ -6553,8 +6553,10 @@
       });
     });
     document.getElementById("btnAddRoom").addEventListener("click", addRoom);
+    document.getElementById("newRoomName").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addRoom(); } });
     document.getElementById("btnAddInteriorColorCat").addEventListener("click", addInteriorColorCategory);
     document.getElementById("btnAddRoomCat").addEventListener("click", addRoomCategory);
+    document.getElementById("roomCatInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addRoomCategory(); } });
 
     document.getElementById("cfType").addEventListener("change", function(e){
       document.getElementById("cfOptionsWrap").hidden = e.target.value !== "選択式";
