@@ -35,7 +35,9 @@
   .band .st{ font-weight:700; margin-top:2px; }
   .band .next{ margin-left:auto; border:1px solid rgba(255,255,255,.5); border-radius:999px; padding:6px 12px; font-size:.74rem; white-space:nowrap; }
 
-  .wrap{ padding:18px 16px 8px; }
+  /* 下部のナビ（さらにその下にNetlifyの「Powered by Netlify」表示が重なる）で
+     最後のコンテンツが隠れないよう、下の余白を広めに確保する。 */
+  .wrap{ padding:18px 16px calc(168px + env(safe-area-inset-bottom)); }
   h2.big{ font-size:1.45rem; margin:6px 0 6px; letter-spacing:.02em; }
   .sub{ color:var(--muted); font-size:.82rem; letter-spacing:.04em; margin:0 0 16px; }
   .sechd{ display:flex; align-items:center; justify-content:space-between; margin:26px 0 10px; }
