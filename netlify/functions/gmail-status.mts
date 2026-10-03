@@ -27,7 +27,7 @@ export default async (req: Request, context: Context) => {
   const data = await store.get("gmail", { type: "json" });
   const connected = !!(data && (data as any).refresh_token);
 
-  return new Response(JSON.stringify({ connected, connectedAt: connected ? (data as any).connectedAt : null }), {
+  return new Response(JSON.stringify({ connected, connectedAt: connected ? (data as any).connectedAt : null, calendar: connected && String((data as any).scope || "").includes("calendar") }), {
     status: 200,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });

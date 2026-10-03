@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#5d5049">
+<meta name="theme-color" content="#3a302b">
 <title>おうちノート</title>
-<link rel="icon" href="/app/icons/favicon-32.png">
-<link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
+<link rel="icon" href="/note/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/note/icons/apple-touch-icon.png">
 <style>
   :root{
     --page:#efe9e2; --bg:#f7f3ee; --card:#fffdfa; --line:#e9e2da; --line2:#ded5cb;
@@ -24,12 +24,13 @@
   @media (min-width:560px){ .app{ margin:16px auto; min-height:calc(100vh - 32px); border-radius:34px; border:8px solid #2b2522; overflow:hidden; } }
 
   /* header */
-  .hd{ display:flex; align-items:center; gap:12px; padding:18px 18px 14px; background:var(--card); }
-  .hd .logo{ width:52px; height:52px; border-radius:14px; background:#8a6e5c; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .hd .logo svg{ width:30px; height:30px; }
-  .hd .co{ font-size:.72rem; color:var(--muted); letter-spacing:.12em; }
-  .hd .ttl{ font-size:1.45rem; letter-spacing:.32em; font-weight:500; margin-top:2px; }
-  .hd .mail{ margin-left:auto; width:46px; height:46px; border-radius:50%; background:var(--chip); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .hd{ display:flex; align-items:center; gap:14px; padding:20px 18px 18px; background:#3a302b; }
+  .hd .logo{ width:48px; height:48px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .hd .logo svg{ width:48px; height:48px; }
+  .hd .en{ font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",Georgia,serif; font-size:1.6rem; letter-spacing:.34em; font-weight:400; color:#f1e6d6; line-height:1; white-space:nowrap; }
+  .hd .rule{ height:1px; width:150px; max-width:100%; background:rgba(216,191,157,.55); margin:9px 0 9px; }
+  .hd .ttl{ font-size:.74rem; letter-spacing:.5em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; }
+  .hd .mail{ margin-left:auto; width:46px; height:46px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
   .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
   .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
   .band .st{ font-weight:700; margin-top:2px; }
@@ -59,6 +60,17 @@
   .cat .nm{ font-weight:700; font-size:1rem; color:var(--ink); }
   .cat .sb{ font-size:.74rem; color:var(--muted); margin-top:4px; letter-spacing:.06em; }
   .cat .cnt{ font-size:.7rem; color:var(--brown2); margin-top:3px; }
+  .catgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .catgrid .cat{ flex-direction:column; align-items:flex-start; gap:8px; padding:12px; }
+  .catgrid .cat .ic{ width:44px; height:44px; }
+  .catgrid .cat .ic svg{ width:26px; height:26px; }
+  .catgrid .cat .nm{ font-size:.95rem; }
+  .catgrid .cat .sb{ letter-spacing:.02em; line-height:1.4; }
+  .catgrid .cat .status{ margin-left:0; margin-top:auto; }
+  .roomhd{ display:flex; align-items:center; gap:10px; margin:24px 0 8px; }
+  .roomhd .rn{ font-weight:700; font-size:1.08rem; color:var(--ink); }
+  .roomnote{ font-size:.8rem; color:var(--ink2); margin:-2px 0 8px; }
+  .ptag{ display:inline-block; font-size:.7rem; color:var(--brown2); background:var(--chip); border-radius:999px; padding:2px 8px; margin-right:6px; }
   .status{ margin-left:auto; flex-shrink:0; font-size:.74rem; border-radius:999px; padding:6px 12px; background:var(--chip); color:var(--muted); font-style:italic; }
   .status.s-仮決定{ background:var(--kari); color:var(--kari-ink); font-style:normal; font-weight:700; }
   .status.s-決定{ background:var(--kettei); color:#fff; font-style:normal; font-weight:700; }
@@ -188,32 +200,22 @@
   .rv .dt .m{ font-size:.7rem; color:var(--muted); } .rv .dt .dd{ font-size:1.5rem; font-weight:700; line-height:1.1; } .rv .dt .w{ font-size:.7rem; color:var(--muted); }
   .rv .ty{ font-weight:700; } .rv .tm{ font-size:.8rem; color:var(--ink2); margin-top:3px; }
   .rv.past{ opacity:.6; }
-
-  /* 予約（自己予約フロー） */
-  .bksteps{ display:flex; align-items:center; gap:6px; font-size:.72rem; color:var(--muted); margin:2px 0 14px; letter-spacing:.04em; }
-  .bkcal{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; }
-  .bkcal-hd{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-  .bkcal-hd button{ border:none; background:var(--chip); width:34px; height:34px; border-radius:50%; font-size:1rem; cursor:pointer; color:var(--ink2); }
-  .bkcal-hd button:disabled{ opacity:.3; cursor:default; }
-  .bkcal-hd .ttl{ font-weight:700; font-size:1rem; }
-  .bkcal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
-  .bkcal-wd{ text-align:center; font-size:.68rem; color:var(--muted); padding-bottom:4px; }
-  .bkcal-day{ aspect-ratio:1/1; border-radius:10px; border:none; background:var(--chip); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:.78rem; cursor:pointer; color:var(--ink); padding:0; }
-  .bkcal-day .n{ font-weight:700; }
-  .bkcal-day .s{ font-size:.56rem; letter-spacing:0; }
-  .bkcal-day.avail{ background:var(--green); color:var(--green-ink); }
-  .bkcal-day.full{ background:#f3e7df; color:#b08a6a; cursor:default; }
-  .bkcal-day.closed{ background:transparent; color:var(--muted); cursor:default; }
-  .bkcal-day.pad{ visibility:hidden; cursor:default; }
-  .bkcal-day.past{ opacity:.3; cursor:default; }
-  .bkcal-day.picked{ background:var(--brown); color:#fff; }
-  .bkslots{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-  .bkslot{ border:1.5px solid var(--line2); background:var(--card); border-radius:12px; padding:12px 4px; font-weight:700; font-size:.9rem; cursor:pointer; color:var(--ink); }
-  .bkslot.picked{ background:var(--brown); border-color:var(--brown); color:#fff; }
-  .bkconfirm{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:4px 14px; }
-  .bkconfirm .row{ display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--line); font-size:.9rem; gap:10px; }
-  .bkconfirm .row:last-child{ border-bottom:none; }
-  .bkconfirm .lbl{ color:var(--muted); flex-shrink:0; }
+  .rvstep{ font-size:.95rem; font-weight:700; margin:22px 0 10px; }
+  .rvtypes{ display:flex; flex-direction:column; gap:10px; }
+  .rvtype{ display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:15px 16px; font:inherit; cursor:pointer; color:var(--ink); }
+  .rvtype b{ font-size:1rem; } .rvtype span{ font-size:.78rem; color:var(--muted); }
+  .rvtype.on{ background:#ead9cf; border-color:var(--brown); }
+  .rvdays{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch; }
+  .rvday{ flex:0 0 74px; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:9px 4px; text-align:center; font:inherit; color:var(--ink); cursor:pointer; }
+  .rvday .a{ font-size:.66rem; color:var(--muted); } .rvday .b{ font-size:1.3rem; font-weight:700; line-height:1.25; } .rvday .c{ font-size:.66rem; color:#5c8a6f; }
+  .rvday.off{ opacity:.45; cursor:default; } .rvday.off .c{ color:var(--muted); }
+  .rvday.on{ background:var(--brown); border-color:var(--brown); color:#fff; } .rvday.on .a,.rvday.on .c{ color:#eadfd6; }
+  .rvslots{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .rvslot{ background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:12px 0; font:inherit; font-size:.95rem; color:var(--ink); cursor:pointer; }
+  .rvslot:disabled{ opacity:.4; text-decoration:line-through; cursor:default; }
+  .rvslot.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
+  .rvnote{ font-size:.74rem; color:var(--muted); text-align:center; margin-top:10px; line-height:1.6; }
+  .btn.full{ width:100%; margin-top:18px; } .btn:disabled{ opacity:.45; cursor:default; }
 
   /* bottom nav */
   /* 下部のpaddingを厚めにして、Netlifyの「Powered by Netlify」バッジ（画面下部に重なって
@@ -246,14 +248,16 @@
 <div class="app" id="app">
   <header class="hd">
     <div class="logo" aria-hidden="true">
-      <svg viewBox="0 0 32 32" fill="none"><path d="M5 15 16 6l11 9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13v12h16V13" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><rect x="14" y="18" width="4" height="7" rx="1" fill="#e8cfc8"/><rect x="10.5" y="15.5" width="3" height="3" rx=".5" fill="#fff"/><rect x="18.5" y="15.5" width="3" height="3" rx=".5" fill="#fff"/></svg>
+      <!-- 家のかたちに笑顔（SMILE）を重ねたマーク -->
+      <svg viewBox="0 0 32 32" fill="none" stroke="#d8bf9d" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 16 6.5l10.5 9" stroke-width="1.2"/><path d="M8.5 13.8V25.5h15V13.8" stroke-width="1.2"/><path d="M12.4 19.6c1.1 2.2 6.1 2.2 7.2 0" stroke-width="1.2"/><circle cx="13" cy="17" r=".85" fill="#d8bf9d" stroke="none"/><circle cx="19" cy="17" r=".85" fill="#d8bf9d" stroke="none"/></svg>
     </div>
     <div>
-      <div class="co">住まいるハウジング</div>
+      <div class="en">SMILE</div>
+      <div class="rule"></div>
       <div class="ttl">おうちノート</div>
     </div>
     <button class="mail" id="btnMail" aria-label="メッセージ">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9a9089" stroke-width="1.6"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
     </button>
   </header>
   <div class="band">
@@ -268,7 +272,7 @@
   <button data-tab="album"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>アルバム</button>
   <button data-tab="msg"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span>メッセージ</button>
   <button data-tab="resv"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M8 14h3M13 14h3M8 17h3"/></svg></span>予約</button>
-  <button data-tab="build"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 5.5a4 4 0 0 0 4.9 4.9l-9 9a2 2 0 0 1-2.8-2.8l9-9a4 4 0 0 0-2.1-2.1z"/></svg></span>家づくり</button>
+  <button data-tab="build"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg></span>家づくり</button>
 </nav>
 
 <div class="lb" id="lb" hidden><button class="x" id="lbX" aria-label="閉じる">×</button><img id="lbImg" alt=""></div>
@@ -288,15 +292,13 @@
     fan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="1.5"/><path d="M12 10.5C9 9 8 4 11 3.5s3 4 1 7M13.5 12c1.5-3 6.5-4 7-1s-4 3-7 1M12 13.5c3 1.5 4 6.5 1 7s-3-4-1-7M10.5 12c-1.5 3-6.5 4-7 1s4-3 7-1"/></svg>',
     plug:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>',
     light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>',
+    room:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M4 21h16M14.5 12h.01"/></svg>',
     sofa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 11V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/><path d="M4 11a2 2 0 0 1 2 2v1h12v-1a2 2 0 1 1 2 2v3H4v-3a2 2 0 0 1 0-4zM6 18v2M18 18v2"/></svg>',
     card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M6 15h5"/><path d="m16.5 13 .8 1.6 1.7.2-1.3 1.2.4 1.7-1.6-.9-1.6.9.4-1.7-1.3-1.2 1.7-.2z"/></svg>',
     link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg>'
   };
   var EXT_LABELS = [["mainWall","メイン外壁"],["mainWallNote","メイン外壁の品番・補足"],["accentWall","アクセント外壁"],["accentWallNote","アクセント外壁の品番・補足"],["roofColor","屋根の色"],["roofNote","屋根・破風の補足"],["roofPhotoNote","屋根の写真・品番"],["fasciaColor","破風・鼻隠しの色"],["fasciaPhotoNote","破風・鼻隠しの写真・品番"],["sashOutside","サッシ外観色"],["sashInside","室内側の窓枠色"],["glass","ガラス"],["fogPlace","くもりガラスの場所"]];
   var WD = ["日","月","火","水","木","金","土"];
-  // 自己予約の種類。netlify/functions/note-booking.mts の RESERVATION_TYPES と同じ内容・同じ順序。
-  var BOOKING_TYPES = [["来店","house"],["オンライン","link"],["銀行","card"],["ショールーム","sofa"]];
-  var BOOKING_DURATION_MIN = 120; // note-booking.mts の DURATION_MIN と同じ（確認表示用）
 
   var P = "", T = "";
   try{
@@ -307,19 +309,11 @@
   }catch(e){}
 
   var data = null;
-  var view = { tab:"home", buildSeg:"spec", cat:null, resvStep:null, booking:{ type:null, month:null, date:null, time:null } };
+  var view = { tab:"home", buildSeg:"spec", cat:null };
+  var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false };
   var main = document.getElementById("main");
-  var bookingDaysCache = {};
-  var bookingSlotsCache = {};
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
-  function pad2(n){ return n<10 ? "0"+n : String(n); }
-  function monthKeyOf(ds){ return String(ds).slice(0,7); }
-  function monthLabel(mk){ var p = mk.split("-"); return Number(p[0])+"年"+Number(p[1])+"月"; }
-  function daysInMonth(mk){ var p = mk.split("-").map(Number); return new Date(p[0], p[1], 0).getDate(); }
-  function addMonths(mk, delta){ var p = mk.split("-").map(Number); var total = p[1]-1+delta; var y = p[0]+Math.floor(total/12); var m = ((total%12)+12)%12; return y+"-"+pad2(m+1); }
-  function addDaysLocal(ds, n){ var d = new Date(ds+"T00:00:00"); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
-  function addMinutesToTime(hhmm, addMin){ var p = String(hhmm).split(":").map(Number); var total = p[0]*60+p[1]+addMin; return pad2(Math.floor(total/60)%24)+":"+pad2(total%60); }
   function fmtD(d){ if(!d) return ""; var p = String(d).slice(0,10).split("-"); return p.length===3 ? Number(p[0])+"."+Number(p[1])+"."+Number(p[2]) : d; }
   function md(d){ if(!d) return ""; var dt = new Date(String(d).slice(0,10)+"T00:00:00"); return (dt.getMonth()+1)+"/"+dt.getDate()+"("+WD[dt.getDay()]+")"; }
   function isImg(f){ return (f.contentType||"").indexOf("image")===0 || /\.(jpe?g|png|gif|webp)$/i.test(f.name||""); }
@@ -424,10 +418,11 @@
     if(view.tab==="home") html = homeHtml();
     else if(view.tab==="album") html = albumHtml();
     else if(view.tab==="msg") html = msgHtml();
-    else if(view.tab==="resv") html = view.resvStep ? bookingFlowHtml() : resvHtml();
+    else if(view.tab==="resv") html = resvHtml();
     else html = view.cat ? catDetailHtml(view.cat) : buildHtml();
     main.innerHTML = '<div class="wrap">'+html+'</div>';
     if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
+    if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
   }
 
   // ---------- ホーム ----------
@@ -460,6 +455,10 @@
       out += '<div class="sechd"><h3>📅 次回のご予約</h3><button class="more" data-go="resv">すべて見る →</button></div>';
       out += '<div class="rv"><div class="dt"><div class="m">'+(ndt.getMonth()+1)+'月</div><div class="dd">'+ndt.getDate()+'</div><div class="w">'+WD[ndt.getDay()]+'曜日</div></div>'+
         '<div><div class="ty">'+esc(nr.type||"お打合せ")+'</div><div class="tm">'+esc(nr.startTime||"")+(nr.endTime?"〜"+esc(nr.endTime):"")+(nr.staff?"　担当："+esc(nr.staff):"")+'</div></div></div>';
+    } else {
+      out += '<div class="sechd"><h3>📅 ご予約予定</h3><button class="more" data-go="resv">予約を見る →</button></div>'+
+        '<div class="rv" style="flex-direction:column; align-items:stretch; gap:10px;"><div><div class="ty">次回予約はありません</div><div class="tm">空いている日時から予約できます</div></div>'+
+        '<button class="btn dk" data-go="resv">予約する</button></div>';
     }
 
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
@@ -578,6 +577,18 @@
   }
 
   // ---------- 予約 ----------
+  async function loadAvail(){
+    rv.loading = true; rv.error = ""; render();
+    try{
+      var res = await fetch("/api/note-calendar?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T), {cache:"no-store"});
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      rv.avail = j; rv.loaded = true;
+      if(!rv.date){ var f = j.days.filter(function(d){ return d.status==="open"; })[0]; if(f) rv.date = f.date; }
+    }catch(e){ rv.error = "unavailable"; rv.loaded = true; }
+    rv.loading = false; render();
+  }
+  function rvDay(date){ return rv.avail ? rv.avail.days.filter(function(d){ return d.date===date; })[0] : null; }
   function resvHtml(){
     var up = data.reservations.filter(function(r){ return r.date >= data.today; });
     var past = data.reservations.filter(function(r){ return r.date < data.today; }).reverse();
@@ -586,150 +597,54 @@
       return '<div class="rv'+(isPast?" past":"")+'"><div class="dt"><div class="m">'+(dt.getMonth()+1)+'月</div><div class="dd">'+dt.getDate()+'</div><div class="w">'+WD[dt.getDay()]+'曜日</div></div>'+
         '<div><div class="ty">'+esc(r.type||"お打合せ")+'</div><div class="tm">'+esc(r.startTime||"")+(r.endTime?"〜"+esc(r.endTime):"")+(r.staff?"　担当："+esc(r.staff):"")+'</div></div></div>';
     }
-    var out = '<h2 class="big">ご予約</h2><p class="sub">お打合せ・ご来場の予定です。</p>';
-    out += '<button class="btn dk" style="width:100%; margin-bottom:20px;" data-startbooking="1">＋ 新しくご予約を取る</button>';
-    out += up.length ? '<div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>' : '<div class="empty">予定されているご予約はありません。</div>';
-    if(past.length) out += '<div class="sechd"><h3>これまでのご予約</h3></div><div class="catlist">'+past.slice(0,10).map(function(r){ return card(r,true); }).join("")+'</div>';
-    out += '<div style="margin-top:16px;"><button class="btn ol" style="width:100%;" data-go="msg">メッセージで予約・変更を相談する</button></div>';
-    return out;
-  }
+    var out = '<h2 class="big">打合せ予約</h2><p class="sub">空いている日時を選んで、そのまま予約できます。</p>';
+    if(up.length) out += '<div class="sechd"><h3>ご予約済み</h3></div><div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>';
 
-  // ---------- 予約（自己予約フロー） ----------
-  function bookingFlowHtml(){
-    if(view.resvStep==="date") return bookingDateHtml();
-    if(view.resvStep==="time") return bookingTimeHtml();
-    if(view.resvStep==="confirm") return bookingConfirmHtml();
-    if(view.resvStep==="done") return bookingDoneHtml();
-    return bookingTypeHtml();
-  }
-  function stepsHtml(cur){
-    var labels = ["種類","日付","時間","確定"];
-    return '<div class="bksteps">'+labels.map(function(l,i){ return (i>0?" ＞ ":"")+(i===cur?"<b>"+l+"</b>":l); }).join("")+'</div>';
-  }
-  function bookingTypeHtml(){
-    var out = '<button class="back" data-backbooking="list">← 予約一覧へ戻る</button>';
-    out += stepsHtml(0);
-    out += '<h2 class="big">ご予約の種類</h2><p class="sub">ご希望のご相談方法をお選びください。</p>';
-    out += '<div class="catlist">'+BOOKING_TYPES.map(function(t){
-      return '<button class="cat" data-picktype="'+esc(t[0])+'"><span class="ic">'+(ICONS[t[1]]||ICONS.house)+'</span><span><div class="nm">'+esc(t[0])+'</div></span></button>';
-    }).join("")+'</div>';
-    return out;
-  }
-  function bookingDateHtml(){
-    if(!view.booking.month) view.booking.month = monthKeyOf(data.today);
-    var mk = view.booking.month;
-    var cache = bookingDaysCache[mk];
-    if(!cache) loadBookingDays(mk);
-    var out = '<button class="back" data-backbooking="type">← 種類の選択へ戻る</button>';
-    out += stepsHtml(1);
-    out += '<h2 class="big">日付を選ぶ</h2><p class="sub">'+esc(view.booking.type)+'のご予約です。ご希望の日付をお選びください。</p>';
-    if(cache && cache.status==="error"){
-      out += '<div class="empty">空き状況を確認できませんでした。しばらくしてからもう一度お試しいただくか、メッセージでお問い合わせください。</div>';
+    out += '<div class="rvstep">1. ご希望の内容</div><div class="rvtypes">';
+    var types = (rv.avail && rv.avail.types) || ["来店","オンライン","銀行","ショールーム"];
+    out += types.map(function(t){ return '<button class="rvtype'+(rv.type===t?" on":"")+'" data-rvtype="'+esc(t)+'"><b>'+esc(t)+'</b><span>2時間</span></button>'; }).join("")+'</div>';
+
+    out += '<div class="rvstep">2. 日付</div>';
+    if(rv.loading || !rv.loaded){
+      out += '<div class="empty">空き状況を確認中です…</div>';
+    } else if(rv.error){
+      out += '<div class="empty">ただいま空き状況を表示できません。お手数ですが、メッセージでご希望の日時をお知らせください。</div>'+
+        '<div style="margin-top:12px;"><button class="btn ol" style="width:100%;" data-go="msg">メッセージで相談する</button></div>';
       return out;
+    } else {
+      out += '<div class="rvdays">'+rv.avail.days.map(function(d){
+        var dt = new Date(d.date+"T00:00:00");
+        var label = d.status==="open" ? "空きあり" : d.status==="full" ? "満席" : (d.reason||"休み");
+        return '<button class="rvday'+(d.status==="open"?"":" off")+(rv.date===d.date?" on":"")+'" data-rvdate="'+d.date+'"'+(d.status==="open"?"":" disabled")+'>'+
+          '<div class="a">'+(dt.getMonth()+1)+'月・'+d.wd+'</div><div class="b">'+dt.getDate()+'日</div><div class="c">'+label+'</div></button>';
+      }).join("")+'</div>';
+      var day = rvDay(rv.date);
+      out += '<div class="rvstep">3. 空いている開始時間（30分単位）</div>';
+      if(!day || day.status!=="open") out += '<div class="empty">日付を選んでください。</div>';
+      else out += '<div class="rvslots">'+day.slots.map(function(sl){
+        return '<button class="rvslot'+(rv.start===sl.start?" on":"")+'" data-rvstart="'+sl.start+'"'+(sl.available?"":" disabled")+'>'+sl.start+'</button>';
+      }).join("")+'</div>';
+      out += '<button class="btn dk full" id="rvBook"'+((rv.date&&rv.start&&!rv.booking)?"":" disabled")+'>'+(rv.booking?"予約中…":"この内容で予約する")+'</button>';
+      out += '<div class="rvnote">受付時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.close)+'（最終開始 '+toHM15(rv.avail)+'）<br>日曜日・祝日は予約できません。変更・キャンセルはメッセージでお知らせください。</div>';
     }
-    out += '<div class="bkcal"><div class="bkcal-hd"><button data-calmonth="-1"'+(mk<=monthKeyOf(data.today)?" disabled":"")+'>‹</button><div class="ttl">'+monthLabel(mk)+'</div><button data-calmonth="1">›</button></div>';
-    out += '<div class="bkcal-grid">'+WD.map(function(w){ return '<div class="bkcal-wd">'+w+'</div>'; }).join("");
-    var first = new Date(mk+"-01T00:00:00");
-    var lead = first.getDay();
-    for(var i=0;i<lead;i++) out += '<div class="bkcal-day pad"></div>';
-    var dim = daysInMonth(mk);
-    for(var d=1; d<=dim; d++){
-      var ds = mk+"-"+pad2(d);
-      var cls = "bkcal-day", label = "", disabled = false;
-      if(ds < data.today){ cls += " past"; disabled = true; }
-      else if(!cache || cache.status==="pending"){ label = "…"; disabled = true; }
-      else {
-        var info = null;
-        for(var k=0;k<cache.days.length;k++){ if(cache.days[k].date===ds){ info = cache.days[k]; break; } }
-        if(!info){ disabled = true; }
-        else if(info.closed){ cls += " closed"; label = "休"; disabled = true; }
-        else if(info.hasOpenSlots){ cls += " avail"; label = "空きあり"; }
-        else { cls += " full"; label = "満席"; disabled = true; }
-      }
-      if(view.booking.date===ds) cls += " picked";
-      out += '<button class="'+cls+'"'+(disabled?' disabled':' data-pickdate="'+ds+'"')+'><span class="n">'+d+'</span><span class="s">'+label+'</span></button>';
-    }
-    out += '</div></div>';
+    if(past.length) out += '<div class="sechd" style="margin-top:26px;"><h3>これまでのご予約</h3></div><div class="catlist">'+past.slice(0,10).map(function(r){ return card(r,true); }).join("")+'</div>';
     return out;
   }
-  function loadBookingDays(mk){
-    bookingDaysCache[mk] = { status:"pending" };
-    var from = mk+"-01";
-    var to = addDaysLocal(from, daysInMonth(mk)-1);
-    fetch("/api/note-booking?action=days&p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T)+"&from="+from+"&to="+to, {cache:"no-store"})
-      .then(function(res){ return res.json().then(function(j){ return {ok:res.ok, j:j}; }); })
-      .then(function(x){
-        if(!x.ok || !x.j.ok) bookingDaysCache[mk] = { status:"error" };
-        else bookingDaysCache[mk] = { status:"done", days:x.j.days };
-        render();
-      })
-      .catch(function(){ bookingDaysCache[mk] = { status:"error" }; render(); });
-  }
-  function bookingTimeHtml(){
-    var date = view.booking.date;
-    var cache = bookingSlotsCache[date];
-    if(!cache) loadBookingSlots(date);
-    var dt = new Date(date+"T00:00:00");
-    var out = '<button class="back" data-backbooking="date">← 日付の選択へ戻る</button>';
-    out += stepsHtml(2);
-    out += '<h2 class="big">時間を選ぶ</h2><p class="sub">'+(dt.getMonth()+1)+'月'+dt.getDate()+'日（'+WD[dt.getDay()]+'）のご予約です。</p>';
-    if(!cache || cache.status==="pending") out += '<div class="empty">空き状況を確認しています…</div>';
-    else if(cache.status==="error") out += '<div class="empty">空き状況の確認に失敗しました。もう一度お試しください。</div>';
-    else if(!cache.slots.length) out += '<div class="empty">この日はご予約いただける時間がありません。別の日をお選びください。</div>';
-    else out += '<div class="bkslots">'+cache.slots.map(function(s){ return '<button class="bkslot'+(view.booking.time===s?" picked":"")+'" data-picktime="'+esc(s)+'">'+esc(s)+'</button>'; }).join("")+'</div>';
-    return out;
-  }
-  function loadBookingSlots(date){
-    bookingSlotsCache[date] = { status:"pending" };
-    fetch("/api/note-booking?action=slots&p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T)+"&date="+encodeURIComponent(date), {cache:"no-store"})
-      .then(function(res){ return res.json().then(function(j){ return {ok:res.ok, j:j}; }); })
-      .then(function(x){
-        if(!x.ok || !x.j.ok) bookingSlotsCache[date] = { status:"error" };
-        else bookingSlotsCache[date] = { status:"done", slots:x.j.slots };
-        render();
-      })
-      .catch(function(){ bookingSlotsCache[date] = { status:"error" }; render(); });
-  }
-  function bookingConfirmHtml(){
-    var b = view.booking;
-    var dt = new Date(b.date+"T00:00:00");
-    var endTime = addMinutesToTime(b.time, BOOKING_DURATION_MIN);
-    var out = '<button class="back" data-backbooking="time">← 時間の選択へ戻る</button>';
-    out += stepsHtml(3);
-    out += '<h2 class="big">内容のご確認</h2><p class="sub">以下の内容でご予約します。よろしければ「この内容で予約する」を押してください。</p>';
-    out += '<div class="bkconfirm">'+
-      '<div class="row"><span class="lbl">種類</span><span>'+esc(b.type)+'</span></div>'+
-      '<div class="row"><span class="lbl">日付</span><span>'+(dt.getMonth()+1)+'月'+dt.getDate()+'日（'+WD[dt.getDay()]+'）</span></div>'+
-      '<div class="row"><span class="lbl">時間</span><span>'+esc(b.time)+'〜'+endTime+'</span></div>'+
-      '</div>';
-    out += '<div class="btns" style="margin-top:18px;"><button class="btn ol" data-backbooking="time">戻る</button><button class="btn dk" id="btnConfirmBooking">この内容で予約する</button></div>';
-    return out;
-  }
-  function bookingDoneHtml(){
-    return '<div class="center">✅<br>ご予約を承りました。<br>当日はお気をつけてお越しください。<br><button class="btn dk" style="margin-top:20px;" data-backtoresv="1">予約一覧へ戻る</button></div>';
-  }
-  function submitBooking(){
-    var btn = document.getElementById("btnConfirmBooking");
-    if(btn) btn.disabled = true;
-    var b = view.booking;
-    fetch("/api/note-booking", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"book", type:b.type, date:b.date, startTime:b.time }) })
-      .then(function(res){ return res.json().then(function(j){ return {ok:res.ok, j:j}; }); })
-      .then(function(x){
-        if(!x.ok || !x.j.ok){
-          if(x.j && x.j.error==="slot_taken"){
-            toast(x.j.message || "その時間はちょうど埋まってしまいました");
-            bookingSlotsCache[b.date] = null;
-            view.resvStep = "time"; render();
-          } else {
-            toast((x.j && x.j.message) || "予約できませんでした。もう一度お試しください");
-            if(btn) btn.disabled = false;
-          }
-          return;
-        }
-        data.reservations.push(x.j.reservation);
-        view.resvStep = "done"; render();
-      })
-      .catch(function(){ toast("通信エラーが発生しました"); if(btn) btn.disabled = false; });
+  function toHM15(av){ var c = av.close.split(":"), m = parseInt(c[0],10)*60+parseInt(c[1],10)-av.durationMinutes; return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+(m%60)).slice(-2); }
+  async function bookNow(){
+    if(!rv.date || !rv.start || rv.booking) return;
+    rv.booking = true; render();
+    try{
+      var res = await fetch("/api/note-calendar", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"book", type:rv.type, date:rv.date, start:rv.start }) });
+      var j = await res.json();
+      if(res.status===409){ toast("その時間は先に埋まりました。別の時間をお選びください"); rv.start=""; rv.loaded=false; rv.booking=false; render(); return; }
+      if(!res.ok) throw new Error(j.error||"error");
+      var r = j.reservation;
+      data.reservations.push({ type:r.type, date:r.date, startTime:r.startTime, endTime:r.endTime, staff:"" });
+      data.reservations.sort(function(a,b){ return (a.date+a.startTime).localeCompare(b.date+b.startTime); });
+      data.nextReservation = data.reservations.filter(function(x){ return x.date >= data.today; })[0] || null;
+      rv.start = ""; rv.loaded = false; rv.booking = false; render(); toast("ご予約を受け付けました");
+    }catch(e){ rv.booking = false; render(); toast("予約できませんでした。もう一度お試しいただくか、メッセージでご連絡ください"); }
   }
 
   // ---------- 家づくり ----------
@@ -738,7 +653,7 @@
     if(view.buildSeg==="spec"){
       out += '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;"><h2 class="big">わが家の設備仕様</h2><span class="countpill" style="margin-top:10px;">'+data.categories.length+'項目</span></div>'+
         '<p class="sub">写真・プランボード・打合せの内容を、時系列で確認できます</p>';
-      out += '<div class="catlist">'+data.categories.map(function(c){
+      out += '<div class="catgrid">'+data.categories.map(function(c){
         return '<button class="cat" data-cat="'+esc(c.id)+'"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span>'+
           '<span><div class="nm">'+esc(c.name)+'</div><div class="sb">'+esc(c.sub)+'</div>'+(c.count?'<div class="cnt">'+c.count+'件の記録</div>':'')+'</span>'+
           '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></button>';
@@ -764,31 +679,18 @@
       (n.open?'<div class="box opn"><div class="bl">確認したいこと</div>'+esc(n.open)+'</div>':'')+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
   }
-  function catDetailHtml(catId){
-    var c = data.categories.find(function(x){ return x.id===catId; });
-    if(!c){ view.cat = null; return buildHtml(); }
-    var out = '<button class="back" data-back="1">← 設備仕様の一覧へ</button>'+
-      '<div class="dhd"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span><div><h2 class="big" style="margin:0;">'+esc(c.name)+'</h2><div class="sub" style="margin:2px 0 0;">'+esc(c.sub)+'</div></div>'+
-      '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></div>';
-
-    if(c.id==="plan"){
-      out += '<div class="sechd"><h3>平面図</h3></div>';
-      out += data.plans.length ? '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.map(function(f){ return thumbHtml(f, fmtD(f.date)); }).join("")+'</div>'
-        : '<div class="empty">図面が登録されると、ここに表示されます。</div>';
-      return out;
-    }
-
-    if(c.id==="exterior"){
-      var vals = data.project.exteriorSpecValues || {};
-      var rows = EXT_LABELS.filter(function(l){ return vals[l[0]]; });
-      if(rows.length){
-        out += '<div class="sechd"><h3>色・仕様</h3></div><div class="speclist">'+rows.map(function(l, i){
-          return '<div class="spec"><div class="num">'+(i<9?"0":"")+(i+1)+'</div><div><div class="k">'+esc(l[1])+'</div><div class="v">'+esc(vals[l[0]])+'</div></div></div>';
-        }).join("")+'</div>';
-      }
-    }
-
-    var items = c.items || [];
+  // 統合した項目（トイレ・暖房換気・電気あかり）と、各部屋を含むインテリアは、
+  // 「どの部位の写真・記録か」が分かるように部位名（例：LDK・天井）を添える
+  var LABEL_CATS = ["toilet","climate","electric","interior","rooms"];
+  function partOf(c, x){
+    if(!x.label || x.label===c.name || LABEL_CATS.indexOf(c.id)<0) return "";
+    if(c.id==="rooms"){ var i = x.label.indexOf("・"); return i>=0 ? x.label.slice(i+1) : ""; } // 部屋名は見出しに出すので部位名だけ
+    return x.label;
+  }
+  function capOf(c, x, base){ var l = partOf(c, x); return l ? (l+"・"+base) : base; }
+  // 写真・プランボード・打合せ記録などを種類別のまとまりで表示する（各部屋では部屋ごとに呼ぶ）
+  function itemsSectionsHtml(c, items){
+    var out = "";
     // Organize items into sections
     var planboards = items.filter(function(x){ return x.type==="planboard"; });
     var notes = items.filter(function(x){ return x.type==="note"; });
@@ -801,7 +703,7 @@
         '<div class="section-header"><span class="section-icon">📐</span><span>プランボード</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         planboards.slice().reverse().map(function(x, i){
-          return thumbHtml(x.file, (i===0?"最新・":"")+fmtD(x.at));
+          return thumbHtml(x.file, capOf(c, x, (i===0?"最新・":"")+fmtD(x.at)));
         }).join("")+
         '</div></div></div>';
     }
@@ -813,7 +715,7 @@
         '<div class="section-content">'+
         notes.slice().reverse().map(function(n){
           var html = '<div class="section-item">'+
-            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+fmtD(n.date)+'</div>';
+            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+fmtD(n.date)+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
           if(n.open) html += '<div class="section-item-desc"><strong>確認：</strong>'+esc(n.open)+'</div>';
@@ -842,7 +744,7 @@
         '<div class="section-header"><span class="section-icon">📷</span><span>写真・資料</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         photos.slice().reverse().map(function(x){
-          return thumbHtml(x.file, fmtD(x.at));
+          return thumbHtml(x.file, capOf(c, x, fmtD(x.at)));
         }).join("")+
         '</div></div></div>';
     }
@@ -862,25 +764,78 @@
       out += '<div class="empty">打合せが進むと、写真やプランボード・記録がここに時系列で並びます。</div>';
     }
 
-    out += '<div class="decide"><div class="now">いまの状態：<span class="status s-'+esc(c.status)+'" style="margin-left:0;">'+esc(c.status)+'</span>'+
-      (c.decidedAt?'<span style="font-size:.74rem; color:var(--muted);">（'+fmtD(c.decidedAt)+' 更新）</span>':'')+'</div>'+
-      '<div class="btns"><button class="btn ol" data-decide="仮決定"'+(c.status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
-      '<button class="btn dk" data-decide="決定"'+(c.status==="決定"?" disabled":"")+'>決定する</button></div>'+
-      ((c.status==="仮決定"||c.status==="決定")?'<button class="linkbtn" data-decide="検討中">検討中に戻す</button>':'')+
-      '</div>';
     return out;
   }
-  async function decide(status){
+  // 「仮決定／決定」のボックス。各部屋では部屋ごと（roomId あり）に表示する
+  function decideBoxHtml(name, status, decidedAt, roomId){
+    var ra = roomId ? ' data-room="'+esc(roomId)+'"' : "";
+    return '<div class="decide"><div class="now">'+(roomId?esc(name)+'の':'')+'いまの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'+
+      (decidedAt?'<span style="font-size:.74rem; color:var(--muted);">（'+fmtD(decidedAt)+' 更新）</span>':'')+'</div>'+
+      '<div class="btns"><button class="btn ol" data-decide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
+      '<button class="btn dk" data-decide="決定"'+ra+(status==="決定"?" disabled":"")+'>決定する</button></div>'+
+      ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-decide="検討中"'+ra+'>検討中に戻す</button>':'')+
+      '</div>';
+  }
+  function catDetailHtml(catId){
+    var c = data.categories.find(function(x){ return x.id===catId; });
+    if(!c){ view.cat = null; return buildHtml(); }
+    var out = '<button class="back" data-back="1">← 設備仕様の一覧へ</button>'+
+      '<div class="dhd"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span><div><h2 class="big" style="margin:0;">'+esc(c.name)+'</h2><div class="sub" style="margin:2px 0 0;">'+esc(c.sub)+'</div></div>'+
+      '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></div>';
+
+    if(c.id==="plan"){
+      out += '<div class="sechd"><h3>平面図</h3></div>';
+      out += data.plans.length ? '<div class="thumbs'+(data.plans.length===1?" one":"")+'">'+data.plans.map(function(f){ return thumbHtml(f, fmtD(f.date)); }).join("")+'</div>'
+        : '<div class="empty">図面が登録されると、ここに表示されます。</div>';
+      return out;
+    }
+
+    if(c.id==="exterior"){
+      var vals = data.project.exteriorSpecValues || {};
+      var rows = EXT_LABELS.filter(function(l){ return vals[l[0]]; });
+      if(rows.length){
+        out += '<div class="sechd"><h3>色・仕様</h3></div><div class="speclist">'+rows.map(function(l, i){
+          return '<div class="spec"><div class="num">'+(i<9?"0":"")+(i+1)+'</div><div><div class="k">'+esc(l[1])+'</div><div class="v">'+esc(vals[l[0]])+'</div></div></div>';
+        }).join("")+'</div>';
+      }
+    }
+
+    if(c.id==="rooms"){
+      var rms = c.rooms || [];
+      if(!rms.length) return out + '<div class="empty">お打合せが進むと、部屋ごとの内容がここに並びます。</div>';
+      return out + rms.map(function(r){
+        return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
+          (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
+          itemsSectionsHtml(c, r.items || [])+
+          decideBoxHtml(r.name, r.status, r.decidedAt, r.id);
+      }).join("");
+    }
+
+    out += itemsSectionsHtml(c, c.items || []);
+
+    out += decideBoxHtml(c.name, c.status, c.decidedAt, "");
+    return out;
+  }
+  async function decide(status, roomId){
     var c = data.categories.find(function(x){ return x.id===view.cat; });
     if(!c) return;
-    var msg = status==="決定" ? "「"+c.name+"」をこの内容で決定します。よろしいですか？" :
-      (status==="仮決定" ? "「"+c.name+"」を仮決定にします。よろしいですか？" : "「"+c.name+"」を検討中に戻します。よろしいですか？");
+    var room = roomId ? (c.rooms||[]).find(function(r){ return r.id===roomId; }) : null;
+    if(roomId && !room) return;
+    var nm = room ? c.name+"（"+room.name+"）" : c.name;
+    var msg = status==="決定" ? "「"+nm+"」をこの内容で決定します。よろしいですか？" :
+      (status==="仮決定" ? "「"+nm+"」を仮決定にします。よろしいですか？" : "「"+nm+"」を検討中に戻します。よろしいですか？");
     if(!window.confirm(msg)) return;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:c.id, status:status }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:c.id, status:status, roomId:roomId||undefined }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
-      c.status = status; c.decidedAt = j.decision.decidedAt;
+      if(room){
+        room.status = status; room.decidedAt = j.decision.decidedAt;
+        // 各部屋カード全体の状態と表示（○/○部屋 決定）も更新する
+        var rs = c.rooms, n = rs.filter(function(r){ return r.status==="決定"; }).length;
+        c.status = n===rs.length ? "決定" : (n===0 && rs.some(function(r){ return r.status==="仮決定"; }) ? "仮決定" : "検討中");
+        c.sub = n+"/"+rs.length+"部屋 決定";
+      } else { c.status = status; c.decidedAt = j.decision.decidedAt; }
       render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
@@ -889,36 +844,24 @@
   document.getElementById("nav").addEventListener("click", function(e){
     var b = e.target.closest("button[data-tab]"); if(!b) return;
     view.tab = b.dataset.tab; if(view.tab!=="build") view.cat = null;
-    if(view.tab!=="resv") view.resvStep = null;
     render(); window.scrollTo(0,0);
   });
   document.getElementById("btnMail").addEventListener("click", function(){ if(!data) return; view.tab="msg"; render(); });
   main.addEventListener("click", function(e){
     var img = e.target.closest("[data-img]");
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
-    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; if(view.tab!=="resv") view.resvStep=null; render(); window.scrollTo(0,0); return; }
+    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; render(); window.scrollTo(0,0); return; }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
-    var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide); return; }
+    var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
-    var sb = e.target.closest("[data-startbooking]");
-    if(sb){ view.booking = { type:null, month:null, date:null, time:null }; view.resvStep = "type"; render(); window.scrollTo(0,0); return; }
-    var bb = e.target.closest("[data-backbooking]");
-    if(bb){ view.resvStep = bb.dataset.backbooking==="list" ? null : bb.dataset.backbooking; render(); window.scrollTo(0,0); return; }
-    var bt = e.target.closest("[data-backtoresv]");
-    if(bt){ view.resvStep = null; render(); window.scrollTo(0,0); return; }
-    var pt = e.target.closest("[data-picktype]");
-    if(pt){ view.booking.type = pt.dataset.picktype; view.booking.date = null; view.booking.time = null; view.resvStep = "date"; render(); window.scrollTo(0,0); return; }
-    var cm = e.target.closest("[data-calmonth]");
-    if(cm){ var nm = addMonths(view.booking.month || monthKeyOf(data.today), Number(cm.dataset.calmonth)); if(nm < monthKeyOf(data.today)) return; view.booking.month = nm; render(); return; }
-    var pd = e.target.closest("[data-pickdate]");
-    if(pd){ view.booking.date = pd.dataset.pickdate; view.booking.time = null; view.resvStep = "time"; render(); window.scrollTo(0,0); return; }
-    var ptime = e.target.closest("[data-picktime]");
-    if(ptime){ view.booking.time = ptime.dataset.picktime; view.resvStep = "confirm"; render(); window.scrollTo(0,0); return; }
-    if(e.target.closest("#btnConfirmBooking")){ submitBooking(); return; }
+    var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; render(); return; }
+    var rd = e.target.closest("[data-rvdate]"); if(rd){ rv.date = rd.dataset.rvdate; rv.start = ""; render(); return; }
+    var rs = e.target.closest("[data-rvstart]"); if(rs){ rv.start = rs.dataset.rvstart; render(); return; }
+    if(e.target.closest("#rvBook")){ bookNow(); return; }
   });
   function closeLb(){ document.getElementById("lb").hidden = true; document.getElementById("lbImg").src = ""; }
   document.getElementById("lbX").addEventListener("click", closeLb);

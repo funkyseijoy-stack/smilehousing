@@ -1,4 +1,5 @@
 import type { Context, Config } from "@netlify/functions";
+import { sendNotifyMail } from "../lib/google.mts";
 import { getStore } from "@netlify/blobs";
 
 // 新おうちノート（/note/）用のお客様向けAPI。
@@ -47,19 +48,34 @@ async function fetchOkaiCustomerExtras(projectId: string): Promise<any> {
 // お客様画面の「設備仕様」一覧。玄関は外部に統合している。
 // match: [scope, category|null]（nullはそのscopeの全カテゴリー）
 const NOTE_CATS = [
-  { id: "plan", name: "平面図", sub: "図面を確認できます", icon: "plan" },
   { id: "exterior", name: "外部", sub: "外壁・屋根・破風・サッシ・玄関", icon: "house" },
   { id: "kitchen", name: "キッチン", sub: "プランボード・設備仕様", icon: "kitchen" },
   { id: "bath", name: "お風呂", sub: "プランボード・設備仕様", icon: "bath" },
   { id: "wash", name: "洗面", sub: "洗面台・ミラー・収納", icon: "wash" },
-  { id: "toilet1", name: "1階トイレ", sub: "商品・リモコン・床", icon: "toilet" },
-  { id: "toilet2", name: "2階トイレ", sub: "商品・リモコン・床", icon: "toilet" },
-  { id: "heating", name: "暖房設備", sub: "暖房機器・設置場所", icon: "heating" },
-  { id: "ventilation", name: "換気設備", sub: "換気方式・給排気口", icon: "fan" },
-  { id: "wiring", name: "電気配線", sub: "照明・スイッチ・コンセント", icon: "plug" },
-  { id: "lighting", name: "あかりプラン", sub: "照明計画", icon: "light" },
+  { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
+  { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
+  { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
   { id: "interior", name: "インテリアメイン", sub: "床・建具・クロス・配色", icon: "sofa" },
+  // 部屋別インテリア。部屋ごとに分けて表示し、「仮決定／決定」も部屋単位で受け付ける
+  { id: "rooms", name: "各部屋", sub: "天井・壁・アクセント", icon: "room" },
 ];
+
+// 統合前（12項目だった頃）の項目IDで保存済みのお客様の「仮決定／決定」を、新しい項目IDに読み替える
+const LEGACY_CAT_MAP: Record<string, string> = {
+  toilet1: "toilet", toilet2: "toilet", heating: "climate", ventilation: "climate", wiring: "electric", lighting: "electric",
+};
+
+const ROOM_CAT_LABELS: Record<string, string> = { ceiling: "天井", wall: "壁", accent: "アクセント" };
+// 各部位の表示名。部屋別インテリアは「部屋名・天井/壁/アクセント」の形にする
+function partLabel(project: any, scope?: string, category?: string | null, roomId?: string | null): string {
+  if (scope === "room") {
+    const room = (project.rooms || []).find((r: any) => r.id === roomId);
+    const custom = (project.roomCatsCustom || []).find((c: any) => c.id === category);
+    const cl = custom ? custom.name : ROOM_CAT_LABELS[String(category)] || category || "";
+    return (room ? room.name : "部屋") + "・" + cl;
+  }
+  return category || "";
+}
 
 function noteCatFor(scope?: string, category?: string | null): string | null {
   if (!scope) return null;
@@ -68,15 +84,12 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
     if (category === "キッチン") return "kitchen";
     if (category === "お風呂") return "bath";
     if (category === "洗面" || category === "脱衣室") return "wash";
-    if (category === "1階トイレ") return "toilet1";
-    if (category === "2階トイレ") return "toilet2";
+    if (category === "1階トイレ" || category === "2階トイレ") return "toilet";
     return null;
   }
   if (scope === "equipment") {
-    if (category === "暖房設備") return "heating";
-    if (category === "換気設備") return "ventilation";
-    if (category === "電気配線") return "wiring";
-    if (category === "あかりプラン") return "lighting";
+    if (category === "暖房設備" || category === "換気設備") return "climate";
+    if (category === "電気配線" || category === "あかりプラン") return "electric";
     return null;
   }
   if (scope === "interiorColor") {
@@ -84,7 +97,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
     if (category === "玄関枠") return "exterior";
     return "interior";
   }
-  if (scope === "room") return "interior";
+  if (scope === "room") return "rooms";
   return null;
 }
 
@@ -134,9 +147,17 @@ export default async (req: Request, context: Context) => {
       const status = String(body.status || "");
       if (!NOTE_CATS.some((c) => c.id === cat)) return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
-      const id = `${projectId}__${cat}`;
       const now = new Date().toISOString();
-      const doc = { id, projectId, category: cat, status, by: "お客様", decidedAt: now, updatedAt: now };
+      let id = `${projectId}__${cat}`;
+      let roomId: string | null = null;
+      if (cat === "rooms") {
+        // 各部屋は部屋ごとに決定する（部屋IDがこの案件の部屋であることを確認する）
+        roomId = String(body.roomId || "");
+        if (!(project.rooms || []).some((r: any) => r.id === roomId)) return json({ error: "unknown_room" }, 400);
+        id = `${projectId}__rooms__${roomId}`;
+      }
+      const doc: any = { id, projectId, category: cat, status, by: "お客様", decidedAt: now, updatedAt: now };
+      if (roomId) doc.roomId = roomId;
       await store.setJSON(`noteDecisions/${id}`, doc);
       return json({ ok: true, decision: doc });
     }
@@ -150,6 +171,11 @@ export default async (req: Request, context: Context) => {
         fromCustomer: true, createdAt: now, updatedAt: now,
       };
       await store.setJSON(`messages/${id}`, doc);
+      // スタッフへ通知メール（失敗してもメッセージ送信自体は成功扱い）
+      await sendNotifyMail(
+        `【おうちノート】${project.customer || "お客様"}様からメッセージが届きました`,
+        `${project.customer || "お客様"}様（${project.name || ""}）から、おうちノートでメッセージが届きました。\n\n${text}\n\n住まいるアプリの「メッセージ」から返信できます。`
+      );
       return json({ ok: true, message: doc });
     }
     return json({ error: "unknown_action" }, 400);
@@ -180,7 +206,8 @@ export default async (req: Request, context: Context) => {
     push(noteCatFor(p.scope, p.category), {
       type: p.kind === "planboard" ? "planboard" : "photo",
       at: p.createdAt || "",
-      label: p.category || "",
+      label: partLabel(project, p.scope, p.category, p.roomId),
+      roomId: p.roomId || null,
       file: fileOf(p),
       source: p.source || null,
       contentType: p.contentType || "",
@@ -190,6 +217,8 @@ export default async (req: Request, context: Context) => {
     const sp = n.specPart || {};
     push(noteCatFor(sp.scope, sp.category), {
       type: "note",
+      label: partLabel(project, sp.scope, sp.category, sp.roomId),
+      roomId: sp.roomId || null,
       at: (n.date ? n.date + "T12:00:00" : "") || n.createdAt || "",
       date: n.date || (n.createdAt || "").slice(0, 10),
       title: n.title || "",
@@ -205,9 +234,46 @@ export default async (req: Request, context: Context) => {
     .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "" }));
 
   const decisionByCat: Record<string, any> = {};
-  for (const d of decisions) decisionByCat[d.category] = d;
+  for (const d of decisions.slice().sort((a, b) => String(a.decidedAt || "").localeCompare(String(b.decidedAt || "")))) {
+    decisionByCat[LEGACY_CAT_MAP[d.category] || d.category] = d; // 新しい日付のものが残る
+  }
+
+  // 各部屋：部屋ごとに写真・記録と決定状況をまとめる（内容のある部屋だけをお客様に見せる）
+  const roomDecisionById: Record<string, any> = {};
+  for (const d of decisions) if (d.category === "rooms" && d.roomId) roomDecisionById[d.roomId] = d;
+  const roomItemsById: Record<string, any[]> = {};
+  for (const it of timelineByCat["rooms"] || []) {
+    if (!it.roomId) continue;
+    (roomItemsById[it.roomId] = roomItemsById[it.roomId] || []).push(it);
+  }
+  const buildRoomsCategory = (c: any) => {
+    const rooms = (project.rooms || [])
+      .map((r: any) => {
+        const items = (roomItemsById[r.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+        const d = roomDecisionById[r.id];
+        return {
+          id: r.id, name: r.name || "部屋", accentNote: r.accentNote || "",
+          items, count: items.length,
+          status: d ? d.status : items.length ? "検討中" : "準備中",
+          decidedAt: d ? d.decidedAt : null,
+        };
+      })
+      .filter((r: any) => r.status !== "準備中");
+    const decidedN = rooms.filter((r: any) => r.status === "決定").length;
+    const status = !rooms.length ? "準備中"
+      : decidedN === rooms.length ? "決定"
+      : decidedN === 0 && rooms.some((r: any) => r.status === "仮決定") ? "仮決定"
+      : "検討中";
+    return {
+      ...c,
+      sub: rooms.length ? `${decidedN}/${rooms.length}部屋 決定` : c.sub,
+      status, decidedAt: null, items: [], rooms,
+      count: rooms.reduce((n: number, r: any) => n + r.count, 0),
+    };
+  };
 
   const categories = NOTE_CATS.map((c) => {
+    if (c.id === "rooms") return buildRoomsCategory(c);
     const items = (timelineByCat[c.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
     const hasContent = c.id === "plan" ? plans.length > 0 : items.length > 0;
     const d = decisionByCat[c.id];
