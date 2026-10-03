@@ -2827,17 +2827,24 @@
     var files = Array.prototype.slice.call(fileList||[]);
     for(var i=0;i<files.length;i++){
       var f = files[i];
-      if(f.size > SPEC_UPLOAD_MAX_BYTES){
+      // 画像は写真・アルバムと同じ仕組みで自動的に軽量化してから登録する
+      // （スマホのカメラ写真はそのままだと4MBを超えることが多いため）。
+      // 動画やPDFなど画像以外はそのままのサイズでチェックする。
+      var upFile = f;
+      if((f.type||"").indexOf("image")===0 || isHeicFile(f)){
+        try{ upFile = await compressImageFile(f); }catch(e){ upFile = f; }
+      }
+      if(upFile.size > SPEC_UPLOAD_MAX_BYTES){
         toast(f.name+"：ファイルサイズが大きすぎるため登録できませんでした（4MBまで。動画は短く撮影するか圧縮してください）");
         continue;
       }
       try{
-        var res = await assets.upload(f);
+        var res = await assets.upload(upFile, {type: upFile.type || f.type});
         var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: scope, category: category,
           roomId: roomId || null, side: side || null, assetId: res.id, url: res.url, kind: "photo",
-          contentType: res.contentType || f.type, fileName: f.name, createdAt: nowIso() };
+          contentType: res.contentType || upFile.type || f.type, fileName: f.name, createdAt: nowIso() };
         if(source){ doc.source = source; }
-        blobCache[res.id] = f;
+        blobCache[res.id] = upFile;
         state.specPhotos.push(doc);
         await saveDoc("specPhotos", doc.id, doc);
       }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
