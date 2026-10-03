@@ -23,6 +23,27 @@ function genId(prefix: string) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
+// 追加見積り・ご家族家電・家づくりリスト・A's 3Dリンクは、今のところ住まいるアプリの
+// 「おうちノート連携」タブが旧おうちノート本体（strong-piroshki-295252、customer-data.mts）
+// に保存しているデータをそのまま使っている（staffDataには無い）。新おうちノートでも
+// 表示できるよう、ここから同じAPIをサーバー間で直接読み出す（okainote-bridge.mtsと同じ
+// 合言葉・仕組み）。取得できなくても他の表示は止めたくないので、失敗時はnullを返すだけにする。
+const OKAINOTE_BASE = "https://strong-piroshki-295252.netlify.app";
+const STAFF_PASSPHRASE = "sumairu2026"; // 住まいるアプリ内の他Functionと同じ合言葉（変更時は全ファイルで揃えること）
+
+async function fetchOkaiCustomerExtras(projectId: string): Promise<any> {
+  try {
+    const res = await fetch(`${OKAINOTE_BASE}/api/customer-data?customerId=${encodeURIComponent(projectId)}`, {
+      headers: { "x-staff-code": STAFF_PASSPHRASE },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    return (data && data.customer) || null;
+  } catch {
+    return null;
+  }
+}
+
 // お客様画面の「設備仕様」一覧。玄関は外部に統合している。
 // match: [scope, category|null]（nullはそのscopeの全カテゴリー）
 const NOTE_CATS = [
@@ -135,7 +156,7 @@ export default async (req: Request, context: Context) => {
   }
 
   // ---------- お客様画面に表示するデータ ----------
-  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices] = await Promise.all([
+  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer] = await Promise.all([
     listCollection(store, "specPhotos", projectId),
     listCollection(store, "meetingNotes", projectId),
     listCollection(store, "attachments", projectId),
@@ -144,6 +165,7 @@ export default async (req: Request, context: Context) => {
     listCollection(store, "reservations", projectId),
     listCollection(store, "noteDecisions", projectId),
     listCollection(store, "noteNotices"),
+    fetchOkaiCustomerExtras(projectId),
   ]);
 
   const reflectedNotes = notes.filter((n) => n.reflected);
@@ -240,6 +262,21 @@ export default async (req: Request, context: Context) => {
         linkLabel: x.linkLabel || "", linkUrl: x.linkUrl || "", order: Number(x.order || 0), createdAt: x.createdAt || "",
       }))
       .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)),
+    // 「おうちノート連携」タブ（旧おうちノート本体と橋渡しされている項目）。表示のみで、
+    // お客様からの回答・更新はまだ今の（旧）おうちノートの画面で行う。
+    estimates: ((okaiCustomer && okaiCustomer.customerEstimates) || []).map((x: any) => ({
+      title: x.title || "", amount: x.amount || "", note: x.note || "",
+      customerResponse: x.customerResponse || "未回答", createdAt: x.createdAt || "",
+    })),
+    familyProfile: okaiCustomer && okaiCustomer.customerProfile ? {
+      familyMembers: okaiCustomer.customerProfile.familyMembers || [],
+      appliances: okaiCustomer.customerProfile.appliances || [],
+      bringIns: okaiCustomer.customerProfile.bringIns || [],
+    } : null,
+    considerations: ((okaiCustomer && okaiCustomer.considerations) || []).map((x: any) => ({
+      title: x.title || "", note: x.note || "", status: x.status || "検討中", createdAt: x.createdAt || "",
+    })),
+    ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });
 };
 
