@@ -200,7 +200,12 @@
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom)); background:var(--ink); color:#fff; padding:10px 16px; border-radius:999px; font-size:.84rem; z-index:60; }
   .toast[hidden]{ display:none; }
   .center{ text-align:center; padding:80px 24px; color:var(--ink2); line-height:1.8; }
+  .th.pdf{ position:relative; }
+  .th.pdf img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .th.pdf .pdfbadge{ position:absolute; left:6px; top:6px; background:rgba(0,0,0,.6); color:#fff; font-size:.62rem; font-weight:700; letter-spacing:.04em; padding:2px 6px; border-radius:6px; }
 </style>
+<!-- PDFの1ページ目をサムネイル画像として表示するために使用（住まいるアプリ本体と同じバージョン） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body>
 <div class="app" id="app">
@@ -272,14 +277,55 @@
   function md(d){ if(!d) return ""; var dt = new Date(String(d).slice(0,10)+"T00:00:00"); return (dt.getMonth()+1)+"/"+dt.getDate()+"("+WD[dt.getDay()]+")"; }
   function isImg(f){ return (f.contentType||"").indexOf("image")===0 || /\.(jpe?g|png|gif|webp)$/i.test(f.name||""); }
   function isPdf(f){ return (f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||""); }
+  if(typeof pdfjsLib !== "undefined"){
+    try{
+      var workerBlob = new Blob(["importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js');"], {type:"application/javascript"});
+      pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+    }catch(e){}
+  }
   function toast(t){ var el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function(){ el.hidden = true; }, 2400); }
 
+  // PDFの1ページ目を画像化してサムネイル表示する（住まいるアプリ本体と同じ仕組み）。
+  // 生成には時間がかかるため、先に簡易アイコンを出しつつ裏で読み込み、
+  // 出来上がったら render() を呼んで差し替える。
+  var pdfThumbCache = {};
+  function loadPdfThumb(url){
+    pdfThumbCache[url] = {status:"pending"};
+    (async function(){
+      try{
+        if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
+        var doc = await pdfjsLib.getDocument(url).promise;
+        var page = await doc.getPage(1);
+        var baseViewport = page.getViewport({scale:1});
+        var scale = 320 / Math.max(baseViewport.width, baseViewport.height);
+        if(!(scale>0)) scale = 1;
+        var viewport = page.getViewport({scale:scale});
+        var canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        var ctx = canvas.getContext("2d");
+        await page.render({canvasContext:ctx, viewport:viewport}).promise;
+        pdfThumbCache[url] = {status:"done", dataUrl:canvas.toDataURL("image/png")};
+      }catch(e){
+        pdfThumbCache[url] = {status:"error"};
+      }
+      render();
+    })();
+  }
   function thumbHtml(f, cap){
     if(!f || !f.url) return "";
     if(isImg(f)){
       return '<button class="th" data-img="'+esc(f.url)+'"><img loading="lazy" src="'+esc(f.url)+'" alt="">'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</button>';
     }
-    return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">'+(isPdf(f)?"📄":"📎")+'</span><span>'+(isPdf(f)?"PDFを開く":"ファイルを開く")+'</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+    if(isPdf(f)){
+      var cached = pdfThumbCache[f.url];
+      if(!cached) loadPdfThumb(f.url);
+      if(cached && cached.status==="done"){
+        return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><img src="'+cached.dataUrl+'" alt="PDF"><span class="pdfbadge">PDF</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+      }
+      return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📄</span><span>PDFを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+    }
+    return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📎</span><span>ファイルを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
   }
 
   async function load(){
@@ -534,12 +580,7 @@
         '<div class="section-header"><span class="section-icon">📄</span><span>変更後のPDF</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         taskPdfs.slice().reverse().map(function(x){
-          var isPdf = (x.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(x.file.name||"");
-          if(isPdf){
-            return '<a class="th pdf" href="'+esc(x.file.url)+'" target="_blank" rel="noopener" style="aspect-ratio:1/1; border-radius:8px;">'+
-              '<span class="pi">📋</span><span class="thumbnail-name">'+esc(x.file.name.replace(/\.[^.]+$/,""))+'</span></a>';
-          }
-          return '<button class="th" data-img="'+esc(x.file.url)+'"><img loading="lazy" src="'+esc(x.file.url)+'" alt=""></button>';
+          return thumbHtml(x.file, "");
         }).join("")+
         '</div></div></div>';
     }
