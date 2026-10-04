@@ -639,8 +639,10 @@
       var j = await res.json();
       if(res.status===409){ toast("その時間は先に埋まりました。別の時間をお選びください"); rv.start=""; rv.loaded=false; rv.booking=false; render(); return; }
       if(!res.ok){
+        // 原因調査用：エラーの詳細をそのまま表示する（解決したら簡潔なメッセージに戻す）
+        var msg = j.detail ? (j.error+"："+j.detail) : (j.error||"error");
         rv.booking = false; render();
-        toast("予約できませんでした。もう一度お試しいただくか、メッセージでご連絡ください");
+        window.alert("予約できませんでした。\n\n【調査用の詳細】\n"+msg+"\n\nこの内容をスタッフにお伝えください。");
         return;
       }
       var r = j.reservation;
