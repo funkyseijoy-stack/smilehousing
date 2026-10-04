@@ -65,13 +65,17 @@ async function calendarBusy(accessToken: string, from: string, to: string): Prom
   const data: any = await res.json();
   const out: Busy[] = [];
   for (const ev of data.items || []) {
-    if (ev.status === "cancelled" || ev.transparency === "transparent") continue;
-    if (ev.start?.date) { // 終日予定は、その日を丸ごと使用中にする
+    if (ev.status === "cancelled") continue;
+    if (ev.start?.date) {
+      // 終日予定は、公開設定（空き時間／予定あり）に関わらず、その日を丸ごと使用中にする。
+      // 定休日などを示す目印として終日予定を使うことが多く、その場合「空き時間」のままでも
+      // 必ずブロックしたいため、ここでは transparency を見ない。
       let d = ev.start.date;
       const endD = ev.end?.date || addDays(d, 1);
       while (d < endD) { out.push({ date: d, start: 0, end: 24 * 60 }); d = addDays(d, 1); }
       continue;
     }
+    if (ev.transparency === "transparent") continue;
     if (!ev.start?.dateTime || !ev.end?.dateTime) continue;
     // timeZone=Asia/Tokyo を指定しているので、dateTime は +09:00 表記で返る
     const sd = ev.start.dateTime.slice(0, 10), ed = ev.end.dateTime.slice(0, 10);
