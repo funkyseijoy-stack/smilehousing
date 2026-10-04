@@ -26,6 +26,7 @@ const CLOSE_MIN = 17 * 60;
 const STEP = 30;
 const DAYS_AHEAD = 28;
 const LEAD_MIN = 60; // 当日は1時間後以降の開始のみ
+const BUFFER_AFTER_MIN = 60; // 予約と予約の間を1時間空ける（前の予定の終了直後は予約不可にする）
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -80,12 +81,14 @@ async function calendarBusy(accessToken: string, from: string, to: string): Prom
     // timeZone=Asia/Tokyo を指定しているので、dateTime は +09:00 表記で返る
     const sd = ev.start.dateTime.slice(0, 10), ed = ev.end.dateTime.slice(0, 10);
     const sm = hmToMin(ev.start.dateTime.slice(11, 16)), em = hmToMin(ev.end.dateTime.slice(11, 16));
-    if (sd === ed) out.push({ date: sd, start: sm, end: em });
+    // 終了後にBUFFER_AFTER_MIN分の空きを確保する（次の予約が間髪入れずに入らないように）
+    const emBuf = Math.min(24 * 60, em + BUFFER_AFTER_MIN);
+    if (sd === ed) out.push({ date: sd, start: sm, end: emBuf });
     else { // 日をまたぐ予定
       out.push({ date: sd, start: sm, end: 24 * 60 });
       let d = addDays(sd, 1);
       while (d < ed) { out.push({ date: d, start: 0, end: 24 * 60 }); d = addDays(d, 1); }
-      if (em > 0) out.push({ date: ed, start: 0, end: em });
+      if (em > 0) out.push({ date: ed, start: 0, end: emBuf });
     }
   }
   return out;
@@ -117,7 +120,8 @@ async function buildDays(accessToken: string, store: any, from: string, to: stri
   const busy: Busy[] = calBusy.slice();
   for (const r of resvs) {
     if (!r.date || !r.startTime || !r.endTime) continue;
-    busy.push({ date: r.date, start: hmToMin(r.startTime), end: hmToMin(r.endTime) });
+    // 終了後にBUFFER_AFTER_MIN分の空きを確保する（次の予約が間髪入れずに入らないように）
+    busy.push({ date: r.date, start: hmToMin(r.startTime), end: Math.min(24 * 60, hmToMin(r.endTime) + BUFFER_AFTER_MIN) });
   }
   const now = nowJst();
   const days: any[] = [];
