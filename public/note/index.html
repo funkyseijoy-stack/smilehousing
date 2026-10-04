@@ -872,6 +872,25 @@
   document.getElementById("lb").addEventListener("click", function(e){ if(e.target.id==="lb") closeLb(); });
 
   load();
+
+  // ホーム画面に追加したアプリ（スタンドアロン）はリロードボタンが無いため、
+  // バックグラウンドから復帰したタイミングで自動的に最新データを取り直す。
+  // ただしメッセージ入力中に内容が消えないよう、入力欄に文字がある間はスキップする。
+  var lastLoadAt = Date.now();
+  function refreshIfStale(){
+    if(!P || !T) return;
+    if(Date.now() - lastLoadAt < 30000) return; // 直近30秒以内に読み込み済みならスキップ
+    var mi = document.getElementById("msgInput");
+    if(mi && mi.value.trim()){ return; } // メッセージ入力中は上書きしない
+    lastLoadAt = Date.now();
+    load();
+  }
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible") refreshIfStale();
+  });
+  window.addEventListener("pageshow", function(e){
+    if(e.persisted) refreshIfStale();
+  });
 })();
 </script>
 </body>
