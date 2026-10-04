@@ -24,13 +24,16 @@
   @media (min-width:560px){ .app{ margin:16px auto; min-height:calc(100vh - 32px); border-radius:34px; border:8px solid #2b2522; overflow:hidden; } }
 
   /* header */
-  .hd{ display:flex; align-items:center; gap:14px; padding:20px 18px 18px; background:#3a302b; }
-  .hd .logo{ width:48px; height:48px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .hd .logo svg{ width:48px; height:48px; }
-  .hd .en{ font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",Georgia,serif; font-size:1.6rem; letter-spacing:.34em; font-weight:400; color:#f1e6d6; line-height:1; white-space:nowrap; }
+  .hd{ display:flex; align-items:center; gap:10px; padding:20px 18px 18px; background:#3a302b; }
+  .hd .logo{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .hd .logo svg{ width:44px; height:44px; }
+  .hd .titlewrap{ min-width:0; }
+  .hd .en{ font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",Georgia,serif; font-size:clamp(1.05rem,4.6vw,1.6rem); letter-spacing:.34em; font-weight:400; color:#f1e6d6; line-height:1; white-space:nowrap; }
   .hd .rule{ height:1px; width:150px; max-width:100%; background:rgba(216,191,157,.55); margin:9px 0 9px; }
-  .hd .ttl{ font-size:.74rem; letter-spacing:.5em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; }
-  .hd .mail{ margin-left:6px; width:46px; height:46px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+  .hd .ttl{ font-size:clamp(.6rem,2.6vw,.74rem); letter-spacing:.5em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; }
+  .hd .help-btn{ margin-left:auto; width:36px; height:36px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.86rem; }
+  .hd .mail{ width:40px; height:40px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+  .hd .mail svg{ width:20px; height:20px; }
   .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
   .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
   .band .st{ font-weight:700; margin-top:2px; }
@@ -239,7 +242,6 @@
   .center{ text-align:center; padding:80px 24px; color:var(--ink2); line-height:1.8; }
 
   /* ヘルプモーダル */
-  .hd .help-btn{ margin-left:auto; width:40px; height:40px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.92rem; }
   .help{ position:fixed; inset:0; background:rgba(20,16,14,.6); z-index:70; display:flex; align-items:flex-end; justify-content:center; }
   .help[hidden]{ display:none; }
   .help-card{ background:var(--card); width:100%; max-width:520px; max-height:86vh; overflow-y:auto; border-radius:22px 22px 0 0; padding:22px 20px calc(26px + env(safe-area-inset-bottom)); position:relative; }
@@ -266,7 +268,7 @@
       <!-- 家のかたちに笑顔（SMILE）を重ねたマーク -->
       <svg viewBox="0 0 32 32" fill="none" stroke="#d8bf9d" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 16 6.5l10.5 9" stroke-width="1.2"/><path d="M8.5 13.8V25.5h15V13.8" stroke-width="1.2"/><path d="M12.4 19.6c1.1 2.2 6.1 2.2 7.2 0" stroke-width="1.2"/><circle cx="13" cy="17" r=".85" fill="#d8bf9d" stroke="none"/><circle cx="19" cy="17" r=".85" fill="#d8bf9d" stroke="none"/></svg>
     </div>
-    <div>
+    <div class="titlewrap">
       <div class="en">SMILE</div>
       <div class="rule"></div>
       <div class="ttl">おうちノート</div>
