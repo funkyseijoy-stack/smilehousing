@@ -625,7 +625,7 @@
         return '<button class="rvslot'+(rv.start===sl.start?" on":"")+'" data-rvstart="'+sl.start+'"'+(sl.available?"":" disabled")+'>'+sl.start+'</button>';
       }).join("")+'</div>';
       out += '<button class="btn dk full" id="rvBook"'+((rv.date&&rv.start&&!rv.booking)?"":" disabled")+'>'+(rv.booking?"予約中…":"この内容で予約する")+'</button>';
-      out += '<div class="rvnote">受付時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.close)+'（最終開始 '+toHM15(rv.avail)+'）<br>日曜日・祝日は予約できません。変更・キャンセルはメッセージでお知らせください。</div>';
+      out += '<div class="rvnote">受付時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.close)+'（最終開始 '+toHM15(rv.avail)+'）<br>日曜日・祝日の予約については、担当者にお問い合わせください。変更・キャンセルはメッセージでお知らせください。</div>';
     }
     if(past.length) out += '<div class="sechd" style="margin-top:26px;"><h3>これまでのご予約</h3></div><div class="catlist">'+past.slice(0,10).map(function(r){ return card(r,true); }).join("")+'</div>';
     return out;
