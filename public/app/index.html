@@ -1982,13 +1982,6 @@
       var data = await res.json();
       var who = data.email ? "（"+data.email+"）" : "";
       el.textContent = !data.connected ? "未連携（下のボタンから連携してください）" : (data.calendar ? "✅ 連携済み（Gmail・カレンダー）"+who : "⚠️ Gmailは連携済み。お客様予約に使うカレンダーの許可がまだです（下のボタンからもう一度連携してください）"+who);
-      // 原因調査用：実際のスコープとカレンダー権限を表示（解決したら削除）
-      if(data.connected){
-        var dbg = "［調査用］付与スコープ: "+(data.grantedScope||"(取得失敗)")+" ／ お客様予約カレンダーへの権限: "+(data.calendarAccessRole||("取得失敗: "+(data.calendarCheckError||"")));
-        var dbgEl = document.getElementById("gmailConnDebug");
-        if(!dbgEl){ dbgEl = document.createElement("div"); dbgEl.id = "gmailConnDebug"; dbgEl.style.cssText="font-size:11px;color:#888;margin-top:4px;word-break:break-all;"; el.insertAdjacentElement("afterend", dbgEl); }
-        dbgEl.textContent = dbg;
-      }
     }catch(e){ el.textContent = "確認できませんでした"; }
   }
   function connectGmail(){
