@@ -191,7 +191,11 @@ export default async (req: Request, context: Context) => {
       }
     );
     const ev: any = await evRes.json();
-    if (!evRes.ok) return json({ error: "calendar_insert_failed", status: evRes.status }, 502);
+    if (!evRes.ok) {
+      // 原因調査用：Googleからの実際のエラー内容をそのまま返す（権限不足・カレンダーID不正などの切り分けのため）。
+      const detail = (ev && ev.error && (ev.error.message || ev.error.status)) || JSON.stringify(ev).slice(0, 300);
+      return json({ error: "calendar_insert_failed", status: evRes.status, detail, calendarId: CUSTOMER_CALENDAR_ID }, 502);
+    }
 
     const id = "rv_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const now = new Date().toISOString();

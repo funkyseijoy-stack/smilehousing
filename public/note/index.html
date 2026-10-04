@@ -638,7 +638,13 @@
       var res = await fetch("/api/note-calendar", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"book", type:rv.type, date:rv.date, start:rv.start }) });
       var j = await res.json();
       if(res.status===409){ toast("その時間は先に埋まりました。別の時間をお選びください"); rv.start=""; rv.loaded=false; rv.booking=false; render(); return; }
-      if(!res.ok) throw new Error(j.error||"error");
+      if(!res.ok){
+        // 原因調査用：エラーの詳細をそのまま表示する（解決したら簡潔なメッセージに戻す）
+        var msg = j.detail ? (j.error+"："+j.detail) : (j.error||"error");
+        rv.booking = false; render();
+        window.alert("予約できませんでした。\n\n【調査用の詳細】\n"+msg+"\n\nこの内容をスタッフにお伝えください。");
+        return;
+      }
       var r = j.reservation;
       data.reservations.push({ type:r.type, date:r.date, startTime:r.startTime, endTime:r.endTime, staff:"" });
       data.reservations.sort(function(a,b){ return (a.date+a.startTime).localeCompare(b.date+b.startTime); });
