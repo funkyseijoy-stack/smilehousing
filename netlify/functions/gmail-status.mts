@@ -1,5 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
+import { getAccessToken } from "../lib/google.mts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,7 +28,25 @@ export default async (req: Request, context: Context) => {
   const data = await store.get("gmail", { type: "json" });
   const connected = !!(data && (data as any).refresh_token);
 
-  return new Response(JSON.stringify({ connected, connectedAt: connected ? (data as any).connectedAt : null, calendar: connected && String((data as any).scope || "").includes("calendar") }), {
+  // どのGoogleアカウントで連携されているかを確認（カレンダーの権限エラー調査用）。
+  // 失敗しても連携状態の表示自体は止めない。
+  let email: string | null = null;
+  if (connected) {
+    try {
+      const tk = await getAccessToken();
+      if (tk.ok) {
+        const r = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+          headers: { Authorization: "Bearer " + tk.accessToken },
+        });
+        if (r.ok) {
+          const u: any = await r.json();
+          email = u.email || null;
+        }
+      }
+    } catch { /* 無視 */ }
+  }
+
+  return new Response(JSON.stringify({ connected, connectedAt: connected ? (data as any).connectedAt : null, calendar: connected && String((data as any).scope || "").includes("calendar"), email }), {
     status: 200,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
