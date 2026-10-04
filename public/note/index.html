@@ -30,7 +30,7 @@
   .hd .en{ font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",Georgia,serif; font-size:1.6rem; letter-spacing:.34em; font-weight:400; color:#f1e6d6; line-height:1; white-space:nowrap; }
   .hd .rule{ height:1px; width:150px; max-width:100%; background:rgba(216,191,157,.55); margin:9px 0 9px; }
   .hd .ttl{ font-size:.74rem; letter-spacing:.5em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; }
-  .hd .mail{ margin-left:auto; width:46px; height:46px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+  .hd .mail{ margin-left:6px; width:46px; height:46px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
   .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
   .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
   .band .st{ font-weight:700; margin-top:2px; }
@@ -237,6 +237,21 @@
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom)); background:var(--ink); color:#fff; padding:10px 16px; border-radius:999px; font-size:.84rem; z-index:60; }
   .toast[hidden]{ display:none; }
   .center{ text-align:center; padding:80px 24px; color:var(--ink2); line-height:1.8; }
+
+  /* ヘルプモーダル */
+  .hd .help-btn{ margin-left:auto; width:40px; height:40px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.92rem; }
+  .help{ position:fixed; inset:0; background:rgba(20,16,14,.6); z-index:70; display:flex; align-items:flex-end; justify-content:center; }
+  .help[hidden]{ display:none; }
+  .help-card{ background:var(--card); width:100%; max-width:520px; max-height:86vh; overflow-y:auto; border-radius:22px 22px 0 0; padding:22px 20px calc(26px + env(safe-area-inset-bottom)); position:relative; }
+  @media (min-width:560px){ .help-card{ border-radius:22px; max-height:80vh; margin-bottom:24px; } }
+  .help-card h2{ font-size:1.05rem; margin:0 0 4px; color:var(--ink); }
+  .help-card .help-lead{ font-size:.82rem; color:var(--ink2); margin:0 0 18px; line-height:1.7; }
+  .help-card h3{ font-size:.88rem; color:var(--brown); margin:20px 0 8px; display:flex; align-items:center; gap:6px; }
+  .help-card h3:first-of-type{ margin-top:0; }
+  .help-card ol, .help-card ul{ margin:0 0 4px; padding-left:1.3em; font-size:.84rem; line-height:1.85; color:var(--ink); }
+  .help-card .help-sub{ font-size:.78rem; color:var(--muted); font-weight:700; margin:10px 0 2px; }
+  .help-note{ margin-top:20px; background:var(--chip); border-radius:14px; padding:14px 16px; font-size:.84rem; line-height:1.7; color:var(--ink); }
+  .help-card .x{ position:absolute; top:14px; right:14px; width:38px; height:38px; border-radius:50%; border:none; background:var(--chip); color:var(--ink); font-size:1.2rem; cursor:pointer; }
   .th.pdf{ position:relative; }
   .th.pdf img{ width:100%; height:100%; object-fit:cover; display:block; }
   .th.pdf .pdfbadge{ position:absolute; left:6px; top:6px; background:rgba(0,0,0,.6); color:#fff; font-size:.62rem; font-weight:700; letter-spacing:.04em; padding:2px 6px; border-radius:6px; }
@@ -256,6 +271,7 @@
       <div class="rule"></div>
       <div class="ttl">おうちノート</div>
     </div>
+    <button class="help-btn" id="btnHelp" aria-label="使い方・追加方法">？</button>
     <button class="mail" id="btnMail" aria-label="メッセージ">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
     </button>
@@ -277,6 +293,39 @@
 
 <div class="lb" id="lb" hidden><button class="x" id="lbX" aria-label="閉じる">×</button><img id="lbImg" alt=""></div>
 <div class="toast" id="toast" hidden></div>
+
+<div class="help" id="help" hidden>
+  <div class="help-card">
+    <button class="x" id="helpX" aria-label="閉じる">×</button>
+    <h2>おうちノートの使い方</h2>
+    <p class="help-lead">ホーム画面に追加すると、アプリのようにすぐ開けて便利です。</p>
+
+    <h3>📱 ホーム画面への追加方法</h3>
+    <div class="help-sub">iPhone（Safari）の場合</div>
+    <ol>
+      <li>画面下の共有ボタン（四角に↑のマーク）をタップ</li>
+      <li>「ホーム画面に追加」をタップ</li>
+      <li>右上の「追加」をタップ</li>
+    </ol>
+    <div class="help-sub">Android（Chrome）の場合</div>
+    <ol>
+      <li>右上の「⋮」（メニュー）をタップ</li>
+      <li>「ホーム画面に追加」または「アプリをインストール」をタップ</li>
+      <li>「追加」をタップ</li>
+    </ol>
+
+    <h3>🏠 画面の見方</h3>
+    <ul>
+      <li><b>ホーム</b>：打合せ内容やお家づくりの進み具合を確認できます</li>
+      <li><b>アルバム</b>：お写真をまとめてご覧いただけます</li>
+      <li><b>メッセージ</b>：住まいるハウジングのスタッフへメッセージを送れます</li>
+      <li><b>予約</b>：打合せなどのご予約ができます</li>
+      <li><b>家づくり</b>：仕様やプランなど、詳しい内容を確認できます</li>
+    </ul>
+
+    <div class="help-note">ご不明な点がございましたら、打合せの際にお気軽にスタッフへお尋ねください。</div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -870,6 +919,11 @@
   function closeLb(){ document.getElementById("lb").hidden = true; document.getElementById("lbImg").src = ""; }
   document.getElementById("lbX").addEventListener("click", closeLb);
   document.getElementById("lb").addEventListener("click", function(e){ if(e.target.id==="lb") closeLb(); });
+
+  function closeHelp(){ document.getElementById("help").hidden = true; }
+  document.getElementById("btnHelp").addEventListener("click", function(){ document.getElementById("help").hidden = false; });
+  document.getElementById("helpX").addEventListener("click", closeHelp);
+  document.getElementById("help").addEventListener("click", function(e){ if(e.target.id==="help") closeHelp(); });
 
   load();
 
