@@ -53,19 +53,34 @@ export default async (req: Request, context: Context) => {
           const ti = await fetch("https://oauth2.googleapis.com/tokeninfo?access_token=" + encodeURIComponent(tk.accessToken));
           if (ti.ok) { const tiData: any = await ti.json(); grantedScope = tiData.scope || null; }
         } catch { /* 無視 */ }
-        // 「お客様予約」カレンダーに対して、このアカウントが実際にどの権限を持っているか
-        // （owner/writer/reader/freeBusyReader）。これがGoogle Calendar APIの判定そのもの。
+        // calendarList系のAPIはcalendar.eventsスコープでは使えない（別の権限区分）ため、
+        // 実際の予約処理と全く同じ方法（calendar.eventsスコープでのevents.insert）で
+        // テスト用の予定を作成→即削除してみて、本物のエラー内容を確認する。
         try {
-          const cl = await fetch(
-            `https://www.googleapis.com/calendar/v3/users/me/calendarList/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}`,
-            { headers: { Authorization: "Bearer " + tk.accessToken } }
+          const farDate = "2099-01-01"; // 予約の空き状況計算に影響しない、十分先の日付
+          const insRes = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}/events`,
+            {
+              method: "POST",
+              headers: { Authorization: "Bearer " + tk.accessToken, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                summary: "[自動テスト・権限確認用／即削除されます]",
+                start: { date: farDate },
+                end: { date: farDate },
+              }),
+            }
           );
-          if (cl.ok) {
-            const clData: any = await cl.json();
-            calendarAccessRole = clData.accessRole || null;
+          const insBody: any = await insRes.json().catch(() => ({}));
+          if (insRes.ok) {
+            calendarAccessRole = "writer（書き込みテスト成功）";
+            if (insBody.id) {
+              await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}/events/${insBody.id}`,
+                { method: "DELETE", headers: { Authorization: "Bearer " + tk.accessToken } }
+              ).catch(() => {});
+            }
           } else {
-            const clErr: any = await cl.json().catch(() => ({}));
-            calendarCheckError = `status ${cl.status}: ${(clErr && clErr.error && clErr.error.message) || "不明"}`;
+            calendarCheckError = `status ${insRes.status}: ${JSON.stringify(insBody).slice(0, 500)}`;
           }
         } catch (e: any) { calendarCheckError = String(e?.message || e); }
       }
