@@ -5149,7 +5149,14 @@
     var title = (titleInput && titleInput.value || "").trim();
     var decided = (decidedInput && decidedInput.value || "").trim();
     var open = (openInput && openInput.value || "").trim();
-    if(!decided && !open){ toast("決定事項または未決事項を入力してください"); return; }
+    // PDF・写真などの資料を添付する場合は、決定事項・未決事項が空でも記録できる（契約書類の保管など）。
+    var hasFilePicked = !!(document.getElementById("meetingNoteFile") && document.getElementById("meetingNoteFile").files && document.getElementById("meetingNoteFile").files.length);
+    var editingHasFiles = false;
+    if(editingMeetingNoteId){
+      var ex0 = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
+      editingHasFiles = !!(ex0 && ex0.files && ex0.files.length);
+    }
+    if(!decided && !open && !hasFilePicked && !editingHasFiles){ toast("決定事項・未決事項を入力するか、資料を添付してください"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var dateInput = document.getElementById("meetingNoteDate");
     var noteDate = (dateInput && dateInput.value) ? dateInput.value : todayStr();
