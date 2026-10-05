@@ -109,6 +109,16 @@ async function listCollection(store: ReturnType<typeof getStore>, collection: st
   );
 }
 
+// お家のイメージの「場所」タグ。住まいるアプリ側（public/app/index.html の IMAGE_PLACES）と
+// public/note/index.html には同じ内容があるので、変更時は3か所とも直すこと。
+const IMAGE_PLACES = ["外観", "玄関", "LDK", "キッチン", "お風呂", "洗面・脱衣", "トイレ", "階段", "寝室", "子供部屋", "その他"];
+const IMAGE_MAX_BYTES = 4 * 1024 * 1024; // 1枚あたり。画面側で長辺1600pxに縮小してから送る
+const IMAGE_MAX_PER_PROJECT = 200; // お客様が追加できる枚数の上限（案件ごと）
+
+function imageOf(x: any) {
+  return { id: x.id, url: x.url, place: x.place || "その他", by: x.by === "customer" ? "customer" : "staff", createdAt: x.createdAt || "" };
+}
+
 function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
@@ -178,11 +188,47 @@ export default async (req: Request, context: Context) => {
       );
       return json({ ok: true, message: doc });
     }
+    // お家のイメージ（アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所）。
+    // お客様は自分が追加した写真だけ削除できる（スタッフの写真は消せない）。
+    if (body.action === "imageAdd") {
+      const place = String(body.place || "");
+      if (!IMAGE_PLACES.includes(place)) return json({ error: "unknown_place" }, 400);
+      const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(String(body.dataUrl || ""));
+      if (!m) return json({ error: "invalid_image" }, 400);
+      const contentType = m[1];
+      let bytes: Uint8Array;
+      try { bytes = Uint8Array.from(Buffer.from(m[2], "base64")); } catch { return json({ error: "invalid_base64" }, 400); }
+      if (!bytes.length) return json({ error: "invalid_image" }, 400);
+      if (bytes.length > IMAGE_MAX_BYTES) return json({ error: "too_large" }, 413);
+      const existing = await listCollection(store, "imageBoard", projectId);
+      if (existing.filter((x) => x.by === "customer").length >= IMAGE_MAX_PER_PROJECT) return json({ error: "limit_reached" }, 429);
+      const photoStore = getStore("customerPhotos");
+      const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      await photoStore.set(`${projectId}/${key}`, bytes, { metadata: { contentType } });
+      const id = genId("img");
+      const now = new Date().toISOString();
+      const doc = {
+        id, projectId, place, by: "customer", contentType,
+        url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
+        fileName: String(body.fileName || "").slice(0, 120), createdAt: now, updatedAt: now,
+      };
+      await store.setJSON(`imageBoard/${id}`, doc);
+      return json({ ok: true, image: imageOf(doc) });
+    }
+    if (body.action === "imageDelete") {
+      const id = String(body.id || "");
+      const doc: any = id ? await store.get(`imageBoard/${id}`, { type: "json" }) : null;
+      if (!doc || doc.projectId !== projectId || doc.deletedAt) return json({ error: "not_found" }, 404);
+      if (doc.by !== "customer") return json({ error: "forbidden" }, 403);
+      const now = new Date().toISOString();
+      await store.setJSON(`imageBoard/${id}`, { ...doc, deletedAt: now, updatedAt: now });
+      return json({ ok: true });
+    }
     return json({ error: "unknown_action" }, 400);
   }
 
   // ---------- お客様画面に表示するデータ ----------
-  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer] = await Promise.all([
+  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer, imageBoard] = await Promise.all([
     listCollection(store, "specPhotos", projectId),
     listCollection(store, "meetingNotes", projectId),
     listCollection(store, "attachments", projectId),
@@ -192,6 +238,7 @@ export default async (req: Request, context: Context) => {
     listCollection(store, "noteDecisions", projectId),
     listCollection(store, "noteNotices"),
     fetchOkaiCustomerExtras(projectId),
+    listCollection(store, "imageBoard", projectId),
   ]);
 
   const reflectedNotes = notes.filter((n) => n.reflected);
@@ -329,6 +376,11 @@ export default async (req: Request, context: Context) => {
     album: album
       .filter((a) => a.url)
       .map((a) => ({ ...fileOf(a), kind: a.kind || "album", createdAt: a.createdAt || "" }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    imagePlaces: IMAGE_PLACES,
+    images: imageBoard
+      .filter((x) => x.url)
+      .map(imageOf)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     messages: messages
       .map((m) => ({ content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "" }))

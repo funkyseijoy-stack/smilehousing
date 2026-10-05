@@ -275,6 +275,8 @@
   .specphoto .spdel{ position:absolute; top:2px; right:2px; background:rgba(20,16,12,.62); color:#fff; border:none; border-radius:999px; width:18px; height:18px; line-height:1; font-size:.68rem; cursor:pointer; padding:0; }
   .specphoto:not(.specadd){ cursor:pointer; }
   .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.56rem; text-align:center; padding:1px 0; pointer-events:none; }
+  .specphoto .spby{ position:absolute; top:2px; left:2px; background:rgba(255,255,255,.9); color:var(--text); font-size:.54rem; font-weight:700; border-radius:999px; padding:0 5px; pointer-events:none; }
+  .specphoto .spby.cust{ background:#b45b6a; color:#fff; }
   .specphoto.specadd{ display:flex; align-items:center; justify-content:center; cursor:pointer; border-style:dashed; color:var(--muted); font-size:1.3rem; }
   .specphoto-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
   .specphoto-checkbox{ position:absolute; top:2px; left:2px; z-index:2; background:rgba(255,255,255,.85); border-radius:5px; width:18px; height:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -578,6 +580,16 @@
             <button class="btn secondary small" id="btnAddAlbumCat">＋ カテゴリー追加</button>
           </div>
           <div id="albumPhotoCategoryWrap"></div>
+        </div>
+        <div class="card">
+          <h3>お家のイメージ（お客様と共有）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所です。おうちノートの「イメージ」タブに表示されます。お客様が追加した写真には「お客様」と表示され、ここから削除もできます。</p>
+          <div class="row" style="margin-block-end:10px; gap:6px; align-items:center;">
+            <select id="imgBoardPlace"></select>
+            <label class="btn secondary small" for="imgBoardFile" style="cursor:pointer;">＋ 写真を追加</label>
+            <input type="file" id="imgBoardFile" accept="image/*" multiple hidden>
+          </div>
+          <div id="imageBoardWrap"></div>
         </div>
       </div>
 
@@ -1274,7 +1286,7 @@
     return g ? g.label : scope;
   }
   var state = {
-    projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [], noteDecisions: [], noteNotices: [],
+    projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [], noteDecisions: [], noteNotices: [], imageBoard: [],
     settings: { progressTags: ["契約前","契約後","着工","上棟","引渡し"], staffList: ["社長","朋子","山本","渡邊"], pin: "0000" },
     currentProjectId: null,
     currentUser: null,
@@ -1297,7 +1309,7 @@
   var gmailNextPageToken = null;
   var gmailCurrentQuery = "";
   var STAFF_TOKEN_KEY = "sumairu_staff_token";
-  var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations","noteDecisions","noteNotices"];
+  var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations","noteDecisions","noteNotices","imageBoard"];
 
   // ================= persistent local user pick (per-viewer convenience) =================
   function loadLocalUser(){
@@ -1792,6 +1804,7 @@
       + state.specPhotos.filter(function(p){return p.deletedAt;}).length
       + state.confirmItems.filter(function(p){return p.deletedAt;}).length
       + state.albumPhotos.filter(function(p){return p.deletedAt;}).length
+      + state.imageBoard.filter(function(p){return p.deletedAt;}).length
       + state.reservations.filter(function(p){return p.deletedAt;}).length;
     document.getElementById("statPending").textContent = pending;
     document.getElementById("statDone").textContent = done;
@@ -4434,6 +4447,7 @@
   function renderPhotosTab(){
     renderPhotoCategorySection("reference","refPhotoCategoryWrap");
     renderPhotoCategorySection("album","albumPhotoCategoryWrap");
+    renderImageBoard();
   }
   async function addPhotoCategory(kind, inputId){
     var proj = projectById(state.currentProjectId);
@@ -4462,6 +4476,57 @@
     });
     render();
     await saveDoc("projects", proj.id, proj);
+  }
+
+  // ================= お家のイメージ（お客様と共有する写真） =================
+  // 場所タグは netlify/functions/note-data.mts の IMAGE_PLACES、public/note/index.html と同じ内容にすること。
+  var IMAGE_PLACES = ["外観","玄関","LDK","キッチン","お風呂","洗面・脱衣","トイレ","階段","寝室","子供部屋","その他"];
+  function liveImageBoard(){ return state.imageBoard.filter(function(p){ return !p.deletedAt && p.projectId===state.currentProjectId; }); }
+  function renderImageBoard(){
+    var wrap = document.getElementById("imageBoardWrap");
+    if(!wrap) return;
+    var sel = document.getElementById("imgBoardPlace");
+    if(sel && !sel.options.length){
+      sel.innerHTML = IMAGE_PLACES.map(function(pl){ return '<option value="'+pl+'">'+pl+'</option>'; }).join("");
+    }
+    var imgs = liveImageBoard();
+    if(!imgs.length){ wrap.innerHTML = '<div class="empty">まだ写真がありません。</div>'; return; }
+    var html = "";
+    IMAGE_PLACES.forEach(function(pl){
+      var list = imgs.filter(function(p){ return (p.place||"その他")===pl; })
+        .sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
+      if(!list.length) return;
+      html += '<div style="margin-block-end:12px;"><strong>'+pl+'</strong>（'+list.length+'）<div class="specphotos" style="margin-block-start:6px;">'+
+        list.map(function(p){
+          var cust = p.by==="customer";
+          return '<div class="specphoto"><img src="'+p.url+'" alt="">'+
+            '<a href="'+p.url+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
+            '<span class="spby'+(cust?' cust':'')+'">'+(cust?'お客様':'スタッフ')+'</span>'+
+            '<button class="spdel" data-delimageboard="'+p.id+'">×</button></div>';
+        }).join("")+'</div></div>';
+    });
+    wrap.innerHTML = html;
+  }
+  async function uploadImageBoard(fileList, place){
+    if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
+    if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var files = Array.prototype.slice.call(fileList||[]);
+    var added = 0;
+    for(var i=0;i<files.length;i++){
+      var f = files[i];
+      try{
+        var compressed = await compressImageFile(f);
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
+        var doc = { id: uid("img"), projectId: state.currentProjectId, place: place, by: "staff", url: res.url,
+          contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso(), updatedAt: nowIso() };
+        state.imageBoard.push(doc);
+        var saved = await saveDoc("imageBoard", doc.id, doc);
+        if(!saved){ state.imageBoard = state.imageBoard.filter(function(x){ return x.id!==doc.id; }); }
+        else added++;
+      }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
+    }
+    render();
+    if(added) logActivity("お家のイメージ写真を追加しました（"+added+"件）");
   }
 
   // ================= 予約・Googleカレンダー連携 =================
@@ -4580,6 +4645,7 @@
     state.specPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ items.push({kind:"仕様写真", label:(p.category||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("specPhotos","specPhotos",p.id,"仕様写真");}, purge:function(){purgeItem("specPhotos","specPhotos",p.id,"仕様写真");}}); });
     state.confirmItems.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="confirm"?"確認事項":"お客様の検討事項")+"「"+(p.content||"").slice(0,20)+"」"; items.push({kind:(p.kind==="confirm"?"確認事項":"お客様の検討事項"), label:(p.content||"").slice(0,20), ts:p.deletedAt, restore:function(){restoreItem("confirmItems","confirmItems",p.id,label);}, purge:function(){purgeItem("confirmItems","confirmItems",p.id,label);}}); });
     state.albumPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="reference"?"参考写真":"アルバム写真"); items.push({kind:label, label:(p.fileName||""), ts:p.deletedAt, restore:function(){restoreItem("albumPhotos","albumPhotos",p.id,label);}, purge:function(){purgeItem("albumPhotos","albumPhotos",p.id,label);}}); });
+    state.imageBoard.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="イメージ写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("imageBoard","imageBoard",p.id,label);}, purge:function(){purgeItem("imageBoard","imageBoard",p.id,label);}}); });
     state.reservations.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="予約「"+(p.type||"")+" "+(p.date||"")+"」"; items.push({kind:"予約", label:(p.type||"")+" "+(p.date||""), ts:p.deletedAt, restore:function(){restoreItem("reservations","reservations",p.id,label);}, purge:function(){purgeItem("reservations","reservations",p.id,label);}}); });
     items.sort(function(a,b){ return (b.ts||"").localeCompare(a.ts||""); });
     empty.hidden = items.length !== 0;
@@ -6625,6 +6691,18 @@
         var del = e.target.closest("[data-delalbum]");
         if(del){ e.preventDefault(); if(confirm2()) deleteAlbumPhoto(del.dataset.delalbum); }
       });
+    });
+
+    document.getElementById("imgBoardFile").addEventListener("change", function(e){
+      var input = e.target;
+      var files = Array.prototype.slice.call(input.files||[]);
+      var place = document.getElementById("imgBoardPlace").value || "その他";
+      input.value = "";
+      uploadImageBoard(files, place);
+    });
+    document.getElementById("imageBoardWrap").addEventListener("click", function(e){
+      var del = e.target.closest("[data-delimageboard]");
+      if(del){ e.preventDefault(); if(confirm2()){ var p = state.imageBoard.find(function(x){ return x.id===del.dataset.delimageboard; }); softDelete("imageBoard","imageBoard", del.dataset.delimageboard, (p && p.by==="customer") ? "お客様のイメージ写真" : "イメージ写真"); } }
     });
 
     document.getElementById("resType").addEventListener("change", function(e){

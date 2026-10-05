@@ -21,6 +21,8 @@ const ALLOWED_COLLECTIONS = [
   "reservations", "settings",
   // 新おうちノート（/note/）用：お客様の仮決定・決定、お知らせ・豆知識
   "noteDecisions", "noteNotices",
+  // お家のイメージ（お客様とスタッフが双方で追加する写真）
+  "imageBoard",
 ];
 
 function genId() {

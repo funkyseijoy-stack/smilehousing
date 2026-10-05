@@ -24,16 +24,15 @@
   @media (min-width:560px){ .app{ margin:16px auto; min-height:calc(100vh - 32px); border-radius:34px; border:8px solid #2b2522; overflow:hidden; } }
 
   /* header */
-  .hd{ display:flex; align-items:center; gap:10px; padding:20px 18px 18px; background:#3a302b; }
-  .hd .logo{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .hd .logo svg{ width:44px; height:44px; }
-  .hd .titlewrap{ min-width:0; }
-  .hd .en{ font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",Georgia,serif; font-size:clamp(1.05rem,4.6vw,1.6rem); letter-spacing:.34em; font-weight:400; color:#f1e6d6; line-height:1; white-space:nowrap; }
-  .hd .rule{ height:1px; width:150px; max-width:100%; background:rgba(216,191,157,.55); margin:9px 0 9px; }
-  .hd .ttl{ font-size:clamp(.6rem,2.6vw,.74rem); letter-spacing:.5em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; }
-  .hd .help-btn{ margin-left:auto; width:36px; height:36px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.86rem; }
-  .hd .mail{ width:40px; height:40px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
-  .hd .mail svg{ width:20px; height:20px; }
+  .hd{ display:flex; align-items:center; gap:6px; padding:18px 14px 16px; background:#3a302b; }
+  .hd .logo{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .hd .logo svg{ width:40px; height:40px; }
+  .hd .titlewrap{ min-width:0; flex:1; margin-right:2px; }
+  .hd .en{ font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",Georgia,serif; font-size:clamp(.92rem,4.2vw,1.5rem); letter-spacing:.3em; font-weight:400; color:#f1e6d6; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hd .rule{ height:1px; width:120px; max-width:100%; background:rgba(216,191,157,.55); margin:8px 0 8px; }
+  .hd .ttl{ font-size:clamp(.54rem,2.3vw,.7rem); letter-spacing:.4em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; overflow:hidden; text-overflow:ellipsis; }
+  .hd .hbtn{ width:33px; height:33px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.8rem; padding:0; }
+  .hd .hbtn svg{ width:16px; height:16px; }
   .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
   .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
   .band .st{ font-weight:700; margin-top:2px; }
@@ -152,6 +151,31 @@
   .svc{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px 10px; display:flex; flex-direction:column; align-items:center; gap:10px; text-decoration:none; color:var(--ink); font-weight:700; font-size:.84rem; }
   .svc .si{ width:64px; height:64px; border-radius:16px; background:var(--chip); display:flex; align-items:center; justify-content:center; color:var(--brown); }
   .svc .si svg{ width:30px; height:30px; }
+  /* お家のイメージ */
+  .imgadd{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .imgadd .row{ display:flex; gap:10px; align-items:center; }
+  .imgadd .row label.l{ font-size:.8rem; color:var(--ink2); flex:none; }
+  .imgadd select{ flex:1; min-width:0; border:1.5px solid var(--line2); border-radius:12px; padding:10px 12px; font:inherit; font-size:.9rem; background:#fff; color:var(--ink); }
+  .imgadd .pick{ display:block; text-align:center; border-radius:14px; padding:13px 6px; font-weight:700; letter-spacing:.08em; background:var(--brown); color:#fff; cursor:pointer; }
+  .imgadd .pick.busy{ opacity:.5; pointer-events:none; }
+  .imgadd .hint{ font-size:.74rem; color:var(--muted); line-height:1.6; }
+  .chips{ display:flex; gap:8px; overflow-x:auto; padding:14px 0 4px; -webkit-overflow-scrolling:touch; }
+  .chipf{ flex:none; border:1.5px solid var(--line2); background:var(--card); color:var(--ink2); border-radius:999px; padding:7px 13px; font-size:.8rem; cursor:pointer; }
+  .chipf.on{ background:var(--brown); border-color:var(--brown); color:#fff; font-weight:700; }
+  .imggrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px; }
+  .imgcell{ position:relative; }
+  .imgcell .th{ width:100%; }
+  .imgcell .by{ position:absolute; top:8px; left:8px; background:rgba(255,255,255,.92); color:var(--ink2); font-size:.64rem; font-weight:700; border-radius:999px; padding:2px 8px; }
+  .imgcell .by.me{ background:var(--brown); color:#fff; }
+  .imgcell .imgdel{ position:absolute; top:6px; right:6px; width:30px; height:30px; border-radius:50%; border:none; background:rgba(20,16,14,.6); color:#fff; font-size:1rem; line-height:1; cursor:pointer; }
+  .orderlist{ display:flex; flex-direction:column; gap:10px; }
+  .orderitem{ display:flex; gap:12px; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; align-items:flex-start; }
+  .orderitem .num{ flex:none; width:26px; height:26px; border-radius:50%; background:var(--brown); color:#fff; font-weight:700; font-size:.8rem; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .orderitem .ot{ font-weight:700; font-size:.88rem; margin-bottom:3px; }
+  .orderitem .od{ font-size:.78rem; color:var(--ink2); line-height:1.5; }
+  .orderitem .otag{ font-size:.68rem; color:var(--muted); margin-top:5px; }
+  .ordernote{ font-size:.74rem; color:var(--muted); margin-top:10px; line-height:1.6; }
+  .meminput{ width:100%; border:1.5px solid var(--line2); border-radius:12px; padding:10px 12px; font:inherit; font-size:.86rem; line-height:1.6; resize:vertical; min-height:150px; background:#fff; color:var(--ink); }
   .ntc-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
   @media (min-width:420px){ .ntc-grid.two{ grid-template-columns:1fr 1fr; } }
   .ntc-wrap .ntag{ display:inline-block; font-size:.68rem; background:var(--green); color:var(--green-ink); border-radius:6px 6px 0 0; padding:3px 9px; }
@@ -273,9 +297,15 @@
       <div class="rule"></div>
       <div class="ttl">おうちノート</div>
     </div>
-    <button class="help-btn" id="btnHelp" aria-label="使い方・追加方法">？</button>
-    <button class="mail" id="btnMail" aria-label="メッセージ">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
+    <button class="hbtn" id="btnOrder" aria-label="決める順番">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
+    </button>
+    <button class="hbtn" id="btnMemo" aria-label="わたしのメモ">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>
+    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法">？</button>
+    <button class="hbtn" id="btnMail" aria-label="メッセージ">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
     </button>
   </header>
   <div class="band">
@@ -288,6 +318,7 @@
 <nav class="nav" id="nav" hidden>
   <button data-tab="home"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg></span>ホーム</button>
   <button data-tab="album"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>アルバム</button>
+  <button data-tab="image"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>イメージ</button>
   <button data-tab="msg"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span>メッセージ</button>
   <button data-tab="resv"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M8 14h3M13 14h3M8 17h3"/></svg></span>予約</button>
   <button data-tab="build"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg></span>家づくり</button>
@@ -320,12 +351,38 @@
     <ul>
       <li><b>ホーム</b>：打合せ内容やお家づくりの進み具合を確認できます</li>
       <li><b>アルバム</b>：お写真をまとめてご覧いただけます</li>
+      <li><b>イメージ</b>：こんなお家にしたい、という写真をスタッフと一緒に追加できます</li>
       <li><b>メッセージ</b>：住まいるハウジングのスタッフへメッセージを送れます</li>
       <li><b>予約</b>：打合せなどのご予約ができます</li>
       <li><b>家づくり</b>：仕様やプランなど、詳しい内容を確認できます</li>
     </ul>
 
+    <h3>📌 上部のボタン</h3>
+    <ul>
+      <li><b>決める順番</b>：家づくりで何から決めればいいか、順番の目安を確認できます</li>
+      <li><b>わたしのメモ</b>：気になったことを自由に書き留められます（この端末にのみ保存されます）</li>
+    </ul>
+
     <div class="help-note">ご不明な点がございましたら、打合せの際にお気軽にスタッフへお尋ねください。</div>
+  </div>
+</div>
+
+<div class="help" id="orderModal" hidden>
+  <div class="help-card">
+    <button class="x" id="orderX" aria-label="閉じる">×</button>
+    <h2>決める順番</h2>
+    <p class="help-lead">家づくりで決めることが多いので、一般的な順番の目安をご案内します。</p>
+    <div class="orderlist" id="orderlist"></div>
+    <div class="ordernote">※工事の進み方や商品の納期により、確認の順番が前後する場合があります。</div>
+  </div>
+</div>
+
+<div class="help" id="memoModal" hidden>
+  <div class="help-card">
+    <button class="x" id="memoX" aria-label="閉じる">×</button>
+    <h2>わたしのメモ</h2>
+    <p class="help-lead">打合せで気になったこと、次回聞きたいことなどを自由に書き留められます。ここに書いた内容はこの端末にのみ保存され、住まいるハウジングのスタッフには共有されません。</p>
+    <textarea id="memoInput" class="meminput" placeholder="例：次回、照明の色味サンプルを見せてもらう"></textarea>
   </div>
 </div>
 
@@ -350,6 +407,15 @@
   };
   var EXT_LABELS = [["mainWall","メイン外壁"],["mainWallNote","メイン外壁の品番・補足"],["accentWall","アクセント外壁"],["accentWallNote","アクセント外壁の品番・補足"],["roofColor","屋根の色"],["roofNote","屋根・破風の補足"],["roofPhotoNote","屋根の写真・品番"],["fasciaColor","破風・鼻隠しの色"],["fasciaPhotoNote","破風・鼻隠しの写真・品番"],["sashOutside","サッシ外観色"],["sashInside","室内側の窓枠色"],["glass","ガラス"],["fogPlace","くもりガラスの場所"]];
   var WD = ["日","月","火","水","木","金","土"];
+  // 「決める順番」カード（全お客様共通の案内。打合せの進み方の目安として表示する）
+  var DECISION_ORDER = [
+    { title:"キッチン・LDK・階段のデザイン", desc:"暮らしの中心となるキッチンから、LDKの空間・階段のデザインまで一緒に決めていきます", tag:"キッチン／LDK／階段" },
+    { title:"外装（お家の顔）", desc:"外壁・屋根・窓の外枠・玄関ドアなど、お家の外観を決めます", tag:"外部／玄関" },
+    { title:"電気・暖房設備", desc:"電気配線・暖房・換気など、見えない部分の設備を決めます", tag:"電気配線／暖房設備／換気設備" },
+    { title:"浴室・システムバスルーム", desc:"浴室の仕様・システムバスルームを決めます", tag:"お風呂" },
+    { title:"空間のトータルコーディネート", desc:"建具（室内のドア）・クロス・洗面・トイレ・脱衣室など、空間全体をまとめて決めます", tag:"ドア／メインクロス／洗面／1階トイレ／2階トイレ／脱衣室" },
+    { title:"ニッチ・マグネットウォール・窓まわり", desc:"ニッチやマグネットウォールなどのご希望をお伺いし、最後に窓まわり（カーテンなど）を仕上げます", tag:"各部屋" }
+  ];
 
   var P = "", T = "";
   try{
@@ -360,7 +426,7 @@
   }catch(e){}
 
   var data = null;
-  var view = { tab:"home", buildSeg:"spec", cat:null };
+  var view = { tab:"home", buildSeg:"spec", cat:null, imgFilter:"all", imgPlace:"LDK", imgBusy:false };
   var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false };
   var main = document.getElementById("main");
 
@@ -368,6 +434,10 @@
   function fmtD(d){ if(!d) return ""; var p = String(d).slice(0,10).split("-"); return p.length===3 ? Number(p[0])+"."+Number(p[1])+"."+Number(p[2]) : d; }
   function md(d){ if(!d) return ""; var dt = new Date(String(d).slice(0,10)+"T00:00:00"); return (dt.getMonth()+1)+"/"+dt.getDate()+"("+WD[dt.getDay()]+")"; }
   function isImg(f){ return (f.contentType||"").indexOf("image")===0 || /\.(jpe?g|png|gif|webp)$/i.test(f.name||""); }
+  // お客様のみが見られる自由メモ。サーバーには送らず、この端末のlocalStorageだけに保存する。
+  function memoKey(){ return "okainote_memo_"+P; }
+  function loadMemo(){ try{ return localStorage.getItem(memoKey())||""; }catch(e){ return ""; } }
+  function saveMemo(v){ try{ localStorage.setItem(memoKey(), v); }catch(e){} }
   function isPdf(f){ return (f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||""); }
   if(typeof pdfjsLib !== "undefined"){
     try{
@@ -470,6 +540,7 @@
     else if(view.tab==="album") html = albumHtml();
     else if(view.tab==="msg") html = msgHtml();
     else if(view.tab==="resv") html = resvHtml();
+    else if(view.tab==="image") html = imageHtml();
     else html = view.cat ? catDetailHtml(view.cat) : buildHtml();
     main.innerHTML = '<div class="wrap">'+html+'</div>';
     if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
@@ -590,6 +661,89 @@
       (n.body?'<div class="nb">'+esc(n.body)+'</div>':'')+
       (n.linkUrl?'<a class="nl" href="'+esc(n.linkUrl)+'" target="_blank" rel="noopener"><div><b>'+esc(n.linkLabel||"詳しく見る")+'</b><span>案内資料</span></div><span class="op">開く</span></a>':'')+
       '</div></div>';
+  }
+
+  // ---------- お家のイメージ ----------
+  function imageHtml(){
+    var places = data.imagePlaces || [];
+    var imgs = data.images || [];
+    var used = {};
+    imgs.forEach(function(x){ used[x.place] = true; });
+    if(view.imgFilter!=="all" && !used[view.imgFilter]) view.imgFilter = "all";
+    var shown = view.imgFilter==="all" ? imgs : imgs.filter(function(x){ return x.place===view.imgFilter; });
+    var out = '<h2 class="big">お家のイメージ</h2><p class="sub">こんなお家にしたい、という写真をお互いに追加できます。追加した写真は住まいるハウジングのスタッフにも共有されます。</p>';
+    out += '<div class="imgadd"><div class="row"><label class="l" for="imgPlace">場所</label><select id="imgPlace">'+
+      places.map(function(pl){ return '<option value="'+esc(pl)+'"'+(pl===view.imgPlace?' selected':'')+'>'+esc(pl)+'</option>'; }).join("")+
+      '</select></div>'+
+      '<label class="pick'+(view.imgBusy?' busy':'')+'" for="imgFile">'+(view.imgBusy?'追加しています…':'＋ 写真を追加')+'</label>'+
+      '<input type="file" id="imgFile" accept="image/*" multiple hidden'+(view.imgBusy?' disabled':'')+'>'+
+      '<div class="hint">Instagramや雑誌などで見つけた「こんな雰囲気がいいな」という写真もどうぞ。ご自身が追加した写真は、あとから削除できます。</div></div>';
+    if(imgs.length){
+      out += '<div class="chips"><button class="chipf'+(view.imgFilter==="all"?' on':'')+'" data-imgfilter="all">すべて '+imgs.length+'</button>'+
+        places.filter(function(pl){ return used[pl]; }).map(function(pl){
+          var n = imgs.filter(function(x){ return x.place===pl; }).length;
+          return '<button class="chipf'+(view.imgFilter===pl?' on':'')+'" data-imgfilter="'+esc(pl)+'">'+esc(pl)+' '+n+'</button>';
+        }).join("")+'</div>';
+      out += '<div class="imggrid">'+shown.map(function(x){
+        var mine = x.by==="customer";
+        return '<div class="imgcell"><button class="th" data-img="'+esc(x.url)+'"><img loading="lazy" src="'+esc(x.url)+'" alt=""><span class="cap">'+esc(x.place)+' ・ '+fmtD(x.createdAt)+'</span></button>'+
+          '<span class="by'+(mine?' me':'')+'">'+(mine?'あなた':'スタッフ')+'</span>'+
+          (mine?'<button class="imgdel" data-imgdel="'+esc(x.id)+'" aria-label="この写真を削除">×</button>':'')+'</div>';
+      }).join("")+'</div>';
+    } else {
+      out += '<div class="empty" style="margin-top:16px;">まだ写真はありません。上のボタンから追加できます。</div>';
+    }
+    return out;
+  }
+  // 端末の写真は大きいので、長辺1600pxのJPEGに縮小してから送る（送信サイズの上限対策）
+  function shrinkImage(file, maxDim, quality){
+    return new Promise(function(resolve, reject){
+      var fr = new FileReader();
+      fr.onerror = function(){ reject(new Error("read")); };
+      fr.onload = function(){
+        var img = new Image();
+        img.onerror = function(){ reject(new Error("decode")); };
+        img.onload = function(){
+          var scale = Math.min(1, maxDim/Math.max(img.naturalWidth, img.naturalHeight));
+          var w = Math.max(1, Math.round(img.naturalWidth*scale)), h = Math.max(1, Math.round(img.naturalHeight*scale));
+          var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(cv.toDataURL("image/jpeg", quality));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  async function addImages(fileList){
+    if(view.imgBusy) return;
+    var files = Array.prototype.slice.call(fileList||[]).filter(function(f){ return /^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name||""); });
+    if(!files.length){ toast("写真を選んでください"); return; }
+    view.imgBusy = true; render();
+    var ok = 0, fail = 0, full = false;
+    for(var i=0;i<files.length;i++){
+      try{
+        var dataUrl = await shrinkImage(files[i], 1600, 0.82);
+        if(dataUrl.length > 5000000) dataUrl = await shrinkImage(files[i], 1200, 0.7);
+        var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ p:P, t:T, action:"imageAdd", place:view.imgPlace, dataUrl:dataUrl, fileName:files[i].name||"" }) });
+        var j = await res.json();
+        if(!res.ok){ if(j && j.error==="limit_reached") full = true; throw new Error(j.error||"error"); }
+        data.images.unshift(j.image); ok++;
+      }catch(e){ fail++; }
+      if(full) break;
+    }
+    view.imgBusy = false; render();
+    toast(full ? "追加できる枚数の上限に達しました" : fail ? (ok+"枚追加しました（"+fail+"枚は追加できませんでした）") : ok+"枚追加しました");
+  }
+  async function deleteImage(id){
+    if(!window.confirm("この写真を削除しますか？")) return;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"imageDelete", id:id }) });
+      if(!res.ok) throw new Error("error");
+      data.images = data.images.filter(function(x){ return x.id!==id; });
+      render(); toast("削除しました");
+    }catch(e){ toast("削除できませんでした。もう一度お試しください"); }
   }
 
   // ---------- アルバム ----------
@@ -908,6 +1062,8 @@
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; render(); window.scrollTo(0,0); return; }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
+    var imf = e.target.closest("[data-imgfilter]"); if(imf){ view.imgFilter = imf.dataset.imgfilter; render(); return; }
+    var imd = e.target.closest("[data-imgdel]"); if(imd){ deleteImage(imd.dataset.imgdel); return; }
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
@@ -918,14 +1074,36 @@
     var rs = e.target.closest("[data-rvstart]"); if(rs){ rv.start = rs.dataset.rvstart; render(); return; }
     if(e.target.closest("#rvBook")){ bookNow(); return; }
   });
+  main.addEventListener("change", function(e){
+    if(e.target.id==="imgPlace"){ view.imgPlace = e.target.value; return; }
+    if(e.target.id==="imgFile"){ var fl = e.target.files; addImages(fl); e.target.value = ""; }
+  });
   function closeLb(){ document.getElementById("lb").hidden = true; document.getElementById("lbImg").src = ""; }
   document.getElementById("lbX").addEventListener("click", closeLb);
   document.getElementById("lb").addEventListener("click", function(e){ if(e.target.id==="lb") closeLb(); });
 
-  function closeHelp(){ document.getElementById("help").hidden = true; }
-  document.getElementById("btnHelp").addEventListener("click", function(){ document.getElementById("help").hidden = false; });
-  document.getElementById("helpX").addEventListener("click", closeHelp);
-  document.getElementById("help").addEventListener("click", function(e){ if(e.target.id==="help") closeHelp(); });
+  // ヘッダーのボタンから開く3つのシート（使い方／決める順番／わたしのメモ）。
+  // いずれもホームの描画（render）とは無関係に、ページ読み込み時に一度だけ組み立てる。
+  function openSheet(id){ document.getElementById(id).hidden = false; }
+  function closeSheet(id){ document.getElementById(id).hidden = true; }
+  [["btnHelp","help","helpX"],["btnOrder","orderModal","orderX"],["btnMemo","memoModal","memoX"]].forEach(function(t){
+    var openBtn = t[0], sheetId = t[1], closeBtn = t[2];
+    document.getElementById(openBtn).addEventListener("click", function(){ openSheet(sheetId); });
+    document.getElementById(closeBtn).addEventListener("click", function(){ closeSheet(sheetId); });
+    document.getElementById(sheetId).addEventListener("click", function(e){ if(e.target.id===sheetId) closeSheet(sheetId); });
+  });
+
+  // 決める順番（全お客様共通の案内）を一度だけ組み立てる
+  document.getElementById("orderlist").innerHTML = DECISION_ORDER.map(function(o,i){
+    return '<div class="orderitem"><div class="num">'+(i+1)+'</div><div><div class="ot">'+esc(o.title)+'</div>'+
+      '<div class="od">'+esc(o.desc)+'</div><div class="otag">関連：'+esc(o.tag)+'</div></div></div>';
+  }).join("");
+
+  // わたしのメモ（お客様のみが見られる自由メモ）。サーバーには送らず、この端末の
+  // localStorageだけに保存する。入力欄はrenderで作り直されないので、直接リスナーを張る。
+  var memoInput = document.getElementById("memoInput");
+  memoInput.value = loadMemo();
+  memoInput.addEventListener("input", function(){ saveMemo(memoInput.value); });
 
   load();
 
@@ -938,6 +1116,9 @@
     if(Date.now() - lastLoadAt < 30000) return; // 直近30秒以内に読み込み済みならスキップ
     var mi = document.getElementById("msgInput");
     if(mi && mi.value.trim()){ return; } // メッセージ入力中は上書きしない
+    if(view.imgBusy){ return; } // 写真の追加中は上書きしない
+    var mo = document.getElementById("memoInput");
+    if(mo && document.activeElement===mo){ return; } // メモ入力中は上書きしない
     lastLoadAt = Date.now();
     load();
   }

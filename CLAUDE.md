@@ -76,6 +76,8 @@
   `public/app/index.html` の `noteCatIdFor` の**2か所に同じ内容**がある。変更時は両方直すこと。
 - 設備仕様の一覧は8項目（外部・キッチン・お風呂・洗面・トイレ・暖房・換気・電気・あかり・インテリアメイン・各部屋）。トイレ（1階・2階）、暖房・換気、電気・あかりは1項目に統合している（統合前のID `toilet1` 等で保存された決定は `LEGACY_CAT_MAP` で読み替え）。
 - 「各部屋」（id `rooms`）は部屋別インテリア（scope:"room"）を部屋ごとに表示し、「仮決定／決定」も部屋単位（`noteDecisions` の `roomId` 付き、ID は `<案件ID>__rooms__<部屋ID>`）。インテリアメインには床・建具・クロスなど家全体の基本色だけを出す。
+- お家のイメージ（2026年10月〜）: アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所。`imageBoard` コレクション（`ALLOWED_COLLECTIONS` に追記済み）。お客様は `note-data.mts` の `imageAdd` / `imageDelete`（自分の写真のみ削除可）、スタッフは住まいるアプリの「写真・アルバム」タブの「お家のイメージ」から。場所タグ（外観・LDKなど）は `note-data.mts` の `IMAGE_PLACES` と `public/app/index.html` の `IMAGE_PLACES` の**2か所**に同じ内容があるので、変更時は両方直すこと（お客様画面はサーバーから受け取る）。
+- ヘッダーのボタン（決める順番・わたしのメモ・使い方・メッセージ）: 「決める順番」は `public/note/index.html` の `DECISION_ORDER`（全お客様共通の文言）。「わたしのメモ」はお客様の端末のlocalStorageにだけ保存し、サーバー・スタッフには送らない。
 - 見積（kind:"quote"）や社内タスクはお客様には出さない設計。
 - 予約（2026年10月〜）: `netlify/functions/note-calendar.mts`（`/api/note-calendar`）。空き状況は Googleカレンダー「お客様予約」＋ 住まいるアプリの `reservations` から判定（9:00〜17:00・30分刻み・1枠2時間・日曜と祝日は不可、同時刻は1件のみ）。確定すると同カレンダーに予定を登録し、`reservations` にも保存する。種類は 来店／オンライン／銀行／ショールーム。
 - 通知: お客様の予約・メッセージ送信時に `netlify/lib/google.mts` の `sendNotifyMail` で smilehousing8@gmail.com へメール（失敗しても処理は止めない）。
