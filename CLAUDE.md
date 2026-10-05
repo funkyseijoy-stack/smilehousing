@@ -79,6 +79,8 @@
 - お家のイメージ（2026年10月〜）: アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所。`imageBoard` コレクション（`ALLOWED_COLLECTIONS` に追記済み）。お客様は `note-data.mts` の `imageAdd` / `imageDelete`（自分の写真のみ削除可）、スタッフは住まいるアプリの「写真・アルバム」タブの「お家のイメージ」から。場所タグ（外観・LDKなど）は `note-data.mts` の `IMAGE_PLACES` と `public/app/index.html` の `IMAGE_PLACES` の**2か所**に同じ内容があるので、変更時は両方直すこと（お客様画面はサーバーから受け取る）。
 - ヘッダーのボタン（決める順番・わたしのメモ・使い方・メッセージ）: 「決める順番」は `public/note/index.html` の `DECISION_ORDER`（全お客様共通の文言）。「わたしのメモ」はお客様の端末のlocalStorageにだけ保存し、サーバー・スタッフには送らない。
 - 見積（kind:"quote"）や社内タスクはお客様には出さない設計。
+- 現場写真（スタッフ限定、2026年10月〜）: リフォーム案件（`type==="リフォーム"`）の「写真・アルバム」タブに出る `sitePhotos` コレクション（`ALLOWED_COLLECTIONS` に追記済み）。**お客様画面には出さない**ので、`note-data.mts` には読み込みを追加しないこと。場所タグは `public/app/index.html` の `SITE_PLACES`、撮影日・メモ付きで複数枚まとめて追加できる。
+- 打合せ記録の「操作」メニュー（2026年10月〜）: 「→社内タスクへ」等のほかに「→追加見積もりへ」があり、おうちノート連携の追加見積り（`customerEstimates`）に金額なし（お客様画面は「金額確認中」）で追加する。金額は「おうちノート」タブの追加見積り一覧で入力。登録済みかどうかは打合せ記録の `sent` フィールド（バッジ表示）で管理。
 - 予約（2026年10月〜）: `netlify/functions/note-calendar.mts`（`/api/note-calendar`）。空き状況は Googleカレンダー「お客様予約」＋ 住まいるアプリの `reservations` から判定（9:00〜17:00・30分刻み・1枠2時間・日曜と祝日は不可、同時刻は1件のみ）。確定すると同カレンダーに予定を登録し、`reservations` にも保存する。種類は 来店／オンライン／銀行／ショールーム。
 - 通知: お客様の予約・メッセージ送信時に `netlify/lib/google.mts` の `sendNotifyMail` で smilehousing8@gmail.com へメール（失敗しても処理は止めない）。
 - カレンダー・メール送信にはGoogle連携（設定タブの「Gmailと連携する」）でカレンダー権限（calendar.events）の許可が必要。権限追加後は一度やり直すこと。Google Cloud側でCalendar APIの有効化も必要。

@@ -606,6 +606,20 @@
           </div>
           <div id="imageBoardWrap"></div>
         </div>
+        <div class="card" id="sitePhotoCard" hidden>
+          <h3>現場写真（スタッフ限定）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">リフォームの現場で撮った写真を、スタッフだけで共有する場所です。お客様のおうちノートには表示されません。複数枚をまとめて追加でき、自動で軽量化されます。</p>
+          <div class="row" style="margin-block-end:8px; gap:6px; align-items:center; flex-wrap:wrap;">
+            <select id="sitePhotoPlace"></select>
+            <input type="date" id="sitePhotoDate" aria-label="撮影日">
+          </div>
+          <div class="row" style="margin-block-end:10px; gap:6px; align-items:center;">
+            <input type="text" id="sitePhotoMemo" placeholder="メモ（任意・選んだ写真すべてに付きます）" style="flex:1; min-width:0;">
+            <label class="btn secondary small" for="sitePhotoFile" style="cursor:pointer;">＋ 写真を追加</label>
+            <input type="file" id="sitePhotoFile" accept="image/*" multiple hidden>
+          </div>
+          <div id="sitePhotoWrap"></div>
+        </div>
       </div>
 
       <!-- 予約 subpanel -->
@@ -1301,7 +1315,7 @@
     return g ? g.label : scope;
   }
   var state = {
-    projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [], noteDecisions: [], noteNotices: [], imageBoard: [],
+    projects: [], vendors: [], requests: [], attachments: [], meetingNotes: [], activity: [], tasks: [], messages: [], specPhotos: [], confirmItems: [], albumPhotos: [], reservations: [], noteDecisions: [], noteNotices: [], imageBoard: [], sitePhotos: [],
     settings: { progressTags: ["契約前","契約後","着工","上棟","引渡し"], staffList: ["社長","朋子","山本","渡邊"], pin: "0000" },
     currentProjectId: null,
     currentUser: null,
@@ -1324,7 +1338,7 @@
   var gmailNextPageToken = null;
   var gmailCurrentQuery = "";
   var STAFF_TOKEN_KEY = "sumairu_staff_token";
-  var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations","noteDecisions","noteNotices","imageBoard"];
+  var DATA_COLLECTIONS = ["projects","vendors","requests","attachments","meetingNotes","activity","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations","noteDecisions","noteNotices","imageBoard","sitePhotos"];
 
   // ================= persistent local user pick (per-viewer convenience) =================
   function loadLocalUser(){
@@ -1820,6 +1834,7 @@
       + state.confirmItems.filter(function(p){return p.deletedAt;}).length
       + state.albumPhotos.filter(function(p){return p.deletedAt;}).length
       + state.imageBoard.filter(function(p){return p.deletedAt;}).length
+      + state.sitePhotos.filter(function(p){return p.deletedAt;}).length
       + state.reservations.filter(function(p){return p.deletedAt;}).length;
     document.getElementById("statPending").textContent = pending;
     document.getElementById("statDone").textContent = done;
@@ -4579,6 +4594,7 @@
     renderPhotoCategorySection("reference","refPhotoCategoryWrap");
     renderPhotoCategorySection("album","albumPhotoCategoryWrap");
     renderImageBoard();
+    renderSitePhotos();
   }
   async function addPhotoCategory(kind, inputId){
     var proj = projectById(state.currentProjectId);
@@ -4658,6 +4674,74 @@
     }
     render();
     if(added) logActivity("お家のイメージ写真を追加しました（"+added+"件）");
+  }
+
+  // ================= 現場写真（スタッフ限定・リフォーム案件） =================
+  // おうちノート（お客様画面）には出さない。note-data.mts は sitePhotos を読まないこと。
+  var SITE_PLACES = ["外観","玄関","LDK","キッチン","お風呂","洗面・脱衣","トイレ","階段","寝室","子供部屋","外構","その他"];
+  function liveSitePhotos(){ return state.sitePhotos.filter(function(p){ return !p.deletedAt && p.projectId===state.currentProjectId; }); }
+  function siteDateLabel(d){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d||"");
+    return m ? (parseInt(m[2],10)+"/"+parseInt(m[3],10)) : "";
+  }
+  function renderSitePhotos(){
+    var card = document.getElementById("sitePhotoCard");
+    var wrap = document.getElementById("sitePhotoWrap");
+    if(!card || !wrap) return;
+    var proj = projectById(state.currentProjectId);
+    card.hidden = !(proj && proj.type === "リフォーム");
+    if(card.hidden) return;
+    var sel = document.getElementById("sitePhotoPlace");
+    if(sel && !sel.options.length){
+      sel.innerHTML = SITE_PLACES.map(function(pl){ return '<option value="'+pl+'">'+pl+'</option>'; }).join("");
+    }
+    var dateInput = document.getElementById("sitePhotoDate");
+    if(dateInput && !dateInput.value) dateInput.value = todayStr();
+    var imgs = liveSitePhotos();
+    if(!imgs.length){ wrap.innerHTML = '<div class="empty">まだ写真がありません。</div>'; return; }
+    var html = "";
+    SITE_PLACES.forEach(function(pl){
+      var list = imgs.filter(function(p){ return (p.place||"その他")===pl; })
+        .sort(function(a,b){
+          var da = a.takenDate||"", db = b.takenDate||"";
+          if(da !== db) return da.localeCompare(db);
+          return (a.createdAt||"").localeCompare(b.createdAt||"");
+        });
+      if(!list.length) return;
+      html += '<div style="margin-block-end:12px;"><strong>'+escapeHtml(pl)+'</strong>（'+list.length+'）<div class="specphotos" style="margin-block-start:6px;">'+
+        list.map(function(p){
+          var cap = siteDateLabel(p.takenDate) + (p.memo ? " "+p.memo : "");
+          return '<div class="specphoto-wrap" style="width:72px;"><div class="specphoto"><img src="'+escapeHtml(p.url)+'" alt="">'+
+            '<a href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
+            '<button class="spdel" data-delsitephoto="'+p.id+'">×</button></div>'+
+            (cap ? '<div class="muted" title="'+escapeHtml(cap)+'" style="font-size:.6rem; width:72px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+escapeHtml(cap)+'</div>' : '')+
+            '</div>';
+        }).join("")+'</div></div>';
+    });
+    wrap.innerHTML = html;
+  }
+  async function uploadSitePhotos(fileList, place, takenDate, memo){
+    if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
+    if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var files = Array.prototype.slice.call(fileList||[]);
+    var added = 0;
+    for(var i=0;i<files.length;i++){
+      var f = files[i];
+      try{
+        var compressed = await compressImageFile(f);
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
+        var doc = { id: uid("site"), projectId: state.currentProjectId, place: place, takenDate: takenDate||"", memo: memo||"",
+          by: state.currentUser||"", url: res.url, contentType: res.contentType || compressed.type || f.type,
+          fileName: f.name, createdAt: nowIso(), updatedAt: nowIso() };
+        state.sitePhotos.push(doc);
+        var saved = await saveDoc("sitePhotos", doc.id, doc);
+        if(!saved){ state.sitePhotos = state.sitePhotos.filter(function(x){ return x.id!==doc.id; }); }
+        else added++;
+        if(i % 3 === 2) render();
+      }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
+    }
+    render();
+    if(added){ toast("✅ 現場写真を"+added+"枚追加しました"); logActivity("現場写真を追加しました（"+added+"件）"); }
   }
 
   // ================= 予約・Googleカレンダー連携 =================
@@ -4777,6 +4861,7 @@
     state.confirmItems.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="confirm"?"確認事項":"お客様の検討事項")+"「"+(p.content||"").slice(0,20)+"」"; items.push({kind:(p.kind==="confirm"?"確認事項":"お客様の検討事項"), label:(p.content||"").slice(0,20), ts:p.deletedAt, restore:function(){restoreItem("confirmItems","confirmItems",p.id,label);}, purge:function(){purgeItem("confirmItems","confirmItems",p.id,label);}}); });
     state.albumPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="reference"?"参考写真":"アルバム写真"); items.push({kind:label, label:(p.fileName||""), ts:p.deletedAt, restore:function(){restoreItem("albumPhotos","albumPhotos",p.id,label);}, purge:function(){purgeItem("albumPhotos","albumPhotos",p.id,label);}}); });
     state.imageBoard.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="イメージ写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("imageBoard","imageBoard",p.id,label);}, purge:function(){purgeItem("imageBoard","imageBoard",p.id,label);}}); });
+    state.sitePhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="現場写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("sitePhotos","sitePhotos",p.id,label);}, purge:function(){purgeItem("sitePhotos","sitePhotos",p.id,label);}}); });
     state.reservations.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="予約「"+(p.type||"")+" "+(p.date||"")+"」"; items.push({kind:"予約", label:(p.type||"")+" "+(p.date||""), ts:p.deletedAt, restore:function(){restoreItem("reservations","reservations",p.id,label);}, purge:function(){purgeItem("reservations","reservations",p.id,label);}}); });
     items.sort(function(a,b){ return (b.ts||"").localeCompare(a.ts||""); });
     empty.hidden = items.length !== 0;
@@ -6912,6 +6997,20 @@
     document.getElementById("imageBoardWrap").addEventListener("click", function(e){
       var del = e.target.closest("[data-delimageboard]");
       if(del){ e.preventDefault(); if(confirm2()){ var p = state.imageBoard.find(function(x){ return x.id===del.dataset.delimageboard; }); softDelete("imageBoard","imageBoard", del.dataset.delimageboard, (p && p.by==="customer") ? "お客様のイメージ写真" : "イメージ写真"); } }
+    });
+
+    document.getElementById("sitePhotoFile").addEventListener("change", function(e){
+      var input = e.target;
+      var files = Array.prototype.slice.call(input.files||[]);
+      var place = document.getElementById("sitePhotoPlace").value || "その他";
+      var taken = document.getElementById("sitePhotoDate").value || todayStr();
+      var memo = document.getElementById("sitePhotoMemo").value.trim();
+      input.value = "";
+      uploadSitePhotos(files, place, taken, memo);
+    });
+    document.getElementById("sitePhotoWrap").addEventListener("click", function(e){
+      var del = e.target.closest("[data-delsitephoto]");
+      if(del){ e.preventDefault(); if(confirm2()) softDelete("sitePhotos","sitePhotos", del.dataset.delsitephoto, "現場写真"); }
     });
 
     document.getElementById("resType").addEventListener("change", function(e){

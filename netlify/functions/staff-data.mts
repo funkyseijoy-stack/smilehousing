@@ -23,6 +23,8 @@ const ALLOWED_COLLECTIONS = [
   "noteDecisions", "noteNotices",
   // お家のイメージ（お客様とスタッフが双方で追加する写真）
   "imageBoard",
+  // 現場写真（スタッフ限定・リフォーム案件。お客様画面には出さない）
+  "sitePhotos",
 ];
 
 function genId() {
