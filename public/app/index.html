@@ -181,6 +181,8 @@
   .noteitem.reflected .ndate{ color:#6b5300; }
   .noteitem.reflected .ntitle{ color:#3d2f00; }
   .noteitem .nreflbadge{ background:#e0a800; color:#2b2100; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  .noteitem .nsentbadge{ background:#e3efe6; color:#1f5a33; border:1px solid #9cc7a9; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .notemenu button.on{ color:#1f5a33; }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]) .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
     :root:not([data-theme="light"]) .noteitem.reflected .ndate{ color:#e8d27a; }
@@ -2228,6 +2230,7 @@
       var decided = n.decided!=null ? n.decided : (n.content||"");
       var open = n.open!=null ? n.open : "";
       var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">未決・お客様に確認すること</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
+      var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
         '<button data-act="editnote" data-id="'+n.id+'">編集</button>'+
@@ -2239,14 +2242,19 @@
         '<div class="notemenu-divider"></div>'+
         '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
         '<div class="notemenu-divider"></div>'+
-        '<button data-act="notetotask" data-tasktype="companytask" data-id="'+n.id+'">→社内タスクへ</button>'+
-        '<button data-act="notetotask" data-tasktype="vendortask" data-id="'+n.id+'">→業者タスクへ</button>'+
-        '<button data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→お客様への確認へ</button>'+
-        '<button data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
+        noteSendButtonHtml(n, sent, "companytask")+
+        noteSendButtonHtml(n, sent, "vendortask")+
+        noteSendButtonHtml(n, sent, "confirm")+
+        noteSendButtonHtml(n, sent, "consider")+
+        noteSendButtonHtml(n, sent, "estimate")+
         '</div>';
+      var sentBadgeHtml = NOTE_SEND_TYPES.filter(function(t){ return sent[t.type]; }).map(function(t){
+        return '<span class="nsentbadge">✓ '+t.badge+'</span>';
+      }).join("");
       return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
         (n.reflected ? '<span class="nreflbadge">🌐 おうちノート反映済み</span>' : '')+
+        sentBadgeHtml+
         (specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
@@ -2257,6 +2265,53 @@
         menuHtml+
         '</div>';
     }).join("");
+  }
+  // 打合せ記録から各リストへ「入れたかどうか」の表示用。
+  var NOTE_SEND_TYPES = [
+    {type:"companytask", label:"→社内タスクへ", badge:"社内タスク済"},
+    {type:"vendortask",  label:"→業者タスクへ", badge:"業者タスク済"},
+    {type:"confirm",     label:"→お客様への確認へ", badge:"お客様への確認済"},
+    {type:"consider",    label:"→お客様の検討事項へ", badge:"検討事項済"},
+    {type:"estimate",    label:"→追加見積もりへ", badge:"追加見積もり済"}
+  ];
+  function noteSentInfo(n){
+    var info = {};
+    var s = n.sent || {};
+    NOTE_SEND_TYPES.forEach(function(t){
+      var rec = s[t.type];
+      if(!rec){ info[t.type] = false; return; }
+      if(t.type === "estimate"){ info[t.type] = true; return; }
+      if(t.type === "companytask" || t.type === "vendortask"){
+        info[t.type] = state.tasks.some(function(x){ return x.id===rec.ref && !x.deletedAt; });
+      } else {
+        info[t.type] = state.confirmItems.some(function(x){ return x.id===rec.ref && !x.deletedAt; });
+      }
+    });
+    // この機能を付ける前に作ったものは、同じ内容の項目があるかで判定する。
+    var c = (n.content||"").trim();
+    if(c){
+      state.tasks.forEach(function(x){
+        if(x.deletedAt || x.projectId!==n.projectId || (x.content||"").trim()!==c) return;
+        if(x.requestTo) info.vendortask = true; else info.companytask = true;
+      });
+      state.confirmItems.forEach(function(x){
+        if(x.deletedAt || x.projectId!==n.projectId || (x.content||"").trim()!==c) return;
+        if(x.kind==="confirm") info.confirm = true;
+        if(x.kind==="consider") info.consider = true;
+      });
+    }
+    return info;
+  }
+  function noteSendButtonHtml(n, sent, type){
+    var def = NOTE_SEND_TYPES.filter(function(t){ return t.type===type; })[0];
+    return '<button class="'+(sent[type]?"on":"")+'" data-act="notetotask" data-tasktype="'+type+'" data-id="'+n.id+'">'+
+      def.label+(sent[type]?'　✓登録済み':'')+'</button>';
+  }
+  function markNoteSent(note, type, refId){
+    note.sent = note.sent || {};
+    note.sent[type] = { at: nowIso(), by: state.currentUser||"", ref: refId||"" };
+    saveDoc("meetingNotes", note.id, note);
+    render();
   }
   function meetingNoteShareText(n){
     var lines = [];
@@ -3406,21 +3461,50 @@
     empty.hidden = true;
     if(totalEl){
       var total = items.reduce(function(sum, it){ return sum + okaiEstimateAmountNumber(it.amount); }, 0);
+      var pending = items.filter(function(it){ return !String(it.amount||"").trim(); }).length;
       totalEl.hidden = false;
-      totalEl.textContent = "合計金額：¥" + total.toLocaleString("ja-JP") + "（" + items.length + "件）";
+      totalEl.textContent = "合計金額：¥" + total.toLocaleString("ja-JP") + "（" + items.length + "件" + (pending ? "・うち金額確認中" + pending + "件" : "") + "）";
     }
     list.innerHTML = items.map(function(it){
+      var hasAmount = !!String(it.amount||"").trim();
       return '<div class="card" style="padding:8px 10px;">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
-        '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+escapeOkai(it.amount)+'</div>'+
+        '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '<span class="pill tag">金額確認中</span>')+'</div>'+
         '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
         '</div>'+
         (it.note?'<div class="muted" style="font-size:.8rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">お客様の回答：'+okaiEstimateResponsePill(it.customerResponse)+
         (it.customerRespondedAt?'<span class="muted" style="font-size:.7rem;">'+escapeOkai(new Date(it.customerRespondedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}))+'</span>':'')+
         '</div>'+
+        '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">'+
+        '<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" value="'+escapeOkai(it.amount||"")+'" placeholder="金額（例：¥48,000）" style="flex:1; min-width:0;">'+
+        '<button class="btn secondary small" data-okai-save-amount="'+escapeOkai(it.id)+'">'+(hasAmount?'金額を変更':'金額を入力')+'</button>'+
+        '</div>'+
         '</div>';
     }).join("");
+  }
+  function okaiSaveEstimateAmount(id){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var input = document.querySelector('[data-okai-amount-for="'+id+'"]');
+    if(!input) return;
+    var amount = input.value.trim();
+    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.customerEstimates) || [];
+    var next = current.map(function(it){
+      return it.id === id ? Object.assign({}, it, { amount: amount, updated: new Date().toISOString() }) : it;
+    });
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: next } })
+    }).then(function(res){
+      if(!res.ok){ toast("金額の保存に失敗しました"); return; }
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = res.body.customer;
+      renderOkaiEstimates(res.body.customer);
+      toast(amount ? "✅ 金額を保存しました（お客様の画面に表示されます）" : "金額を空にしました（お客様には「金額確認中」と表示されます）");
+      logActivity("追加見積もりの金額を"+(amount ? "「"+amount+"」に更新しました" : "空にしました"));
+    }).catch(function(){ toast("金額の保存に失敗しました"); });
   }
   function renderOkaiProfile(customer){
     var area = document.getElementById("okaiProfileArea");
@@ -3582,6 +3666,14 @@
       okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
       okaiBridgeCache[proj.id].customer = res.body.customer;
       renderOkaiEstimates(res.body.customer);
+      // 打合せ記録側の「追加見積もり済み」表示も外す（もう一度入れられるようにする）
+      state.meetingNotes.forEach(function(n){
+        if(n.sent && n.sent.estimate && n.sent.estimate.ref === id){
+          delete n.sent.estimate;
+          saveDoc("meetingNotes", n.id, n);
+        }
+      });
+      render();
       toast("削除しました");
     }).catch(function(){ toast("削除に失敗しました"); });
   }
@@ -4115,13 +4207,37 @@
     if(!note){ toast("打合せ記録が見つかりません"); return; }
     var content = (note.content||"").trim();
     if(!content){ toast("内容が空です"); return; }
+    if(noteSentInfo(note)[taskType]){ toast("すでに登録済みです"); return; }
+
+    if(taskType === "estimate"){
+      var firstLine = content.split("\n")[0].trim();
+      var estTitle = (note.title||"").trim() || (firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine);
+      var fresh = await okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=data').catch(function(){ return null; });
+      if(!fresh || !fresh.ok){ toast("おうちノートに接続できませんでした。「おうちノート」タブでリンクを発行済みか確認してください"); return; }
+      var estCurrent = (fresh.body.customer && fresh.body.customer.customerEstimates) || [];
+      var estId = uid("est");
+      var estNext = estCurrent.concat([{ id: estId, title: estTitle, amount: "", note: content, status: "確認中", updated: nowIso(), createdAt: nowIso() }]);
+      var estRes = await okaiBridgeFetch('', {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: estNext } })
+      }).catch(function(){ return null; });
+      if(!estRes || !estRes.ok){ toast("追加見積もりへの追加に失敗しました"); return; }
+      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
+      okaiBridgeCache[proj.id].customer = estRes.body.customer;
+      renderOkaiEstimates(estRes.body.customer);
+      markNoteSent(note, "estimate", estId);
+      logActivity("打合せ記録から追加見積もり「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
+      toast("✅ 追加見積もりに追加しました（お客様には「金額確認中」と表示されます）");
+      return;
+    }
 
     if(taskType === "confirm"){
       var doc1 = { id: uid("cf"), projectId: proj.id, kind:"confirm", content: content,
         responseType: "自由入力", options: [], answer: null, answeredAt: null,
         hasDeadline: false, deadline: null, attachments: (note.files||[]).slice(), createdAt: nowIso() };
       state.confirmItems.push(doc1);
-      render();
+      markNoteSent(note, "confirm", doc1.id);
       await saveDoc("confirmItems", doc1.id, doc1);
       logActivity("打合せ記録からお客様への確認「"+content.slice(0,20)+"」を作成しました");
       toast("✅ お客様への確認に追加しました");
@@ -4133,7 +4249,7 @@
         status: "検討中", statusHistory: [{status:"検討中", ts: nowIso(), actor: state.currentUser||""}],
         attachments: (note.files||[]).slice(), createdAt: nowIso() };
       state.confirmItems.push(doc2);
-      render();
+      markNoteSent(note, "consider", doc2.id);
       await saveDoc("confirmItems", doc2.id, doc2);
       logActivity("打合せ記録からお客様の検討事項「"+content.slice(0,20)+"」を作成しました");
       toast("✅ お客様の検討事項に追加しました");
@@ -4155,8 +4271,8 @@
           status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
         };
         state.tasks.push(t);
-        if(part && part.scope!=="general" && !note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); saveDoc("meetingNotes", note.id, note); }
-        render();
+        if(part && part.scope!=="general" && !note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
+        markNoteSent(note, "companytask", t.id);
         saveDoc("tasks", t.id, t);
         logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました"+(part?"（部位："+part.label+"）":""));
         toast("✅ 社内タスクに追加しました");
@@ -4185,8 +4301,8 @@
             status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
           };
           state.tasks.push(t3);
-          if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); saveDoc("meetingNotes", note.id, note); }
-          render();
+          if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
+          markNoteSent(note, "vendortask", t3.id);
           saveDoc("tasks", t3.id, t3);
           logActivity("打合せ記録から業者タスク「"+content.slice(0,20)+"」を作成しました（部位："+part.label+"）");
           toast("✅ 業者タスクに追加しました");
@@ -6512,6 +6628,8 @@
       okaiMarkInboxRead(btn.dataset.okaiRead);
     });
     document.getElementById("okaiEstimateList").addEventListener("click", function(e){
+      var saveBtn = e.target.closest("[data-okai-save-amount]");
+      if(saveBtn){ okaiSaveEstimateAmount(saveBtn.dataset.okaiSaveAmount); return; }
       var btn = e.target.closest("[data-okai-del-estimate]");
       if(!btn) return;
       okaiDeleteEstimate(btn.dataset.okaiDelEstimate);

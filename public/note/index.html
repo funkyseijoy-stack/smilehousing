@@ -626,9 +626,12 @@
     if(data.estimates && data.estimates.length){
       out += '<div class="sechd"><h3>追加見積り</h3></div><div class="catlist">'+data.estimates.map(function(x){
         var r = x.customerResponse || "未回答";
+        var pendingAmt = !String(x.amount||"").trim();
         var cls = r==="承認" ? "s-決定" : (r==="未回答" ? "s-仮決定" : "");
-        return '<div class="rv"><div style="flex:1;"><div class="ty">'+esc(x.title)+'　'+esc(x.amount)+'</div>'+
-          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+'</div><span class="status '+cls+'">'+esc(r==="未回答"?"ご確認ください":r)+'</span></div>';
+        // 金額が決まるまでは「金額確認中」と表示する（スタッフが金額を入力すると自動で切り替わる）
+        var label = pendingAmt ? "金額確認中" : (r==="未回答" ? "ご確認ください" : r);
+        return '<div class="rv"><div style="flex:1;"><div class="ty">'+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
+          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
       }).join("")+'</div>';
     }
 
