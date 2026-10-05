@@ -272,6 +272,7 @@
   .kancard .kc-actions{ display:flex; gap:4px; flex-wrap:wrap; }
   .taskform-modal{ position:fixed; inset:0; background:rgba(20,16,12,.55); z-index:85; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; }
   .taskform-modal[hidden]{ display:none; }
+  #cmCancelRow[hidden]{ display:none; }
   .taskform-card{ background:var(--bg); border-radius:18px; max-width:520px; width:100%; padding:16px; box-shadow: var(--shadow); }
 
   /* ---- spec management (仕様) ---- */
@@ -434,7 +435,7 @@
     </div>
     <div class="card" id="publicBookingCard">
       <h2 style="margin:0 0 4px;">新規のお客様のご予約</h2>
-      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。</p>
+      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。予約直後に確認メール、前日の朝9時にリマインドメールが自動で届きます。日時変更・キャンセルなどは「メールを送る」から送れます。</p>
       <div id="publicBookingList" style="display:flex; flex-direction:column; gap:8px;"></div>
       <div class="empty" id="publicBookingEmpty" hidden>今後のご予約はありません。</div>
     </div>
@@ -1205,6 +1206,30 @@
       <div class="row" style="margin-block-start:6px;">
         <button class="btn" id="tfSubmit">追加</button>
         <button class="btn secondary" id="tfCancel">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 新規のお客様へのメール送信 MODAL ========== -->
+<div class="taskform-modal" id="custMailModal" hidden>
+  <div class="taskform-card">
+    <h3 style="margin:0 0 6px;">お客様へメールを送る</h3>
+    <p class="muted" style="margin:0 0 10px; font-size:.76rem;">共有Gmail（smilehousing8@gmail.com）から、差出人名「住まいるハウジング」で送ります。お客様が返信すると、そのGmailに届き、ホームの「やりとりを見る」やGmailタブで読めます。</p>
+    <div class="addform" style="flex-direction:column; align-items:stretch;">
+      <div class="muted" id="cmTo" style="font-size:.84rem;"></div>
+      <label class="field">文面の雛形<select id="cmKind">
+        <option value="free">自由なメッセージ</option>
+        <option value="change">ご予約日時の変更のお知らせ</option>
+        <option value="cancel">ご予約のキャンセルのお知らせ</option>
+      </select></label>
+      <label class="field">件名<input type="text" id="cmSubject" maxlength="200"></label>
+      <label class="field">本文<textarea id="cmBody" rows="11"></textarea></label>
+      <label class="field" id="cmCancelRow" style="flex-direction:row; align-items:center; gap:6px;" hidden>
+        <input type="checkbox" id="cmDeleteEvent" checked> Googleカレンダーの予定も削除し、一覧から外す（枠が空きます）</label>
+      <div class="row" style="margin-block-start:6px;">
+        <button class="btn" id="cmSend">送信する</button>
+        <button class="btn secondary" id="cmClose">閉じる</button>
       </div>
     </div>
   </div>
@@ -4844,20 +4869,101 @@
     var rows = liveReservations().filter(function(r){ return r.source==="public" && (r.date||"") >= today; })
       .sort(function(a,b){ return ((a.date||"")+"T"+(a.startTime||"")).localeCompare((b.date||"")+"T"+(b.startTime||"")); });
     empty.hidden = rows.length !== 0;
+    var KIND = {free:"メッセージ", change:"日時変更のお知らせ", cancel:"キャンセルのお知らせ"};
     wrap.innerHTML = rows.map(function(r){
       var wd = ["日","月","火","水","木","金","土"][new Date(r.date+"T00:00:00").getDay()];
+      var badges = '<span class="pill tag">新規</span> '+
+        (r.confirmMailSentAt ? '<span class="pill tag">✓ 確認メール送信済</span> ' : (r.email ? '<span class="pill" style="background:#fbeaea; color:#9a2f3f;">確認メール未送信</span> ' : ''))+
+        (r.reminderSentAt ? '<span class="pill tag">✓ リマインド送信済</span> ' : '');
+      var log = (r.mailLog||[]).slice(-3).map(function(m){
+        return escapeHtml((KIND[m.kind]||"メール")+"："+(m.at||"").slice(5,10).replace("-","/")+" "+((m.at||"").slice(11,16)));
+      }).join("、");
       return '<div class="noteitem">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
-          '<div><strong>'+escapeHtml(r.date)+'（'+wd+'）'+escapeHtml(r.startTime)+'〜'+escapeHtml(r.endTime)+'</strong>　'+
-            '<span class="pill tag">新規</span></div>'+
+          '<div style="flex:1; min-width:0;"><strong>'+escapeHtml(r.date)+'（'+wd+'）'+escapeHtml(r.startTime)+'〜'+escapeHtml(r.endTime)+'</strong>　'+badges+'</div>'+
           '<button class="btn danger-ghost small" data-delpublicbooking="'+r.id+'" title="一覧から削除（Googleカレンダーの予定は残ります）">×</button>'+
         '</div>'+
         '<div style="margin-block-start:4px;"><strong>'+escapeHtml(r.customerName||"")+' 様</strong>　'+
           (r.phone ? '<a href="tel:'+escapeHtml(String(r.phone).replace(/[^0-9+]/g,""))+'">'+escapeHtml(r.phone)+'</a>' : '')+
           (r.email ? '　<a href="mailto:'+escapeHtml(r.email)+'">'+escapeHtml(r.email)+'</a>' : '')+'</div>'+
         (r.notes ? '<div class="ntext" style="margin-block-start:4px;">'+escapeHtml(r.notes)+'</div>' : "")+
+        (log ? '<div class="muted" style="font-size:.74rem; margin-block-start:4px;">送信履歴：'+log+'</div>' : '')+
+        (r.email ? '<div class="row" style="margin-block-start:8px; gap:6px;">'+
+          '<button class="btn secondary small" data-mailpublicbooking="'+r.id+'">✉ メールを送る</button>'+
+          '<button class="btn ghost small" data-viewmailthread="'+r.id+'">📥 やりとりを見る</button></div>' : '')+
       '</div>';
     }).join("");
+  }
+
+  // ---- 新規のお客様へのメール送信（日時変更・キャンセル・自由なメッセージ） ----
+  // 署名は netlify/lib/google.mts の CUSTOMER_MAIL_SIGNATURE と同じにすること。
+  var CM_SIGNATURE = "\n――――――――――――\n住まいるハウジング\n（このメールにご返信いただければ、担当者に届きます）";
+  var cmTargetId = null;
+  function cmWhen(r){
+    var wd = ["日","月","火","水","木","金","土"][new Date(r.date+"T00:00:00").getDay()];
+    var p = r.date.split("-");
+    return (+p[1])+"月"+(+p[2])+"日（"+wd+"） "+r.startTime+"〜"+r.endTime;
+  }
+  function cmTemplate(kind, r){
+    var name = (r.customerName||"お客")+"様";
+    var head = name+"\n\nいつもお世話になっております。住まいるハウジングです。\n";
+    if(kind==="change") return {
+      subject: "【住まいるハウジング】ご予約日時の変更について",
+      body: head+"ご予約いただいている、下記の日時について、ご連絡いたします。\n\n■ 現在のご予約\n"+cmWhen(r)+"\n\n■ 変更後の日時\n★ここに変更後の日時を入力してください★\n\nご都合が合わない場合は、このメールにご返信ください。\n"+CM_SIGNATURE };
+    if(kind==="cancel") return {
+      subject: "【住まいるハウジング】ご予約のキャンセルについて",
+      body: head+"下記のご予約を、キャンセルとして承りました。\n\n■ キャンセルのご予約\n"+cmWhen(r)+"\n\nまた、ご都合の良いときに、あらためてご予約いただければ幸いです。\n"+CM_SIGNATURE };
+    return { subject: "【住まいるハウジング】ご連絡", body: head+"\n★ここに本文を入力してください★\n"+CM_SIGNATURE };
+  }
+  function cmApplyTemplate(){
+    var r = state.reservations.find(function(x){ return x.id===cmTargetId; }); if(!r) return;
+    var kind = document.getElementById("cmKind").value;
+    var t = cmTemplate(kind, r);
+    document.getElementById("cmSubject").value = t.subject;
+    document.getElementById("cmBody").value = t.body;
+    document.getElementById("cmCancelRow").hidden = (kind !== "cancel");
+  }
+  function openCustMail(id){
+    var r = state.reservations.find(function(x){ return x.id===id; });
+    if(!r || !r.email){ toast("メールアドレスが登録されていません"); return; }
+    cmTargetId = id;
+    document.getElementById("cmTo").textContent = "宛先：" + (r.customerName||"") + " 様 <" + r.email + ">　（"+cmWhen(r)+"のご予約）";
+    document.getElementById("cmKind").value = "free";
+    document.getElementById("cmDeleteEvent").checked = true;
+    cmApplyTemplate();
+    document.getElementById("custMailModal").hidden = false;
+  }
+  function closeCustMail(){ document.getElementById("custMailModal").hidden = true; cmTargetId = null; }
+  var cmSending = false;
+  async function sendCustMail(){
+    if(cmSending || !cmTargetId) return;
+    var r = state.reservations.find(function(x){ return x.id===cmTargetId; }); if(!r) return;
+    var subject = document.getElementById("cmSubject").value.trim();
+    var body = document.getElementById("cmBody").value.trim();
+    var kind = document.getElementById("cmKind").value;
+    if(!subject || !body){ toast("件名と本文を入力してください"); return; }
+    if(body.indexOf("★")!==-1 || subject.indexOf("★")!==-1){ toast("★の部分を書き換えてから送信してください"); return; }
+    var del = kind==="cancel" && document.getElementById("cmDeleteEvent").checked;
+    if(kind==="cancel" && !window.confirm("キャンセルのお知らせを送り、"+(del?"カレンダーの予定を削除して、":"")+"この予約を一覧から外します。よろしいですか？")) return;
+    cmSending = true; document.getElementById("cmSend").disabled = true; document.getElementById("cmSend").textContent = "送信中…";
+    try{
+      var res = await fetch("/api/customer-mail", { method:"POST", headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
+        body: JSON.stringify({ reservationId: r.id, kind: kind, subject: subject, body: body, deleteEvent: del, by: state.currentUser||"" }) });
+      var j = await res.json().catch(function(){ return {}; });
+      if(!res.ok){ toast(j.error==="send_failed" ? "メールを送信できませんでした。Gmailの連携を確認してください" : "メールを送信できませんでした"); return; }
+      Object.keys(r).forEach(function(k){ delete r[k]; }); Object.assign(r, j.reservation);
+      logActivity((r.customerName||"")+"様（新規予約）へメールを送信しました（"+subject.slice(0,24)+"）");
+      closeCustMail(); render();
+      toast(kind==="cancel" ? (del && j.eventDeleted===false ? "✅ 送信しました（カレンダーの予定は削除できませんでした。手で削除してください）" : "✅ キャンセルのお知らせを送り、予約を外しました") : "✅ メールを送信しました");
+    }catch(e){ toast("メールを送信できませんでした"); }
+    finally{ cmSending = false; var b = document.getElementById("cmSend"); b.disabled = false; b.textContent = "送信する"; }
+  }
+  // そのお客様とのメールのやりとり（送信・受信）をGmailタブで開く
+  function viewCustMailThread(id){
+    var r = state.reservations.find(function(x){ return x.id===id; }); if(!r || !r.email) return;
+    var hum = document.getElementById("gmailHumanOnly"); if(hum) hum.checked = false;
+    document.getElementById("gmailSearchInput").value = r.email;
+    switchTab("gmail");
   }
   function renderReservationTab(){
     populateResStartTimeOptions();
@@ -7048,7 +7154,14 @@
       document.getElementById("resDuration").value = RESERVATION_DEFAULT_DURATION[e.target.value] || 120;
     });
     document.getElementById("btnAddReservation").addEventListener("click", addReservation);
+    document.getElementById("cmKind").addEventListener("change", cmApplyTemplate);
+    document.getElementById("cmSend").addEventListener("click", sendCustMail);
+    document.getElementById("cmClose").addEventListener("click", closeCustMail);
     document.getElementById("publicBookingList").addEventListener("click", function(e){
+      var mb = e.target.closest("[data-mailpublicbooking]");
+      if(mb){ openCustMail(mb.dataset.mailpublicbooking); return; }
+      var vb = e.target.closest("[data-viewmailthread]");
+      if(vb){ viewCustMailThread(vb.dataset.viewmailthread); return; }
       var del = e.target.closest("[data-delpublicbooking]");
       if(!del) return;
       var r = state.reservations.find(function(x){ return x.id===del.dataset.delpublicbooking; });

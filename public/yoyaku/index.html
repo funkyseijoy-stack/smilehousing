@@ -135,7 +135,8 @@
       (st.formErr ? '<div class="err" role="alert">'+esc(st.formErr)+'</div>' : '')+
       '<label class="f">お名前<span class="req">必須</span><input type="text" id="fName" autocomplete="name" maxlength="50" value="'+esc(st.name)+'" placeholder="例：山田 太郎"></label>'+
       '<label class="f">お電話番号<span class="req">必須</span><input type="tel" id="fPhone" autocomplete="tel" inputmode="tel" maxlength="20" value="'+esc(st.phone)+'" placeholder="例：090-1234-5678"></label>'+
-      '<label class="f">メールアドレス<span class="opt">任意</span><input type="email" id="fEmail" autocomplete="email" maxlength="100" value="'+esc(st.email)+'" placeholder="例：example@mail.com"></label>'+
+      '<label class="f">メールアドレス<span class="req">必須</span><input type="email" id="fEmail" autocomplete="email" inputmode="email" maxlength="100" value="'+esc(st.email)+'" placeholder="例：example@mail.com"></label>'+
+      '<p class="hint" style="margin:-8px 0 14px;">ご予約の確認メールをお送りします。受信拒否の設定をされている場合は、住まいるハウジング（smilehousing8@gmail.com）からのメールを受信できるようにしてください。</p>'+
       '<label class="f">ご相談内容<span class="opt">任意</span><textarea id="fNotes" maxlength="500" placeholder="例：土地探しから相談したい、建築予定地は釧路市内、など">'+esc(st.notes)+'</textarea></label>'+
       '<div class="hp" aria-hidden="true"><label>website<input type="text" id="fWebsite" tabindex="-1" autocomplete="off"></label></div>'+
       '<button class="btn" id="btnBook"'+(st.sending?" disabled":"")+'>'+(st.sending?"送信中…":"この内容で予約する")+'</button>';
@@ -147,7 +148,10 @@
       root.innerHTML = '<div class="done"><div class="ck">✓</div><h1>ご予約を受け付けました</h1>'+
         '<p class="lead">ご予約ありがとうございます。当日、お待ちしております。</p>'+
         '<div class="dt"><span style="color:var(--muted);font-size:.78rem;">ショールーム見学＆おうち相談</span><b>'+esc(dateLabel(st.done.date))+'</b><b>'+esc(st.done.startTime)+'〜'+esc(st.done.endTime)+'</b></div>'+
-        '<p class="hint">ご予約の変更・キャンセルをご希望の場合は、住まいるハウジングまでご連絡ください。</p></div>';
+        (st.done.mailOk
+          ? '<p class="lead">ご入力のメールアドレス（'+esc(st.done.email)+'）に、確認メールをお送りしました。<br>届かない場合は、迷惑メールフォルダもご確認ください。</p>'
+          : '<div class="err" role="alert">確認メールを送れませんでした。ご予約は完了しています。担当者よりあらためてご連絡いたします。</div>')+
+        '<p class="hint">ご予約の変更・キャンセルをご希望の場合は、確認メールにご返信ください。</p></div>';
       window.scrollTo(0,0);
       return;
     }
@@ -177,7 +181,7 @@
     if(document.getElementById("fName")){ st.name = g("fName"); st.phone = g("fPhone"); st.email = g("fEmail"); st.notes = g("fNotes"); }
   }
   var ERR = {
-    name_required:"お名前を入力してください。", invalid_phone:"お電話番号をご確認ください（10〜11桁の数字）。", invalid_email:"メールアドレスの形式をご確認ください。",
+    name_required:"お名前を入力してください。", email_required:"メールアドレスを入力してください。", invalid_phone:"お電話番号をご確認ください（10〜11桁の数字）。", invalid_email:"メールアドレスの形式をご確認ください。",
     slot_taken:"その時間は先に埋まりました。別の時間をお選びください。", already_booked:"すでにご予約をいただいております。変更をご希望の場合は、住まいるハウジングまでご連絡ください。",
     too_many:"ただいま予約が集中しています。時間をおいて、もう一度お試しください。"
   };
@@ -186,15 +190,19 @@
     var name = st.name.trim(), phone = st.phone.trim();
     if(!name){ st.formErr = ERR.name_required; render(); return; }
     if(phone.replace(/[^0-9０-９]/g,"").length < 10){ st.formErr = ERR.invalid_phone; render(); return; }
+    var email = st.email.trim();
+    if(!email){ st.formErr = ERR.email_required; render(); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ st.formErr = ERR.invalid_email; render(); return; }
     st.sending = true; st.formErr = ""; render();
     var web = document.getElementById("fWebsite");
     fetch("/api/public-booking", { method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ action:"book", date:st.date, start:st.start, name:name, phone:phone, email:st.email.trim(), notes:st.notes.trim(), website: web ? web.value : "" }) })
+      body: JSON.stringify({ action:"book", date:st.date, start:st.start, name:name, phone:phone, email:email, notes:st.notes.trim(), website: web ? web.value : "" }) })
     .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok, status:r.status, j:j}; }); })
     .then(function(res){
       st.sending = false;
       if(res.ok){
         st.done = res.j.reservation || { date:st.date, startTime:st.start, endTime:endOf(st.start) };
+        st.done.mailOk = res.j.confirmMail !== false; st.done.email = email;
         render(); return;
       }
       st.formErr = ERR[res.j.error] || "予約できませんでした。時間をおいて、もう一度お試しください。";

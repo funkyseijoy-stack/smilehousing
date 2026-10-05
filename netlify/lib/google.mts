@@ -39,19 +39,24 @@ function mimeHeader(text: string) {
   return "=?UTF-8?B?" + Buffer.from(text, "utf-8").toString("base64") + "?=";
 }
 
-// スタッフへの通知メールを送る。失敗しても呼び出し元の処理は止めない（true/false を返すだけ）。
-export async function sendNotifyMail(subject: string, body: string): Promise<boolean> {
+export type SendResult = { ok: boolean; id?: string; threadId?: string };
+
+// 指定した宛先へメールを送る（共有Gmail smilehousing8@gmail.com から。返信はそのGmailに届く）。
+// 失敗しても例外は投げず ok:false を返す。subject の改行は取り除く（ヘッダーインジェクション対策）。
+export async function sendMailTo(opts: { to: string; subject: string; body: string; fromName?: string }): Promise<SendResult> {
   try {
     const t = await getAccessToken();
-    if (!t.ok) return false;
+    if (!t.ok) return { ok: false };
+    const subject = opts.subject.replace(/[\r\n]+/g, " ").trim();
     const lines = [
-      "To: " + NOTIFY_TO,
+      ...(opts.fromName ? ["From: " + mimeHeader(opts.fromName) + " <" + NOTIFY_TO + ">"] : []),
+      "To: " + opts.to,
       "Subject: " + mimeHeader(subject),
       "MIME-Version: 1.0",
       'Content-Type: text/plain; charset="UTF-8"',
       "Content-Transfer-Encoding: base64",
       "",
-      Buffer.from(body, "utf-8").toString("base64").replace(/(.{76})/g, "$1\r\n"),
+      Buffer.from(opts.body, "utf-8").toString("base64").replace(/(.{76})/g, "$1\r\n"),
     ];
     const raw = Buffer.from(lines.join("\r\n"), "utf-8")
       .toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -60,8 +65,19 @@ export async function sendNotifyMail(subject: string, body: string): Promise<boo
       headers: { Authorization: "Bearer " + t.accessToken, "Content-Type": "application/json" },
       body: JSON.stringify({ raw }),
     });
-    return res.ok;
+    if (!res.ok) return { ok: false };
+    const j: any = await res.json().catch(() => ({}));
+    return { ok: true, id: j.id, threadId: j.threadId };
   } catch {
-    return false;
+    return { ok: false };
   }
 }
+
+// スタッフへの通知メールを送る。失敗しても呼び出し元の処理は止めない（true/false を返すだけ）。
+export async function sendNotifyMail(subject: string, body: string): Promise<boolean> {
+  return (await sendMailTo({ to: NOTIFY_TO, subject, body })).ok;
+}
+
+// お客様宛メールの共通の差出人名・署名
+export const CUSTOMER_MAIL_FROM_NAME = "住まいるハウジング";
+export const CUSTOMER_MAIL_SIGNATURE = "\n――――――――――――\n住まいるハウジング\n（このメールにご返信いただければ、担当者に届きます）";
