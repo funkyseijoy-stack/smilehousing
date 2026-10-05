@@ -1158,7 +1158,7 @@
 <!-- ========== TASK FORM MODAL ========== -->
 <div class="taskform-modal" id="taskFormModal" hidden>
   <div class="taskform-card">
-    <h3 style="margin:0 0 10px;">タスクを追加</h3>
+    <h3 style="margin:0 0 10px;" id="tfTitle">タスクを追加</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <label class="field">案件<select id="tfProject"></select></label>
       <label class="field">内容<textarea id="tfContent" rows="3" placeholder="対応内容を入力してください"></textarea></label>
@@ -1888,6 +1888,7 @@
           '</div>'+
           '<div class="kc-actions">'+
             '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
+            '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             (t.vendorSpec?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映中':'反映する')+'</button>':'')+
             (canBack?'<button class="btn small secondary" data-taskact="back" data-id="'+t.id+'">←戻す</button>':'')+
@@ -5276,7 +5277,10 @@
 
   // ================= tasks (社内タスク管理・最重要) =================
   var taskFormVendorSpec = null;
-  function openTaskForm(){
+  var editingTaskId = null;
+  function openTaskForm(taskId){
+    var editing = (typeof taskId === "string") ? state.tasks.find(function(x){ return x.id===taskId; }) : null;
+    editingTaskId = editing ? editing.id : null;
     var projSel = document.getElementById("tfProject");
     projSel.innerHTML = liveProjects().map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; }).join("") || '<option value="">案件がありません</option>';
     var staff = state.settings.staffList || [];
@@ -5290,6 +5294,28 @@
     document.getElementById("tfAttachment").value = "";
     taskFormVendorSpec = null;
     document.getElementById("tfVendorSpecLabel").textContent = "未選択";
+    document.getElementById("tfTitle").textContent = editing ? "タスクを編集" : "タスクを追加";
+    document.getElementById("tfSubmit").textContent = editing ? "保存" : "追加";
+    if(editing){
+      var setSel = function(id, val){
+        var el = document.getElementById(id);
+        if(val && !Array.prototype.some.call(el.options, function(o){ return o.value===val; })){
+          var o = document.createElement("option"); o.value = val; o.textContent = val; el.appendChild(o);
+        }
+        el.value = val || "";
+      };
+      setSel("tfProject", editing.projectId || "");
+      document.getElementById("tfContent").value = editing.content || "";
+      setSel("tfAssignee", editing.assignee || "");
+      setSel("tfInstructor", editing.instructor || "");
+      setSel("tfVendor", editing.requestTo || "");
+      document.getElementById("tfMethod").value = editing.requestMethod || "gmail";
+      document.getElementById("tfHasDeadline").checked = !!editing.hasDeadline;
+      document.getElementById("tfDeadline").value = editing.deadline || "";
+      document.getElementById("tfPrivate").checked = !!editing.private;
+      taskFormVendorSpec = editing.vendorSpec || null;
+      document.getElementById("tfVendorSpecLabel").textContent = editing.vendorSpec ? (editing.vendorSpec.label||"設定済み") : "未選択";
+    }
     document.getElementById("taskFormModal").hidden = false;
   }
   function closeTaskForm(){ document.getElementById("taskFormModal").hidden = true; }
@@ -5309,6 +5335,40 @@
 
     var attachmentAssetIds = [];
     var taskAttachments = [];
+    var editTarget = editingTaskId ? state.tasks.find(function(x){ return x.id===editingTaskId; }) : null;
+    if(editTarget){
+      // 編集：既存の添付は残し、新しく選んだファイルだけ追加する。
+      editTarget.attachments = editTarget.attachments || [];
+      editTarget.attachmentAssetIds = editTarget.attachmentAssetIds || [];
+      if(assets && files && files.length){
+        for(var j=0;j<files.length;j++){
+          try{
+            var r2 = await assets.upload(files[j]);
+            blobCache[r2.id] = files[j];
+            editTarget.attachmentAssetIds.push(r2.id);
+            editTarget.attachments.push({ id: r2.id, url: r2.url, contentType: r2.contentType||files[j].type, name: files[j].name });
+          }catch(e){ toast(files[j].name+" の添付に失敗しました"); }
+        }
+      }
+      editTarget.projectId = projectId||null;
+      editTarget.content = content;
+      editTarget.assignee = assignee||"";
+      editTarget.instructor = instructor||"";
+      editTarget.requestTo = requestTo||"";
+      editTarget.requestMethod = method;
+      editTarget.hasDeadline = hasDeadline;
+      editTarget.deadline = hasDeadline?deadline:"";
+      editTarget.private = isPrivate;
+      editTarget.vendorSpec = taskFormVendorSpec || null;
+      editTarget.updatedAt = nowIso();
+      editingTaskId = null;
+      closeTaskForm();
+      render();
+      await saveDoc("tasks", editTarget.id, editTarget);
+      logActivity("タスクを編集しました（"+content.slice(0,20)+"）");
+      toast("タスクを保存しました");
+      return;
+    }
     if(assets && files && files.length){
       for(var i=0;i<files.length;i++){
         try{
@@ -6764,6 +6824,7 @@
       if(act==="forward") moveTask(id,"forward");
       else if(act==="back") moveTask(id,"back");
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
+      else if(act==="edit") openTaskForm(id);
       else if(act==="setpart") setTaskSpecPart(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
     });
