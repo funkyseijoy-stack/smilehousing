@@ -176,6 +176,19 @@
 
   .notelist{ display:flex; flex-direction:column; gap:10px; }
   .noteitem{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  /* おうちノートに反映済みの打合せ記録は、黄色（蛍光ペン風）の背景＋太い枠＋バッジで一目で分かるようにする */
+  .noteitem.reflected{ background:#fff3b0; border:3px solid #e0a800; }
+  .noteitem.reflected .ndate{ color:#6b5300; }
+  .noteitem.reflected .ntitle{ color:#3d2f00; }
+  .noteitem .nreflbadge{ background:#e0a800; color:#2b2100; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
+    :root:not([data-theme="light"]) .noteitem.reflected .ndate{ color:#e8d27a; }
+    :root:not([data-theme="light"]) .noteitem.reflected .ntitle{ color:#fff6cf; }
+  }
+  :root[data-theme="dark"] .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
+  :root[data-theme="dark"] .noteitem.reflected .ndate{ color:#e8d27a; }
+  :root[data-theme="dark"] .noteitem.reflected .ntitle{ color:#fff6cf; }
   .noteitem .ndate{ font-size:.7rem; color:var(--muted); font-weight:700; }
   .noteitem .ntitle{ font-size:.92rem; font-weight:700; }
   .noteitem .nhead{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
@@ -2230,8 +2243,9 @@
         '<button data-act="notetotask" data-tasktype="confirm" data-id="'+n.id+'">→お客様への確認へ</button>'+
         '<button data-act="notetotask" data-tasktype="consider" data-id="'+n.id+'">→お客様の検討事項へ</button>'+
         '</div>';
-      return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+'">'+
+      return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
+        (n.reflected ? '<span class="nreflbadge">🌐 おうちノート反映済み</span>' : '')+
         (specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
