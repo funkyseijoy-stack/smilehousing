@@ -82,6 +82,7 @@
 - 現場写真（スタッフ限定、2026年10月〜）: リフォーム案件（`type==="リフォーム"`）の「写真・アルバム」タブに出る `sitePhotos` コレクション（`ALLOWED_COLLECTIONS` に追記済み）。**お客様画面には出さない**ので、`note-data.mts` には読み込みを追加しないこと。場所タグは `public/app/index.html` の `SITE_PLACES`、撮影日・メモ付きで複数枚まとめて追加できる。
 - 打合せ記録の「操作」メニュー（2026年10月〜）: 「→社内タスクへ」等のほかに「→追加見積もりへ」があり、おうちノート連携の追加見積り（`customerEstimates`）に金額なし（お客様画面は「金額確認中」）で追加する。金額は「おうちノート」タブの追加見積り一覧で入力。登録済みかどうかは打合せ記録の `sent` フィールド（バッジ表示）で管理。
 - 予約（2026年10月〜）: `netlify/functions/note-calendar.mts`（`/api/note-calendar`）。空き状況は Googleカレンダー「お客様予約」＋ 住まいるアプリの `reservations` から判定（9:00〜17:00・30分刻み・1枠2時間・日曜と祝日は不可、同時刻は1件のみ）。確定すると同カレンダーに予定を登録し、`reservations` にも保存する。種類は 来店／オンライン／銀行／ショールーム。
+- 新規のお客様向けの公開予約（2026年10月〜）: `https://sprightly-pegasus-9b65a7.netlify.app/yoyaku/`（画面 `public/yoyaku/index.html`、API `netlify/functions/public-booking.mts`）。ログイン不要で、種類は「ショールーム見学＆おうち相談」のみ。空き状況のルール（9:00〜17:00・30分刻み・1枠2時間・日曜祝日不可・前後1時間の間隔）は `netlify/lib/booking.mts` に共通化してあり、おうちノートの予約（`note-calendar.mts`）と同じ「お客様予約」カレンダーを見る。予約は `reservations` に `projectId:""`・`source:"public"`・`customerName/phone/email/notes` で保存し、カレンダー登録＋スタッフへ通知メール。住まいるアプリのホームの「新規のお客様のご予約」に今日以降の分が出る。誰でも叩ける公開APIなので、入力チェック・ハニーポット欄・同じ連絡先は今後2件まで・24時間で15件までの上限を入れている。
 - 通知: お客様の予約・メッセージ送信時に `netlify/lib/google.mts` の `sendNotifyMail` で smilehousing8@gmail.com へメール（失敗しても処理は止めない）。
 - カレンダー・メール送信にはGoogle連携（設定タブの「Gmailと連携する」）でカレンダー権限（calendar.events）の許可が必要。権限追加後は一度やり直すこと。Google Cloud側でCalendar APIの有効化も必要。
 - 旧おうちノートからの切り替え（既存のお客様への案内）はまだ。確認後に判断する。

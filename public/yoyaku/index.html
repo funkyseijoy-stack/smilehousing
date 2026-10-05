@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a302b">
+<meta name="robots" content="noindex">
+<title>ショールーム見学＆おうち相談 ご予約｜住まいるハウジング</title>
+<link rel="icon" href="/note/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/note/icons/apple-touch-icon.png">
+<style>
+  :root{
+    --page:#efe9e2; --bg:#f7f3ee; --card:#fffdfa; --line:#e9e2da; --line2:#ded5cb;
+    --ink:#2f2925; --ink2:#5c534d; --muted:#8a8078; --brown:#5d5049; --brown2:#7a6a60;
+    --chip:#efe9e3; --green:#e3efe7; --green-ink:#3f6a4f; --rose:#b45b6a;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--page); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.6; }
+  button,input,textarea{ font-family:inherit; font-size:1rem; }
+  .app{ max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); }
+  @media (min-width:560px){ .app{ margin:16px auto; min-height:calc(100vh - 32px); border-radius:34px; border:8px solid #2b2522; overflow:hidden; } }
+  .hd{ background:#3a302b; padding:20px 20px 18px; }
+  .hd .co{ color:#f1e6d6; font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",Georgia,serif; letter-spacing:.28em; font-size:1.02rem; }
+  .hd .rule{ height:1px; width:120px; background:rgba(216,191,157,.55); margin:9px 0; }
+  .hd .sb{ color:#cdb9a0; font-size:.68rem; letter-spacing:.34em; }
+  .wrap{ padding:22px 18px calc(56px + env(safe-area-inset-bottom)); }
+  h1{ font-size:1.38rem; line-height:1.4; margin:0 0 8px; letter-spacing:.02em; }
+  .lead{ margin:0 0 6px; color:var(--ink2); font-size:.9rem; }
+  .pill{ display:inline-block; background:var(--green); color:var(--green-ink); font-size:.76rem; font-weight:700; border-radius:999px; padding:4px 12px; margin:6px 0 4px; }
+  .step{ display:flex; align-items:center; gap:10px; margin:28px 0 12px; font-weight:700; font-size:1.02rem; }
+  .step .n{ width:26px; height:26px; border-radius:50%; background:var(--brown); color:#fff; font-size:.82rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .month{ font-weight:700; color:var(--ink2); font-size:.86rem; margin:14px 0 6px; letter-spacing:.06em; }
+  .dow, .days{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .dow div{ text-align:center; font-size:.7rem; color:var(--muted); padding-bottom:2px; }
+  .dow div:first-child, .day.sun .d{ color:var(--rose); }
+  .day{ border:1.5px solid var(--line2); background:var(--card); border-radius:12px; padding:7px 0 6px; min-height:56px; cursor:pointer; text-align:center; color:var(--ink); }
+  .day .d{ font-size:1.02rem; font-weight:700; line-height:1.2; }
+  .day .s{ font-size:.62rem; color:var(--green-ink); margin-top:2px; }
+  .day.off{ background:transparent; border-color:transparent; color:#b8aea5; cursor:default; }
+  .day.off .s{ color:#b8aea5; }
+  .day.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
+  .day.on .s{ color:#e8dccd; }
+  .blank{ visibility:hidden; }
+  .slots{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .slot{ border:1.5px solid var(--line2); background:var(--card); border-radius:12px; padding:12px 0; font-weight:700; cursor:pointer; color:var(--ink); }
+  .slot:disabled{ background:transparent; border-color:var(--line); color:#c3b9b0; text-decoration:line-through; cursor:default; }
+  .slot.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
+  .hint{ color:var(--muted); font-size:.78rem; margin:10px 0 0; }
+  .empty{ color:var(--muted); font-size:.88rem; text-align:center; padding:22px 10px; background:var(--card); border:1px dashed var(--line2); border-radius:14px; }
+  label.f{ display:block; margin:0 0 14px; font-size:.84rem; font-weight:700; color:var(--ink2); }
+  label.f .opt{ font-weight:400; color:var(--muted); font-size:.74rem; margin-left:6px; }
+  label.f .req{ color:var(--rose); font-size:.74rem; margin-left:6px; }
+  input[type=text],input[type=tel],input[type=email],textarea{ display:block; width:100%; margin-top:6px; border:1.5px solid var(--line2); border-radius:12px; padding:12px 13px; background:#fff; color:var(--ink); font-weight:400; }
+  textarea{ resize:vertical; min-height:92px; }
+  input:focus,textarea:focus,button:focus-visible{ outline:2px solid var(--brown2); outline-offset:1px; }
+  .sel{ background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; margin:0 0 16px; font-size:.92rem; }
+  .sel b{ display:block; font-size:1rem; }
+  .btn{ display:block; width:100%; border:none; border-radius:999px; background:var(--brown); color:#fff; font-weight:700; padding:15px; cursor:pointer; letter-spacing:.04em; }
+  .btn:disabled{ background:#c9beb3; cursor:default; }
+  .err{ background:#fbeaea; color:#9a2f3f; border-radius:12px; padding:11px 13px; font-size:.86rem; margin:0 0 14px; }
+  .done{ text-align:center; padding:12px 4px; }
+  .done .ck{ width:60px; height:60px; border-radius:50%; background:var(--green); color:var(--green-ink); display:flex; align-items:center; justify-content:center; margin:6px auto 14px; font-size:1.8rem; }
+  .done .dt{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; margin:16px 0; }
+  .done .dt b{ font-size:1.15rem; display:block; }
+  .hp{ position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+  .foot{ color:var(--muted); font-size:.74rem; margin-top:22px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hd">
+    <div class="co">住まいるハウジング</div>
+    <div class="rule"></div>
+    <div class="sb">SHOWROOM RESERVATION</div>
+  </header>
+  <main class="wrap" id="root"><div class="empty">読み込み中です…</div></main>
+</div>
+
+<script>
+(function(){
+  var WD = ["日","月","火","水","木","金","土"];
+  var root = document.getElementById("root");
+  var st = { avail:null, loading:true, error:"", date:"", start:"", sending:false, formErr:"", done:null,
+             name:"", phone:"", email:"", notes:"" };
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function dayOf(date){ return st.avail ? st.avail.days.filter(function(d){ return d.date===date; })[0] : null; }
+  function dateLabel(date){ var p = date.split("-"); var d = new Date(+p[0], +p[1]-1, +p[2]); return (+p[1])+"月"+(+p[2])+"日（"+WD[d.getDay()]+"）"; }
+
+  function load(){
+    st.loading = true; st.error = ""; render();
+    fetch("/api/public-booking", {cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||"error"); return j; }); })
+      .then(function(j){
+        st.avail = j;
+        if(st.date){ var d = dayOf(st.date); if(!d || d.status!=="open") { st.date=""; st.start=""; } }
+        if(st.start){ var dd = dayOf(st.date); var sl = dd && dd.slots.filter(function(x){ return x.start===st.start; })[0]; if(!sl || !sl.available) st.start=""; }
+      })
+      .catch(function(){ st.error = "unavailable"; })
+      .then(function(){ st.loading = false; render(); });
+  }
+
+  function headHtml(){
+    return '<h1>ショールーム見学＆おうち相談</h1>'+
+      '<p class="lead">ご希望の日時を選んで、お申し込みください。</p>'+
+      '<span class="pill">所要時間 約2時間</span>';
+  }
+
+  function calHtml(){
+    var days = st.avail.days, out = "";
+    out += '<div class="dow">'+WD.map(function(w){ return '<div>'+w+'</div>'; }).join("")+'</div>';
+    var curMonth = "";
+    var cells = "";
+    function flush(){ if(cells) out += '<div class="days">'+cells+'</div>'; cells = ""; }
+    days.forEach(function(d, i){
+      var p = d.date.split("-"), m = +p[1];
+      if(String(m) !== curMonth){
+        flush();
+        curMonth = String(m);
+        out += '<div class="month">'+p[0]+'年'+m+'月</div>';
+        for(var b=0; b<d.dow; b++) cells += '<div class="blank"></div>';
+      }
+      var label = d.status==="open" ? "空きあり" : d.status==="full" ? "満席" : (d.reason||"休み");
+      cells += '<button type="button" class="day'+(d.dow===0?" sun":"")+(d.status==="open"?"":" off")+(st.date===d.date?" on":"")+'" data-date="'+d.date+'"'+(d.status==="open"?"":" disabled")+
+        ' aria-label="'+esc(dateLabel(d.date)+" "+label)+'"><div class="d">'+(+p[2])+'</div><div class="s">'+esc(label)+'</div></button>';
+    });
+    flush();
+    return out;
+  }
+
+  function formHtml(){
+    return '<div class="sel"><span style="color:var(--muted);font-size:.76rem;">ご予約の日時</span><b>'+esc(dateLabel(st.date))+' '+esc(st.start)+'〜'+esc(endOf(st.start))+'</b></div>'+
+      (st.formErr ? '<div class="err" role="alert">'+esc(st.formErr)+'</div>' : '')+
+      '<label class="f">お名前<span class="req">必須</span><input type="text" id="fName" autocomplete="name" maxlength="50" value="'+esc(st.name)+'" placeholder="例：山田 太郎"></label>'+
+      '<label class="f">お電話番号<span class="req">必須</span><input type="tel" id="fPhone" autocomplete="tel" inputmode="tel" maxlength="20" value="'+esc(st.phone)+'" placeholder="例：090-1234-5678"></label>'+
+      '<label class="f">メールアドレス<span class="opt">任意</span><input type="email" id="fEmail" autocomplete="email" maxlength="100" value="'+esc(st.email)+'" placeholder="例：example@mail.com"></label>'+
+      '<label class="f">ご相談内容<span class="opt">任意</span><textarea id="fNotes" maxlength="500" placeholder="例：土地探しから相談したい、建築予定地は釧路市内、など">'+esc(st.notes)+'</textarea></label>'+
+      '<div class="hp" aria-hidden="true"><label>website<input type="text" id="fWebsite" tabindex="-1" autocomplete="off"></label></div>'+
+      '<button class="btn" id="btnBook"'+(st.sending?" disabled":"")+'>'+(st.sending?"送信中…":"この内容で予約する")+'</button>';
+  }
+  function endOf(s){ var m = parseInt(s.slice(0,2),10)*60 + parseInt(s.slice(3,5),10) + (st.avail ? st.avail.durationMinutes : 120); return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+(m%60)).slice(-2); }
+
+  function render(){
+    if(st.done){
+      root.innerHTML = '<div class="done"><div class="ck">✓</div><h1>ご予約を受け付けました</h1>'+
+        '<p class="lead">ご予約ありがとうございます。当日、お待ちしております。</p>'+
+        '<div class="dt"><span style="color:var(--muted);font-size:.78rem;">ショールーム見学＆おうち相談</span><b>'+esc(dateLabel(st.done.date))+'</b><b>'+esc(st.done.startTime)+'〜'+esc(st.done.endTime)+'</b></div>'+
+        '<p class="hint">ご予約の変更・キャンセルをご希望の場合は、住まいるハウジングまでご連絡ください。</p></div>';
+      window.scrollTo(0,0);
+      return;
+    }
+    var out = headHtml();
+    if(st.loading && !st.avail){ out += '<div class="step"><span class="n">1</span>日付を選ぶ</div><div class="empty">空き状況を確認中です…</div>'; root.innerHTML = out; return; }
+    if(st.error && !st.avail){
+      out += '<div class="empty" style="margin-top:18px;">ただいま空き状況を表示できません。時間をおいて、もう一度お試しください。</div>'+
+        '<div style="margin-top:14px;"><button class="btn" id="btnRetry">もう一度読み込む</button></div>';
+      root.innerHTML = out; return;
+    }
+    out += '<div class="step"><span class="n">1</span>日付を選ぶ</div>'+calHtml();
+    out += '<p class="hint">受付時間 '+esc(st.avail.open)+'〜'+esc(st.avail.close)+'。日曜・祝日はお休みをいただいております。</p>';
+    var day = dayOf(st.date);
+    if(day && day.status==="open"){
+      out += '<div class="step"><span class="n">2</span>開始時間を選ぶ</div><div class="slots">'+
+        day.slots.map(function(sl){ return '<button type="button" class="slot'+(st.start===sl.start?" on":"")+'" data-start="'+sl.start+'"'+(sl.available?"":" disabled")+'>'+sl.start+'</button>'; }).join("")+'</div>'+
+        '<p class="hint">30分刻みで選べます（所要時間は約2時間です）。</p>';
+    }
+    if(st.date && st.start){
+      out += '<div class="step"><span class="n">3</span>お客様情報を入力</div>'+formHtml();
+    }
+    root.innerHTML = out;
+  }
+
+  function readForm(){
+    var g = function(id){ var e = document.getElementById(id); return e ? e.value : ""; };
+    if(document.getElementById("fName")){ st.name = g("fName"); st.phone = g("fPhone"); st.email = g("fEmail"); st.notes = g("fNotes"); }
+  }
+  var ERR = {
+    name_required:"お名前を入力してください。", invalid_phone:"お電話番号をご確認ください（10〜11桁の数字）。", invalid_email:"メールアドレスの形式をご確認ください。",
+    slot_taken:"その時間は先に埋まりました。別の時間をお選びください。", already_booked:"すでにご予約をいただいております。変更をご希望の場合は、住まいるハウジングまでご連絡ください。",
+    too_many:"ただいま予約が集中しています。時間をおいて、もう一度お試しください。"
+  };
+  function book(){
+    readForm();
+    var name = st.name.trim(), phone = st.phone.trim();
+    if(!name){ st.formErr = ERR.name_required; render(); return; }
+    if(phone.replace(/[^0-9０-９]/g,"").length < 10){ st.formErr = ERR.invalid_phone; render(); return; }
+    st.sending = true; st.formErr = ""; render();
+    var web = document.getElementById("fWebsite");
+    fetch("/api/public-booking", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"book", date:st.date, start:st.start, name:name, phone:phone, email:st.email.trim(), notes:st.notes.trim(), website: web ? web.value : "" }) })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok, status:r.status, j:j}; }); })
+    .then(function(res){
+      st.sending = false;
+      if(res.ok){
+        st.done = res.j.reservation || { date:st.date, startTime:st.start, endTime:endOf(st.start) };
+        render(); return;
+      }
+      st.formErr = ERR[res.j.error] || "予約できませんでした。時間をおいて、もう一度お試しください。";
+      if(res.status===409 && res.j.error==="slot_taken"){ st.start = ""; load(); return; }
+      render();
+    })
+    .catch(function(){ st.sending = false; st.formErr = "通信に失敗しました。電波の良いところで、もう一度お試しください。"; render(); });
+  }
+
+  root.addEventListener("click", function(e){
+    var t = e.target.closest("button"); if(!t) return;
+    if(t.dataset.date){ readForm(); st.date = t.dataset.date; st.start = ""; st.formErr = ""; render(); return; }
+    if(t.dataset.start){ readForm(); st.start = t.dataset.start; st.formErr = ""; render();
+      var f = document.getElementById("fName"); if(f && f.scrollIntoView) f.scrollIntoView({behavior:"smooth", block:"center"}); return; }
+    if(t.id==="btnBook"){ book(); return; }
+    if(t.id==="btnRetry"){ load(); return; }
+  });
+  load();
+})();
+</script>
+</body>
+</html>

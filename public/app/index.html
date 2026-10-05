@@ -432,6 +432,12 @@
       <div id="homeActivity"></div>
       <div class="empty" id="homeActivityEmpty" hidden>まだ操作履歴がありません。</div>
     </div>
+    <div class="card" id="publicBookingCard">
+      <h2 style="margin:0 0 4px;">新規のお客様のご予約</h2>
+      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。</p>
+      <div id="publicBookingList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      <div class="empty" id="publicBookingEmpty" hidden>今後のご予約はありません。</div>
+    </div>
     <div class="card">
       <h2 style="margin:0 0 8px;">案件へ</h2>
       <div class="projlist" id="homeProjList"></div>
@@ -1646,6 +1652,7 @@
     renderStats();
     renderKanban();
     renderHomeActivity();
+    renderPublicBookings();
     renderHomeProjList();
     renderProgressFilterBar();
     renderProjectTypeFilterBar();
@@ -4828,6 +4835,30 @@
       '</div>';
     }).join("");
   }
+  // 新規のお客様向け予約ページ（/yoyaku/）からの予約（source:"public"・案件に紐づかない）をホームに出す
+  function renderPublicBookings(){
+    var wrap = document.getElementById("publicBookingList");
+    var empty = document.getElementById("publicBookingEmpty");
+    if(!wrap || !empty) return;
+    var today = todayStr();
+    var rows = liveReservations().filter(function(r){ return r.source==="public" && (r.date||"") >= today; })
+      .sort(function(a,b){ return ((a.date||"")+"T"+(a.startTime||"")).localeCompare((b.date||"")+"T"+(b.startTime||"")); });
+    empty.hidden = rows.length !== 0;
+    wrap.innerHTML = rows.map(function(r){
+      var wd = ["日","月","火","水","木","金","土"][new Date(r.date+"T00:00:00").getDay()];
+      return '<div class="noteitem">'+
+        '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
+          '<div><strong>'+escapeHtml(r.date)+'（'+wd+'）'+escapeHtml(r.startTime)+'〜'+escapeHtml(r.endTime)+'</strong>　'+
+            '<span class="pill tag">新規</span></div>'+
+          '<button class="btn danger-ghost small" data-delpublicbooking="'+r.id+'" title="一覧から削除（Googleカレンダーの予定は残ります）">×</button>'+
+        '</div>'+
+        '<div style="margin-block-start:4px;"><strong>'+escapeHtml(r.customerName||"")+' 様</strong>　'+
+          (r.phone ? '<a href="tel:'+escapeHtml(String(r.phone).replace(/[^0-9+]/g,""))+'">'+escapeHtml(r.phone)+'</a>' : '')+
+          (r.email ? '　<a href="mailto:'+escapeHtml(r.email)+'">'+escapeHtml(r.email)+'</a>' : '')+'</div>'+
+        (r.notes ? '<div class="ntext" style="margin-block-start:4px;">'+escapeHtml(r.notes)+'</div>' : "")+
+      '</div>';
+    }).join("");
+  }
   function renderReservationTab(){
     populateResStartTimeOptions();
     populateResStaffSelect();
@@ -7017,6 +7048,12 @@
       document.getElementById("resDuration").value = RESERVATION_DEFAULT_DURATION[e.target.value] || 120;
     });
     document.getElementById("btnAddReservation").addEventListener("click", addReservation);
+    document.getElementById("publicBookingList").addEventListener("click", function(e){
+      var del = e.target.closest("[data-delpublicbooking]");
+      if(!del) return;
+      var r = state.reservations.find(function(x){ return x.id===del.dataset.delpublicbooking; });
+      if(confirm2()) softDelete("reservations","reservations", del.dataset.delpublicbooking, "新規のお客様の予約「"+(r?(r.customerName||"")+" "+r.date:"")+"」");
+    });
     document.getElementById("reservationList").addEventListener("click", function(e){
       var del = e.target.closest("[data-delreservation]");
       if(del){ if(confirm2()) deleteReservation(del.dataset.delreservation); }

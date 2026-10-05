@@ -3,5 +3,7 @@
 /app/icons/*  /app/icons/:splat  200
 /app/manifest.json  /app/manifest.json  200
 /note/*  /note/index.html  200!
+/yoyaku  /yoyaku/index.html  200!
+/yoyaku/*  /yoyaku/index.html  200!
 /app/*  /app/index.html  200!
 /*  /index.html  200
