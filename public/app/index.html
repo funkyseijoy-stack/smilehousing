@@ -5574,11 +5574,21 @@
         if(!rooms.length){ toast("この案件にはまだ部屋が登録されていません"); callback(null); return; }
         askChoice("部屋を選択", "", rooms.map(function(r){ return {label:r.name, value:r.id}; }), function(roomId){
           if(!roomId){ callback(null); return; }
+          var roomName = (rooms.find(function(r){ return r.id===roomId; })||{}).name || "";
           var roomCats = roomCatsFor(proj);
-          askChoice("項目を選択", "", roomCats.map(function(rc){ return {label:rc.label, value:rc.id}; }), function(catId){
+          // 天井/壁/アクセントはクロス専用なので、ドア・枠・床など「クロス以外」は
+          // 先頭の「（項目を限定しない）」で部屋そのものに直接入れられるようにする。
+          // （category:null なので仕様タブのタイムライン自動反映はしない）
+          var DIRECT = "__direct";
+          var choices = [{label:roomName+"（項目を限定しない）", value:DIRECT}]
+            .concat(roomCats.map(function(rc){ return {label:rc.label, value:rc.id}; }));
+          askChoice("項目を選択", "", choices, function(catId){
             if(!catId){ callback(null); return; }
+            if(catId===DIRECT){
+              callback({scope:"room", category:null, roomId:roomId, side:null, label:roomName});
+              return;
+            }
             var rc = roomCats.find(function(x){ return x.id===catId; });
-            var roomName = (rooms.find(function(r){ return r.id===roomId; })||{}).name || "";
             callback({scope:"room", category:catId, roomId:roomId, side:null, label:roomName+"・"+(rc?rc.label:catId)});
           });
         });

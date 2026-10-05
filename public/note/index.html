@@ -557,7 +557,8 @@
     var h = new Date().getHours();
     var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
     var name = (data.project.customer || "お客様").replace(/様$/, "");
-    var album = data.album.filter(function(a){ return isImg(a); });
+    // 家づくり参考写真（kind:"reference"）はホームのアルバムには出さない
+    var album = data.album.filter(function(a){ return isImg(a) && a.kind!=="reference"; });
     var weekAgo = new Date(Date.now()-7*86400000).toISOString();
     var newCount = album.filter(function(a){ return a.createdAt >= weekAgo; }).length;
     var pg = progress();
