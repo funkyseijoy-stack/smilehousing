@@ -3116,7 +3116,7 @@
       state.confirmItems.push(doc1);
       await saveDoc("confirmItems", doc1.id, doc1);
       logActivity(ctx.sourceLabel+"から確認事項「"+content.slice(0,20)+"」を作成しました");
-      return;
+      return doc1.id;
     }
     if(badgeType==="consider"){
       var doc2 = { id: uid("cs"), projectId: proj.id, kind:"consider", content: content,
@@ -3125,7 +3125,7 @@
       state.confirmItems.push(doc2);
       await saveDoc("confirmItems", doc2.id, doc2);
       logActivity(ctx.sourceLabel+"からお客様の検討事項「"+content.slice(0,20)+"」を作成しました");
-      return;
+      return doc2.id;
     }
     if(badgeType==="companytask"){
       var t = { id: uid("task"), projectId: proj.id, content: content,
@@ -3137,7 +3137,7 @@
       state.tasks.push(t);
       await saveDoc("tasks", t.id, t);
       logActivity(ctx.sourceLabel+"から社内タスク「"+content.slice(0,20)+"」を作成しました"+(part?"（部位："+part.label+"）":""));
-      return;
+      return t.id;
     }
     if(badgeType==="vendortask"){
       var vendor = vendorId ? vendorById(vendorId) : null;
@@ -3159,7 +3159,7 @@
           await saveDoc("requests", req.id, req);
         }
       }
-      return;
+      return t3.id;
     }
   }
   // 登録フォームで新規に保存した/編集した打合せ記録に対して、まだ自動登録していない
@@ -3253,6 +3253,54 @@
     }).join("");
     return '<div class="decidedsummary"><div class="decidedsummary-label">現在の決定事項</div>'+itemsHtml+'</div>';
   }
+  // ---- 仕様画面の履歴（写真・資料）から、タスク依頼・お客様への確認などへ入れる ----
+  var SPEC_SEND_TYPES = NOTE_SEND_TYPES.filter(function(t){ return t.type!=="estimate"; });
+  function specSentInfo(p){
+    var info = {};
+    var s = p.sent || {};
+    SPEC_SEND_TYPES.forEach(function(t){
+      var rec = s[t.type];
+      if(!rec){ info[t.type] = false; return; }
+      if(t.type==="companytask" || t.type==="vendortask"){
+        info[t.type] = state.tasks.some(function(x){ return x.id===rec.ref && !x.deletedAt; });
+      } else {
+        info[t.type] = state.confirmItems.some(function(x){ return x.id===rec.ref && !x.deletedAt; });
+      }
+    });
+    return info;
+  }
+  function openSpecTaskMenu(spId, scope, category, roomId, side){
+    var p = state.specPhotos.find(function(x){ return x.id===spId; });
+    if(!p) return;
+    var sent = specSentInfo(p);
+    var label = specPartLabelFor(scope, category, roomId, side);
+    var choices = SPEC_SEND_TYPES.map(function(t){
+      return {label: t.label+(sent[t.type]?"　✓登録済み":""), value: t.type};
+    });
+    askChoice("タスク依頼・確認へ入れる", "部位：「"+label+"」", choices, function(type){
+      if(!type) return;
+      if(sent[type]){ toast("すでに登録済みです"); return; }
+      var run = function(vendorId){
+        var snippet = (p.source && p.source.noteSnippet) || "";
+        var what = snippet || p.fileName || ((p.contentType||"").indexOf("pdf")>=0 ? "PDF資料" : "写真");
+        var content = "【"+label+"】"+what;
+        var part = { scope: scope, category: category||null, roomId: roomId||null, side: side||null, label: label };
+        var files = (p.url||p.assetId) ? [{ id: p.assetId||p.id, url: p.url, contentType: p.contentType, name: p.fileName||"" }] : [];
+        autoCreateLinkedItem({ projectId: p.projectId, content: content, part: part, files: files, sourceLabel: "仕様の履歴" }, type, vendorId).then(function(refId){
+          if(!refId){ toast("登録に失敗しました"); return; }
+          p.sent = p.sent || {};
+          p.sent[type] = { at: nowIso(), by: state.currentUser||"", ref: refId };
+          render();
+          saveDoc("specPhotos", p.id, p);
+          var def = SPEC_SEND_TYPES.filter(function(t){ return t.type===type; })[0];
+          toast("✅ "+def.label.replace("→","").replace("へ","")+"に追加しました");
+        });
+      };
+      if(type==="vendortask"){
+        askVendorForBadge(function(vendorId){ if(vendorId===null) return; run(vendorId); });
+      } else run(null);
+    });
+  }
   function renderSpecTimeline(scope, category, roomId, side){
     var rows = specPhotosFor(scope, category, roomId, side).slice();
     if(!rows.length) return "";
@@ -3299,6 +3347,14 @@
         (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
       var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
       var delBtnHtml = '<button class="spdel" data-delspec="'+p.id+'" title="この履歴を削除">×</button>';
+      var spSent = specSentInfo(p);
+      var spSentTypes = SPEC_SEND_TYPES.filter(function(t){ return spSent[t.type]; });
+      var taskBtnHtml = (p.kind!=="note")
+        ? '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-taskmenu="'+p.id+'" data-sc="'+escapeHtml(scope||"")+'" data-cat="'+escapeHtml(category||"")+'" data-room="'+escapeHtml(roomId||"")+'" data-side="'+escapeHtml(side||"")+'">'+(spSentTypes.length?'✓ ':'')+'タスク依頼</button>'
+        : '';
+      var sentBadgesHtml = spSentTypes.length
+        ? '<div style="flex-basis:100%; margin-block-start:4px;">'+spSentTypes.map(function(t){ return '<span class="pill small status-受領済み" style="margin-inline-end:4px;">'+escapeHtml(t.badge)+'</span>'; }).join("")+'</div>'
+        : '';
       // 旧「写真」「プランボード・図面」ギャラリーに付いていた「依頼状況」「おうちノートに反映」
       // ボタンは、ギャラリーを廃止してもこのタイムラインから引き続き操作できるようにする
       // （打ち合わせ記録由来＝kind:"note" はメモそのものなので対象外）。
@@ -3316,7 +3372,7 @@
         return '<div class="'+cardClass+' spectl-card-row">'+
           '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">'+
           '<div class="spectl-meta">'+metaHtml+'</div>'+
-          '<div class="spectl-actions">'+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+          '<div class="spectl-actions">'+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
           badgeRowHtml+
@@ -3325,7 +3381,8 @@
       return '<div class="'+cardClass+'">'+
         thumbHtml+
         '<div class="spectl-meta">'+metaHtml+'</div>'+
-        '<div class="spectl-actions">'+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+        '<div class="spectl-actions">'+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+        sentBadgesHtml+
         badgeRowHtml+
         '</div>';
     });
@@ -7031,6 +7088,8 @@
         if(cyclereq){ cyclePbReqStatus(cyclereq.dataset.cyclereq); return; }
         var togglereflect = e.target.closest("[data-togglereflect]");
         if(togglereflect){ togglePbReflected(togglereflect.dataset.togglereflect); return; }
+        var sptask = e.target.closest("[data-spec-taskmenu]");
+        if(sptask){ openSpecTaskMenu(sptask.dataset.specTaskmenu, sptask.dataset.sc, sptask.dataset.cat||null, sptask.dataset.room||null, sptask.dataset.side||null); return; }
         var specdecide = e.target.closest("[data-spec-decide]");
         if(specdecide){ toggleSpecDecided(specdecide.dataset.specDecide); return; }
         var openspec = e.target.closest("[data-openspec]");
