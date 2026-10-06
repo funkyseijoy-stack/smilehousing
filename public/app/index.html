@@ -4586,6 +4586,11 @@
             status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
           };
           Object.assign(t3, newTaskVendorFields(vendorNames));
+          // 業者を選んだら、そのまま「業者連絡済み」へ送る（各社も「連絡済み」）
+          if(t3.vendors && t3.vendors.length){
+            t3.vendors.forEach(function(v){ v.status = "連絡済み"; });
+            t3.status = "業者連絡済み";
+          }
           state.tasks.push(t3);
           if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
           markNoteSent(note, "vendortask", t3.id);
@@ -4595,16 +4600,21 @@
           goToTaskBoard(t3.id);
 
           // 業者が指定されていれば、見積依頼状況にも「未依頼」として自動登録する。
-          if(vendor){
+          var addedNames = [];
+          vendorIds.forEach(function(vid){
+            var vendor = vendorById(vid);
+            if(!vendor) return;
             var already = liveRequests().some(function(r){ return r.projectId===proj.id && r.vendorId===vendor.id && r.status==="未依頼"; });
-            if(!already){
-              var req = { id:uid("req"), projectId: proj.id, vendorId: vendor.id, method:"", status:"未依頼",
-                requestedAt:"", receivedAt:"", note:"打合せ記録「"+content.slice(0,20)+"」より自動登録", dueDate:"", requestedBy:"", receivedBy:"" };
-              state.requests.push(req);
-              render();
-              saveDoc("requests", req.id, req);
-              toast("✅ 見積依頼状況にも「"+vendor.name+"」を未依頼として追加しました");
-            }
+            if(already) return;
+            var req = { id:uid("req"), projectId: proj.id, vendorId: vendor.id, method:"", status:"未依頼",
+              requestedAt:"", receivedAt:"", note:"打合せ記録「"+content.slice(0,20)+"」より自動登録", dueDate:"", requestedBy:"", receivedBy:"" };
+            state.requests.push(req);
+            saveDoc("requests", req.id, req);
+            addedNames.push(vendor.name);
+          });
+          if(addedNames.length){
+            render();
+            toast("✅ 見積依頼状況にも「"+addedNames.join("、")+"」を未依頼として追加しました");
           }
         });
         });
