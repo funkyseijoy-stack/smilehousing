@@ -621,8 +621,7 @@
       }).join("")+'</div>';
     }
 
-    // 追加見積り（旧おうちノートの「お客様用リンク」と同じ内容。ご回答は今のところ
-    // 従来のおうちノートで受け付けている）
+    // 追加見積り（住まいるアプリの「おうちノート連携」タブで登録。お客様の承認／見送りもここで受け付ける）
     if(data.estimates && data.estimates.length){
       out += '<div class="sechd"><h3>追加見積り</h3></div><div class="catlist">'+data.estimates.map(function(x){
         var r = x.customerResponse || "未回答";
@@ -631,8 +630,15 @@
         var cls = r==="承認" ? "s-決定" : (r==="未回答" ? "s-仮決定" : "");
         // 金額が決まるまでは「金額確認中」と表示する（スタッフが金額を入力すると自動で切り替わる）
         var label = pendingAmt ? "金額確認中" : (r==="承認" ? "承認済み" : (r==="未回答" ? "ご確認ください" : r));
-        return '<div class="rv"><div style="flex:1;"><div class="ty">'+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
-          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
+        // 金額が決まったら、お客様がここで「承認」「見送り」を選べる
+        var act = "";
+        if(!pendingAmt && x.id){
+          act = r==="未回答"
+            ? '<div style="display:flex; gap:8px; margin-top:10px;"><button class="btn dk" style="flex:1;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div>'
+            : '<div style="margin-top:8px;"><button class="btn ol" style="padding:8px 14px; font-size:.8rem;" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
+        }
+        return '<div class="rv" style="flex-wrap:wrap;"><div style="flex:1; min-width:0;"><div class="ty">'+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
+          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
       }).join("")+'</div>';
     }
 
@@ -1046,6 +1052,20 @@
     out += decideBoxHtml(c.name, c.status, c.decidedAt, "");
     return out;
   }
+  async function respondEstimate(id, response){
+    var x = (data.estimates||[]).find(function(e){ return e.id===id; });
+    if(!x) return;
+    var msg = response==="承認" ? "追加見積り「"+x.title+"」を承認します。よろしいですか？" :
+      (response==="見送り" ? "追加見積り「"+x.title+"」を見送ります。よろしいですか？" : "「"+x.title+"」の回答を取り消して、もう一度選べるようにします。よろしいですか？");
+    if(!window.confirm(msg)) return;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"estimateRespond", id:id, response:response }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      x.customerResponse = j.customerResponse; x.estimateState = j.estimateState;
+      render(); toast(response==="未回答" ? "回答を取り消しました" : (response==="承認" ? "承認として住まいるハウジングにお伝えしました" : "見送りとして住まいるハウジングにお伝えしました"));
+    }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
+  }
   async function decide(status, roomId){
     var c = data.categories.find(function(x){ return x.id===view.cat; });
     if(!c) return;
@@ -1089,6 +1109,7 @@
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
+    var er = e.target.closest("[data-estresp]"); if(er){ respondEstimate(er.dataset.estid, er.dataset.estresp); return; }
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; render(); return; }

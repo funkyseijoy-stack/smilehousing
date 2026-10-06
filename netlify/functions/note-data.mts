@@ -1,5 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { sendNotifyMail } from "../lib/google.mts";
+import { getExtras, saveExtras } from "../lib/note-extras.mts";
 import { getStore } from "@netlify/blobs";
 
 // 新おうちノート（/note/）用のお客様向けAPI。
@@ -22,27 +23,6 @@ function json(body: unknown, status = 200) {
 
 function genId(prefix: string) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
-}
-
-// 追加見積り・ご家族家電・家づくりリスト・A's 3Dリンクは、今のところ住まいるアプリの
-// 「おうちノート連携」タブが旧おうちノート本体（strong-piroshki-295252、customer-data.mts）
-// に保存しているデータをそのまま使っている（staffDataには無い）。新おうちノートでも
-// 表示できるよう、ここから同じAPIをサーバー間で直接読み出す（okainote-bridge.mtsと同じ
-// 合言葉・仕組み）。取得できなくても他の表示は止めたくないので、失敗時はnullを返すだけにする。
-const OKAINOTE_BASE = "https://strong-piroshki-295252.netlify.app";
-const STAFF_PASSPHRASE = "sumairu2026"; // 住まいるアプリ内の他Functionと同じ合言葉（変更時は全ファイルで揃えること）
-
-async function fetchOkaiCustomerExtras(projectId: string): Promise<any> {
-  try {
-    const res = await fetch(`${OKAINOTE_BASE}/api/customer-data?customerId=${encodeURIComponent(projectId)}`, {
-      headers: { "x-staff-code": STAFF_PASSPHRASE },
-    });
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    return (data && data.customer) || null;
-  } catch {
-    return null;
-  }
 }
 
 // お客様画面の「設備仕様」一覧。玄関は外部に統合している。
@@ -188,6 +168,32 @@ export default async (req: Request, context: Context) => {
       );
       return json({ ok: true, message: doc });
     }
+    // 追加見積りの「承認」「見送り」（お客様の回答。「承認依頼」に戻すこともできる）
+    if (body.action === "estimateRespond") {
+      const estId = String(body.id || "");
+      const response = String(body.response || "");
+      if (!estId || !["承認", "見送り", "未回答"].includes(response)) return json({ error: "invalid_request" }, 400);
+      const extras: any = await getExtras(store, projectId);
+      if (!extras) return json({ error: "unavailable" }, 502);
+      const list: any[] = extras.customerEstimates || [];
+      const item = list.find((x) => x.id === estId);
+      if (!item) return json({ error: "not_found" }, 404);
+      const pending = item.estimateState ? item.estimateState === "金額確認中" : !String(item.amount || "").trim();
+      if (pending) return json({ error: "amount_pending" }, 400);
+      const now = new Date().toISOString();
+      item.customerResponse = response;
+      item.customerRespondedAt = response === "未回答" ? "" : now;
+      item.estimateState = response === "承認" ? "承認済み" : response === "見送り" ? "見送り" : "承認依頼";
+      item.updated = now;
+      await saveExtras(store, extras);
+      if (response !== "未回答") {
+        await sendNotifyMail(
+          `【おうちノート】${project.customer || "お客様"}様が追加見積りを「${response === "承認" ? "承認" : "見送り"}」しました`,
+          `${project.customer || "お客様"}様（${project.name || ""}）が、追加見積り「${item.title || ""}」${item.amount ? "（" + item.amount + "）" : ""}を「${response === "承認" ? "承認" : "見送り"}」しました。\n\n住まいるアプリの「おうちノート連携」タブで確認できます。`
+        );
+      }
+      return json({ ok: true, id: estId, customerResponse: item.customerResponse, estimateState: item.estimateState, customerRespondedAt: item.customerRespondedAt });
+    }
     // お家のイメージ（アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所）。
     // お客様は自分が追加した写真だけ削除できる（スタッフの写真は消せない）。
     if (body.action === "imageAdd") {
@@ -237,7 +243,7 @@ export default async (req: Request, context: Context) => {
     listCollection(store, "reservations", projectId),
     listCollection(store, "noteDecisions", projectId),
     listCollection(store, "noteNotices"),
-    fetchOkaiCustomerExtras(projectId),
+    getExtras(store, projectId),
     listCollection(store, "imageBoard", projectId),
   ]);
 
@@ -401,7 +407,7 @@ export default async (req: Request, context: Context) => {
     // 「おうちノート連携」タブ（旧おうちノート本体と橋渡しされている項目）。表示のみで、
     // お客様からの回答・更新はまだ今の（旧）おうちノートの画面で行う。
     estimates: ((okaiCustomer && okaiCustomer.customerEstimates) || []).map((x: any) => ({
-      title: x.title || "", amount: x.amount || "", note: x.note || "",
+      id: x.id || "", title: x.title || "", amount: x.amount || "", note: x.note || "",
       customerResponse: x.customerResponse || "未回答", estimateState: x.estimateState || "", createdAt: x.createdAt || "",
     })),
     familyProfile: okaiCustomer && okaiCustomer.customerProfile ? {

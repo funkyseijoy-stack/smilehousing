@@ -692,7 +692,7 @@
       <div class="subpanel" id="sub-okainote">
         <div class="card" style="border:2px solid var(--accent);">
           <h3 style="margin:0;">新しいおうちノート（試作版）</h3>
-          <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。下の「追加見積り」「ご家族・家電・持ち込み品」「家づくりリスト」「A's 3Dリンク」も、今までのおうちノート（本番サイト）の内容がそのまま表示されます。お客様は各項目を「仮決定」「決定」できます。</p>
+          <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。下の「追加見積り」「ご家族・家電・持ち込み品」「家づくりリスト」「A's 3Dリンク」も、住まいるアプリに保存され、そのまま表示されます（旧おうちノートの内容は、最初に開いたときに1回だけ写してあります）。お客様は各項目を「仮決定」「決定」できます。</p>
           <div id="newNoteLinkArea" style="font-size:.85rem; word-break:break-all;"></div>
           <div class="row" style="margin-block-start:10px; gap:6px; flex-wrap:wrap;">
             <button class="btn small" id="btnNewNoteIssue">リンクを発行する</button>
@@ -716,20 +716,8 @@
         </div>
 
         <div class="card">
-          <h3>設備仕様の状況（お客様側の表示）</h3>
-          <div id="okaiSpecStatus" style="display:flex; flex-direction:column; gap:4px; font-size:.85rem;"></div>
-        </div>
-
-        <div class="card">
-          <h3>サンプル請求・検討リストの投稿（お客様から）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">メッセージのやり取りは対象外です。サンプル請求・写真共有・仕様の仮決定などお客様からの投稿がここに並びます。</p>
-          <div id="okaiInboxList" style="display:flex; flex-direction:column; gap:8px;"></div>
-          <div class="empty" id="okaiInboxEmpty" hidden>まだ投稿はありません。</div>
-        </div>
-
-        <div class="card">
           <h3>追加見積り</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">住まいるから追加見積りを送ると、お客様がおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面と「投稿」欄に届きます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">追加見積りを登録して金額を入れると、お客様が新しいおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面の「状態」に反映され、通知メールも届きます。状態は、ここで手動でも変えられます。</p>
           <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.85rem; font-weight:700;" hidden></p>
           <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
@@ -762,7 +750,7 @@
           </div>
         </div>
 
-        <div class="empty" id="okaiUnavailable" hidden>おうちノートと通信できませんでした。しばらくしてからもう一度お試しください。</div>
+        <div class="empty" id="okaiUnavailable" hidden>データを読み込めませんでした。しばらくしてからもう一度お試しください。</div>
       </div>
 
       <!-- 見積 subpanel -->
@@ -3327,13 +3315,13 @@
   }
   // 登録フォームで新規に保存した/編集した打合せ記録に対して、まだ自動登録していない
   // バッジ（社内タスク・業者タスク・確認事項・お客様の検討事項）があれば作成する。
-  async function applyNewlyOnBadges(note, badges, vendorId){
+  async function applyNewlyOnBadges(note, badges, vendorId, assignee){
     note.autoCreated = note.autoCreated || {};
     var ran = false;
     for(var i=0;i<BADGE_AUTO_KEYS.length;i++){
       var key = BADGE_AUTO_KEYS[i];
       if(badges[key] && !note.autoCreated[key]){
-        await autoCreateLinkedItem({ projectId:note.projectId, content:(note.content||note.decided||note.title||""), part:note.specPart, files:note.files, sourceLabel:"打合せ記録" }, key, key==="vendortask" ? vendorId : null);
+        await autoCreateLinkedItem({ projectId:note.projectId, content:(note.content||note.decided||note.title||""), part:note.specPart, files:note.files, sourceLabel:"打合せ記録", assignee: (key==="companytask" ? (assignee||"") : "") }, key, key==="vendortask" ? vendorId : null);
         note.autoCreated[key] = true;
         ran = true;
       }
@@ -3346,13 +3334,13 @@
     if(!n) return;
     n.badges = n.badges || {};
     n.autoCreated = n.autoCreated || {};
-    function applyOn(vendorId){
+    function applyOn(vendorId, assignee){
       n.badges[key] = true;
       render();
       saveDoc("meetingNotes", n.id, n);
       if(BADGE_AUTO_KEYS.indexOf(key)>=0 && !n.autoCreated[key]){
         n.autoCreated[key] = true;
-        autoCreateLinkedItem({ projectId:n.projectId, content:(n.content||n.decided||n.title||""), part:n.specPart, files:n.files, sourceLabel:"打合せ記録" }, key, vendorId).then(function(){ render(); saveDoc("meetingNotes", n.id, n); });
+        autoCreateLinkedItem({ projectId:n.projectId, content:(n.content||n.decided||n.title||""), part:n.specPart, files:n.files, sourceLabel:"打合せ記録", assignee: assignee||"" }, key, vendorId).then(function(){ render(); saveDoc("meetingNotes", n.id, n); });
       }
     }
     if(!n.badges[key] && key==="vendortask"){
@@ -3363,6 +3351,10 @@
       n.badges[key] = false;
       render();
       saveDoc("meetingNotes", n.id, n);
+      return;
+    }
+    if(key==="companytask" && !n.autoCreated[key]){
+      askAssignee(function(a){ if(a===null) return; applyOn(null, a); });
       return;
     }
     applyOn(null);
@@ -3379,6 +3371,7 @@
   // ---- 「打合せ内容を記録」フォーム（新規登録前）のバッジ下書き ----
   var newMeetingNoteBadges = {};
   var newMeetingNoteBadgeVendorId = null;
+  var newMeetingNoteBadgeAssignee = "";
   function renderMeetingNoteBadgePicker(){
     var el = document.getElementById("meetingNoteBadgePicker");
     if(el) el.innerHTML = badgePickerHtml("newnote", newMeetingNoteBadges);
@@ -3393,8 +3386,19 @@
       });
       return;
     }
+    if(!newMeetingNoteBadges[key] && key==="companytask"){
+      // 業者タスクで業者を選ぶのと同じように、担当者をここで選ぶ
+      askAssignee(function(a){
+        if(a===null) return;
+        newMeetingNoteBadgeAssignee = a;
+        newMeetingNoteBadges[key] = true;
+        renderMeetingNoteBadgePicker();
+      });
+      return;
+    }
     newMeetingNoteBadges[key] = !newMeetingNoteBadges[key];
     if(key==="vendortask" && !newMeetingNoteBadges[key]) newMeetingNoteBadgeVendorId = null;
+    if(key==="companytask" && !newMeetingNoteBadges[key]) newMeetingNoteBadgeAssignee = "";
     renderMeetingNoteBadgePicker();
   }
   function handleBadgePickClick(target){
@@ -3839,20 +3843,17 @@
     unavailable.hidden = true;
     document.getElementById("okaiAce3dUrl").value = "";
     Promise.all([
-      okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=data'),
-      okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=inbox')
+      okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=data')
     ]).then(function(results){
-      var dataRes = results[0], inboxRes = results[1];
+      var dataRes = results[0];
       if(!dataRes.ok){ unavailable.hidden = false; return; }
       okaiBridgeCache[proj.id] = { customer: dataRes.body.customer, link: dataRes.body.link };
       renderOkaiLink(proj, dataRes.body);
       renderOkaiBooking(dataRes.body.customer);
-      renderOkaiSpecStatus(dataRes.body.customer);
       renderOkaiEstimates(dataRes.body.customer);
       renderOkaiProfile(dataRes.body.customer);
       renderOkaiConsider(dataRes.body.customer);
       document.getElementById("okaiAce3dUrl").value = (dataRes.body.customer && dataRes.body.customer.customerLinks && dataRes.body.customer.customerLinks.ace3dUrl) || "";
-      if(inboxRes.ok){ renderOkaiInbox(inboxRes.body.entries); }
     }).catch(function(){ unavailable.hidden = false; });
   }
 
@@ -5886,6 +5887,7 @@
     // cancelEditMeetingNote() で下書き（バッジ・業者選択）がリセットされる前に控えておく。
     var badgesToApply = Object.assign({}, newMeetingNoteBadges);
     var vendorIdToApply = newMeetingNoteBadgeVendorId;
+    var assigneeToApply = newMeetingNoteBadgeAssignee;
 
     if(editingMeetingNoteId){
       var existing = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
@@ -5904,7 +5906,7 @@
       render();
       await saveDoc("meetingNotes", existing.id, existing);
       if(existing.specPart) upsertNoteSpecEntry(existing);
-      await applyNewlyOnBadges(existing, badgesToApply, vendorIdToApply);
+      await applyNewlyOnBadges(existing, badgesToApply, vendorIdToApply, assigneeToApply);
       logActivity("打合せ内容を編集しました");
       return;
     }
@@ -5917,7 +5919,7 @@
     render();
     await saveDoc("meetingNotes", n.id, n);
     if(n.specPart) upsertNoteSpecEntry(n);
-    await applyNewlyOnBadges(n, badgesToApply, vendorIdToApply);
+    await applyNewlyOnBadges(n, badgesToApply, vendorIdToApply, assigneeToApply);
     logActivity("打合せ内容を記録しました");
   }
   function editMeetingNote(id){
@@ -5939,6 +5941,7 @@
     lastAutoFilledMeetingNoteTitle = "";
     newMeetingNoteBadges = Object.assign({}, n.badges||{});
     newMeetingNoteBadgeVendorId = null;
+    newMeetingNoteBadgeAssignee = "";
     renderMeetingNoteBadgePicker();
     var btn = document.getElementById("btnAddMeetingNote");
     if(btn) btn.textContent = "更新";
@@ -5965,6 +5968,7 @@
     lastAutoFilledMeetingNoteTitle = "";
     newMeetingNoteBadges = {};
     newMeetingNoteBadgeVendorId = null;
+    newMeetingNoteBadgeAssignee = "";
     renderMeetingNoteBadgePicker();
     var btn = document.getElementById("btnAddMeetingNote");
     if(btn) btn.textContent = "記録する";
@@ -7242,11 +7246,6 @@
     });
     document.getElementById("btnOkaiAddEstimate").addEventListener("click", okaiAddEstimate);
     document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
-    document.getElementById("okaiInboxList").addEventListener("click", function(e){
-      var btn = e.target.closest("[data-okai-read]");
-      if(!btn) return;
-      okaiMarkInboxRead(btn.dataset.okaiRead);
-    });
     document.getElementById("okaiEstimateList").addEventListener("change", function(e){
       var sel = e.target.closest("[data-okai-est-state]");
       if(sel) okaiSetEstimateState(sel.dataset.okaiEstState, sel.value);
