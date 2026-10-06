@@ -141,7 +141,7 @@
 
 - 仕様履歴カードの「お客様の決定ボタン：出す／出さない」（2026年10月〜）: 仕様タブの履歴カード（手動追加の写真・PDF・受領PDF・プランボード。タスクから作ったコピーはタスク側のボタンで決める）に、反映ボタンの隣へ追加（`toggleSpecAskDecision`、`specPhotos.askDecision`）。「出す」にしたカードだけ、お客様画面（`public/note/index.html` の `itemsSectionsHtml`）で「写真・資料」「プランボード」欄から記録・図面と同じ時系列のカードに移り、カードごとに仮決定／決定を選べる。カードの `cardKey` は `s:<仕様写真ID>`（`note-data.mts` の `decideCard` は `n:`／`t:`／`s:` を受け付ける）。
 
-- 「確認事項」タブの分割（2026年10月〜）: 案件の上段にあった「確認事項」（固定6項目、`scope:"siteCheck"`）は廃止し、項目ごとに分けた。**ポスト**は外部仕様のカード（`EXTERIOR_CATS`）、**ランドリーバー**は設備仕様のカード（`FACILITY_CATS`、脱衣室の隣。お客様画面は洗面に出る：`note-data.mts` の `noteCatFor` と `noteCatIdFor` に対応を追加）。残りの**外部散水栓・インターホン親機・給湯リモコン・床下点検口**は、打合せ記録のサブタブの並びにそれぞれ別のタブ（`SITECHECK_TABS`、キー `sc_*`、`renderSpecSiteCheck` が `#siteCheckPanes` に描画）として出す（これらは `scope:"siteCheck"` のままで、お客様画面には出ない）。以前 siteCheck に入れたポスト／ランドリーバーの写真・記録・タスク・メモは、起動時に `migrateSiteCheckMoves` が新しい場所へ移す（何度動かしても同じ結果）。
+- 「確認事項」タブの分割（2026年10月〜）: 案件の上段にあった「確認事項」（固定6項目、`scope:"siteCheck"`）は廃止し、項目ごとに分けた。**ポスト**は外部仕様のカード（`EXTERIOR_CATS`）、**ランドリーバー**は設備仕様のカード（`FACILITY_CATS`、脱衣室の隣。お客様画面は新しい項目「脱衣室」（id `dressing`、洗面の次）に出る。脱衣室・ランドリーバーは洗面から分けた：`note-data.mts` の `NOTE_CATS`／`noteCatFor` と、住まいるアプリの `noteCatIdFor`／`NOTE_CAT_NAMES` の2か所に同じ対応）。残りの**外部散水栓・インターホン親機・給湯リモコン・床下点検口**は、打合せ記録のサブタブの並びにそれぞれ別のタブ（`SITECHECK_TABS`、キー `sc_*`、`renderSpecSiteCheck` が `#siteCheckPanes` に描画）として出す（これらは `scope:"siteCheck"` のままで、お客様画面には出ない）。以前 siteCheck に入れたポスト／ランドリーバーの写真・記録・タスク・メモは、起動時に `migrateSiteCheckMoves` が新しい場所へ移す（何度動かしても同じ結果）。
 
 ## 編集を依頼する人向け：進め方の目安
 

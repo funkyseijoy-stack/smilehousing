@@ -32,6 +32,7 @@ const NOTE_CATS = [
   { id: "kitchen", name: "キッチン", sub: "プランボード・設備仕様", icon: "kitchen" },
   { id: "bath", name: "お風呂", sub: "プランボード・設備仕様", icon: "bath" },
   { id: "wash", name: "洗面", sub: "洗面台・ミラー・収納", icon: "wash" },
+  { id: "dressing", name: "脱衣室", sub: "ランドリーバー・収納", icon: "wash" },
   { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
   { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
   { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
@@ -75,7 +76,8 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   if (scope === "facility") {
     if (category === "キッチン") return "kitchen";
     if (category === "お風呂") return "bath";
-    if (category === "洗面" || category === "脱衣室" || category === "ランドリーバー") return "wash";
+    if (category === "洗面") return "wash";
+    if (category === "脱衣室" || category === "ランドリーバー") return "dressing";
     if (category === "1階トイレ" || category === "2階トイレ") return "toilet";
     return null;
   }
