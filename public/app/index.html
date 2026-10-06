@@ -420,6 +420,7 @@
         <button class="btn small" id="btnNewTask">＋ タスク追加</button>
       </div>
       <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
+      <div class="row" id="taskAssigneeFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="kanbanwrap" id="kanbanWrap"></div>
     </div>
     <div class="statrow">
@@ -1354,6 +1355,7 @@
     progressFilter: null,
     projectTypeFilter: null,
     taskKindFilter: null,
+    taskAssigneeFilter: null,
     noteSpecFilter: null,
     meetingSubTab: "record",
     editingProject: false
@@ -1897,10 +1899,24 @@
       return '<span class="tagchip'+(state.taskKindFilter===o.value?" active":"")+'" data-taskkindfilter="'+(o.value||"")+'">'+o.label+'</span>';
     }).join("");
   }
+  // 担当者での絞り込み（値: null=すべて／"__none"=担当未設定／スタッフ名）
+  function renderTaskAssigneeFilterBar(){
+    var bar = document.getElementById("taskAssigneeFilterBar");
+    if(!bar) return;
+    var names = (state.settings.staffList || []).slice();
+    liveTasks().forEach(function(t){ if(t.assignee && names.indexOf(t.assignee)<0) names.push(t.assignee); });
+    var opts = [{label:"担当：すべて", value:null}].concat(names.map(function(n){ return {label:n, value:n}; })).concat([{label:"担当未設定", value:"__none"}]);
+    bar.innerHTML = opts.map(function(o){
+      return '<span class="tagchip'+(state.taskAssigneeFilter===o.value?" active":"")+'" data-taskassigneefilter="'+escapeHtml(o.value||"")+'">'+escapeHtml(o.label)+'</span>';
+    }).join("");
+  }
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
     renderTaskKindFilterBar();
+    renderTaskAssigneeFilterBar();
     var tasks = liveTasks().filter(function(t){
+      if(state.taskAssigneeFilter==="__none" && t.assignee) return false;
+      if(state.taskAssigneeFilter && state.taskAssigneeFilter!=="__none" && t.assignee!==state.taskAssigneeFilter) return false;
       if(state.taskKindFilter==="vendor") return !!t.requestTo;
       if(state.taskKindFilter==="internal") return !t.requestTo;
       return true;
@@ -7264,6 +7280,12 @@
       var chip = e.target.closest("[data-taskkindfilter]");
       if(!chip) return;
       state.taskKindFilter = chip.dataset.taskkindfilter || null;
+      renderKanban();
+    });
+    document.getElementById("taskAssigneeFilterBar").addEventListener("click", function(e){
+      var chip = e.target.closest("[data-taskassigneefilter]");
+      if(!chip) return;
+      state.taskAssigneeFilter = chip.dataset.taskassigneefilter || null;
       renderKanban();
     });
     var noteSpecFilterBarEl = document.getElementById("noteSpecFilterBar");
