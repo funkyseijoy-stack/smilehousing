@@ -402,7 +402,7 @@ export default async (req: Request, context: Context) => {
     // お客様からの回答・更新はまだ今の（旧）おうちノートの画面で行う。
     estimates: ((okaiCustomer && okaiCustomer.customerEstimates) || []).map((x: any) => ({
       title: x.title || "", amount: x.amount || "", note: x.note || "",
-      customerResponse: x.customerResponse || "未回答", createdAt: x.createdAt || "",
+      customerResponse: x.customerResponse || "未回答", estimateState: x.estimateState || "", createdAt: x.createdAt || "",
     })),
     familyProfile: okaiCustomer && okaiCustomer.customerProfile ? {
       familyMembers: okaiCustomer.customerProfile.familyMembers || [],

@@ -3718,6 +3718,36 @@
     var label = r === "承認" ? "承認済み" : r;
     return '<span class="pill '+cls+'">'+escapeOkai(label)+'</span>';
   }
+  // 追加見積りの状態（スタッフが切り替える）。estimateState が無い古いデータは、金額・お客様の回答から判定する。
+  var OKAI_EST_STATES = ["金額確認中","承認依頼","承認済み","見送り"];
+  function okaiEstimateState(it){
+    if(it.estimateState && OKAI_EST_STATES.indexOf(it.estimateState)>=0) return it.estimateState;
+    if(it.customerResponse==="承認") return "承認済み";
+    if(it.customerResponse==="見送り") return "見送り";
+    if(!String(it.amount||"").trim()) return "金額確認中";
+    return "承認依頼";
+  }
+  function okaiSetEstimateState(id, newState){
+    var proj = projectById(state.currentProjectId);
+    if(!proj || OKAI_EST_STATES.indexOf(newState)<0) return;
+    okaiUpdateList(proj.id, "customerEstimates", function(list){
+      return list.map(function(it){
+        if(it.id !== id) return it;
+        var o = Object.assign({}, it, { estimateState: newState, updated: new Date().toISOString() });
+        // 旧おうちノート側の「お客様の回答」とも揃える
+        if(newState==="承認済み"){ o.customerResponse = "承認"; o.customerRespondedAt = o.customerRespondedAt || new Date().toISOString(); }
+        else if(newState==="見送り"){ o.customerResponse = "見送り"; o.customerRespondedAt = o.customerRespondedAt || new Date().toISOString(); }
+        else { o.customerResponse = "未回答"; o.customerRespondedAt = ""; }
+        return o;
+      });
+    }).then(function(customer){
+      var saved = ((customer&&customer.customerEstimates)||[]).some(function(x){ return x.id===id && x.estimateState===newState; });
+      if(!saved){ toast("状態が保存されませんでした。もう一度お試しください"); loadOkaiNotePanel(); return; }
+      renderOkaiEstimates(customer);
+      toast("✅ 「"+newState+"」にしました");
+      logActivity("追加見積りの状態を「"+newState+"」にしました");
+    }).catch(function(){ toast("状態の保存に失敗しました"); });
+  }
   function renderOkaiEstimates(customer){
     var list = document.getElementById("okaiEstimateList");
     var empty = document.getElementById("okaiEstimateEmpty");
@@ -3738,14 +3768,18 @@
     }
     list.innerHTML = items.map(function(it){
       var hasAmount = !!String(it.amount||"").trim();
+      var estState = okaiEstimateState(it);
       return '<div class="card" style="padding:8px 10px;">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
-        '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '<span class="pill tag">金額確認中</span>')+'</div>'+
+        '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '')+'　<span class="pill '+(estState==="承認済み"?"estimate-承認":(estState==="見送り"?"estimate-見送り":"tag"))+'">'+escapeOkai(estState)+'</span></div>'+
         '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
         '</div>'+
         (it.note?'<div class="muted" style="font-size:.85rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">お客様の回答：'+okaiEstimateResponsePill(it.customerResponse)+
         (it.customerRespondedAt?'<span class="muted" style="font-size:.85rem;">'+escapeOkai(new Date(it.customerRespondedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}))+'</span>':'')+
+        '</div>'+
+        '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">状態：'+
+        '<select data-okai-est-state="'+escapeOkai(it.id)+'" style="flex:1; min-width:140px;">'+OKAI_EST_STATES.map(function(st){ return '<option value="'+st+'"'+(st===estState?' selected':'')+'>'+st+'</option>'; }).join("")+'</select>'+
         '</div>'+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">'+
         '<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" value="'+escapeOkai(it.amount||"")+'" placeholder="金額（例：¥48,000）" style="flex:1; min-width:0;">'+
@@ -7208,6 +7242,10 @@
       var btn = e.target.closest("[data-okai-read]");
       if(!btn) return;
       okaiMarkInboxRead(btn.dataset.okaiRead);
+    });
+    document.getElementById("okaiEstimateList").addEventListener("change", function(e){
+      var sel = e.target.closest("[data-okai-est-state]");
+      if(sel) okaiSetEstimateState(sel.dataset.okaiEstState, sel.value);
     });
     document.getElementById("okaiEstimateList").addEventListener("click", function(e){
       var saveBtn = e.target.closest("[data-okai-save-amount]");
