@@ -115,6 +115,9 @@
 - お客様の追加見積りの承認／見送り（2026年10月〜）: 新おうちノート（/note/）の追加見積りで、金額が入っている項目に「承認する／見送る」ボタン（承認後は「回答をやり直す」）。`note-data.mts` の `estimateRespond`（金額確認中は不可）が `customerResponse`／`customerRespondedAt`／`estimateState`（承認済み・見送り・承認依頼）を更新し、`sendNotifyMail` でスタッフへ通知する。スタッフ側の状態選択（`okaiSetEstimateState`）と同じ項目を共有。
 - 打合せ記録フォームの社内タスク（2026年10月〜）: 「社内タスク」バッジを押した時点で担当者を選ぶ（業者タスクで業者を選ぶのと同じ。`askAssignee`、`newMeetingNoteBadgeAssignee`）。記録後の一覧のバッジから付けるときも同様。
 
+- お客様によるご家族・家電・持ち込み品の入力（2026年10月〜）: 新おうちノート（/note/）のホームに「ご家族・家電・持ち込み品」欄（「入力・変更する」でシート `#famModal`、`FAM_DEFS`／`famOpen`／`famSave`）。`note-data.mts` の `profileSave`（各20行・60文字まで、名前なしの行は捨てる）が `noteExtras` の `customerProfile` に保存し、スタッフへ通知メール。住まいるアプリの「おうちノート連携」タブ（`renderOkaiProfile`）に表示される。
+- スマホ幅の仕様タブ（2026年10月〜）: 文字拡大で `.speccat` の最小幅340pxが画面からはみ出していたため、幅760px以下は1列・最小幅なし。`.spectl-actions` と `.btn.small` は折り返し可。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す

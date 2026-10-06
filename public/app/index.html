@@ -101,7 +101,7 @@
   button.btn:disabled{ opacity:.5; cursor:not-allowed; }
   button.btn.secondary{ background:var(--surface-2); color:var(--ink); border-color:var(--border); }
   button.btn.ghost{ background:transparent; color:var(--accent-ink); border-color:var(--accent); padding:6px 11px; font-size:.85rem; }
-  button.btn.small{ padding:5px 10px; font-size:.85rem; border-radius:8px; }
+  button.btn.small{ padding:5px 10px; font-size:.85rem; border-radius:8px; white-space:normal; max-width:100%; }
   button.btn.danger-ghost{ background:transparent; color:var(--danger); border-color:var(--danger); padding:5px 10px; font-size:.85rem; border-radius:8px; }
   button.tbtn{ appearance:none; border:1px solid transparent; background:none; cursor:pointer; border-radius:9px; padding:7px 10px; font-size:.85rem; font-weight:700; color:var(--ink); font-family:"Zen Maru Gothic",sans-serif; display:flex; align-items:center; gap:5px; white-space:nowrap; }
   button.tbtn:hover{ background:var(--surface-2); }
@@ -173,6 +173,7 @@
   .meetingsubpane.active{ display:block; }
   .speccatgrid{ display:flex; flex-wrap:wrap; gap:12px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
   .speccatgrid .speccat{ flex:0 0 calc(50% - 6px); min-width:340px; margin-block-end:0; }
+  @media (max-width:760px){ .speccatgrid{ overflow-x:visible; } .speccatgrid .speccat{ flex:0 0 100%; min-width:0; max-width:100%; } }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
@@ -335,7 +336,7 @@
   .spectl-card.spectl-type-vendor-border{ border-inline-start-color:var(--orange); }
   .spectl-card.spectl-type-manual-border{ border-inline-start-color:var(--border); }
   .spectl-meta{ flex-grow:1; min-width:120px; }
-  .spectl-actions{ display:flex; gap:6px; flex-shrink:0; margin-inline-start:auto; }
+  .spectl-actions{ display:flex; flex-wrap:wrap; gap:6px; max-width:100%; margin-inline-start:auto; }
   .spectl-thumb{ position:relative; width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
   .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
@@ -3811,11 +3812,13 @@
   }
   function renderOkaiProfile(customer){
     var area = document.getElementById("okaiProfileArea");
-    var profile = (customer && customer.customerProfile) || {familyMembers:[],appliances:[],bringIns:[]};
+    var profile = (customer && customer.customerProfile) || {};
+    var fam = profile.familyMembers || [], app = profile.appliances || [], bri = profile.bringIns || [];
+    var none = '未入力';
     var html = "";
-    html += '<div><strong>ご家族</strong>：'+(profile.familyMembers.length? profile.familyMembers.map(function(m){ return escapeOkai(m.name)+'（身長'+escapeOkai(m.heightCm)+'cm）'; }).join("、") : '未入力')+'</div>';
-    html += '<div><strong>家電</strong>：'+(profile.appliances.length? profile.appliances.map(function(a){ return escapeOkai(a.name)+' '+escapeOkai(a.model)+' '+escapeOkai(a.size); }).join("、") : '未入力')+'</div>';
-    html += '<div><strong>持ち込み品</strong>：'+(profile.bringIns.length? profile.bringIns.map(function(b){ return escapeOkai(b.name)+'（'+escapeOkai(b.width)+'×'+escapeOkai(b.depth)+'×'+escapeOkai(b.height)+'）'; }).join("、") : '未入力')+'</div>';
+    html += '<div><strong>ご家族</strong>：'+(fam.length? fam.map(function(m){ return escapeOkai(m.name)+(m.heightCm?'（身長'+escapeOkai(m.heightCm)+'cm）':''); }).join("、") : none)+'</div>';
+    html += '<div><strong>家電</strong>：'+(app.length? app.map(function(a){ return [a.name,a.model,a.size].filter(Boolean).map(escapeOkai).join(' '); }).join("、") : none)+'</div>';
+    html += '<div><strong>持ち込み品</strong>：'+(bri.length? bri.map(function(b){ var d=[b.width,b.depth,b.height].filter(Boolean).map(escapeOkai).join('×'); return escapeOkai(b.name)+(d?'（'+d+'）':''); }).join("、") : none)+'</div>';
     area.innerHTML = html;
   }
   function renderOkaiConsider(customer){

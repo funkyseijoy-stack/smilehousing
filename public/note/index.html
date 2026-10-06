@@ -175,6 +175,13 @@
   .orderitem .od{ font-size:.78rem; color:var(--ink2); line-height:1.5; }
   .orderitem .otag{ font-size:.68rem; color:var(--muted); margin-top:5px; }
   .ordernote{ font-size:.74rem; color:var(--muted); margin-top:10px; line-height:1.6; }
+  .famsec{ margin-top:16px; } .famsec h3{ margin:0 0 4px; font-size:.95rem; } .famsec .fh{ font-size:.74rem; color:var(--muted); margin-bottom:8px; line-height:1.6; }
+  .famrow{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:8px; margin-bottom:8px; }
+  .famrow input{ flex:1 1 90px; min-width:0; border:1.5px solid var(--line2); border-radius:10px; padding:9px 10px; font:inherit; font-size:.9rem; background:#fff; color:var(--ink); }
+  .famrow input.w2{ flex:2 1 140px; }
+  .famrow .rm{ flex:none; border:none; background:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:0 6px; }
+  .famadd{ border:1.5px dashed var(--line2); background:none; border-radius:12px; padding:10px; width:100%; font:inherit; font-weight:700; color:var(--ink2); cursor:pointer; }
+  .famedit{ border:1.5px solid var(--line2); background:#fff; border-radius:999px; padding:6px 14px; font:inherit; font-size:.8rem; font-weight:700; color:var(--ink2); cursor:pointer; margin-left:auto; }
   .meminput{ width:100%; border:1.5px solid var(--line2); border-radius:12px; padding:10px 12px; font:inherit; font-size:.86rem; line-height:1.6; resize:vertical; min-height:150px; background:#fff; color:var(--ink); }
   .ntc-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
   @media (min-width:420px){ .ntc-grid.two{ grid-template-columns:1fr 1fr; } }
@@ -374,6 +381,16 @@
     <p class="help-lead">家づくりで決めることが多いので、一般的な順番の目安をご案内します。</p>
     <div class="orderlist" id="orderlist"></div>
     <div class="ordernote">※工事の進み方や商品の納期により、確認の順番が前後する場合があります。</div>
+  </div>
+</div>
+
+<div class="help" id="famModal" hidden>
+  <div class="help-card">
+    <button class="x" id="famX" aria-label="閉じる">×</button>
+    <h2>ご家族・家電・持ち込み品</h2>
+    <p class="help-lead">間取りや収納、コンセントの計画に役立てます。わかる範囲でご入力ください（住まいるハウジングのスタッフに共有されます）。</p>
+    <div id="famBody"></div>
+    <button class="btn dk full" id="famSave">保存する</button>
   </div>
 </div>
 
@@ -650,14 +667,18 @@
       }).join("")+'</div>';
     }
 
-    // ご家族・家電・持ち込み品（お客様入力。入力自体は今のところ従来のおうちノートで受け付けている）
-    var fp = data.familyProfile;
-    if(fp && (fp.familyMembers.length || fp.appliances.length || fp.bringIns.length)){
-      out += '<div class="sechd"><h3>ご家族・家電・持ち込み品</h3></div><div class="speclist">'+
-        (fp.familyMembers.length ? '<div class="spec"><div><div class="k">ご家族</div><div class="v">'+esc(fp.familyMembers.map(function(m){ return m.name+'（身長'+m.heightCm+'cm）'; }).join("、"))+'</div></div></div>' : '')+
+    // ご家族・家電・持ち込み品（お客様が入力する。入力はシートで行う）
+    var fp = data.familyProfile || {familyMembers:[],appliances:[],bringIns:[]};
+    var fpHas = fp.familyMembers.length || fp.appliances.length || fp.bringIns.length;
+    out += '<div class="sechd"><h3>ご家族・家電・持ち込み品</h3><button class="famedit" data-famopen="1">'+(fpHas?'入力・変更する':'入力する')+'</button></div>';
+    if(fpHas){
+      out += '<div class="speclist">'+
+        (fp.familyMembers.length ? '<div class="spec"><div><div class="k">ご家族</div><div class="v">'+esc(fp.familyMembers.map(function(m){ return m.name+(m.heightCm?'（身長'+m.heightCm+'cm）':''); }).join("、"))+'</div></div></div>' : '')+
         (fp.appliances.length ? '<div class="spec"><div><div class="k">家電</div><div class="v">'+esc(fp.appliances.map(function(a){ return [a.name,a.model,a.size].filter(Boolean).join(" "); }).join("、"))+'</div></div></div>' : '')+
-        (fp.bringIns.length ? '<div class="spec"><div><div class="k">持ち込み品</div><div class="v">'+esc(fp.bringIns.map(function(b){ return b.name+'（'+b.width+'×'+b.depth+'×'+b.height+'）'; }).join("、"))+'</div></div></div>' : '')+
+        (fp.bringIns.length ? '<div class="spec"><div><div class="k">持ち込み品</div><div class="v">'+esc(fp.bringIns.map(function(b){ var sz=[b.width,b.depth,b.height].filter(Boolean).join('×'); return b.name+(sz?'（'+sz+'）':''); }).join("、"))+'</div></div></div>' : '')+
         '</div>';
+    } else {
+      out += '<div class="empty">まだ入力されていません。ご家族の身長や、お使いの家電・持ち込みたい家具の大きさを入れておくと、設計に活かせます。</div>';
     }
 
     var ntcs = data.notices.filter(function(n){ return n.kind==="notice"; });
@@ -1052,6 +1073,57 @@
     out += decideBoxHtml(c.name, c.status, c.decidedAt, "");
     return out;
   }
+  // ---------- ご家族・家電・持ち込み品の入力シート ----------
+  var fam = null;
+  var FAM_DEFS = {
+    familyMembers:{ title:"ご家族", hint:"お名前（呼び名）と身長。キッチンや洗面の高さの目安にします。", fields:[["name","お名前","w2"],["heightCm","身長(cm)",""]], blank:{name:"",heightCm:""} },
+    appliances:{ title:"家電", hint:"冷蔵庫・洗濯機など。型番や大きさがわかれば入れてください。", fields:[["name","家電の名前","w2"],["model","型番",""],["size","大きさ",""]], blank:{name:"",model:"",size:""} },
+    bringIns:{ title:"持ち込み品（家具など）", hint:"今の家から持ち込みたい家具など。幅×奥行×高さ(cm)。", fields:[["name","品名","w2"],["width","幅",""],["depth","奥行",""],["height","高さ",""]], blank:{name:"",width:"",depth:"",height:""} }
+  };
+  function famRender(){
+    document.getElementById("famBody").innerHTML = Object.keys(FAM_DEFS).map(function(k){
+      var d = FAM_DEFS[k];
+      return '<div class="famsec"><h3>'+d.title+'</h3><div class="fh">'+d.hint+'</div>'+
+        fam[k].map(function(row,i){
+          return '<div class="famrow">'+d.fields.map(function(f){
+            return '<input class="'+f[2]+'" data-fam="'+k+'" data-i="'+i+'" data-f="'+f[0]+'" placeholder="'+f[1]+'" value="'+esc(row[f[0]]||"")+'" maxlength="60">';
+          }).join("")+'<button class="rm" data-famrm="'+k+'" data-i="'+i+'" aria-label="削除">×</button></div>';
+        }).join("")+
+        '<button class="famadd" data-famadd="'+k+'">＋ '+d.title.replace(/（.*/,"")+'を追加</button></div>';
+    }).join("");
+  }
+  function famOpen(){
+    var fp = data.familyProfile || {};
+    fam = {};
+    Object.keys(FAM_DEFS).forEach(function(k){ fam[k] = (fp[k]||[]).map(function(x){ var o = Object.assign({}, FAM_DEFS[k].blank); Object.keys(o).forEach(function(f){ o[f] = x[f]==null?"":String(x[f]); }); return o; }); });
+    famRender();
+    document.getElementById("famModal").hidden = false;
+  }
+  async function famSave(){
+    var btn = document.getElementById("famSave"); btn.disabled = true;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"profileSave", profile:fam }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.familyProfile = j.profile;
+      document.getElementById("famModal").hidden = true;
+      render(); toast("保存しました。住まいるハウジングにも共有されます");
+    }catch(e){ toast("保存できませんでした。もう一度お試しください"); }
+    btn.disabled = false;
+  }
+  document.getElementById("famX").addEventListener("click", function(){ document.getElementById("famModal").hidden = true; });
+  document.getElementById("famSave").addEventListener("click", famSave);
+  document.getElementById("famBody").addEventListener("input", function(e){
+    var el = e.target.closest("[data-fam]"); if(!el || !fam) return;
+    fam[el.dataset.fam][parseInt(el.dataset.i,10)][el.dataset.f] = el.value;
+  });
+  document.getElementById("famBody").addEventListener("click", function(e){
+    var rm = e.target.closest("[data-famrm]");
+    if(rm){ fam[rm.dataset.famrm].splice(parseInt(rm.dataset.i,10),1); famRender(); return; }
+    var ad = e.target.closest("[data-famadd]");
+    if(ad){ var k = ad.dataset.famadd; if(fam[k].length>=20){ toast("これ以上は追加できません"); return; } fam[k].push(Object.assign({}, FAM_DEFS[k].blank)); famRender();
+      var ins = document.querySelectorAll('#famBody [data-fam="'+k+'"]'); if(ins.length){ var last = document.querySelectorAll('#famBody .famsec')[Object.keys(FAM_DEFS).indexOf(k)].querySelectorAll('.famrow'); last = last[last.length-1]; if(last) last.querySelector("input").focus(); } }
+  });
   async function respondEstimate(id, response){
     var x = (data.estimates||[]).find(function(e){ return e.id===id; });
     if(!x) return;
@@ -1109,6 +1181,7 @@
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
+    if(e.target.closest("[data-famopen]")){ famOpen(); return; }
     var er = e.target.closest("[data-estresp]"); if(er){ respondEstimate(er.dataset.estid, er.dataset.estresp); return; }
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }

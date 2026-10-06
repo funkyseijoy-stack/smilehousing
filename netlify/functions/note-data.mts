@@ -168,6 +168,29 @@ export default async (req: Request, context: Context) => {
       );
       return json({ ok: true, message: doc });
     }
+    // ご家族・家電・持ち込み品（お客様が入力する）
+    if (body.action === "profileSave") {
+      const src = body.profile && typeof body.profile === "object" ? body.profile : {};
+      const clean = (v: any) => String(v == null ? "" : v).trim().slice(0, 60);
+      const rows = (arr: any, keys: string[]) =>
+        (Array.isArray(arr) ? arr : []).slice(0, 20)
+          .map((r: any) => { const o: any = {}; for (const k of keys) o[k] = clean(r && r[k]); return o; })
+          .filter((o: any) => o.name);
+      const profile = {
+        familyMembers: rows(src.familyMembers, ["name", "heightCm"]),
+        appliances: rows(src.appliances, ["name", "model", "size"]),
+        bringIns: rows(src.bringIns, ["name", "width", "depth", "height"]),
+      };
+      const extras: any = await getExtras(store, projectId);
+      if (!extras) return json({ error: "unavailable" }, 502);
+      extras.customerProfile = { ...(extras.customerProfile || {}), ...profile };
+      await saveExtras(store, extras);
+      await sendNotifyMail(
+        `【おうちノート】${project.customer || "お客様"}様がご家族・家電・持ち込み品を更新しました`,
+        `${project.customer || "お客様"}様（${project.name || ""}）が、おうちノートで「ご家族・家電・持ち込み品」を入力・更新しました。\n\n住まいるアプリの「おうちノート連携」タブで確認できます。`
+      );
+      return json({ ok: true, profile });
+    }
     // 追加見積りの「承認」「見送り」（お客様の回答。「承認依頼」に戻すこともできる）
     if (body.action === "estimateRespond") {
       const estId = String(body.id || "");
