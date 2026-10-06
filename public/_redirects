@@ -2,6 +2,7 @@
 /note/icons/*  /note/icons/:splat  200
 /app/icons/*  /app/icons/:splat  200
 /app/manifest.json  /app/manifest.json  200
+/app/migration-check.html  /app/migration-check.html  200!
 /note/*  /note/index.html  200!
 /yoyaku  /yoyaku/index.html  200!
 /yoyaku/*  /yoyaku/index.html  200!
