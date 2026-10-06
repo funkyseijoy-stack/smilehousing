@@ -445,6 +445,8 @@
         <h2 style="margin:0;">社内タスク【最重要】</h2>
         <button class="btn small" id="btnNewTask">＋ タスク追加</button>
       </div>
+      <div class="row" id="taskProjectFilterRow" style="gap:8px; margin-block-end:8px; flex-wrap:wrap;"><label for="taskProjectFilter" style="font-weight:700;">案件</label><select id="taskProjectFilter" style="max-width:100%;"></select></div>
+      <div class="row" id="taskStatusFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
       <div class="row" id="taskAssigneeFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="kanbanwrap" id="kanbanWrap"></div>
@@ -1429,6 +1431,8 @@
     projectTypeFilter: null,
     taskKindFilter: null,
     taskAssigneeFilter: null,
+    taskProjectFilter: null,
+    taskStatusFilter: null,
     noteSpecFilter: null,
     meetingSubTab: "record",
     editingProject: false
@@ -1990,6 +1994,8 @@
   function goToTaskBoard(taskId){
     state.taskKindFilter = null;
     state.taskAssigneeFilter = null;
+    state.taskProjectFilter = null;
+    state.taskStatusFilter = null;
     var gt = state.tasks.find(function(x){ return x.id===taskId; });
     if(gt){ state.taskOpen = state.taskOpen || {}; state.taskOpen[gt.status||"未着手"] = true; }
     switchTab("home");
@@ -2016,11 +2022,36 @@
       return '<span class="tagchip'+(state.taskAssigneeFilter===o.value?" active":"")+'" data-taskassigneefilter="'+escapeHtml(o.value||"")+'">'+escapeHtml(o.label)+'</span>';
     }).join("");
   }
+  // 案件（プルダウン）と進捗（チップ）での絞り込み
+  function renderTaskProjectStatusBars(){
+    var sel = document.getElementById("taskProjectFilter");
+    if(sel){
+      var counts = {};
+      liveTasks().forEach(function(t){ var k = t.projectId||"__none"; counts[k] = (counts[k]||0)+1; });
+      var h = '<option value="">すべての案件</option>';
+      liveProjects().forEach(function(p){
+        h += '<option value="'+escapeHtml(p.id)+'"'+(state.taskProjectFilter===p.id?" selected":"")+'>'+escapeHtml(p.name)+(counts[p.id]?'（'+counts[p.id]+'）':'')+'</option>';
+      });
+      if(counts["__none"]) h += '<option value="__none"'+(state.taskProjectFilter==="__none"?" selected":"")+'>案件未設定（'+counts["__none"]+'）</option>';
+      sel.innerHTML = h;
+      if(state.taskProjectFilter && sel.value!==state.taskProjectFilter){ state.taskProjectFilter = null; sel.value = ""; }
+    }
+    var bar = document.getElementById("taskStatusFilterBar");
+    if(bar){
+      var opts = [{label:"進捗：すべて", value:null}].concat(STATUS_ORDER.map(function(st){ return {label:st, value:st}; }));
+      bar.innerHTML = opts.map(function(o){
+        return '<span class="tagchip'+(state.taskStatusFilter===o.value?" active":"")+'" data-taskstatusfilter="'+escapeHtml(o.value||"")+'">'+escapeHtml(o.label)+'</span>';
+      }).join("");
+    }
+  }
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
     renderTaskKindFilterBar();
     renderTaskAssigneeFilterBar();
+    renderTaskProjectStatusBars();
     var tasks = liveTasks().filter(function(t){
+      if(state.taskProjectFilter==="__none" && t.projectId) return false;
+      if(state.taskProjectFilter && state.taskProjectFilter!=="__none" && t.projectId!==state.taskProjectFilter) return false;
       if(state.taskAssigneeFilter==="__none" && t.assignee) return false;
       if(state.taskAssigneeFilter && state.taskAssigneeFilter!=="__none" && t.assignee!==state.taskAssigneeFilter && t.checker!==state.taskAssigneeFilter) return false;
       if(state.taskKindFilter==="vendor") return !!t.requestTo;
@@ -2029,7 +2060,7 @@
       return true;
     });
     if(!state.taskOpen) state.taskOpen = {"未着手":true,"対応中":true,"社長確認中":true,"朋子確認中":true};
-    wrap.innerHTML = STATUS_ORDER.map(function(status){
+    wrap.innerHTML = STATUS_ORDER.filter(function(st){ return !state.taskStatusFilter || st===state.taskStatusFilter; }).map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
       // 部位ごとにまとまり、各部位の中では古い→新しい（時系列）に並ぶようにする。
       // 部位未設定のものは最後にまとめる。
@@ -2068,7 +2099,7 @@
             '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
-            (t.vendorSpec?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
+            (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
             '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
           '</div>'+
@@ -2077,7 +2108,7 @@
           }).join("")+'</div>' : '')+
           '</div>';
       }).join("") || '<div class="empty" style="padding:10px 4px;">なし</div>';
-      var isOpen = !!state.taskOpen[status];
+      var isOpen = !!state.taskStatusFilter || !!state.taskOpen[status];
       return '<div class="kancol'+(isOpen?" open":"")+'"><button class="kanhead" data-taskstatustoggle="'+status+'" aria-expanded="'+isOpen+'">'+
         '<span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span><span>'+status+'</span><span class="kancount tabular">'+rows.length+'</span><span class="kanarrow">▾</span></button>'+
         '<div class="kangrid">'+cards+'</div></div>';
@@ -6298,7 +6329,39 @@
       render();
       saveDoc("tasks", t.id, t);
       logActivity("タスク「"+(t.content||"").slice(0,20)+"」に部位「"+part.label+"」を設定しました");
-    });
+      // 反映済みなら、設備仕様に入っている図面も新しい部位へ移す
+      if(t.reflected){ syncTaskSpecCopies(t).then(function(){ render(); }); }
+    }, t.projectId);
+  }
+  // タスクの添付（図面など）を、そのタスクの案件の設備仕様の履歴に入れる／部位や反映の状態をそろえる。
+  // ※画面が今どの案件を開いているかに関係なく、必ずタスクの案件（t.projectId）に入れる。
+  async function syncTaskSpecCopies(t){
+    var vs = t.vendorSpec;
+    if(!vs || vs.scope==="general" || !vs.category || !t.projectId) return 0;
+    var created = 0;
+    var atts = t.attachments || [];
+    for(var i=0; i<atts.length; i++){
+      var att = atts[i];
+      var cp = liveSpecPhotos().find(function(sp){ return sp.source && sp.source.taskId===t.id && sp.assetId===att.id; });
+      if(cp){
+        var changed = false;
+        if(cp.projectId!==t.projectId || cp.scope!==vs.scope || cp.category!==vs.category || (cp.roomId||null)!==(vs.roomId||null) || (cp.side||null)!==(vs.side||null)){
+          cp.projectId = t.projectId; cp.scope = vs.scope; cp.category = vs.category; cp.roomId = vs.roomId||null; cp.side = vs.side||null; changed = true;
+        }
+        if(!!cp.reflected !== !!t.reflected){ cp.reflected = !!t.reflected; cp.reflectedAt = t.reflected ? nowIso() : null; changed = true; }
+        if(changed) await saveDoc("specPhotos", cp.id, cp);
+      }else if(t.reflected){
+        var doc = { id: uid("sp"), projectId: t.projectId, scope: vs.scope, category: vs.category,
+          roomId: vs.roomId || null, side: vs.side || null, assetId: att.id, url: att.url, kind: "photo",
+          contentType: att.contentType || "application/pdf", fileName: att.name, createdAt: nowIso(),
+          source: { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) },
+          reflected: true, reflectedAt: nowIso() };
+        state.specPhotos.push(doc);
+        await saveDoc("specPhotos", doc.id, doc);
+        created++;
+      }
+    }
+    return created;
   }
   async function attachVendorTaskFiles(taskId, fileList){
     var files = Array.prototype.slice.call(fileList||[]);
@@ -6323,57 +6386,44 @@
     logActivity((t.requestTo?"業者タスク":"社内タスク")+"「"+(t.content||"").slice(0,20)+"」に資料を添付しました");
     toast("✅ 添付しました");
     if(t.reflected && t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category){
-      var vs = t.vendorSpec;
-      var source = { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) };
-      await uploadSpecPhotos(vs.scope, vs.category, vs.roomId||null, vs.side||null, files, source, true);
-      toast("✅ 「"+(vs.label||"")+"」の仕様にも自動反映しました");
+      var nSync = await syncTaskSpecCopies(t);
+      render();
+      if(nSync) toast("✅ 「"+(t.vendorSpec.label||"")+"」の設備仕様・おうちノートにも反映しました");
     }
   }
   async function toggleTaskReflect(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t) return;
+    // 反映をONにするときに部位が未設定なら、先に部位を選んでもらう
+    if(!t.reflected && (!t.vendorSpec || !t.vendorSpec.category)){
+      if(!t.projectId){ toast("案件が未設定のタスクは反映できません。編集で案件を選んでください"); return; }
+      askSpecPart(function(part){
+        if(!part) return;
+        t.vendorSpec = part;
+        doToggleTaskReflect(t);
+      }, t.projectId);
+      return;
+    }
+    doToggleTaskReflect(t);
+  }
+  async function doToggleTaskReflect(t){
     t.reflected = !t.reflected;
     t.reflectedAt = t.reflected ? nowIso() : null;
+    t.updatedAt = nowIso();
     render();
-    await saveDoc("tasks", t.id, t);
+    var ok = await saveDoc("tasks", t.id, t);
     logActivity("タスク「"+(t.content||"").slice(0,20)+"」を"+(t.reflected?"おうちノートに反映しました":"反映解除しました"));
-    // このタスクの添付から作った仕様写真のコピーも、反映のON/OFFに合わせる
-    var copies = liveSpecPhotos().filter(function(sp){ return sp.source && sp.source.taskId===t.id && !!sp.reflected !== !!t.reflected; });
-    for(var ci=0; ci<copies.length; ci++){
-      copies[ci].reflected = !!t.reflected;
-      copies[ci].reflectedAt = t.reflected ? nowIso() : null;
-      await saveDoc("specPhotos", copies[ci].id, copies[ci]);
-    }
-
-    // 反映をONにした場合、既存のファイルも一緒に部位に反映する
-    if(t.reflected && t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category && (t.attachments||[]).length){
-      var vs = t.vendorSpec;
-      var atts = t.attachments || [];
-      for(var i=0; i<atts.length; i++){
-        var att = atts[i];
-        var existingSpec = liveSpecPhotos().find(function(sp){
-          return sp.projectId===state.currentProjectId &&
-                 sp.scope===vs.scope &&
-                 sp.category===vs.category &&
-                 (sp.roomId||null)===(vs.roomId||null) &&
-                 (sp.side||null)===(vs.side||null) &&
-                 sp.assetId===att.id;
-        });
-        if(!existingSpec){
-          var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: vs.scope, category: vs.category,
-            roomId: vs.roomId || null, side: vs.side || null, assetId: att.id, url: att.url, kind: "photo",
-            contentType: att.contentType || "application/pdf", fileName: att.name, createdAt: nowIso(),
-            source: { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) },
-            // このタスク自体がすでに「反映」済みなので、ここで登録する仕様写真も
-            // 作成時点で reflected:true にする（そうしないとおうちノート側に出てこない）。
-            reflected: true, reflectedAt: nowIso()
-          };
-          state.specPhotos.push(doc);
-          await saveDoc("specPhotos", doc.id, doc);
-        }
-      }
+    // 添付（図面）を、そのタスクの案件の設備仕様の履歴へ入れる（OFFのときは反映だけ外す）
+    var vs = t.vendorSpec;
+    if(vs && vs.scope!=="general" && vs.category){
+      var n = await syncTaskSpecCopies(t);
       render();
-      toast("✅ 「"+(vs.label||"")+"」の仕様に自動反映しました");
+      if(t.reflected){
+        if((t.attachments||[]).length) toast("✅ 「"+(vs.label||"")+"」の設備仕様とおうちノートに、図面ごと反映しました");
+        else toast("✅ 反映しました（添付を追加すると、図面も一緒に反映されます）");
+      }
+    }else if(t.reflected){
+      toast("部位が「総合」などのため、おうちノートの項目には出ません。「部位を変更」で項目を選んでください");
     }
   }
   async function deleteTaskAttachment(taskId, attId){
@@ -6522,8 +6572,8 @@
     if(scope==="interiorColor") return interiorColorCatsFor(proj).map(function(c){ return c.name; });
     return [];
   }
-  function askSpecPart(callback){
-    var proj = projectById(state.currentProjectId);
+  function askSpecPart(callback, projectId){
+    var proj = projectById(projectId || state.currentProjectId);
     askChoice("部位を選択", "受領した変更内容を、どの部位の仕様に反映しますか？", SPEC_PART_GROUPS, function(scope){
       if(!scope){ callback(null); return; }
       if(scope==="general"){
@@ -7784,6 +7834,16 @@
       var chip = e.target.closest("[data-taskkindfilter]");
       if(!chip) return;
       state.taskKindFilter = chip.dataset.taskkindfilter || null;
+      renderKanban();
+    });
+    document.getElementById("taskProjectFilter").addEventListener("change", function(){
+      state.taskProjectFilter = this.value || null;
+      renderKanban();
+    });
+    document.getElementById("taskStatusFilterBar").addEventListener("click", function(e){
+      var chip = e.target.closest("[data-taskstatusfilter]");
+      if(!chip) return;
+      state.taskStatusFilter = chip.dataset.taskstatusfilter || null;
       renderKanban();
     });
     document.getElementById("taskAssigneeFilterBar").addEventListener("click", function(e){
