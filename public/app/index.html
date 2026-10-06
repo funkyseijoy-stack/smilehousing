@@ -516,6 +516,7 @@
           <label class="field">案件名<input type="text" id="editProjectName"></label>
           <label class="field">お客様名（任意）<input type="text" id="editProjectCustomer"></label>
           <label class="field">種別<select id="editProjectType"></select></label>
+          <label class="field">進捗（契約前・着工など）<select id="editProjectTag"></select></label>
           <div class="row" style="gap:8px; margin-block-start:6px;">
             <button class="btn" id="btnSaveEditProject">保存</button>
             <button class="btn secondary" id="btnCancelEditProject">キャンセル</button>
@@ -860,6 +861,7 @@
           <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
           <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア基本色</button>
           <button class="meetingsub-btn" data-meetingsub="room">部屋別インテリア</button>
+          <button class="meetingsub-btn" id="btnAddCustomPart" type="button" style="border-style:dashed;">＋追加</button>
           <button class="meetingsub-btn" data-meetingsub="planboard">プランボード</button>
         </div>
 
@@ -944,6 +946,7 @@
             <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
           </div>
         </div>
+        <div id="customPartPanes"></div>
         <div class="meetingsubpane" id="meetingsubpane-planboard">
           <div class="card">
             <h3>プランボード</h3>
@@ -1419,6 +1422,7 @@
   ];
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
+    if(scope==="custom") return "追加した部位";
     var g = SPEC_PART_GROUPS.find(function(x){ return x.value===scope; });
     return g ? g.label : scope;
   }
@@ -1818,6 +1822,7 @@
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "rooms";
+    if(scope==="custom") return category ? "cp_"+category : null; // 追加した部位は1つずつ別の項目（note-data.mts の noteCatFor と同じ）
     return null;
   }
   var NOTE_CAT_NAMES = { exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", toilet:"トイレ",
@@ -1835,6 +1840,7 @@
   function noteDecisionName(proj, d){
     var key = NOTE_LEGACY_CAT[d.category]||d.category;
     var nm = NOTE_CAT_NAMES[key]||d.category;
+    if(String(key).indexOf("cp_")===0) nm = customPartName(proj, String(key).slice(3));
     if(key==="rooms"){
       var room = ((proj && proj.rooms)||[]).find(function(r){ return r.id===d.roomId; });
       nm = nm+"・"+(room?room.name:"部屋");
@@ -2199,7 +2205,8 @@
     var tagBar = document.getElementById("detailTagBar");
     var tags = state.settings.progressTags || [];
     tagBar.innerHTML = tags.map(function(t){
-      return '<span class="tagchip'+(proj.progressTag===t?" active":"")+'" data-settag="'+escapeHtml(t)+'">'+escapeHtml(t)+'</span>';
+      // 誤って押して変わらないよう、ここは表示だけ。変更は「編集」の「進捗」で行う。
+      return '<span class="tagchip'+(proj.progressTag===t?" active":"")+'" style="cursor:default;">'+escapeHtml(t)+'</span>';
     }).join("");
   }
 
@@ -2752,6 +2759,7 @@
       var rc = roomCatsFor(proj).find(function(x){ return x.id===category; });
       return (room?room.name:"部屋")+"・"+(rc?rc.label:category);
     }
+    if(scope==="custom") return customPartName(proj, category);
     if(scope==="interiorColor") return specPartGroupLabel(scope)+"・"+category+(side?"（"+side+"）":"");
     return specPartGroupLabel(scope)+"・"+category;
   }
@@ -3160,12 +3168,99 @@
         '</div>';
     }).join("");
   }
+  // ---- 案件ごとに自由に増やせる「追加した部位」（scope:"custom"、category=部位ID） ----
+  function customPartsOf(proj){ return ((proj && proj.customParts)||[]).filter(function(c){ return c && c.id && !c.deletedAt; }); }
+  function customPartName(proj, id){
+    var c = ((proj && proj.customParts)||[]).find(function(x){ return x.id===id; });
+    return c ? c.name : "追加した部位";
+  }
+  function renderCustomPartTabs(){
+    var proj = projectById(state.currentProjectId);
+    var bar = document.getElementById("meetingSubTabBar");
+    var panes = document.getElementById("customPartPanes");
+    if(!bar || !panes) return;
+    var parts = customPartsOf(proj);
+    bar.querySelectorAll(".custompart-btn").forEach(function(b){ b.remove(); });
+    var anchor = document.getElementById("btnAddCustomPart");
+    parts.forEach(function(c){
+      var b = document.createElement("button");
+      b.className = "meetingsub-btn custompart-btn";
+      b.dataset.meetingsub = "custom_"+c.id;
+      b.textContent = c.name;
+      bar.insertBefore(b, anchor);
+    });
+    panes.innerHTML = parts.map(function(c){
+      var unrefl = liveSpecPhotos().filter(function(p){ return p.projectId===state.currentProjectId && p.scope==="custom" && p.category===c.id && !p.reflected; }).length;
+      return '<div class="meetingsubpane" id="meetingsubpane-custom_'+escapeHtml(c.id)+'"><div class="card">'+
+        '<div class="row" style="justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;"><h3 style="margin:0;">'+escapeHtml(c.name)+noteDecisionPill("custom",c.id)+'</h3>'+
+        '<span class="row" style="gap:6px;"><button type="button" class="btn secondary small" data-customrename="'+escapeHtml(c.id)+'">名前を変える</button>'+
+        '<button type="button" class="btn secondary small" data-customdel="'+escapeHtml(c.id)+'">この部位を削除</button></span></div>'+
+        '<div class="muted" style="font-size:.85rem; margin-block:6px;">この案件だけの部位です。打合せ記録・タスク・仕様履歴で「追加した部位」から選ぶと、ここに履歴が並び、お客様のおうちノートにも1つの項目として出ます。</div>'+
+        decidedSummaryHtml("custom",c.id,null,null)+
+        '<textarea data-custommemo="'+escapeHtml(c.id)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml(c.memo||"")+'</textarea>'+
+        '<div style="margin-block-start:10px;">'+(renderSpecTimeline("custom",c.id,null,null)||'<div class="muted" style="font-size:.85rem;">まだ履歴がありません</div>')+'</div>'+
+        '</div></div>';
+    }).join("");
+    // いま開いているタブが無くなっていたら記録へ戻す
+    var cur = state.meetingSubTab;
+    if(cur && cur.indexOf("custom_")===0 && !document.getElementById("meetingsubpane-"+cur)) cur = "record";
+    if(cur) switchMeetingSubTab(cur);
+  }
+  async function saveCustomParts(proj, logMsg){
+    var ok = await saveDoc("projects", proj.id, proj);
+    if(logMsg) logActivity(logMsg);
+    return ok;
+  }
+  function addCustomPart(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    var name = (prompt("追加する部位の名前を入れてください（例：玄関ホール、物置、駐車場）")||"").trim();
+    if(!name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    if(customPartsOf(proj).some(function(c){ return c.name===name; })){ toast("同じ名前の部位がすでにあります"); return; }
+    var c = { id: uid("cp"), name: name, createdAt: nowIso() };
+    proj.customParts = (proj.customParts||[]).concat([c]);
+    saveCustomParts(proj, "部位「"+name+"」を追加しました");
+    state.meetingSubTab = "custom_"+c.id;
+    render();
+    toast("部位「"+name+"」を追加しました");
+  }
+  function renameCustomPart(id){
+    var proj = projectById(state.currentProjectId);
+    var c = ((proj&&proj.customParts)||[]).find(function(x){ return x.id===id; });
+    if(!c) return;
+    var name = (prompt("新しい名前", c.name)||"").trim();
+    if(!name || name===c.name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    c.name = name;
+    saveCustomParts(proj, "部位の名前を「"+name+"」に変更しました");
+    render();
+  }
+  function deleteCustomPart(id){
+    var proj = projectById(state.currentProjectId);
+    var c = ((proj&&proj.customParts)||[]).find(function(x){ return x.id===id; });
+    if(!c) return;
+    var n = liveSpecPhotos().filter(function(p){ return p.projectId===proj.id && p.scope==="custom" && p.category===id; }).length;
+    if(!confirm("部位「"+c.name+"」を削除しますか？"+(n?"\n履歴"+n+"件はお客様の画面からも見えなくなります。":""))) return;
+    c.deletedAt = nowIso();
+    state.meetingSubTab = "record";
+    saveCustomParts(proj, "部位「"+c.name+"」を削除しました");
+    render();
+  }
+  async function updateCustomPartMemo(id, value){
+    var proj = projectById(state.currentProjectId);
+    var c = ((proj&&proj.customParts)||[]).find(function(x){ return x.id===id; });
+    if(!c) return;
+    c.memo = value;
+    await saveDoc("projects", proj.id, proj);
+  }
   function renderSpecTab(){
     renderSpecExterior();
     renderSpecFacility();
     renderSpecEquipment();
     renderSpecInterior();
     renderSpecRooms();
+    renderCustomPartTabs();
   }
   var SPEC_UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // サーバー関数のリクエストサイズ上限に合わせた安全値
   async function uploadSpecPhotos(scope, category, roomId, side, fileList, source, autoReflect){
@@ -5862,6 +5957,12 @@
     document.getElementById("editProjectCustomer").value = p.customer||"";
     var typeSel = document.getElementById("editProjectType");
     typeSel.innerHTML = projectTypeOptionsHtml(p.type);
+    var tagSel = document.getElementById("editProjectTag");
+    var tagList = (state.settings.progressTags || []).slice();
+    if(p.progressTag && tagList.indexOf(p.progressTag)<0) tagList.push(p.progressTag);
+    tagSel.innerHTML = '<option value="">（未設定）</option>'+tagList.map(function(t){
+      return '<option value="'+escapeHtml(t)+'"'+(t===p.progressTag?" selected":"")+'>'+escapeHtml(t)+'</option>';
+    }).join("");
     state.editingProject = true;
     render();
   }
@@ -5877,10 +5978,13 @@
     p.name = name;
     p.customer = document.getElementById("editProjectCustomer").value.trim();
     p.type = document.getElementById("editProjectType").value;
+    var newTag = document.getElementById("editProjectTag").value;
+    var tagChanged = newTag !== (p.progressTag || "");
+    p.progressTag = newTag;
     state.editingProject = false;
     render();
     await saveDoc("projects", p.id, p);
-    logActivity("案件「"+p.name+"」の情報を編集しました");
+    logActivity("案件「"+p.name+"」の情報を編集しました"+(tagChanged?"（進捗を「"+(newTag||"未設定")+"」に変更）":""));
     toast("案件情報を更新しました");
   }
   async function setProjectTag(tag){
@@ -6608,8 +6712,17 @@
   }
   function askSpecPart(callback, projectId){
     var proj = projectById(projectId || state.currentProjectId);
-    askChoice("部位を選択", "受領した変更内容を、どの部位の仕様に反映しますか？", SPEC_PART_GROUPS, function(scope){
+    var groups = SPEC_PART_GROUPS.slice();
+    if(customPartsOf(proj).length) groups.push({label:"追加した部位（この案件だけ）", value:"custom"});
+    askChoice("部位を選択", "受領した変更内容を、どの部位の仕様に反映しますか？", groups, function(scope){
       if(!scope){ callback(null); return; }
+      if(scope==="custom"){
+        askChoice("追加した部位を選択", "", customPartsOf(proj).map(function(c){ return {label:c.name, value:c.id}; }), function(id){
+          if(!id){ callback(null); return; }
+          callback({scope:"custom", category:id, roomId:null, side:null, label:customPartName(proj,id)});
+        });
+        return;
+      }
       if(scope==="general"){
         callback({scope:"general", category:null, roomId:null, side:null, label:"総合"});
         return;
@@ -7442,11 +7555,6 @@
       document.querySelector('.tab-btn[data-tab="projects"]').click();
       openProjectDetail(row.dataset.openProject);
     });
-    document.getElementById("detailTagBar").addEventListener("click", function(e){
-      var chip = e.target.closest("[data-settag]");
-      if(!chip) return;
-      setProjectTag(chip.dataset.settag);
-    });
 
     document.querySelectorAll(".sub-btn").forEach(function(btn){
       btn.addEventListener("click", function(){
@@ -7606,7 +7714,7 @@
       var dl = e.target.closest("[data-delntc]"); if(dl){ if(confirm2()) deleteNotice(dl.dataset.delntc); return; }
     });
 
-    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specSiteCheckWrap","specInteriorWrap","specRoomsWrap"].forEach(function(wrapId){
+    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specSiteCheckWrap","specInteriorWrap","specRoomsWrap","customPartPanes"].forEach(function(wrapId){
       var wrap = document.getElementById(wrapId);
       if(!wrap) return;
       wrap.addEventListener("change", function(e){
@@ -7700,6 +7808,18 @@
         if(siteCheckNote){ updateSiteCheckNote(siteCheckNote.dataset.sitechecknote, siteCheckNote.value); return; }
       });
     });
+    var addCpBtn = document.getElementById("btnAddCustomPart");
+    if(addCpBtn) addCpBtn.addEventListener("click", addCustomPart);
+    var cpPanes = document.getElementById("customPartPanes");
+    if(cpPanes){
+      cpPanes.addEventListener("click", function(e){
+        var rn = e.target.closest("[data-customrename]"); if(rn){ renameCustomPart(rn.dataset.customrename); return; }
+        var dl = e.target.closest("[data-customdel]"); if(dl){ deleteCustomPart(dl.dataset.customdel); return; }
+      });
+      cpPanes.addEventListener("change", function(e){
+        var m = e.target.closest("[data-custommemo]"); if(m){ updateCustomPartMemo(m.dataset.custommemo, m.value); }
+      });
+    }
     document.getElementById("btnAddRoom").addEventListener("click", addRoom);
     document.getElementById("newRoomName").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addRoom(); } });
     document.getElementById("btnAddInteriorColorCat").addEventListener("click", addInteriorColorCategory);
@@ -7902,7 +8022,7 @@
           state.noteSpecFilter = part;
           renderMeetingNotes();
           renderSpecTab();
-          var subKey = MEETING_SUBTAB_BY_SCOPE[part.scope];
+          var subKey = part.scope==="custom" ? "custom_"+part.category : MEETING_SUBTAB_BY_SCOPE[part.scope];
           if(subKey) switchMeetingSubTab(subKey);
         });
       }

@@ -54,7 +54,19 @@ function partLabel(project: any, scope?: string, category?: string | null, roomI
     const cl = custom ? custom.name : ROOM_CAT_LABELS[String(category)] || category || "";
     return (room ? room.name : "部屋") + "・" + cl;
   }
+  if (scope === "custom") {
+    const c = (project.customParts || []).find((x: any) => x.id === category);
+    return c ? c.name : "追加した部位";
+  }
   return category || "";
+}
+
+// 固定の項目＋この案件で追加された部位（削除済みは除く）
+function catsOf(project: any) {
+  const extra = ((project && project.customParts) || [])
+    .filter((c: any) => c && c.id && !c.deletedAt)
+    .map((c: any) => ({ id: "cp_" + c.id, name: String(c.name || "追加した部位"), sub: "", icon: "house" }));
+  return NOTE_CATS.concat(extra);
 }
 
 function noteCatFor(scope?: string, category?: string | null): string | null {
@@ -78,6 +90,8 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
     return "interior";
   }
   if (scope === "room") return "rooms";
+  // 案件ごとに追加した部位は、1つずつ別の項目（id は cp_<部位ID>）として出す
+  if (scope === "custom") return category ? "cp_" + category : null;
   return null;
 }
 
@@ -148,7 +162,7 @@ export default async (req: Request, context: Context) => {
     if (body.action === "decide") {
       const cat = String(body.category || "");
       const status = String(body.status || "");
-      if (!NOTE_CATS.some((c) => c.id === cat)) return json({ error: "unknown_category" }, 400);
+      if (!catsOf(project).some((c) => c.id === cat)) return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
       const now = new Date().toISOString();
       let id = `${projectId}__${cat}`;
@@ -169,7 +183,7 @@ export default async (req: Request, context: Context) => {
       const cat = String(body.category || "");
       const status = String(body.status || "");
       const cardKey = String(body.cardKey || "");
-      if (!NOTE_CATS.some((c) => c.id === cat) || cat === "plan") return json({ error: "unknown_category" }, 400);
+      if (!catsOf(project).some((c) => c.id === cat) || cat === "plan") return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
       if (!/^[nt]:[A-Za-z0-9_\-]{1,80}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
       let roomId: string | null = null;
@@ -446,7 +460,7 @@ export default async (req: Request, context: Context) => {
     };
   };
 
-  const categories = NOTE_CATS.map((c) => {
+  const categories = catsOf(project).map((c) => {
     if (c.id === "rooms") return buildRoomsCategory(c);
     const items = (timelineByCat[c.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
     const hasContent = c.id === "plan" ? plans.length > 0 : items.length > 0;
