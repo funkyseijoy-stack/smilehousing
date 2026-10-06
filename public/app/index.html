@@ -260,8 +260,9 @@
   @media (max-width: 480px){ button.tbtn span.label{ display:none; } }
 
   /* ---- kanban (社内タスク) ---- */
-  .kanbanwrap{ display:flex; gap:10px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
-  .kancol{ flex:1 1 0; min-width:132px; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:8px; }
+  .kanbanwrap{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; align-items:start; padding-block-end:6px; }
+  @media (max-width:900px){ .kanbanwrap{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .kancol{ min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:8px; }
   #reTypeRow[hidden], #reCustRows[hidden]{ display:none; }
   .kancol h4{ margin:2px 4px; font-size:.78rem; color:var(--muted); display:flex; justify-content:space-between; }
   .kancard{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 9px; font-size:.78rem; box-shadow: var(--shadow); }
@@ -1321,7 +1322,7 @@
   function confirm2(){ return true; } // confirm() is inert in the artifact viewer
 
   // ================= state =================
-  var STATUS_ORDER = ["未着手","対応中","対応済み","社長確認中","朋子確認中","お客様へ連絡済み","完了"];
+  var STATUS_ORDER = ["未着手","対応中","対応済み","社長確認中","朋子確認中","業者連絡済み","お客様へ連絡済み","完了"];
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
