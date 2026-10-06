@@ -241,6 +241,7 @@ export default async (req: Request, context: Context) => {
     listCollection(store, "imageBoard", projectId),
   ]);
 
+  const specBadge = (b: any) => ({ contract: !!(b && b.contract), quote: !!(b && b.quote) });
   const reflectedNotes = notes.filter((n) => n.reflected);
   const timelineByCat: Record<string, any[]> = {};
   const push = (cat: string | null, item: any) => {
@@ -258,6 +259,8 @@ export default async (req: Request, context: Context) => {
       file: fileOf(p),
       source: p.source || null,
       contentType: p.contentType || "",
+      // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
+      spec: specBadge(p.badges),
     });
   }
   for (const n of reflectedNotes) {
@@ -272,6 +275,7 @@ export default async (req: Request, context: Context) => {
       decided: n.decided != null ? n.decided : n.content || "",
       open: n.open || "",
       files: (n.files || []).map(fileOf),
+      spec: specBadge(n.badges),
     });
   }
 

@@ -426,7 +426,7 @@
   }catch(e){}
 
   var data = null;
-  var view = { tab:"home", buildSeg:"spec", cat:null, imgFilter:"all", imgPlace:"LDK", imgBusy:false };
+  var view = { tab:"home", buildSeg:"spec", cat:null, imgFilter:"all", imgPlace:"LDK", imgBusy:false, specTab:{} };
   var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false };
   var main = document.getElementById("main");
 
@@ -902,8 +902,24 @@
   }
   function capOf(c, x, base){ var l = partOf(c, x); return l ? (l+"・"+base) : base; }
   // 写真・プランボード・打合せ記録などを種類別のまとまりで表示する（各部屋では部屋ごとに呼ぶ）
-  function itemsSectionsHtml(c, items){
+  // 「契約時仕様」「見積もり仕様」のタブ（スタッフが分類した項目があるときだけ表示）
+  var SPEC_TABS = [{key:"all", label:"すべて"},{key:"contract", label:"契約時仕様"},{key:"quote", label:"見積もり仕様"}];
+  function itemsSectionsHtml(c, items, tabKey){
     var out = "";
+    var tabbed = items.some(function(x){ return x.spec && (x.spec.contract || x.spec.quote); });
+    if(tabbed){
+      var cur = (view.specTab && view.specTab[tabKey]) || "all";
+      var counts = { all: items.length,
+        contract: items.filter(function(x){ return x.spec && x.spec.contract; }).length,
+        quote: items.filter(function(x){ return x.spec && x.spec.quote; }).length };
+      out += '<div class="chips" style="margin:6px 0 10px;">'+SPEC_TABS.map(function(t){
+        return '<button class="chipf'+(cur===t.key?' on':'')+'" data-spectab="'+esc(tabKey)+'|'+t.key+'">'+t.label+' '+counts[t.key]+'</button>';
+      }).join("")+'</div>';
+      if(cur!=="all"){
+        items = items.filter(function(x){ return x.spec && x.spec[cur]; });
+        if(!items.length) return out + '<div class="empty">「'+(cur==="contract"?"契約時仕様":"見積もり仕様")+'」の内容はまだありません。</div>';
+      }
+    }
     // Organize items into sections
     var planboards = items.filter(function(x){ return x.type==="planboard"; });
     var notes = items.filter(function(x){ return x.type==="note"; });
@@ -1019,12 +1035,12 @@
       return out + rms.map(function(r){
         return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
           (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
-          itemsSectionsHtml(c, r.items || [])+
+          itemsSectionsHtml(c, r.items || [], c.id+":"+r.id)+
           decideBoxHtml(r.name, r.status, r.decidedAt, r.id);
       }).join("");
     }
 
-    out += itemsSectionsHtml(c, c.items || []);
+    out += itemsSectionsHtml(c, c.items || [], c.id);
 
     out += decideBoxHtml(c.name, c.status, c.decidedAt, "");
     return out;
@@ -1068,6 +1084,7 @@
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var imf = e.target.closest("[data-imgfilter]"); if(imf){ view.imgFilter = imf.dataset.imgfilter; render(); return; }
     var imd = e.target.closest("[data-imgdel]"); if(imd){ deleteImage(imd.dataset.imgdel); return; }
+    var stb = e.target.closest("[data-spectab]"); if(stb){ var sp = stb.dataset.spectab.split("|"); view.specTab[sp[0]] = sp[1]; render(); return; }
     var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
