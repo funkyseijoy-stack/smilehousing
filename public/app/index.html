@@ -3696,19 +3696,12 @@
     var input = document.querySelector('[data-okai-amount-for="'+id+'"]');
     if(!input) return;
     var amount = input.value.trim();
-    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.customerEstimates) || [];
-    var next = current.map(function(it){
-      return it.id === id ? Object.assign({}, it, { amount: amount, updated: new Date().toISOString() }) : it;
-    });
-    okaiBridgeFetch('', {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: next } })
-    }).then(function(res){
-      if(!res.ok){ toast("金額の保存に失敗しました"); return; }
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = res.body.customer;
-      renderOkaiEstimates(res.body.customer);
+    okaiUpdateList(proj.id, "customerEstimates", function(list){
+      return list.map(function(it){
+        return it.id === id ? Object.assign({}, it, { amount: amount, updated: new Date().toISOString() }) : it;
+      });
+    }).then(function(customer){
+      renderOkaiEstimates(customer);
       toast(amount ? "✅ 金額を保存しました（お客様の画面に表示されます）" : "金額を空にしました（お客様には「金額確認中」と表示されます）");
       logActivity("追加見積もりの金額を"+(amount ? "「"+amount+"」に更新しました" : "空にしました"));
     }).catch(function(){ toast("金額の保存に失敗しました"); });
@@ -3785,20 +3778,15 @@
     var amount = document.getElementById("okaiEstAmount").value.trim();
     var note = document.getElementById("okaiEstNote").value.trim();
     if(!title){ toast("件名を入力してください"); return; }
-    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.customerEstimates) || [];
-    var next = current.concat([{ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,8)), title: title, amount: amount, note: note, status: "確認中", updated: new Date().toISOString() }]);
-    okaiBridgeFetch('', {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: next } })
-    }).then(function(res){
-      if(!res.ok){ toast("追加見積りの送信に失敗しました"); return; }
+    var newEstId = (Date.now().toString(36)+Math.random().toString(36).slice(2,8));
+    okaiUpdateList(proj.id, "customerEstimates", function(list){
+      return list.concat([{ id: newEstId, title: title, amount: amount, note: note, status: "確認中", updated: new Date().toISOString() }]);
+    }).then(function(customer){
+      if(!((customer.customerEstimates||[]).some(function(x){ return x.id===newEstId; }))){ toast("追加見積りが保存されませんでした。もう一度お試しください"); return; }
       document.getElementById("okaiEstTitle").value = "";
       document.getElementById("okaiEstAmount").value = "";
       document.getElementById("okaiEstNote").value = "";
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = res.body.customer;
-      renderOkaiEstimates(res.body.customer);
+      renderOkaiEstimates(customer);
       toast("✅ 追加見積りを送りました");
       logActivity((proj.customer||proj.name||"")+"に追加見積り「"+title+"」を送りました");
     }).catch(function(){ toast("追加見積りの送信に失敗しました"); });
@@ -3862,17 +3850,10 @@
     var proj = projectById(state.currentProjectId);
     if(!proj) return;
     if(!confirm("この追加見積りを削除しますか？")) return;
-    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.customerEstimates) || [];
-    var next = current.filter(function(it){ return it.id !== id; });
-    okaiBridgeFetch('', {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: next } })
-    }).then(function(res){
-      if(!res.ok){ toast("削除に失敗しました"); return; }
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = res.body.customer;
-      renderOkaiEstimates(res.body.customer);
+    okaiUpdateList(proj.id, "customerEstimates", function(list){
+      return list.filter(function(it){ return it.id !== id; });
+    }).then(function(customer){
+      renderOkaiEstimates(customer);
       // 打合せ記録側の「追加見積もり済み」表示も外す（もう一度入れられるようにする）
       state.meetingNotes.forEach(function(n){
         if(n.sent && n.sent.estimate && n.sent.estimate.ref === id){
@@ -3889,17 +3870,10 @@
     var proj = projectById(state.currentProjectId);
     if(!proj) return;
     if(!confirm("この項目を削除しますか？")) return;
-    var current = (okaiBridgeCache[proj.id] && okaiBridgeCache[proj.id].customer && okaiBridgeCache[proj.id].customer.considerations) || [];
-    var next = current.filter(function(it){ return it.id !== id; });
-    okaiBridgeFetch('', {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
-    }).then(function(res){
-      if(!res.ok){ toast("削除に失敗しました"); return; }
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = res.body.customer;
-      renderOkaiConsider(res.body.customer);
+    okaiUpdateList(proj.id, "considerations", function(list){
+      return list.filter(function(it){ return it.id !== id; });
+    }).then(function(customer){
+      renderOkaiConsider(customer);
       toast("削除しました");
     }).catch(function(){ toast("削除に失敗しました"); });
   }
@@ -3960,6 +3934,29 @@
     okaiBridgeCache[projectId] = okaiBridgeCache[projectId] || {};
     okaiBridgeCache[projectId].customer = res.body.customer;
     return res.body.customer;
+  }
+  // 旧おうちノート側の一覧（追加見積り・家づくりリストなど）を更新する共通処理。
+  // 古い画面のキャッシュで全件を書き戻すと、別の操作で増えた項目を消してしまうため、
+  // 毎回「最新を取り直す → 変更する → 書き戻す」を行い、同じ案件の更新は1件ずつ順番に実行する。
+  var okaiUpdateQueue = {};
+  function okaiUpdateList(projectId, key, mutate){
+    var prev = okaiUpdateQueue[projectId] || Promise.resolve();
+    var run = prev.catch(function(){}).then(async function(){
+      var customer = await okaiFetchCustomerData(projectId);
+      var current = (customer && customer[key]) || [];
+      var next = mutate(current.slice());
+      var patch = {}; patch[key] = next;
+      var res = await okaiBridgeFetch('', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ projectId: projectId, patch: patch })
+      });
+      if(!res.ok) throw new Error("patch_failed");
+      okaiBridgeCache[projectId] = okaiBridgeCache[projectId] || {};
+      okaiBridgeCache[projectId].customer = res.body.customer;
+      return res.body.customer;
+    });
+    okaiUpdateQueue[projectId] = run.catch(function(){});
+    return run;
   }
   async function ensureOkaiSpecCategory(projectId, categoryId, categoryName){
     var cached = okaiBridgeCache[projectId] && okaiBridgeCache[projectId].customer;
@@ -4419,20 +4416,16 @@
     if(taskType === "estimate"){
       var firstLine = content.split("\n")[0].trim();
       var estTitle = (note.title||"").trim() || (firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine);
-      var fresh = await okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=data').catch(function(){ return null; });
-      if(!fresh || !fresh.ok){ toast("おうちノートに接続できませんでした。「おうちノート」タブでリンクを発行済みか確認してください"); return; }
-      var estCurrent = (fresh.body.customer && fresh.body.customer.customerEstimates) || [];
       var estId = uid("est");
-      var estNext = estCurrent.concat([{ id: estId, title: estTitle, amount: "", note: content, status: "確認中", updated: nowIso(), createdAt: nowIso() }]);
-      var estRes = await okaiBridgeFetch('', {
-        method:'PATCH',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ projectId: proj.id, patch: { customerEstimates: estNext } })
-      }).catch(function(){ return null; });
-      if(!estRes || !estRes.ok){ toast("追加見積もりへの追加に失敗しました"); return; }
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = estRes.body.customer;
-      renderOkaiEstimates(estRes.body.customer);
+      var estCustomer;
+      try{
+        estCustomer = await okaiUpdateList(proj.id, "customerEstimates", function(list){
+          return list.concat([{ id: estId, title: estTitle, amount: "", note: content, status: "確認中", updated: nowIso(), createdAt: nowIso() }]);
+        });
+      }catch(e){ toast("追加見積もりへの追加に失敗しました。「おうちノート」タブでリンクを発行済みか確認してください"); return; }
+      var estSaved = ((estCustomer && estCustomer.customerEstimates) || []).some(function(x){ return x.id===estId; });
+      if(!estSaved){ toast("追加見積もりに入りませんでした（おうちノート側で保存されませんでした）。もう一度お試しください"); return; }
+      renderOkaiEstimates(estCustomer);
       markNoteSent(note, "estimate", estId);
       logActivity("打合せ記録から追加見積もり「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
       toast("✅ 追加見積もりに追加しました（お客様には「金額確認中」と表示されます）");
@@ -4561,25 +4554,17 @@
     if(!it){ toast("項目が見つかりません"); return; }
     try{
       await getOrIssueOkaiLink(proj);
-      var customer = await okaiFetchCustomerData(proj.id);
-      var current = (customer && customer.considerations) || [];
       var mappedStatus = (it.status==="決定") ? "完了" : "検討中";
-      var next, newId;
-      if(it.okaiConsiderationId && current.some(function(c){ return c.id===it.okaiConsiderationId; })){
-        next = current.map(function(c){
-          return c.id===it.okaiConsiderationId ? Object.assign({}, c, { title:(it.content||"").slice(0,160), status:mappedStatus }) : c;
-        });
-      } else {
+      var newId;
+      var newCustomer = await okaiUpdateList(proj.id, "considerations", function(current){
+        if(it.okaiConsiderationId && current.some(function(c){ return c.id===it.okaiConsiderationId; })){
+          return current.map(function(c){
+            return c.id===it.okaiConsiderationId ? Object.assign({}, c, { title:(it.content||"").slice(0,160), status:mappedStatus }) : c;
+          });
+        }
         newId = (Date.now().toString(36)+Math.random().toString(36).slice(2,8));
-        next = current.concat([{ id:newId, title:(it.content||"").slice(0,160), note:"", status:mappedStatus, createdAt:new Date().toISOString() }]);
-      }
-      var res = await okaiBridgeFetch('', {
-        method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ projectId: proj.id, patch: { considerations: next } })
+        return current.concat([{ id:newId, title:(it.content||"").slice(0,160), note:"", status:mappedStatus, createdAt:new Date().toISOString() }]);
       });
-      if(!res.ok) throw new Error("patch_failed");
-      okaiBridgeCache[proj.id] = okaiBridgeCache[proj.id] || {};
-      okaiBridgeCache[proj.id].customer = res.body.customer;
       if(newId) it.okaiConsiderationId = newId;
       render();
       await saveDoc("confirmItems", it.id, it);
