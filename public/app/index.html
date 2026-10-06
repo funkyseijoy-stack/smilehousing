@@ -3344,6 +3344,15 @@
   }
   // 仕様写真・図面を「決定」としてマークする。同じ部位（scope/category/roomId/side）の
   // 中では「決定」は常に1件だけになるよう、他のdecidedは解除する。
+  async function toggleSpecAskDecision(id){
+    var p = state.specPhotos.find(function(x){ return x.id===id; });
+    if(!p) return;
+    p.askDecision = !p.askDecision;
+    var ok = await saveDoc("specPhotos", p.id, p);
+    if(ok===false){ p.askDecision = !p.askDecision; toast("保存できませんでした"); render(); return; }
+    render();
+    toast(p.askDecision ? "お客様の画面に「仮決定／決定」ボタンを出します（反映済みのとき）" : "お客様の画面の「仮決定／決定」ボタンを出さないようにしました");
+  }
   function toggleSpecDecided(id){
     var p = state.specPhotos.find(function(x){ return x.id===id; });
     if(!p) return;
@@ -3745,6 +3754,9 @@
       // （打ち合わせ記録由来＝kind:"note" はメモそのものなので対象外）。
       var reqBtnHtml = (p.kind==="planboard") ? '<button class="pill status-'+(p.reqStatus||"未依頼")+'" style="cursor:pointer; border:none; font-family:inherit;" data-cyclereq="'+p.id+'">'+(p.reqStatus||"未依頼")+'</button>' : '';
       var reflectBtnHtml = (p.kind!=="note") ? '<button class="pill reflect small'+(p.reflected?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>' : '';
+      // お客様の画面に「仮決定／決定」ボタンを出すか（タスクから作ったコピーはタスク側のボタンで決める）
+      var askBtnHtml = (p.kind!=="note" && !(p.source && p.source.taskId))
+        ? '<button class="pill reflect small'+(p.askDecision?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-spec-toggleask="'+p.id+'" title="お客様のおうちノートで、このカードに「仮決定／決定」ボタンを出す">'+(p.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>' : '';
       // バッジ（打合せ記録は6種類すべて、写真・プランボードは分類用の2種類のみ、トグル可能）。
       var badgeRowHtml = (p.kind==="note")
         ? (relatedNote ? '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("note:"+relatedNote.id, relatedNote.badges)+'</div>' : "")
@@ -3757,7 +3769,7 @@
         return '<div class="'+cardClass+' spectl-card-row">'+
           '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">'+
           '<div class="spectl-meta">'+metaHtml+'</div>'+
-          '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+          '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
           memoHtml+
@@ -3767,7 +3779,7 @@
       return '<div class="'+cardClass+'">'+
         thumbHtml+
         '<div class="spectl-meta">'+metaHtml+'</div>'+
-        '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+        '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
         sentBadgesHtml+
         memoHtml+
         badgeRowHtml+
@@ -7782,6 +7794,8 @@
         if(spedit){ openSpecEdit(spedit.dataset.specEdit); return; }
         var sptask = e.target.closest("[data-spec-taskmenu]");
         if(sptask){ openSpecTaskMenu(sptask.dataset.specTaskmenu, sptask.dataset.sc, sptask.dataset.cat||null, sptask.dataset.room||null, sptask.dataset.side||null); return; }
+        var specask = e.target.closest("[data-spec-toggleask]");
+        if(specask){ toggleSpecAskDecision(specask.dataset.specToggleask); return; }
         var specdecide = e.target.closest("[data-spec-decide]");
         if(specdecide){ toggleSpecDecided(specdecide.dataset.specDecide); return; }
         var openspec = e.target.closest("[data-openspec]");

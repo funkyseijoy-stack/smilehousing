@@ -185,7 +185,7 @@ export default async (req: Request, context: Context) => {
       const cardKey = String(body.cardKey || "");
       if (!catsOf(project).some((c) => c.id === cat) || cat === "plan") return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
-      if (!/^[nt]:[A-Za-z0-9_\-]{1,80}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
+      if (!/^[nts]:[A-Za-z0-9_\-]{1,80}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
       let roomId: string | null = null;
       if (cat === "rooms") {
         roomId = String(body.roomId || "");
@@ -342,8 +342,9 @@ export default async (req: Request, context: Context) => {
       label: partLabel(project, p.scope, p.category, p.roomId),
       roomId: p.roomId || null,
       file: fileOf(p),
-      key: srcTask ? "t:" + srcTask.id : undefined,
-      askDecision: srcTask ? srcTask.askDecision : undefined,
+      // タスク由来はタスク単位（t:）、手動追加などはこの写真・PDF単位（s:）でカードごとに仮決定／決定できる
+      key: srcTask ? "t:" + srcTask.id : "s:" + String(p.id).slice(0, 78),
+      askDecision: srcTask ? srcTask.askDecision : p.askDecision,
       source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）

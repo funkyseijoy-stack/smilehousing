@@ -1005,6 +1005,10 @@
       }
     }
     // Organize items into sections
+    // 「仮決定／決定」ボタンを出す設定の写真・PDF・プランボード（s:）は、記録・図面と同じ時系列のカードにする
+    var isSpecCard = function(x){ return x.showDecide && x.key && String(x.key).charAt(0)==="s"; };
+    var specCards = items.filter(isSpecCard);
+    items = items.filter(function(x){ return !isSpecCard(x); });
     var planboards = items.filter(function(x){ return x.type==="planboard"; });
     var notes = items.filter(function(x){ return x.type==="note"; });
     var taskPdfs = items.filter(function(x){ return x.type==="photo" && x.source && x.source.taskId; });
@@ -1037,6 +1041,7 @@
     var feed = [];
     notes.forEach(function(n){ feed.push({ at: n.at||"", kind:"note", n:n }); });
     Object.keys(pdfGroups).forEach(function(k){ feed.push({ at: pdfGroups[k].at, kind:"pdf", g:pdfGroups[k] }); });
+    specCards.forEach(function(x){ feed.push({ at: x.at||"", kind:"spec", x:x }); });
     feed.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
     var roomIdOfTab = (c.id==="rooms" && String(tabKey).indexOf(":")>0) ? String(tabKey).split(":")[1] : "";
     function cardDecHtml(key, status, label, show){
@@ -1059,6 +1064,13 @@
               (g.snippet ? '<div class="section-item-desc" style="font-size:.88rem;">'+esc(g.snippet)+'</div>' : '')+
               '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>'+
               cardDecHtml(g.key, g.cardStatus, g.snippet, g.showDecide)+'</div>';
+          }
+          if(it.kind==="spec"){
+            var x = it.x;
+            return '<div class="fcard st-'+esc(x.cardStatus||"検討中")+'">'+
+              '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(x.type==="planboard"?"📐 プランボード":"📷 写真・資料")+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>'+
+              '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
+              cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true)+'</div>';
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+

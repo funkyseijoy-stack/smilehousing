@@ -139,6 +139,8 @@
 
 - 部位の自由追加（2026年10月〜）: 打合せ記録のサブタブ（記録・外部仕様…・プランボード）の「＋追加」で、その案件だけの部位を増やせる（`project.customParts=[{id,name,memo,deletedAt}]`、`addCustomPart`／`renameCustomPart`／`deleteCustomPart`、画面は `renderCustomPartTabs`。追加した部位のタブは「＋追加」「プランボード」の前に並ぶ）。部位は `scope:"custom"`・`category=部位ID` で、打合せ記録・タスク（反映も）・仕様履歴の部位選択（`askSpecPart` の「追加した部位」）から使える。お客様のおうちノートでは1つずつ別の項目（ID `cp_<部位ID>`）として出る：`note-data.mts` の `catsOf`／`noteCatFor`／`partLabel`、住まいるアプリの `noteCatIdFor`／`noteDecisionName` の**2か所に同じ対応**がある。削除は `deletedAt` を付けるだけ（履歴は残るが、お客様画面からは消える）。
 
+- 仕様履歴カードの「お客様の決定ボタン：出す／出さない」（2026年10月〜）: 仕様タブの履歴カード（手動追加の写真・PDF・受領PDF・プランボード。タスクから作ったコピーはタスク側のボタンで決める）に、反映ボタンの隣へ追加（`toggleSpecAskDecision`、`specPhotos.askDecision`）。「出す」にしたカードだけ、お客様画面（`public/note/index.html` の `itemsSectionsHtml`）で「写真・資料」「プランボード」欄から記録・図面と同じ時系列のカードに移り、カードごとに仮決定／決定を選べる。カードの `cardKey` は `s:<仕様写真ID>`（`note-data.mts` の `decideCard` は `n:`／`t:`／`s:` を受け付ける）。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す
