@@ -290,6 +290,7 @@
   #reTypeRow[hidden], #reCustRows[hidden]{ display:none; }
   .kancol h4{ margin:2px 4px; font-size:.85rem; color:var(--muted); display:flex; justify-content:space-between; }
   .kancard{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 9px; font-size:.85rem; box-shadow: var(--shadow); }
+  .kancard.reflected{ background:var(--accent-soft); border-color:var(--accent); border-inline-start:6px solid var(--accent); }
   .kancard .kc-proj{ font-weight:700; margin-block-end:3px; }
   .kancard .kc-content{ white-space:pre-wrap; margin-block-end:5px; }
   .kancard .kc-meta{ display:flex; flex-wrap:wrap; gap:4px; margin-block-end:6px; font-size:.85rem; color:var(--muted); }
@@ -1665,6 +1666,16 @@
     }
     render();
     populateUserSelect();
+    repairReflectedTaskCopies();
+  }
+  // 「✓反映済み」なのに設備仕様に入っていない図面を、タスクの案件の設備仕様へ入れて直す（起動時に1回）。
+  async function repairReflectedTaskCopies(){
+    try{
+      var fixed = 0;
+      var list = (state.tasks||[]).filter(function(t){ return !t.deletedAt && !t.private && t.reflected && t.projectId && t.vendorSpec && (t.attachments||[]).length; });
+      for(var i=0; i<list.length; i++){ fixed += await syncTaskSpecCopies(list[i]); }
+      if(fixed){ render(); toast("✅ 反映済みなのに設備仕様に入っていなかった図面を "+fixed+" 件、直しました"); }
+    }catch(e){}
   }
 
   async function syncFromServer(){
@@ -2075,7 +2086,7 @@
       var cards = rows.map(function(t){
         var proj = projectById(t.projectId);
         var isVendor = !!t.requestTo;
-        return '<div class="kancard" data-taskid="'+t.id+'">'+
+        return '<div class="kancard'+(t.reflected?" reflected":"")+'" data-taskid="'+t.id+'">'+
           '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+
             (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
             (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
@@ -6351,7 +6362,8 @@
         if(!!cp.reflected !== !!t.reflected){ cp.reflected = !!t.reflected; cp.reflectedAt = t.reflected ? nowIso() : null; changed = true; }
         if(changed) await saveDoc("specPhotos", cp.id, cp);
       }else if(t.reflected){
-        var doc = { id: uid("sp"), projectId: t.projectId, scope: vs.scope, category: vs.category,
+        // IDは「タスク×添付」で決まる形にする（複数の端末で同時に直しても重複しない）
+        var doc = { id: "sp_t_"+t.id+"_"+att.id, projectId: t.projectId, scope: vs.scope, category: vs.category,
           roomId: vs.roomId || null, side: vs.side || null, assetId: att.id, url: att.url, kind: "photo",
           contentType: att.contentType || "application/pdf", fileName: att.name, createdAt: nowIso(),
           source: { taskId: t.id, vendor: t.requestTo||"", noteSnippet: (t.content||"").slice(0,30) },
