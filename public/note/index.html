@@ -1029,17 +1029,18 @@
     taskPdfs.forEach(function(x){
       var u = x.file && x.file.url; if(!u || seenPdf[u]) return; seenPdf[u] = true;
       var k = x.source.taskId;
-      if(!pdfGroups[k]) pdfGroups[k] = { at: x.at||"", snippet: x.source.noteSnippet||"", files: [], key: x.key||("t:"+k), cardStatus: x.cardStatus||"検討中" };
+      if(!pdfGroups[k]) pdfGroups[k] = { at: x.at||"", snippet: x.source.noteSnippet||"", files: [], key: x.key||("t:"+k), cardStatus: x.cardStatus||"検討中", showDecide: false };
+      if(x.showDecide) pdfGroups[k].showDecide = true;
       if(String(x.at||"") > String(pdfGroups[k].at)) pdfGroups[k].at = x.at;
       pdfGroups[k].files.push(x.file);
     });
     var feed = [];
     notes.forEach(function(n){ feed.push({ at: n.at||"", kind:"note", n:n }); });
     Object.keys(pdfGroups).forEach(function(k){ feed.push({ at: pdfGroups[k].at, kind:"pdf", g:pdfGroups[k] }); });
-    feed.sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); });
+    feed.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
     var roomIdOfTab = (c.id==="rooms" && String(tabKey).indexOf(":")>0) ? String(tabKey).split(":")[1] : "";
-    function cardDecHtml(key, status, label){
-      if(!key) return "";
+    function cardDecHtml(key, status, label, show){
+      if(!key || !show) return "";
       var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(label||"").slice(0,40))+'" data-ccat="'+esc(c.id)+'"';
       return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span></div>'+
         '<div class="btns"><button class="btn ol" data-cdecide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
@@ -1053,21 +1054,21 @@
           var newest = i===0 ? '<span class="tag new">最新</span>' : '';
           if(it.kind==="pdf"){
             var g = it.g;
-            return '<div class="fcard st-'+esc(g.cardStatus)+'">'+
+            return '<div class="fcard'+(g.showDecide?' st-'+esc(g.cardStatus):'')+'">'+
               '<div class="fhd"><span class="fd">'+fmtD(g.at)+'</span><span class="tag pdf">📄 変更後のPDF</span>'+newest+'</div>'+
               (g.snippet ? '<div class="section-item-desc" style="font-size:.88rem;">'+esc(g.snippet)+'</div>' : '')+
               '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>'+
-              cardDecHtml(g.key, g.cardStatus, g.snippet)+'</div>';
+              cardDecHtml(g.key, g.cardStatus, g.snippet, g.showDecide)+'</div>';
           }
           var n = it.n;
-          var html = '<div class="fcard st-'+esc(n.cardStatus||"検討中")+'">'+
+          var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
             '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録</span>'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
           if(n.open) html += '<div class="section-item-desc"><strong>確認：</strong>'+esc(n.open)+'</div>';
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
-          html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open)+'</div>';
+          html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
           return html;
         }).join("")+'</div>';
     }

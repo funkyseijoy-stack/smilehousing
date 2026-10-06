@@ -2113,6 +2113,7 @@
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
+            (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
             '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
           '</div>'+
@@ -2491,6 +2492,7 @@
         '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
         '<div class="notemenu-divider"></div>'+
         '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
+        '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>'+
         '<div class="notemenu-divider"></div>'+
         noteSendButtonHtml(n, sent, "companytask")+
         noteSendButtonHtml(n, sent, "vendortask")+
@@ -3688,6 +3690,24 @@
         '</div>';
     }).join("");
     return '<div style="margin-block-start:10px;"><div style="font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
+  }
+  // お客様画面のカードに「仮決定／決定」ボタンを出すかどうか（記録・業者タスクごと。初めは出さない）
+  function toggleMeetingAskDecision(id){
+    var n = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!n) return;
+    n.askDecision = !n.askDecision;
+    render();
+    saveDoc("meetingNotes", n.id, n);
+    toast(n.askDecision ? "お客様の画面に「仮決定／決定」ボタンを出します" : "お客様の画面の「仮決定／決定」ボタンを外しました");
+  }
+  function toggleTaskAskDecision(id){
+    var t = state.tasks.find(function(x){ return x.id===id; });
+    if(!t) return;
+    t.askDecision = !t.askDecision;
+    t.updatedAt = nowIso();
+    render();
+    saveDoc("tasks", t.id, t);
+    toast(t.askDecision ? "お客様の画面に「仮決定／決定」ボタンを出します" : "お客様の画面の「仮決定／決定」ボタンを外しました");
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
@@ -7837,6 +7857,7 @@
       else if(act==="edit") openTaskForm(id);
       else if(act==="setpart") setTaskSpecPart(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
+      else if(act==="toggleask") toggleTaskAskDecision(id);
     });
     document.getElementById("kanbanWrap").addEventListener("change", function(e){
       var input = e.target.closest("input[type=file][data-kcattach]");
@@ -7922,6 +7943,7 @@
       else if(act==="editnote"){ editMeetingNote(id); }
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
+      else if(act==="togglenoteask"){ toggleMeetingAskDecision(id); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
       else if(act==="togglenotemenu"){ e.stopPropagation(); toggleNoteMenu(id); }

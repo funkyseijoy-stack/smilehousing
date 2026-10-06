@@ -99,6 +99,19 @@ function imageOf(x: any) {
   return { id: x.id, url: x.url, place: x.place || "その他", by: x.by === "customer" ? "customer" : "staff", createdAt: x.createdAt || "" };
 }
 
+// 打合せ記録の並び順用の時刻（UTCのISO文字列）。記録を書いた日が打合せ日と同じ（日本時間）なら、書いた時刻を使う。
+// 別の日の記録は、その日の正午（日本時間）とする。同じ日の図面（反映した時刻）と、書いた順に並ぶようにする。
+function noteAt(n: any): string {
+  const created = n.createdAt ? new Date(n.createdAt) : null;
+  const createdJst = created && !isNaN(created.getTime()) ? new Date(created.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10) : "";
+  if (n.date) {
+    if (created && createdJst === n.date) return created.toISOString();
+    const d = new Date(n.date + "T12:00:00+09:00");
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+  return created && !isNaN(created.getTime()) ? created.toISOString() : "";
+}
+
 function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
@@ -316,6 +329,7 @@ export default async (req: Request, context: Context) => {
       roomId: p.roomId || null,
       file: fileOf(p),
       key: srcTask ? "t:" + srcTask.id : undefined,
+      askDecision: srcTask ? srcTask.askDecision : undefined,
       source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
@@ -341,6 +355,7 @@ export default async (req: Request, context: Context) => {
         roomId: vs.roomId || null,
         file: fileOf(att),
         key: "t:" + t.id,
+        askDecision: t.askDecision,
         source: { taskId: t.id, noteSnippet: String(t.content || "").slice(0, 60) },
         contentType: att.contentType || "",
         spec: { contract: false, quote: false },
@@ -354,9 +369,10 @@ export default async (req: Request, context: Context) => {
       type: "note",
       id: n.id,
       key: "n:" + n.id,
+      askDecision: n.askDecision,
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,
-      at: (n.date ? n.date + "T12:00:00" : "") || n.createdAt || "",
+      at: noteAt(n),
       date: n.date || (n.createdAt || "").slice(0, 10),
       title: n.title || "",
       decided: n.decided != null ? n.decided : n.content || "",
@@ -382,6 +398,10 @@ export default async (req: Request, context: Context) => {
       const d = cardDecByKey[it.key];
       it.cardStatus = d ? d.status : "検討中";
       it.cardDecidedAt = d ? d.decidedAt : null;
+      // 「仮決定／決定」ボタンを出すか：スタッフが出す設定にした記録・タスクだけ。
+      // 初めは出さない。ただし、お客様がすでに選んでいるカードは（スタッフが明示的に外さない限り）出し続ける。
+      it.showDecide = it.askDecision === true || (it.askDecision !== false && !!d);
+      delete it.askDecision;
     }
   }
 
