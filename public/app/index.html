@@ -227,6 +227,7 @@
   .notemenu button:hover{ background:var(--surface-2); }
   .notemenu button.danger{ color:var(--red, #c0392b); }
   .notemenu button.on{ color:var(--accent-ink); font-weight:700; }
+  .notemenu button.notemenu-close{ text-align:end; font-weight:700; color:var(--muted); border-block-end:1px solid var(--border); border-radius:7px 7px 0 0; margin-block-end:4px; }
   .notemenu-divider{ border-block-start:1px dashed var(--border); margin:5px 2px; }
 
   .lockbox{ display:flex; align-items:center; gap:8px; background:var(--gold-soft); color:var(--gold); border-radius:10px; padding:8px 10px; font-size:.85rem; font-weight:700; }
@@ -2499,6 +2500,7 @@
       var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
+        '<button class="notemenu-close" data-act="togglenotemenu" data-id="'+n.id+'" title="閉じる">✕ 閉じる</button>'+
         '<button data-act="editnote" data-id="'+n.id+'">編集</button>'+
         '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
         '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
@@ -8100,7 +8102,8 @@
     // カード内以外をクリックしたら「⋮ 操作」メニューを閉じる
     document.addEventListener("click", function(e){
       if(openNoteMenuId==null) return;
-      if(e.target.closest(".noteitem")) return;
+      // メニューの中と「⋮ 操作」ボタンの操作は除き、それ以外（カードの空き部分や他のカード）を押したら閉じる
+      if(e.target.closest(".notemenu") || e.target.closest(".notemenu-trigger")) return;
       openNoteMenuId = null;
       renderMeetingNotes();
     });
