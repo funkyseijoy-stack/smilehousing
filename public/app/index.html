@@ -262,9 +262,19 @@
   @media (max-width: 480px){ button.tbtn span.label{ display:none; } }
 
   /* ---- kanban (社内タスク) ---- */
-  .kanbanwrap{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; align-items:start; padding-block-end:6px; }
-  @media (max-width:900px){ .kanbanwrap{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
-  .kancol{ min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:8px; }
+  .kanbanwrap{ display:flex; flex-direction:column; gap:10px; padding-block-end:6px; }
+  .kancol{ min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:0; overflow:hidden; }
+  .kancol .kanhead{ width:100%; display:flex; align-items:center; gap:10px; padding:12px 14px; background:none; border:0; cursor:pointer; text-align:start; font-family:inherit; color:var(--text); font-size:1rem; font-weight:700; }
+  .kancol .kanhead .kandot{ width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .kancol .kanhead .kancount{ background:var(--accent); color:#fff; border-radius:999px; padding:1px 11px; font-size:.85rem; }
+  .kancol .kanhead .kanarrow{ margin-inline-start:auto; color:var(--muted); transition:transform .15s; }
+  .kancol.open .kanhead .kanarrow{ transform:rotate(180deg); }
+  .kancol .kangrid{ display:none; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; padding:4px 12px 12px; align-items:start; }
+  .kancol.open .kangrid{ display:grid; }
+  @media (max-width:900px){ .kancol .kangrid{ grid-template-columns:minmax(0,1fr); } }
+  .kancard .kc-statusmenu{ display:flex; flex-wrap:wrap; gap:6px; padding:8px; margin-block-start:6px; background:var(--surface-2); border-radius:10px; }
+  .kancard .kc-statusmenu button{ border:2px solid var(--border); background:var(--surface); color:var(--text); border-radius:999px; padding:5px 12px; font-family:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+  .kancard .kc-statusmenu button.cur{ background:var(--accent); border-color:var(--accent); color:#fff; }
   #reTypeRow[hidden], #reCustRows[hidden]{ display:none; }
   .kancol h4{ margin:2px 4px; font-size:.85rem; color:var(--muted); display:flex; justify-content:space-between; }
   .kancard{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 9px; font-size:.85rem; box-shadow: var(--shadow); }
@@ -1328,6 +1338,7 @@
 
   // ================= state =================
   var STATUS_ORDER = ["未着手","対応中","社長確認中","朋子確認中","業者連絡済み","お客様へ連絡済み","完了"];
+  var STATUS_COLORS = {"未着手":"#8a8a85","対応中":"#2f6fb3","社長確認中":"#c2703a","朋子確認中":"#c2703a","業者連絡済み":"#2a8a7a","お客様へ連絡済み":"#7a5ab0","完了":"#4a7c59"};
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
@@ -1961,6 +1972,8 @@
   function goToTaskBoard(taskId){
     state.taskKindFilter = null;
     state.taskAssigneeFilter = null;
+    var gt = state.tasks.find(function(x){ return x.id===taskId; });
+    if(gt){ state.taskOpen = state.taskOpen || {}; state.taskOpen[gt.status||"未着手"] = true; }
     switchTab("home");
     renderKanban();
     setTimeout(function(){
@@ -1997,6 +2010,7 @@
       if(state.taskKindFilter==="check") return !!t.checker;
       return true;
     });
+    if(!state.taskOpen) state.taskOpen = {"未着手":true,"対応中":true,"社長確認中":true,"朋子確認中":true};
     wrap.innerHTML = STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
       // 部位ごとにまとまり、各部位の中では古い→新しい（時系列）に並ぶようにする。
@@ -2011,8 +2025,6 @@
       });
       var cards = rows.map(function(t){
         var proj = projectById(t.projectId);
-        var canForward = STATUS_ORDER.indexOf(status) < STATUS_ORDER.length-1;
-        var canBack = STATUS_ORDER.indexOf(status) > 0;
         var isVendor = !!t.requestTo;
         return '<div class="kancard" data-taskid="'+t.id+'">'+
           '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+
@@ -2038,12 +2050,18 @@
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             (t.vendorSpec?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
-            (canBack?'<button class="btn small secondary" data-taskact="back" data-id="'+t.id+'">←戻す</button>':'')+
-            (canForward?'<button class="btn small" data-taskact="forward" data-id="'+t.id+'">次へ→</button>':'')+
+            '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
-          '</div></div>';
+          '</div>'+
+          (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
+            return '<button data-taskact="setstatus" data-id="'+t.id+'" data-status="'+st+'"'+(st===status?' class="cur"':'')+'>'+st+'</button>';
+          }).join("")+'</div>' : '')+
+          '</div>';
       }).join("") || '<div class="empty" style="padding:10px 4px;">なし</div>';
-      return '<div class="kancol"><h4><span>'+status+'</span><span class="tabular">'+rows.length+'</span></h4>'+cards+'</div>';
+      var isOpen = !!state.taskOpen[status];
+      return '<div class="kancol'+(isOpen?" open":"")+'"><button class="kanhead" data-taskstatustoggle="'+status+'" aria-expanded="'+isOpen+'">'+
+        '<span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span><span>'+status+'</span><span class="kancount tabular">'+rows.length+'</span><span class="kanarrow">▾</span></button>'+
+        '<div class="kangrid">'+cards+'</div></div>';
     }).join("");
   }
 
@@ -6113,15 +6131,18 @@
     if(checkStatusFor(checker)) goToTaskBoard(t.id);
   }
 
-  async function moveTask(id, dir){
+  // 進捗を好きな段階へ直接変更する（飛ばしてもよい）。変更先の見出しは自動で開く。
+  async function setTaskStatus(id, newStatus){
     var t = state.tasks.find(function(x){ return x.id===id; });
-    if(!t) return;
-    var idx = STATUS_ORDER.indexOf(t.status||"未着手");
-    var newIdx = dir==="forward" ? idx+1 : idx-1;
-    if(newIdx<0 || newIdx>=STATUS_ORDER.length) return;
-    t.status = STATUS_ORDER[newIdx];
+    state.taskMenuId = null;
+    if(!t || STATUS_ORDER.indexOf(newStatus)<0){ render(); return; }
+    if((t.status||"未着手")===newStatus){ render(); return; }
+    t.status = newStatus;
     t.updatedAt = nowIso();
+    state.taskOpen = state.taskOpen || {};
+    state.taskOpen[newStatus] = true;
     render();
+    toast("「"+newStatus+"」へ移しました");
     await saveDoc("tasks", t.id, t);
     logActivity("タスクのステータスを「"+t.status+"」にしました");
   }
@@ -7590,11 +7611,19 @@
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
       var vcyc = e.target.closest("[data-vendorcycle]");
       if(vcyc){ cycleVendorStatus(vcyc.dataset.vendorcycle, parseInt(vcyc.dataset.vidx,10)); return; }
+      var head = e.target.closest("[data-taskstatustoggle]");
+      if(head){
+        var st0 = head.dataset.taskstatustoggle;
+        state.taskOpen = state.taskOpen || {};
+        state.taskOpen[st0] = !state.taskOpen[st0];
+        renderKanban();
+        return;
+      }
       var btn = e.target.closest("button[data-taskact]");
       if(!btn) return;
       var act = btn.dataset.taskact, id = btn.dataset.id;
-      if(act==="forward") moveTask(id,"forward");
-      else if(act==="back") moveTask(id,"back");
+      if(act==="statusmenu"){ state.taskMenuId = (state.taskMenuId===id ? null : id); renderKanban(); }
+      else if(act==="setstatus") setTaskStatus(id, btn.dataset.status);
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
       else if(act==="edit") openTaskForm(id);
       else if(act==="setpart") setTaskSpecPart(id);
