@@ -1902,6 +1902,23 @@
       return '<span class="tagchip'+(state.taskKindFilter===o.value?" active":"")+'" data-taskkindfilter="'+(o.value||"")+'">'+o.label+'</span>';
     }).join("");
   }
+  // タスクを依頼したら、ホームのタスク画面へ移動して、できたカードを見せる。
+  function goToTaskBoard(taskId){
+    state.taskKindFilter = null;
+    state.taskAssigneeFilter = null;
+    switchTab("home");
+    renderKanban();
+    setTimeout(function(){
+      var card = document.querySelector('.kancard[data-taskid="'+taskId+'"]');
+      var target = card || document.getElementById("kanbanWrap");
+      if(target && target.scrollIntoView) target.scrollIntoView({behavior:"smooth", block:"center", inline:"center"});
+      if(card){
+        card.style.transition = "box-shadow .3s";
+        card.style.boxShadow = "0 0 0 3px var(--orange)";
+        setTimeout(function(){ card.style.boxShadow = ""; }, 2500);
+      }
+    }, 100);
+  }
   // 担当者での絞り込み（値: null=すべて／"__none"=担当未設定／スタッフ名）
   function renderTaskAssigneeFilterBar(){
     var bar = document.getElementById("taskAssigneeFilterBar");
@@ -3315,6 +3332,7 @@
           saveDoc("specPhotos", p.id, p);
           var def = SPEC_SEND_TYPES.filter(function(t){ return t.type===type; })[0];
           toast("✅ "+def.label.replace("→","").replace("へ","")+"に追加しました");
+          if(type==="companytask" || type==="vendortask") goToTaskBoard(refId);
         });
       };
       if(type==="vendortask"){
@@ -4408,6 +4426,7 @@
         saveDoc("tasks", t.id, t);
         logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました"+(part?"（部位："+part.label+"）":""));
         toast("✅ 社内タスクに追加しました");
+        goToTaskBoard(t.id);
       });
      });
       return;
@@ -4441,6 +4460,7 @@
           saveDoc("tasks", t3.id, t3);
           logActivity("打合せ記録から業者タスク「"+content.slice(0,20)+"」を作成しました（部位："+part.label+"）");
           toast("✅ 業者タスクに追加しました");
+          goToTaskBoard(t3.id);
 
           // 業者が指定されていれば、見積依頼状況にも「未依頼」として自動登録する。
           if(vendor){
