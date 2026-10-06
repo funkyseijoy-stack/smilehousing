@@ -541,7 +541,6 @@
 
       <div class="subtabs">
         <button class="sub-btn active" data-sub="overview">概要</button>
-        <button class="sub-btn" data-sub="sitecheck">確認事項</button>
         <button class="sub-btn" data-sub="customer">お客様情報</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
         <button class="sub-btn" data-sub="confirm">お客様への確認</button>
@@ -558,15 +557,6 @@
         <div class="card">
           <h3>この案件の概要</h3>
           <div id="overviewBody" style="font-size:.85rem; line-height:1.9;"></div>
-        </div>
-      </div>
-
-      <!-- 確認事項 subpanel（現場で確認・決定する固定チェックリスト） -->
-      <div class="subpanel" id="sub-sitecheck">
-        <div class="card">
-          <h3>確認事項</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">現場で確認・決定する項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
-          <div id="specSiteCheckWrap"></div>
         </div>
       </div>
 
@@ -870,6 +860,7 @@
           <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
           <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア基本色</button>
           <button class="meetingsub-btn" data-meetingsub="room">部屋別インテリア</button>
+          <button class="meetingsub-btn" data-meetingsub="siteCheck">外部散水栓など</button>
           <button class="meetingsub-btn" id="btnAddCustomPart" type="button" style="border-style:dashed;">＋追加</button>
           <button class="meetingsub-btn" data-meetingsub="planboard">プランボード</button>
         </div>
@@ -953,6 +944,13 @@
             </div>
             <div id="specRoomsWrap"></div>
             <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
+          </div>
+        </div>
+        <div class="meetingsubpane" id="meetingsubpane-siteCheck">
+          <div class="card">
+            <h3>外部散水栓など</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">打合せで確認して、漏れがないようにする項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
+            <div id="specSiteCheckWrap"></div>
           </div>
         </div>
         <div id="customPartPanes"></div>
@@ -1425,7 +1423,7 @@
     {label:"外部仕様", value:"exterior"},
     {label:"設備仕様", value:"facility"},
     {label:"暖房・換気・電気設備", value:"equipment"},
-    {label:"現場確認", value:"siteCheck"},
+    {label:"外部散水栓など", value:"siteCheck"},
     {label:"インテリア基本色", value:"interiorColor"},
     {label:"部屋別インテリア", value:"room"}
   ];
@@ -2419,7 +2417,7 @@
     wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
-  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room" };
+  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room", siteCheck:"siteCheck" };
   function switchMeetingSubTab(key){
     var bar = document.getElementById("meetingSubTabBar");
     if(!bar) return;
