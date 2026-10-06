@@ -1275,6 +1275,23 @@
   </div>
 </div>
 
+<!-- ========== 仕様履歴の編集 MODAL ========== -->
+<div class="taskform-modal" id="spEditModal" hidden>
+  <div class="taskform-card">
+    <h3 style="margin:0 0 6px;">履歴を編集</h3>
+    <div class="addform" style="flex-direction:column; align-items:stretch;">
+      <div class="muted" id="spEditInfo" style="font-size:.78rem;"></div>
+      <label class="field" id="spEditDateRow">日付<input type="date" id="spEditDate"></label>
+      <label class="field">メモ（スタッフ用・お客様には表示されません）<textarea id="spEditMemo" rows="4"></textarea></label>
+      <div class="row" style="margin-block-start:6px;">
+        <button class="btn" id="spEditSave">保存</button>
+        <button class="btn secondary" id="spEditNote" hidden>記録の内容を編集</button>
+        <button class="btn secondary" id="spEditClose">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -3427,6 +3444,10 @@
         (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
       var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
       var delBtnHtml = '<button class="spdel" data-delspec="'+p.id+'" title="この履歴を削除">×</button>';
+      var editBtnHtml = '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-edit="'+p.id+'">✏️ 編集</button>';
+      var memoHtml = p.memo
+        ? '<div style="flex-basis:100%; margin-block-start:5px; padding:6px 8px; border-radius:8px; background:var(--surface-2); font-size:.76rem; white-space:pre-wrap;">📝 '+escapeHtml(p.memo)+'</div>'
+        : '';
       var spSent = specSentInfo(p);
       var spSentTypes = SPEC_SEND_TYPES.filter(function(t){ return spSent[t.type]; });
       var taskBtnHtml = (p.kind!=="note")
@@ -3452,17 +3473,19 @@
         return '<div class="'+cardClass+' spectl-card-row">'+
           '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">'+
           '<div class="spectl-meta">'+metaHtml+'</div>'+
-          '<div class="spectl-actions">'+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+          '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
+          memoHtml+
           badgeRowHtml+
           '</div>';
       }
       return '<div class="'+cardClass+'">'+
         thumbHtml+
         '<div class="spectl-meta">'+metaHtml+'</div>'+
-        '<div class="spectl-actions">'+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
+        '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
         sentBadgesHtml+
+        memoHtml+
         badgeRowHtml+
         '</div>';
     });
@@ -5009,6 +5032,38 @@
     document.getElementById("reNotes").value = r.notes || "";
     document.getElementById("reHint").textContent = "日時を変えると、他の予約との重なりを確認し、Googleカレンダーの予定も新しい日時に直します。"+(isPublic && r.email ? "お客様へのお知らせは、保存後に「メールを送る」→「ご予約日時の変更のお知らせ」で送れます。" : "");
     document.getElementById("resEditModal").hidden = false;
+  }
+  var spEditId = null;
+  function openSpecEdit(id){
+    var p = state.specPhotos.find(function(x){ return x.id===id; });
+    if(!p) return;
+    spEditId = id;
+    var isNote = p.kind==="note";
+    document.getElementById("spEditInfo").textContent = (isNote?"打ち合わせ記録":(p.fileName||"写真・PDF"))+"（"+(p.category||"")+"）";
+    document.getElementById("spEditDate").value = (p.createdAt||"").slice(0,10);
+    document.getElementById("spEditDateRow").hidden = isNote;
+    document.getElementById("spEditMemo").value = p.memo||"";
+    document.getElementById("spEditNote").hidden = !(isNote && p.source && p.source.noteId);
+    document.getElementById("spEditModal").hidden = false;
+  }
+  function closeSpecEdit(){ document.getElementById("spEditModal").hidden = true; spEditId = null; }
+  async function saveSpecEdit(){
+    var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
+    if(!p) return;
+    var updated = Object.assign({}, p, {memo: document.getElementById("spEditMemo").value.trim()});
+    var d = document.getElementById("spEditDate").value;
+    if(p.kind!=="note" && d && d!==(p.createdAt||"").slice(0,10)){
+      updated.createdAt = d+(p.createdAt||"").slice(10 ) ;
+      if(updated.createdAt.length<=10) updated.createdAt = d+"T09:00:00.000Z";
+    }
+    try{
+      var ok = await saveDoc("specPhotos", p.id, updated);
+      if(ok===false) throw new Error("save failed");
+    }catch(err){ toast("保存できませんでした"); return; }
+    Object.assign(p, updated);
+    closeSpecEdit();
+    render();
+    toast("保存しました");
   }
   function closeResEdit(){ document.getElementById("resEditModal").hidden = true; reTargetId = null; }
   async function saveResEdit(force){
@@ -7270,6 +7325,8 @@
         if(cyclereq){ cyclePbReqStatus(cyclereq.dataset.cyclereq); return; }
         var togglereflect = e.target.closest("[data-togglereflect]");
         if(togglereflect){ togglePbReflected(togglereflect.dataset.togglereflect); return; }
+        var spedit = e.target.closest("[data-spec-edit]");
+        if(spedit){ openSpecEdit(spedit.dataset.specEdit); return; }
         var sptask = e.target.closest("[data-spec-taskmenu]");
         if(sptask){ openSpecTaskMenu(sptask.dataset.specTaskmenu, sptask.dataset.sc, sptask.dataset.cat||null, sptask.dataset.room||null, sptask.dataset.side||null); return; }
         var specdecide = e.target.closest("[data-spec-decide]");
@@ -7400,6 +7457,14 @@
     document.getElementById("cmClose").addEventListener("click", closeCustMail);
     document.getElementById("reSave").addEventListener("click", function(){ saveResEdit(false); });
     document.getElementById("reClose").addEventListener("click", closeResEdit);
+    document.getElementById("spEditSave").addEventListener("click", saveSpecEdit);
+    document.getElementById("spEditClose").addEventListener("click", closeSpecEdit);
+    document.getElementById("spEditNote").addEventListener("click", function(){
+      var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
+      var nid = p && p.source && p.source.noteId;
+      closeSpecEdit();
+      if(nid){ switchMeetingSubTab("record"); editMeetingNote(nid); }
+    });
     document.getElementById("publicBookingList").addEventListener("click", function(e){
       var eb = e.target.closest("[data-editreservation]");
       if(eb){ openResEdit(eb.dataset.editreservation); return; }

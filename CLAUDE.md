@@ -97,6 +97,8 @@
 - カレンダー・メール送信にはGoogle連携（設定タブの「Gmailと連携する」）でカレンダー権限（calendar.events）の許可が必要。権限追加後は一度やり直すこと。Google Cloud側でCalendar APIの有効化も必要。
 - 旧おうちノートからの切り替え（既存のお客様への案内）はまだ。確認後に判断する。
 
+- 仕様履歴カードの編集・メモ（2026年10月〜）: 仕様タブの履歴カード（写真・PDF・打合せ記録）に「✏️ 編集」（`openSpecEdit`／`saveSpecEdit`、モーダル `#spEditModal`）。スタッフ用メモを `specPhotos` の `memo` に保存しカードに「📝」表示、写真・PDFは日付（`createdAt`）も変更可。打合せ記録は「記録の内容を編集」で既存の `editMeetingNote` へ移動。`memo` はお客様画面（`note-data.mts`）には出さない。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す
