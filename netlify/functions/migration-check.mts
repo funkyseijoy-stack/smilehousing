@@ -34,17 +34,25 @@ export default async (req: Request, _context: Context) => {
 
   const rows = await Promise.all(projects.map(async (p) => {
     const id = String(p.id);
-    const row: any = { id, customer: p.customer || "", name: p.name || "", old: null, oldStatus: "", now: null, moved: false, diff: [] };
+    const row: any = { id, customer: p.customer || "", name: p.name || "", old: null, oldStatus: "", now: null, moved: false, diff: [], detail: {} };
+    let oldDoc: any = null;
     try {
       const res = await fetch(`${OLD_BASE}/api/customer-data?customerId=${encodeURIComponent(id)}`, { headers: { "x-staff-code": STAFF_PASSPHRASE } });
       if (res.status === 404) row.oldStatus = "旧側に記録なし";
       else if (!res.ok) row.oldStatus = "旧側と通信できず(" + res.status + ")";
-      else { const d: any = await res.json().catch(() => null); row.old = summarize(d && d.customer); row.oldStatus = "取得OK"; }
+      else { const d: any = await res.json().catch(() => null); oldDoc = d && d.customer; row.old = summarize(oldDoc); row.oldStatus = "取得OK"; }
     } catch { row.oldStatus = "旧側と通信できず"; }
     const doc: any = await store.get(`noteExtras/${id}`, { type: "json" });
     row.moved = !!doc;
     if (doc) row.now = summarize(doc);
     if (row.old) for (const k of KEYS) if ((row.old[k] || 0) > ((row.now && row.now[k]) || 0)) row.diff.push(k);
+    // 旧のほうが多い項目だけ、旧側の中身（見出し程度）を添える（読み取りのみ）
+    for (const k of row.diff) {
+      const v = oldDoc ? oldDoc[k] : null;
+      if (Array.isArray(v)) row.detail[k] = v.map((x: any) => (x && typeof x === "object")
+        ? [x.title, x.name, x.amount, x.estimateState, x.customerResponse, x.createdAt || x.at].filter((y: any) => y).join(" / ").slice(0, 200)
+        : String(x).slice(0, 200));
+    }
     return row;
   }));
   return json({ rows });

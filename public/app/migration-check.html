@@ -23,7 +23,8 @@ document.getElementById("go").onclick=async function(){
       var st=x.oldStatus+(x.moved?"／移行済み":"／未移行（まだ開いていない）");
       var cls=x.diff.length?"ng":(x.moved?"ok":"");
       if(x.diff.length) st+="／旧のほうが多い: "+x.diff.join("、");
-      h+="<tr class='"+cls+"'><td>"+esc(x.customer)+" "+esc(x.name)+"</td><td>"+fmt(x.old)+"</td><td>"+fmt(x.now)+"</td><td>"+esc(st)+"</td></tr>";
+      var dt=""; x.diff.forEach(function(k){ var a=(x.detail&&x.detail[k])||[]; if(a.length) dt+="<div><b>"+esc(k)+"（旧側の中身）</b><ul>"+a.map(function(t){return "<li>"+esc(t)+"</li>"}).join("")+"</ul></div>"; });
+      h+="<tr class='"+cls+"'><td>"+esc(x.customer)+" "+esc(x.name)+"</td><td>"+fmt(x.old)+"</td><td>"+fmt(x.now)+"</td><td>"+esc(st)+dt+"</td></tr>";
     });
     document.getElementById("out").innerHTML=h+"</table>";
   }catch(e){m.textContent="失敗しました"}
