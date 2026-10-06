@@ -202,6 +202,14 @@
   .noteitem .nbox .nboxlabel{ font-size:.85rem; font-weight:700; margin-block-end:3px; }
   .noteitem .nbox.decided{ background:var(--accent-soft); }
   .noteitem .nbox.decided .nboxlabel{ color:var(--accent-ink); }
+  .noteitem .nbox.talk{ background:var(--surface-2); }
+  .noteitem .nbox.msg{ background:#f1ebf5; }
+  .noteitem .nbox.msg .nboxlabel{ color:#6b4f86; }
+  .nchgbadge{ font-size:.85rem; font-weight:700; background:#fbe9d6; color:#a8581c; border-radius:999px; padding:2px 10px; }
+  .decsum{ background:var(--accent-soft); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+  .decsum .dsi{ border-top:1px solid var(--border); padding:6px 0; font-size:.85rem; white-space:pre-wrap; }
+  .decsum .dsi:first-of-type{ border-top:none; }
+  .decsum .dsd{ font-size:.85rem; color:var(--muted); }
   .noteitem .nbox.open{ background:var(--orange-soft); }
   .noteitem .nbox.open .nboxlabel{ color:var(--orange); }
   .noteitem .nbtnrow{ display:flex; gap:6px; flex-wrap:wrap; padding-block-start:8px; }
@@ -850,10 +858,17 @@
         </div>
 
         <div class="meetingsubpane active" id="meetingsubpane-record">
+          <div class="card" id="decidedSummaryCard" hidden>
+            <h3>✅ 決定事項のまとめ</h3>
+            <p class="muted" style="margin:0 0 8px; font-size:.85rem;">この案件で決まったことを、新しい順にまとめています。</p>
+            <div class="decsum" id="decidedSummaryList"></div>
+          </div>
           <div class="card">
             <h3>打合せ内容を記録</h3>
             <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
             <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
+            <label class="field">打合せ内容（社内メモ・お客様には出ません）<textarea id="meetingNoteTalk" rows="3" placeholder="打合せで話した内容・経過など"></textarea></label>
+            <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
             <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
             <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
@@ -2365,7 +2380,29 @@
     openNoteMenuId = (openNoteMenuId === id) ? null : id;
     renderMeetingNotes();
   }
+  // 業者タスクに入れた記録・仕様履歴で、そのタスクがまだ完了していないあいだは「変更依頼中」。
+  function isChangeRequesting(x){
+    var rec = x && x.sent && x.sent.vendortask;
+    if(!rec || !rec.ref) return false;
+    return state.tasks.some(function(t){ return t.id===rec.ref && !t.deletedAt && t.status!=="完了"; });
+  }
+  function renderDecidedSummary(){
+    var card = document.getElementById("decidedSummaryCard");
+    var box = document.getElementById("decidedSummaryList");
+    if(!card || !box) return;
+    var rows = liveNotes().filter(function(n){ return n.projectId===state.currentProjectId && (n.decided||"").trim(); })
+      .slice().sort(function(a,b){
+        var da = a.date || (a.createdAt||"").slice(0,10), db = b.date || (b.createdAt||"").slice(0,10);
+        if(da!==db) return db.localeCompare(da);
+        return (b.createdAt||"").localeCompare(a.createdAt||"");
+      });
+    card.hidden = rows.length===0;
+    box.innerHTML = rows.map(function(n){
+      return '<div class="dsi"><div class="dsd">'+escapeHtml(n.date || fmtTs(n.createdAt))+(n.title?'　'+escapeHtml(n.title):'')+(n.specPart?'　['+escapeHtml(n.specPart.label)+']':'')+'</div>'+escapeHtml(n.decided)+'</div>';
+    }).join("");
+  }
   function renderMeetingNotes(){
+    renderDecidedSummary();
     var dateInput = document.getElementById("meetingNoteDate");
     if(dateInput && !dateInput.value) dateInput.value = todayStr();
     var wrap = document.getElementById("meetingNoteList");
@@ -2391,6 +2428,8 @@
         '<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
       var decided = n.decided!=null ? n.decided : (n.content||"");
       var open = n.open!=null ? n.open : "";
+      var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（社内メモ）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
+      var msgHtml = n.message ? '<div class="nbox msg"><div class="nboxlabel">お客様へのメッセージ</div><div class="ntext">'+escapeHtml(n.message)+'</div></div>' : "";
       var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">未決・お客様に確認すること</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
       var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
@@ -2416,13 +2455,16 @@
       return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
+        (isChangeRequesting(n) ? '<span class="nchgbadge">変更依頼中</span>' : '')+
         sentBadgeHtml+
         (specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
-        '<div class="nbox decided"><div class="nboxlabel">決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>'+
+        talkHtml+
+        (decided ? '<div class="nbox decided"><div class="nboxlabel">決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
+        msgHtml+
         filesHtml+
         menuHtml+
         '</div>';
@@ -3332,7 +3374,8 @@
     for(var i=0;i<BADGE_AUTO_KEYS.length;i++){
       var key = BADGE_AUTO_KEYS[i];
       if(badges[key] && !note.autoCreated[key]){
-        await autoCreateLinkedItem({ projectId:note.projectId, content:(note.content||note.decided||note.title||""), part:note.specPart, files:note.files, sourceLabel:"打合せ記録", assignee: (key==="companytask" ? (assignee||"") : "") }, key, key==="vendortask" ? vendorId : null);
+        var refId0 = await autoCreateLinkedItem({ projectId:note.projectId, content:(note.content||note.decided||note.title||""), part:note.specPart, files:note.files, sourceLabel:"打合せ記録", assignee: (key==="companytask" ? (assignee||"") : "") }, key, key==="vendortask" ? vendorId : null);
+        if(refId0 && (key==="vendortask" || key==="companytask")){ note.sent = note.sent || {}; note.sent[key] = { at: nowIso(), by: state.currentUser||"", ref: refId0 }; }
         note.autoCreated[key] = true;
         ran = true;
       }
@@ -3351,7 +3394,7 @@
       saveDoc("meetingNotes", n.id, n);
       if(BADGE_AUTO_KEYS.indexOf(key)>=0 && !n.autoCreated[key]){
         n.autoCreated[key] = true;
-        autoCreateLinkedItem({ projectId:n.projectId, content:(n.content||n.decided||n.title||""), part:n.specPart, files:n.files, sourceLabel:"打合せ記録", assignee: assignee||"" }, key, vendorId).then(function(){ render(); saveDoc("meetingNotes", n.id, n); });
+        autoCreateLinkedItem({ projectId:n.projectId, content:(n.content||n.decided||n.title||""), part:n.specPart, files:n.files, sourceLabel:"打合せ記録", assignee: assignee||"" }, key, vendorId).then(function(refId1){ if(refId1 && (key==="vendortask" || key==="companytask")){ n.sent = n.sent || {}; n.sent[key] = { at: nowIso(), by: state.currentUser||"", ref: refId1 }; } render(); saveDoc("meetingNotes", n.id, n); });
       }
     }
     if(!n.badges[key] && key==="vendortask"){
@@ -5940,6 +5983,8 @@
     var title = (titleInput && titleInput.value || "").trim();
     var decided = (decidedInput && decidedInput.value || "").trim();
     var open = (openInput && openInput.value || "").trim();
+    var talk = (document.getElementById("meetingNoteTalk").value || "").trim();
+    var message = (document.getElementById("meetingNoteMessage").value || "").trim();
     // PDF・写真などの資料を添付する場合は、決定事項・未決事項が空でも記録できる（契約書類の保管など）。
     var hasFilePicked = !!(document.getElementById("meetingNoteFile") && document.getElementById("meetingNoteFile").files && document.getElementById("meetingNoteFile").files.length);
     var editingHasFiles = false;
@@ -5947,7 +5992,7 @@
       var ex0 = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
       editingHasFiles = !!(ex0 && ex0.files && ex0.files.length);
     }
-    if(!decided && !open && !hasFilePicked && !editingHasFiles){ toast("決定事項・未決事項を入力するか、資料を添付してください"); return; }
+    if(!decided && !open && !talk && !message && !hasFilePicked && !editingHasFiles){ toast("打合せ内容・決定事項・未決事項などを入力するか、資料を添付してください"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var dateInput = document.getElementById("meetingNoteDate");
     var noteDate = (dateInput && dateInput.value) ? dateInput.value : todayStr();
@@ -5965,6 +6010,8 @@
       existing.title = title;
       existing.decided = decided;
       existing.open = open;
+      existing.talk = talk;
+      existing.message = message;
       existing.content = meetingNoteDerivedContent(decided, open);
       existing.date = noteDate;
       if(newFiles.length) existing.files = (existing.files||[]).concat(newFiles);
@@ -5981,7 +6028,7 @@
       return;
     }
 
-    var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open,
+    var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open, talk:talk, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
@@ -6004,6 +6051,8 @@
     if(titleInput) titleInput.value = n.title || "";
     if(decidedInput) decidedInput.value = (n.decided!=null ? n.decided : (n.content||""));
     if(openInput) openInput.value = n.open || "";
+    document.getElementById("meetingNoteTalk").value = n.talk || "";
+    document.getElementById("meetingNoteMessage").value = n.message || "";
     if(dateInput) dateInput.value = n.date || todayStr();
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = n.specPart || null;
@@ -6031,6 +6080,8 @@
     if(titleInput) titleInput.value = "";
     if(decidedInput) decidedInput.value = "";
     if(openInput) openInput.value = "";
+    document.getElementById("meetingNoteTalk").value = "";
+    document.getElementById("meetingNoteMessage").value = "";
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = null;

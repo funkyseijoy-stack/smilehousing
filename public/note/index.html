@@ -106,6 +106,13 @@
   .box{ border-radius:10px; padding:8px 10px; font-size:.86rem; white-space:pre-wrap; margin-bottom:6px; }
   .box .bl{ font-size:.68rem; font-weight:700; margin-bottom:2px; }
   .box.dec{ background:#eef3ef; } .box.dec .bl{ color:var(--green-ink); }
+  .tag.chg{ background:#fbe9d6; color:#a8581c; font-weight:700; }
+  .box.msg{ background:#f1ebf5; } .box.msg .bl{ color:#6b4f86; }
+  .dsum{ background:#eef3ef; border-radius:16px; padding:14px 14px 6px; margin:14px 0 18px; }
+  .dsum h3{ font-size:1rem; margin:0 0 8px; color:var(--green-ink); }
+  .dsum .di{ border-top:1px solid rgba(60,90,70,.15); padding:8px 0; font-size:.88rem; white-space:pre-wrap; }
+  .dsum .di:first-of-type{ border-top:none; }
+  .dsum .dd{ font-size:.72rem; color:var(--ink2); margin-bottom:2px; }
   .box.opn{ background:#f8eee4; } .box.opn .bl{ color:#a8682c; }
   .thumbs{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
   .thumbs.one{ grid-template-columns:1fr; }
@@ -928,6 +935,12 @@
       }).join("")+'</div>';
     } else if(view.buildSeg==="notes"){
       out += '<h2 class="big">打合せ記録</h2><p class="sub">お打合せで決まったこと・確認したいことの記録です（新しい順）。</p>';
+      var decNotes = data.notes.filter(function(n){ return (n.decided||"").trim(); });
+      if(decNotes.length){
+        out += '<div class="dsum"><h3>✅ 決まったことのまとめ</h3>'+decNotes.map(function(n){
+          return '<div class="di"><div class="dd">'+fmtD(n.date)+(n.title?'　'+esc(n.title):'')+(n.part?'　['+esc(n.part)+']':'')+'</div>'+esc(n.decided)+'</div>';
+        }).join("")+'</div>';
+      }
       out += data.notes.length ? '<div class="catlist">'+data.notes.map(function(n){
         return '<div class="tli flat">'+noteBody(n, true)+'</div>';
       }).join("")+'</div>' : '<div class="empty">まだ記録はありません。</div>';
@@ -941,10 +954,11 @@
     return out;
   }
   function noteBody(n, showPart){
-    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+'</div>'+
+    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.decided?'<div class="box dec"><div class="bl">決定したこと</div>'+esc(n.decided)+'</div>':'')+
       (n.open?'<div class="box opn"><div class="bl">確認したいこと</div>'+esc(n.open)+'</div>':'')+
+      (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
   }
   // 統合した項目（トイレ・暖房換気・電気あかり）と、各部屋を含むインテリアは、
@@ -987,7 +1001,7 @@
         '<div class="section-header"><span class="section-icon">📐</span><span>プランボード</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         planboards.slice().reverse().map(function(x, i){
-          return thumbHtml(x.file, capOf(c, x, (i===0?"最新・":"")+fmtD(x.at)));
+          return thumbHtml(x.file, capOf(c, x, (i===0?"最新・":"")+fmtD(x.at))+(x.changing?"・変更依頼中":""));
         }).join("")+
         '</div></div></div>';
     }
@@ -999,10 +1013,11 @@
         '<div class="section-content">'+
         notes.slice().reverse().map(function(n){
           var html = '<div class="section-item">'+
-            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+fmtD(n.date)+'</div>';
+            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+fmtD(n.date)+(n.changing?' <span class="tag chg">変更依頼中</span>':'')+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
           if(n.open) html += '<div class="section-item-desc"><strong>確認：</strong>'+esc(n.open)+'</div>';
+          if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
           html += '</div>';
           return html;
@@ -1028,7 +1043,7 @@
         '<div class="section-header"><span class="section-icon">📷</span><span>写真・資料</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         photos.slice().reverse().map(function(x){
-          return thumbHtml(x.file, capOf(c, x, fmtD(x.at)));
+          return thumbHtml(x.file, capOf(c, x, fmtD(x.at))+(x.changing?"・変更依頼中":""));
         }).join("")+
         '</div></div></div>';
     }
@@ -1041,7 +1056,7 @@
         if(x.type==="note") return '<div class="tli'+(latest?" latest":"")+'">'+noteBody(x,false).replace('<span class="tag note">打合せ記録</span>', '<span class="tag note">打合せ記録</span>'+(latest?'<span class="tag new">最新</span>':''))+'</div>';
         var tagCls = x.type==="planboard" ? "pb" : "ph";
         var tagLbl = x.type==="planboard" ? "プランボード" : "写真";
-        return '<div class="tli'+(latest?" latest":"")+'"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+tagCls+'">'+tagLbl+'</span>'+(x.label&&x.label!==c.name?'<span class="tag">'+esc(x.label)+'</span>':'')+(latest?'<span class="tag new">最新</span>':'')+'</div>'+
+        return '<div class="tli'+(latest?" latest":"")+'"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+tagCls+'">'+tagLbl+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+(x.label&&x.label!==c.name?'<span class="tag">'+esc(x.label)+'</span>':'')+(latest?'<span class="tag new">最新</span>':'')+'</div>'+
           '<div class="thumbs one" style="max-width:150px;">'+thumbHtml(x.file,"")+'</div></div>';
       }).join("")+'</div>';
     } else if(!items.length){

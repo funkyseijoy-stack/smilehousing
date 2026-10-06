@@ -257,7 +257,7 @@ export default async (req: Request, context: Context) => {
   }
 
   // ---------- お客様画面に表示するデータ ----------
-  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer, imageBoard] = await Promise.all([
+  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer, imageBoard, tasks] = await Promise.all([
     listCollection(store, "specPhotos", projectId),
     listCollection(store, "meetingNotes", projectId),
     listCollection(store, "attachments", projectId),
@@ -268,7 +268,13 @@ export default async (req: Request, context: Context) => {
     listCollection(store, "noteNotices"),
     getExtras(store, projectId),
     listCollection(store, "imageBoard", projectId),
+    listCollection(store, "tasks", projectId),
   ]);
+
+  // 「変更依頼中」: 打合せ記録・仕様履歴から作った業者タスクが、まだ完了していない間だけ true。
+  // タスクの中身はお客様には渡さず、true/false だけ渡す。
+  const liveTaskIds = new Set(tasks.filter((t: any) => !t.deletedAt && t.status !== "完了").map((t: any) => t.id));
+  const isChanging = (x: any) => !!(x && x.sent && x.sent.vendortask && x.sent.vendortask.ref && liveTaskIds.has(x.sent.vendortask.ref));
 
   const specBadge = (b: any) => ({ contract: !!(b && b.contract), quote: !!(b && b.quote) });
   const reflectedNotes = notes.filter((n) => n.reflected);
@@ -290,6 +296,7 @@ export default async (req: Request, context: Context) => {
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
       spec: specBadge(p.badges),
+      changing: isChanging(p),
     });
   }
   for (const n of reflectedNotes) {
@@ -305,6 +312,8 @@ export default async (req: Request, context: Context) => {
       open: n.open || "",
       files: (n.files || []).map(fileOf),
       spec: specBadge(n.badges),
+      changing: isChanging(n),
+      message: n.message || "",
     });
   }
 
@@ -402,6 +411,8 @@ export default async (req: Request, context: Context) => {
         title: n.title || "",
         decided: n.decided != null ? n.decided : n.content || "",
         open: n.open || "",
+        message: n.message || "",
+        changing: isChanging(n),
         part: (n.specPart && n.specPart.label) || "",
         files: (n.files || []).map(fileOf),
       }))
