@@ -1196,7 +1196,7 @@
         <label class="field">確認者（確認依頼）<select id="tfChecker"></select></label>
       </div>
       <div class="row">
-        <label class="field">依頼先（業者・任意）<select id="tfVendor"><option value="">なし</option></select></label>
+        <div class="field">依頼先（業者・任意・複数可）<div id="tfVendorBox" style="display:flex; flex-wrap:wrap; gap:6px 14px; padding:6px 0;"></div></div>
         <label class="field">依頼方法<select id="tfMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option><option value="other">その他</option></select></label>
       </div>
       <div class="row" style="align-items:center; gap:8px;">
@@ -2037,9 +2037,14 @@
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
             (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
             (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
-            (t.requestTo?'<span>依頼先 '+escapeHtml(t.requestTo)+'</span>':'')+
             fmtDeadline(t)+
           '</div>'+
+          (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
+            var st = v.status||"未連絡";
+            var done = VENDOR_STATUS.indexOf(st) >= 1;
+            return '<div style="display:flex; align-items:center; gap:6px; font-size:.78rem;"><span>依頼先 '+escapeHtml(v.name)+'</span>'+
+              '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(done?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
+          }).join("")+'</div>' : '')+
           '<div class="kc-actions">'+
             '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
@@ -3198,12 +3203,69 @@
     }).join("")+'</span>';
   }
   // 業者タスクバッジをONにする時だけ依頼先の選択を挟む。それ以外は即トグル。
-  function askVendorForBadge(cb){
-    var vendorChoices = liveVendors().map(function(v){ return {label:v.name, value:v.id}; })
-      .concat([{label:"（業者未定・あとで入力）", value:""}]);
-    askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorId){
-      cb(vendorId===null ? null : (vendorId||""));
+  // ---- 業者タスクの依頼先（複数社対応、2026年10月〜） ----
+  // t.vendors = [{name, status}]（会社ごとの進捗）。t.requestTo は会社名を「、」でつないだ文字列を
+  // 引き続き持つ（絞り込み・表示・旧データとの互換用）。vendors が無い旧タスクは requestTo 1社として扱う。
+  var VENDOR_STATUS = ["未連絡","連絡済み","返答あり","完了"];
+  function taskVendors(t){
+    if(Array.isArray(t.vendors)) return t.vendors;
+    return t.requestTo ? [{name:t.requestTo, status:"未連絡"}] : [];
+  }
+  function setTaskVendors(t, names){
+    var prev = taskVendors(t);
+    t.vendors = names.map(function(n){
+      var old = prev.find(function(v){ return v.name===n; });
+      return {name:n, status: old ? old.status : "未連絡"};
     });
+    t.requestTo = names.join("、");
+  }
+  function newTaskVendorFields(names){
+    var o = {}; setTaskVendors(o, names); return {vendors:o.vendors, requestTo:o.requestTo};
+  }
+  // 依頼先の業者を複数選ぶ。callback: 業者IDの配列（[]＝あとで決める）／キャンセル時null
+  function askVendorForBadge(cb){
+    var vs = liveVendors();
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:360px;width:100%;box-shadow:var(--shadow);max-height:85vh;overflow:auto;";
+    box.innerHTML = '<h3 style="margin:0 0 6px;">依頼先の業者を選択</h3>'+
+      '<p class="muted" style="margin:0 0 10px; font-size:.8rem;">複数社に頼むときは、すべてチェックしてください（選ばなければ、あとで入力）</p>'+
+      '<div style="display:flex; flex-direction:column; gap:6px; margin-block-end:12px;">'+
+      (vs.length ? vs.map(function(v){ return '<label style="display:flex; align-items:center; gap:8px; font-size:.9rem;"><input type="checkbox" data-vpick="'+escapeHtml(v.id)+'"> '+escapeHtml(v.name)+'</label>'; }).join("") : '<div class="muted">業者が登録されていません</div>')+
+      '</div>'+
+      '<div style="display:flex; gap:8px;"><button class="btn" data-vok style="flex:1;">決定</button><button class="btn secondary" data-vcancel style="flex:1;">キャンセル</button></div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    box.addEventListener("click", function(e){
+      if(e.target.closest("[data-vcancel]")){ overlay.remove(); cb(null); return; }
+      if(e.target.closest("[data-vok]")){
+        var ids = Array.prototype.map.call(box.querySelectorAll("input[data-vpick]:checked"), function(c){ return c.dataset.vpick; });
+        overlay.remove(); cb(ids);
+      }
+    });
+  }
+  // 全社が「連絡済み」以降になったら、カードの進捗を「業者連絡済み」へ自動で進める（それより前のときだけ）。
+  function autoAdvanceByVendors(t){
+    var vs = taskVendors(t);
+    if(!vs.length) return false;
+    var allContacted = vs.every(function(v){ return VENDOR_STATUS.indexOf(v.status||"未連絡") >= 1; });
+    if(allContacted && (t.status==="未着手" || t.status==="対応中" || !t.status)){ t.status = "業者連絡済み"; return true; }
+    return false;
+  }
+  async function cycleVendorStatus(taskId, idx){
+    var t = state.tasks.find(function(x){ return x.id===taskId; });
+    if(!t) return;
+    var vs = taskVendors(t).map(function(v){ return {name:v.name, status:v.status||"未連絡"}; });
+    if(!vs[idx]) return;
+    vs[idx].status = VENDOR_STATUS[(VENDOR_STATUS.indexOf(vs[idx].status)+1) % VENDOR_STATUS.length];
+    t.vendors = vs;
+    var moved = autoAdvanceByVendors(t);
+    t.updatedAt = nowIso();
+    render();
+    var res = await saveDoc("tasks", t.id, t);
+    if(res===false){ toast("保存できませんでした"); return; }
+    toast(moved ? vs[idx].name+"：「"+vs[idx].status+"」（全社連絡済みのため「業者連絡済み」へ移しました）" : vs[idx].name+"：「"+vs[idx].status+"」");
   }
   // 打合せ記録・仕様写真から、バッジに応じて社内タスク／業者タスク／確認事項／
   // お客様の検討事項を自動登録する（既存の createTaskFromNote と同じデータ形）。
@@ -3245,17 +3307,20 @@
       return t.id;
     }
     if(badgeType==="vendortask"){
-      var vendor = vendorId ? vendorById(vendorId) : null;
+      var vIds = Array.isArray(vendorId) ? vendorId : (vendorId ? [vendorId] : []);
+      var vendorList = vIds.map(function(id){ return vendorById(id); }).filter(Boolean);
       var t3 = { id: uid("task"), projectId: proj.id, content: content,
         assignee: ctx.assignee||"", instructor:"", creator: state.currentUser||"",
-        hasDeadline:false, deadline:"", requestTo: vendor?vendor.name:"", requestMethod:"",
+        hasDeadline:false, deadline:"", requestMethod:"",
         attachmentAssetIds:[], attachments: files.slice(),
         vendorSpec: part||null, private:false, reflected:false, reflectedAt:null,
         status:"未着手", createdAt: nowIso(), updatedAt: nowIso() };
+      Object.assign(t3, newTaskVendorFields(vendorList.map(function(v){ return v.name; })));
       state.tasks.push(t3);
       await saveDoc("tasks", t3.id, t3);
       logActivity(ctx.sourceLabel+"から業者タスク「"+content.slice(0,20)+"」を作成しました");
-      if(vendor){
+      for(var vi=0; vi<vendorList.length; vi++){
+        var vendor = vendorList[vi];
         var already = liveRequests().some(function(r){ return r.projectId===proj.id && r.vendorId===vendor.id && r.status==="未依頼"; });
         if(!already){
           var req = { id:uid("req"), projectId: proj.id, vendorId: vendor.id, method:"", status:"未依頼",
@@ -4499,11 +4564,9 @@
     }
 
     if(taskType === "vendortask"){
-      var vendorChoices = liveVendors().map(function(v){ return {label:v.name, value:v.id}; })
-        .concat([{label:"（業者未定・あとで入力）", value:""}]);
-      askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorId){
-        if(vendorId===null) return;
-        var vendor = vendorId ? vendorById(vendorId) : null;
+      askVendorForBadge(function(vendorIds){
+        if(vendorIds===null) return;
+        var vendorNames = vendorIds.map(function(id){ var v = vendorById(id); return v ? v.name : null; }).filter(Boolean);
         askAssignee(function(pickedAssignee){
         if(pickedAssignee===null) return;
         askSpecPart(function(part){
@@ -4512,7 +4575,7 @@
             id: uid("task"), projectId: proj.id, content: content,
             assignee: pickedAssignee, instructor: "", creator: state.currentUser||"",
             hasDeadline: false, deadline: "",
-            requestTo: vendor ? vendor.name : "", requestMethod: "",
+            requestMethod: "",
             attachmentAssetIds: [],
             attachments: (note.files||[]).slice(),
             vendorSpec: part,
@@ -4520,6 +4583,7 @@
             reflected: false, reflectedAt: null,
             status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
           };
+          Object.assign(t3, newTaskVendorFields(vendorNames));
           state.tasks.push(t3);
           if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
           markNoteSent(note, "vendortask", t3.id);
@@ -5903,7 +5967,7 @@
     document.getElementById("tfAssignee").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfInstructor").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfChecker").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
-    document.getElementById("tfVendor").innerHTML = '<option value="">なし</option>' + liveVendors().map(function(v){ return '<option value="'+escapeHtml(v.name)+'">'+escapeHtml(v.name)+'</option>'; }).join("");
+    renderTaskVendorBox([]);
     document.getElementById("tfContent").value = "";
     document.getElementById("tfHasDeadline").checked = false;
     document.getElementById("tfDeadline").value = "";
@@ -5926,7 +5990,7 @@
       setSel("tfAssignee", editing.assignee || "");
       setSel("tfInstructor", editing.instructor || "");
       setSel("tfChecker", editing.checker || "");
-      setSel("tfVendor", editing.requestTo || "");
+      renderTaskVendorBox(taskVendors(editing).map(function(v){ return v.name; }));
       document.getElementById("tfMethod").value = editing.requestMethod || "gmail";
       document.getElementById("tfHasDeadline").checked = !!editing.hasDeadline;
       document.getElementById("tfDeadline").value = editing.deadline || "";
@@ -5935,6 +5999,15 @@
       document.getElementById("tfVendorSpecLabel").textContent = editing.vendorSpec ? (editing.vendorSpec.label||"設定済み") : "未選択";
     }
     document.getElementById("taskFormModal").hidden = false;
+  }
+  function renderTaskVendorBox(checkedNames){
+    var box = document.getElementById("tfVendorBox");
+    if(!box) return;
+    var names = liveVendors().map(function(v){ return v.name; });
+    checkedNames.forEach(function(n){ if(names.indexOf(n)<0) names.push(n); });
+    box.innerHTML = names.length ? names.map(function(n){
+      return '<label style="display:flex; align-items:center; gap:6px; font-size:.88rem;"><input type="checkbox" data-tfvendor="'+escapeHtml(n)+'"'+(checkedNames.indexOf(n)>=0?" checked":"")+'> '+escapeHtml(n)+'</label>';
+    }).join("") : '<span class="muted" style="font-size:.8rem;">業者が登録されていません</span>';
   }
   function closeTaskForm(){ document.getElementById("taskFormModal").hidden = true; }
 
@@ -5945,7 +6018,7 @@
     var assignee = document.getElementById("tfAssignee").value;
     var instructor = document.getElementById("tfInstructor").value;
     var checker = document.getElementById("tfChecker").value;
-    var requestTo = document.getElementById("tfVendor").value;
+    var vendorNames = Array.prototype.map.call(document.querySelectorAll("#tfVendorBox input[data-tfvendor]:checked"), function(c){ return c.dataset.tfvendor; });
     var method = document.getElementById("tfMethod").value;
     var hasDeadline = document.getElementById("tfHasDeadline").checked;
     var deadline = document.getElementById("tfDeadline").value;
@@ -5977,7 +6050,8 @@
       editTarget.checker = checker||"";
       var jumpTo = (checker && checker!==prevChecker) ? checkStatusFor(checker) : null;
       if(jumpTo) editTarget.status = jumpTo;
-      editTarget.requestTo = requestTo||"";
+      setTaskVendors(editTarget, vendorNames);
+      autoAdvanceByVendors(editTarget);
       editTarget.requestMethod = method;
       editTarget.hasDeadline = hasDeadline;
       editTarget.deadline = hasDeadline?deadline:"";
@@ -6009,7 +6083,7 @@
       id: uid("task"), projectId: projectId||null, content: content,
       assignee: assignee||"", instructor: instructor||"", checker: checker||"", creator: state.currentUser||"",
       hasDeadline: hasDeadline, deadline: hasDeadline?deadline:"",
-      requestTo: requestTo||"", requestMethod: method,
+      requestMethod: method,
       attachmentAssetIds: attachmentAssetIds,
       attachments: taskAttachments,
       vendorSpec: taskFormVendorSpec || null,
@@ -6017,6 +6091,7 @@
       reflected: false, reflectedAt: null,
       status: checkStatusFor(checker) || "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
+    Object.assign(t, newTaskVendorFields(vendorNames));
     state.tasks.push(t);
     closeTaskForm();
     render();
@@ -7500,6 +7575,8 @@
     document.getElementById("kanbanWrap").addEventListener("click", function(e){
       var delAttachBtn = e.target.closest("button[data-delattach]");
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
+      var vcyc = e.target.closest("[data-vendorcycle]");
+      if(vcyc){ cycleVendorStatus(vcyc.dataset.vendorcycle, parseInt(vcyc.dataset.vidx,10)); return; }
       var btn = e.target.closest("button[data-taskact]");
       if(!btn) return;
       var act = btn.dataset.taskact, id = btn.dataset.id;
