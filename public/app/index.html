@@ -261,7 +261,8 @@
 
   /* ---- kanban (社内タスク) ---- */
   .kanbanwrap{ display:flex; gap:10px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
-  .kancol{ flex:0 0 240px; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:8px; }
+  .kancol{ flex:1 1 0; min-width:132px; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:8px; }
+  #reTypeRow[hidden], #reCustRows[hidden]{ display:none; }
   .kancol h4{ margin:2px 4px; font-size:.78rem; color:var(--muted); display:flex; justify-content:space-between; }
   .kancard{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 9px; font-size:.78rem; box-shadow: var(--shadow); }
   .kancard .kc-proj{ font-weight:700; margin-block-end:3px; }
@@ -1234,6 +1235,40 @@
       <div class="row" style="margin-block-start:6px;">
         <button class="btn" id="cmSend">送信する</button>
         <button class="btn secondary" id="cmClose">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 予約の編集 MODAL ========== -->
+<div class="taskform-modal" id="resEditModal" hidden>
+  <div class="taskform-card">
+    <h3 style="margin:0 0 6px;">予約を編集</h3>
+    <div class="addform" style="flex-direction:column; align-items:stretch;">
+      <div id="reCustRows" style="display:flex; flex-direction:column; gap:8px;">
+        <label class="field">お名前<input type="text" id="reName" maxlength="60"></label>
+        <div class="row">
+          <label class="field">電話番号<input type="tel" id="rePhone" maxlength="30"></label>
+          <label class="field">メールアドレス<input type="email" id="reEmail" maxlength="120"></label>
+        </div>
+      </div>
+      <div class="row" id="reTypeRow">
+        <label class="field">種別<select id="reType">
+          <option value="来店">来店</option><option value="オンライン">オンライン</option>
+          <option value="銀行">銀行</option><option value="ショールーム">ショールーム</option>
+        </select></label>
+        <label class="field">担当者<select id="reStaff"></select></label>
+      </div>
+      <div class="row">
+        <label class="field">日付<input type="date" id="reDate"></label>
+        <label class="field">開始時刻<select id="reStart"></select></label>
+        <label class="field">所要時間（分）<input type="number" id="reDuration" step="30" min="30" max="480"></label>
+      </div>
+      <label class="field">メモ<textarea id="reNotes" rows="3"></textarea></label>
+      <div class="muted" id="reHint" style="font-size:.76rem;"></div>
+      <div class="row" style="margin-block-start:6px;">
+        <button class="btn" id="reSave">保存</button>
+        <button class="btn secondary" id="reClose">キャンセル</button>
       </div>
     </div>
   </div>
@@ -4945,6 +4980,78 @@
     logActivity(type+"の予約（"+date+" "+startTime+"〜"+endTime+"）を登録しました");
     toast(doc.googleEventId ? "予約を登録し、Googleカレンダーにも追加しました" : "予約を登録しました");
   }
+  // ---- 予約の編集（案件の予約タブ・ホームの新規のお客様のご予約 共通） ----
+  var reTargetId = null, reSaving = false;
+  function openResEdit(id){
+    var r = state.reservations.find(function(x){ return x.id===id; }); if(!r) return;
+    reTargetId = id;
+    var isPublic = r.source==="public";
+    document.getElementById("reCustRows").hidden = !isPublic;
+    document.getElementById("reTypeRow").hidden = isPublic;
+    document.getElementById("reName").value = r.customerName || "";
+    document.getElementById("rePhone").value = r.phone || "";
+    document.getElementById("reEmail").value = r.email || "";
+    document.getElementById("reType").value = r.type || "来店";
+    var staff = state.settings.staffList || [];
+    var sel = document.getElementById("reStaff");
+    sel.innerHTML = '<option value="">（未設定）</option>'+staff.map(function(n){ return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>'; }).join("");
+    if(r.staff && staff.indexOf(r.staff)<0){ var o = document.createElement("option"); o.value = r.staff; o.textContent = r.staff; sel.appendChild(o); }
+    sel.value = r.staff || "";
+    var st = document.getElementById("reStart");
+    var opts = [];
+    for(var h=9; h<17; h++){ opts.push(String(h).padStart(2,"0")+":00"); opts.push(String(h).padStart(2,"0")+":30"); }
+    if(r.startTime && opts.indexOf(r.startTime)<0) opts.push(r.startTime);
+    st.innerHTML = opts.map(function(t){ return '<option value="'+t+'">'+t+'</option>'; }).join("");
+    st.value = r.startTime || "09:00";
+    document.getElementById("reDate").value = r.date || "";
+    document.getElementById("reDuration").value = r.durationMinutes || (r.startTime && r.endTime ? (parseInt(r.endTime.slice(0,2),10)*60+parseInt(r.endTime.slice(3),10)) - (parseInt(r.startTime.slice(0,2),10)*60+parseInt(r.startTime.slice(3),10)) : 120);
+    document.getElementById("reNotes").value = r.notes || "";
+    document.getElementById("reHint").textContent = "日時を変えると、他の予約との重なりを確認し、Googleカレンダーの予定も新しい日時に直します。"+(isPublic && r.email ? "お客様へのお知らせは、保存後に「メールを送る」→「ご予約日時の変更のお知らせ」で送れます。" : "");
+    document.getElementById("resEditModal").hidden = false;
+  }
+  function closeResEdit(){ document.getElementById("resEditModal").hidden = true; reTargetId = null; }
+  async function saveResEdit(force){
+    if(reSaving || !reTargetId) return;
+    var r = state.reservations.find(function(x){ return x.id===reTargetId; }); if(!r) return;
+    var isPublic = r.source==="public";
+    var patch = {
+      date: document.getElementById("reDate").value,
+      startTime: document.getElementById("reStart").value,
+      durationMinutes: parseInt(document.getElementById("reDuration").value,10) || 120,
+      staff: document.getElementById("reStaff").value,
+      notes: document.getElementById("reNotes").value.trim()
+    };
+    if(!patch.date){ toast("日付を入力してください"); return; }
+    if(isPublic){
+      patch.customerName = document.getElementById("reName").value.trim();
+      patch.phone = document.getElementById("rePhone").value.trim();
+      patch.email = document.getElementById("reEmail").value.trim();
+      if(!patch.customerName){ toast("お名前を入力してください"); return; }
+    } else {
+      patch.type = document.getElementById("reType").value;
+    }
+    reSaving = true; var btn = document.getElementById("reSave"); btn.disabled = true; btn.textContent = "保存中…";
+    try{
+      var res = await fetch("/api/reservation-update", { method:"POST", headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
+        body: JSON.stringify({ reservationId: r.id, patch: patch, force: !!force, by: state.currentUser||"" }) });
+      var j = await res.json().catch(function(){ return {}; });
+      if(res.status===409){
+        reSaving = false; btn.disabled = false; btn.textContent = "保存";
+        askChoice("他の予定と重なっています", j.message||"", [{label:"このまま変更する", value:"go"}], function(v){ if(v==="go") saveResEdit(true); });
+        return;
+      }
+      if(!res.ok){
+        toast(j.message || (j.error==="invalid_email" ? "メールアドレスの形式を確認してください" : "保存できませんでした"));
+        return;
+      }
+      Object.keys(r).forEach(function(k){ delete r[k]; }); Object.assign(r, j.reservation);
+      logActivity("予約を編集しました（"+(r.customerName||r.type||"")+" "+r.date+" "+r.startTime+"〜"+r.endTime+"）");
+      closeResEdit(); render();
+      if(j.calendarUpdated===false) toast("✅ 保存しました（Googleカレンダーの予定は直せませんでした。手で直してください）");
+      else toast(j.calendarUpdated ? "✅ 保存し、Googleカレンダーの予定も直しました" : "✅ 保存しました");
+    }catch(e){ toast("保存できませんでした"); }
+    finally{ reSaving = false; btn.disabled = false; btn.textContent = "保存"; }
+  }
   function deleteReservation(id){
     var r = state.reservations.find(function(x){ return x.id===id; });
     softDelete("reservations","reservations", id, "予約「"+(r?r.type:"")+" "+(r?r.date:"")+"」");
@@ -4963,7 +5070,8 @@
             (r.staff?'　担当：'+escapeHtml(r.staff):"")+
             (r.googleEventId ? ' <span class="pill tag">Googleカレンダー登録済み</span>' : "")+
           '</div>'+
-          '<button class="btn danger-ghost small" data-delreservation="'+r.id+'">×</button>'+
+          '<span class="row" style="gap:6px;"><button class="btn secondary small" data-editreservation="'+r.id+'">✏️ 編集</button>'+
+          '<button class="btn danger-ghost small" data-delreservation="'+r.id+'">×</button></span>'+
         '</div>'+
         (r.notes ? '<div class="ntext" style="margin-block-start:4px;">'+escapeHtml(r.notes)+'</div>' : "")+
       '</div>';
@@ -4990,7 +5098,8 @@
       return '<div class="noteitem">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
           '<div style="flex:1; min-width:0;"><strong>'+escapeHtml(r.date)+'（'+wd+'）'+escapeHtml(r.startTime)+'〜'+escapeHtml(r.endTime)+'</strong>　'+badges+'</div>'+
-          '<button class="btn danger-ghost small" data-delpublicbooking="'+r.id+'" title="一覧から削除（Googleカレンダーの予定は残ります）">×</button>'+
+          '<span class="row" style="gap:6px;"><button class="btn secondary small" data-editreservation="'+r.id+'">✏️ 編集</button>'+
+          '<button class="btn danger-ghost small" data-delpublicbooking="'+r.id+'" title="一覧から削除（Googleカレンダーの予定は残ります）">×</button></span>'+
         '</div>'+
         '<div style="margin-block-start:4px;"><strong>'+escapeHtml(r.customerName||"")+' 様</strong>　'+
           (r.phone ? '<a href="tel:'+escapeHtml(String(r.phone).replace(/[^0-9+]/g,""))+'">'+escapeHtml(r.phone)+'</a>' : '')+
@@ -7278,7 +7387,11 @@
     document.getElementById("cmKind").addEventListener("change", cmApplyTemplate);
     document.getElementById("cmSend").addEventListener("click", sendCustMail);
     document.getElementById("cmClose").addEventListener("click", closeCustMail);
+    document.getElementById("reSave").addEventListener("click", function(){ saveResEdit(false); });
+    document.getElementById("reClose").addEventListener("click", closeResEdit);
     document.getElementById("publicBookingList").addEventListener("click", function(e){
+      var eb = e.target.closest("[data-editreservation]");
+      if(eb){ openResEdit(eb.dataset.editreservation); return; }
       var mb = e.target.closest("[data-mailpublicbooking]");
       if(mb){ openCustMail(mb.dataset.mailpublicbooking); return; }
       var vb = e.target.closest("[data-viewmailthread]");
@@ -7289,6 +7402,8 @@
       if(confirm2()) softDelete("reservations","reservations", del.dataset.delpublicbooking, "新規のお客様の予約「"+(r?(r.customerName||"")+" "+r.date:"")+"」");
     });
     document.getElementById("reservationList").addEventListener("click", function(e){
+      var eb = e.target.closest("[data-editreservation]");
+      if(eb){ openResEdit(eb.dataset.editreservation); return; }
       var del = e.target.closest("[data-delreservation]");
       if(del){ if(confirm2()) deleteReservation(del.dataset.delreservation); }
     });

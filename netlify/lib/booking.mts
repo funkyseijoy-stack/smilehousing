@@ -39,7 +39,7 @@ export async function listCollection(store: any, name: string, projectId?: strin
 export type Busy = { date: string; start: number; end: number };
 
 // Google カレンダーの予定（お客様予約）→ 日別の使用中時間
-export async function calendarBusy(accessToken: string, from: string, to: string): Promise<Busy[]> {
+export async function calendarBusy(accessToken: string, from: string, to: string, excludeEventId?: string | null): Promise<Busy[]> {
   const u = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}/events`);
   u.searchParams.set("timeMin", `${from}T00:00:00+09:00`);
   u.searchParams.set("timeMax", `${addDays(to, 1)}T00:00:00+09:00`);
@@ -52,6 +52,7 @@ export async function calendarBusy(accessToken: string, from: string, to: string
   const out: Busy[] = [];
   for (const ev of data.items || []) {
     if (ev.status === "cancelled") continue;
+    if (excludeEventId && ev.id === excludeEventId) continue; // 予約の編集時：その予約自身の予定は重なり判定から外す
     if (ev.start?.date) {
       // 終日予定は、公開設定（空き時間／予定あり）に関わらず、その日を丸ごと使用中にする。
       // 定休日などを示す目印として終日予定を使うことが多く、その場合「空き時間」のままでも
