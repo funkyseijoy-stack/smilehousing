@@ -145,6 +145,8 @@
 
 - お客様画面の部位名と「その他の確認」（2026年10月〜）: 外部・脱衣室にも部位名（ポスト・ランドリーバーなど）をカードに付ける（`public/note/index.html` の `LABEL_CATS`）。外部散水栓・インターホン親機・給湯リモコン・床下点検口（`scope:"siteCheck"`）は、反映したものだけお客様画面の新しい項目「その他の確認」（id `other`）に出す（`note-data.mts` の `noteCatFor`／`NOTE_CATS`、住まいるアプリの `noteCatIdFor`／`NOTE_CAT_NAMES` の2か所に同じ対応）。
 
+- 引っ越し状況の確認（2026年10月〜）: 旧おうちノートからの引っ越し状況を調べるだけのページ `/app/migration-check.html`（API `netlify/functions/migration-check.mts`、合言葉で認証・`STAFF_PASSPHRASE` あり）。案件ごとに旧側と新しい側（noteExtras）の件数を並べ、旧のほうが多い案件を赤で出す。何も書き換えない・旧側も消さない。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す

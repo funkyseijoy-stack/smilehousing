@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>引っ越し状況の確認</title>
+<style>body{font:16px/1.6 sans-serif;margin:16px;max-width:1100px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f3f3f3}.ng{background:#fde8e8}.ok{background:#e8f6ea}button{font-size:16px;padding:8px 16px}</style></head>
+<body>
+<h1>旧おうちノートからの引っ越し状況（調べるだけ）</h1>
+<p>何も書き換えません。「旧」は旧おうちノート側の件数、「今」は住まいるアプリ側の件数です（見積り/リスト/家族等/リンク/予約）。</p>
+<button id="go">調べる</button> <span id="msg"></span>
+<div id="out"></div>
+<script>
+var N=["customerEstimates","considerations","customerProfile","customerLinks","nextBookings"];
+function fmt(s){return s?N.map(function(k){return s[k]||0}).join(" / "):"—"}
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+document.getElementById("go").onclick=async function(){
+  var pass=prompt("合言葉を入力してください"); if(!pass) return;
+  var m=document.getElementById("msg"); m.textContent="調べています…";
+  try{
+    var r=await fetch("/api/migration-check",{headers:{"x-staff-token":pass}});
+    if(!r.ok){m.textContent="失敗しました("+r.status+")";return}
+    var d=await r.json(); m.textContent=d.rows.length+"件";
+    var h="<table><tr><th>お客様</th><th>旧</th><th>今</th><th>状況</th></tr>";
+    d.rows.forEach(function(x){
+      var st=x.oldStatus+(x.moved?"／移行済み":"／未移行（まだ開いていない）");
+      var cls=x.diff.length?"ng":(x.moved?"ok":"");
+      if(x.diff.length) st+="／旧のほうが多い: "+x.diff.join("、");
+      h+="<tr class='"+cls+"'><td>"+esc(x.customer)+" "+esc(x.name)+"</td><td>"+fmt(x.old)+"</td><td>"+fmt(x.now)+"</td><td>"+esc(st)+"</td></tr>";
+    });
+    document.getElementById("out").innerHTML=h+"</table>";
+  }catch(e){m.textContent="失敗しました"}
+};
+</script></body></html>
