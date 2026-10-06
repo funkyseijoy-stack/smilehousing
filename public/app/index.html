@@ -202,6 +202,7 @@
   .noteitem .nbox .nboxlabel{ font-size:.85rem; font-weight:700; margin-block-end:3px; }
   .noteitem .nbox.decided{ background:var(--accent-soft); }
   .noteitem .nbox.decided .nboxlabel{ color:var(--accent-ink); }
+  .kc-memo{ background:var(--surface-2); border-radius:8px; padding:6px 8px; margin-block-start:6px; font-size:.85rem; white-space:pre-wrap; color:var(--text); }
   .noteitem .nbox.talk{ background:var(--surface-2); }
   .noteitem .nbox.msg{ background:#f1ebf5; }
   .noteitem .nbox.msg .nboxlabel{ color:#6b4f86; }
@@ -1200,6 +1201,7 @@
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <label class="field">案件<select id="tfProject"></select></label>
       <label class="field">内容<textarea id="tfContent" rows="3" placeholder="対応内容を入力してください"></textarea></label>
+      <label class="field">メモ（社内用・業者やお客様には出ません）<textarea id="tfMemo" rows="3" placeholder="経過・気づいたことなどを自由に書けます"></textarea></label>
       <div class="row">
         <label class="field">担当者<select id="tfAssignee"></select></label>
         <label class="field">指示者<select id="tfInstructor"></select></label>
@@ -2045,6 +2047,7 @@
             (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
             (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+          (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
           (t.vendorSpec?'<div class="muted" style="font-size:.85rem; margin-block-end:4px;">部位：'+escapeHtml(t.vendorSpec.label||"")+'</div>':'')+
           (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
           '<div class="kc-meta">'+
@@ -6124,6 +6127,7 @@
     document.getElementById("tfChecker").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     renderTaskVendorBox([]);
     document.getElementById("tfContent").value = "";
+    document.getElementById("tfMemo").value = "";
     document.getElementById("tfHasDeadline").checked = false;
     document.getElementById("tfDeadline").value = "";
     document.getElementById("tfPrivate").checked = false;
@@ -6142,6 +6146,7 @@
       };
       setSel("tfProject", editing.projectId || "");
       document.getElementById("tfContent").value = editing.content || "";
+      document.getElementById("tfMemo").value = editing.memo || "";
       setSel("tfAssignee", editing.assignee || "");
       setSel("tfInstructor", editing.instructor || "");
       setSel("tfChecker", editing.checker || "");
@@ -6170,6 +6175,7 @@
     var projectId = document.getElementById("tfProject").value;
     var content = document.getElementById("tfContent").value.trim();
     if(!content){ toast("内容を入力してください"); return; }
+    var memo = document.getElementById("tfMemo").value.trim();
     var assignee = document.getElementById("tfAssignee").value;
     var instructor = document.getElementById("tfInstructor").value;
     var checker = document.getElementById("tfChecker").value;
@@ -6199,6 +6205,7 @@
       }
       editTarget.projectId = projectId||null;
       editTarget.content = content;
+      editTarget.memo = memo;
       editTarget.assignee = assignee||"";
       editTarget.instructor = instructor||"";
       var prevChecker = editTarget.checker || "";
@@ -6235,7 +6242,7 @@
     }
 
     var t = {
-      id: uid("task"), projectId: projectId||null, content: content,
+      id: uid("task"), projectId: projectId||null, content: content, memo: memo,
       assignee: assignee||"", instructor: instructor||"", checker: checker||"", creator: state.currentUser||"",
       hasDeadline: hasDeadline, deadline: hasDeadline?deadline:"",
       requestMethod: method,
