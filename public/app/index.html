@@ -2953,7 +2953,7 @@
         renderSpecTimeline("exterior",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
-    wrap.innerHTML = valuesBlockHtml + scopeMergeBarHtml("exterior") + catsGridHtml;
+    wrap.innerHTML = valuesBlockHtml + catsGridHtml;
     wrap.addEventListener("change", function(e){
       var noteField = e.target.closest("textarea.exteriorNote");
       if(noteField) updateExteriorNote(noteField.dataset.exteriornote, noteField.value);
@@ -3018,10 +3018,6 @@
     var facilityUnreflectedCount = liveSpecPhotos().filter(function(p){
       return p.projectId===state.currentProjectId && p.scope==="facility" && !p.reflected;
     }).length;
-    var reflectAllHtml = '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
-      '<span style="font-size:.85rem; color:var(--muted);">各カテゴリーの写真・プランボードの「反映」ボタンでも個別に送れます。</span>'+
-      '<button type="button" class="btn secondary small" id="btnReflectAllFacility">🌐 未反映の写真をすべておうちノートに反映する'+(facilityUnreflectedCount?'（'+facilityUnreflectedCount+'件）':'')+'</button>'+
-      '</div>';
     var catsGridHtml = '<div class="speccatgrid">'+facilityCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("facility",cat)+'</h4>'+
         decidedSummaryHtml("facility",cat,null,null)+
@@ -3037,9 +3033,7 @@
         renderSpecTimeline("facility",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
-    wrap.innerHTML = reflectAllHtml + scopeMergeBarHtml("facility") + catsGridHtml;
-    var reflectAllBtn = document.getElementById("btnReflectAllFacility");
-    if(reflectAllBtn) reflectAllBtn.addEventListener("click", function(){ reflectAllUnreflectedSpecPhotos("facility"); });
+    wrap.innerHTML = catsGridHtml;
   }
   // scope内のまだ未反映（reflected=false）の写真・プランボードをまとめて
   // おうちノートへ反映する（個別の「反映」ボタンを1件ずつ押す手間を省く）。
@@ -3085,7 +3079,7 @@
         renderSpecTimeline("equipment",cat,null,null)+
         '</div>';
     }).join("")+'</div>';
-    wrap.innerHTML = scopeMergeBarHtml("equipment") + catsGridHtml;
+    wrap.innerHTML = catsGridHtml;
   }
   async function updateEquipmentNote(cat, value){
     var proj = projectById(state.currentProjectId);
