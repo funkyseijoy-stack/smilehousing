@@ -1339,7 +1339,7 @@
   function confirm2(){ return true; } // confirm() is inert in the artifact viewer
 
   // ================= state =================
-  var STATUS_ORDER = ["未着手","対応中","対応済み","社長確認中","朋子確認中","業者連絡済み","お客様へ連絡済み","完了"];
+  var STATUS_ORDER = ["未着手","対応中","社長確認中","朋子確認中","業者連絡済み","お客様へ連絡済み","完了"];
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
@@ -1608,6 +1608,18 @@
     }
   }
 
+  // 進捗「対応済み」を廃止して「業者連絡済み」に統合した（2026年10月）。
+  // 既存の「対応済み」のタスクは、画面から消えないよう「業者連絡済み」に移して保存し直す。
+  function migrateLegacyTaskStatus(){
+    (state.tasks||[]).forEach(function(t){
+      if(t.status==="対応済み"){
+        t.status = "業者連絡済み";
+        t.updatedAt = nowIso();
+        saveDoc("tasks", t.id, t);
+      }
+    });
+  }
+
   async function boot(){
     state.currentUser = loadLocalUser();
     try{
@@ -1615,6 +1627,7 @@
       DATA_COLLECTIONS.forEach(function(c, i){ state[c] = results[i]; });
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
+      migrateLegacyTaskStatus();
       state.currentProjectId = state.projects.find(function(p){return !p.deletedAt;}) ? state.projects.find(function(p){return !p.deletedAt;}).id : null;
       var settingsItems = await apiGet("settings");
       var s = settingsItems.find(function(x){ return x.id==="main"; });
@@ -1642,6 +1655,7 @@
       DATA_COLLECTIONS.forEach(function(c, i){ state[c] = results[i]; });
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
+      migrateLegacyTaskStatus();
       if(state.currentProjectId && !state.projects.some(function(p){ return p.id===state.currentProjectId; })){
         var firstLive = state.projects.find(function(p){return !p.deletedAt;});
         state.currentProjectId = firstLive ? firstLive.id : null;
