@@ -1191,6 +1191,9 @@
         <label class="field">指示者<select id="tfInstructor"></select></label>
       </div>
       <div class="row">
+        <label class="field">確認者（確認依頼）<select id="tfChecker"></select></label>
+      </div>
+      <div class="row">
         <label class="field">依頼先（業者・任意）<select id="tfVendor"><option value="">なし</option></select></label>
         <label class="field">依頼方法<select id="tfMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option><option value="other">その他</option></select></label>
       </div>
@@ -1283,7 +1286,7 @@
   function confirm2(){ return true; } // confirm() is inert in the artifact viewer
 
   // ================= state =================
-  var STATUS_ORDER = ["未着手","対応中","対応済み","お客様へ連絡済み","完了"];
+  var STATUS_ORDER = ["未着手","対応中","対応済み","社長確認中","朋子確認中","お客様へ連絡済み","完了"];
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
@@ -1894,7 +1897,7 @@
   function renderTaskKindFilterBar(){
     var bar = document.getElementById("taskKindFilterBar");
     if(!bar) return;
-    var opts = [{label:"すべて", value:null},{label:"社内", value:"internal"},{label:"業者", value:"vendor"}];
+    var opts = [{label:"すべて", value:null},{label:"社内", value:"internal"},{label:"業者", value:"vendor"},{label:"確認依頼", value:"check"}];
     bar.innerHTML = opts.map(function(o){
       return '<span class="tagchip'+(state.taskKindFilter===o.value?" active":"")+'" data-taskkindfilter="'+(o.value||"")+'">'+o.label+'</span>';
     }).join("");
@@ -1905,7 +1908,7 @@
     if(!bar) return;
     var names = (state.settings.staffList || []).slice();
     liveTasks().forEach(function(t){ if(t.assignee && names.indexOf(t.assignee)<0) names.push(t.assignee); });
-    var opts = [{label:"担当：すべて", value:null}].concat(names.map(function(n){ return {label:n, value:n}; })).concat([{label:"担当未設定", value:"__none"}]);
+    var opts = [{label:"担当・確認：すべて", value:null}].concat(names.map(function(n){ return {label:n, value:n}; })).concat([{label:"担当未設定", value:"__none"}]);
     bar.innerHTML = opts.map(function(o){
       return '<span class="tagchip'+(state.taskAssigneeFilter===o.value?" active":"")+'" data-taskassigneefilter="'+escapeHtml(o.value||"")+'">'+escapeHtml(o.label)+'</span>';
     }).join("");
@@ -1916,9 +1919,10 @@
     renderTaskAssigneeFilterBar();
     var tasks = liveTasks().filter(function(t){
       if(state.taskAssigneeFilter==="__none" && t.assignee) return false;
-      if(state.taskAssigneeFilter && state.taskAssigneeFilter!=="__none" && t.assignee!==state.taskAssigneeFilter) return false;
+      if(state.taskAssigneeFilter && state.taskAssigneeFilter!=="__none" && t.assignee!==state.taskAssigneeFilter && t.checker!==state.taskAssigneeFilter) return false;
       if(state.taskKindFilter==="vendor") return !!t.requestTo;
       if(state.taskKindFilter==="internal") return !t.requestTo;
+      if(state.taskKindFilter==="check") return !!t.checker;
       return true;
     });
     wrap.innerHTML = STATUS_ORDER.map(function(status){
@@ -1948,6 +1952,7 @@
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
             (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
+            (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
             (t.requestTo?'<span>依頼先 '+escapeHtml(t.requestTo)+'</span>':'')+
             fmtDeadline(t)+
           '</div>'+
@@ -3145,7 +3150,7 @@
     }
     if(badgeType==="companytask"){
       var t = { id: uid("task"), projectId: proj.id, content: content,
-        assignee:"", instructor:"", creator: state.currentUser||"",
+        assignee: ctx.assignee||"", instructor:"", creator: state.currentUser||"",
         hasDeadline:false, deadline:"", requestTo:"", requestMethod:"",
         attachmentAssetIds:[], attachments: files.slice(),
         vendorSpec: part||null, private:false, reflected:false, reflectedAt:null,
@@ -3158,7 +3163,7 @@
     if(badgeType==="vendortask"){
       var vendor = vendorId ? vendorById(vendorId) : null;
       var t3 = { id: uid("task"), projectId: proj.id, content: content,
-        assignee:"", instructor:"", creator: state.currentUser||"",
+        assignee: ctx.assignee||"", instructor:"", creator: state.currentUser||"",
         hasDeadline:false, deadline:"", requestTo: vendor?vendor.name:"", requestMethod:"",
         attachmentAssetIds:[], attachments: files.slice(),
         vendorSpec: part||null, private:false, reflected:false, reflectedAt:null,
@@ -3296,13 +3301,13 @@
     askChoice("タスク依頼・確認へ入れる", "部位：「"+label+"」", choices, function(type){
       if(!type) return;
       if(sent[type]){ toast("すでに登録済みです"); return; }
-      var run = function(vendorId){
+      var run = function(vendorId, assignee){
         var snippet = (p.source && p.source.noteSnippet) || "";
         var what = snippet || p.fileName || ((p.contentType||"").indexOf("pdf")>=0 ? "PDF資料" : "写真");
         var content = "【"+label+"】"+what;
         var part = { scope: scope, category: category||null, roomId: roomId||null, side: side||null, label: label };
         var files = (p.url||p.assetId) ? [{ id: p.assetId||p.id, url: p.url, contentType: p.contentType, name: p.fileName||"" }] : [];
-        autoCreateLinkedItem({ projectId: p.projectId, content: content, part: part, files: files, sourceLabel: "仕様の履歴" }, type, vendorId).then(function(refId){
+        autoCreateLinkedItem({ projectId: p.projectId, content: content, part: part, files: files, sourceLabel: "仕様の履歴", assignee: assignee||"" }, type, vendorId).then(function(refId){
           if(!refId){ toast("登録に失敗しました"); return; }
           p.sent = p.sent || {};
           p.sent[type] = { at: nowIso(), by: state.currentUser||"", ref: refId };
@@ -3313,8 +3318,13 @@
         });
       };
       if(type==="vendortask"){
-        askVendorForBadge(function(vendorId){ if(vendorId===null) return; run(vendorId); });
-      } else run(null);
+        askVendorForBadge(function(vendorId){
+          if(vendorId===null) return;
+          askAssignee(function(a){ if(a===null) return; run(vendorId, a); });
+        });
+      } else if(type==="companytask"){
+        askAssignee(function(a){ if(a===null) return; run(null, a); });
+      } else run(null, "");
     });
   }
   function renderSpecTimeline(scope, category, roomId, side){
@@ -4377,10 +4387,12 @@
     }
 
     if(taskType === "companytask"){
+     askAssignee(function(pickedAssignee){
+      if(pickedAssignee===null) return;
       askSpecPart(function(part){
         var t = {
           id: uid("task"), projectId: proj.id, content: content,
-          assignee: "", instructor: "", creator: state.currentUser||"",
+          assignee: pickedAssignee, instructor: "", creator: state.currentUser||"",
           hasDeadline: false, deadline: "",
           requestTo: "", requestMethod: "",
           attachmentAssetIds: [],
@@ -4397,6 +4409,7 @@
         logActivity("打合せ記録から社内タスク「"+content.slice(0,20)+"」を作成しました"+(part?"（部位："+part.label+"）":""));
         toast("✅ 社内タスクに追加しました");
       });
+     });
       return;
     }
 
@@ -4406,11 +4419,13 @@
       askChoice("依頼先の業者を選択", "", vendorChoices, function(vendorId){
         if(vendorId===null) return;
         var vendor = vendorId ? vendorById(vendorId) : null;
+        askAssignee(function(pickedAssignee){
+        if(pickedAssignee===null) return;
         askSpecPart(function(part){
           if(!part){ toast("部位が選択されなかったため、作成を中止しました"); return; }
           var t3 = {
             id: uid("task"), projectId: proj.id, content: content,
-            assignee: "", instructor: "", creator: state.currentUser||"",
+            assignee: pickedAssignee, instructor: "", creator: state.currentUser||"",
             hasDeadline: false, deadline: "",
             requestTo: vendor ? vendor.name : "", requestMethod: "",
             attachmentAssetIds: [],
@@ -4439,6 +4454,7 @@
               toast("✅ 見積依頼状況にも「"+vendor.name+"」を未依頼として追加しました");
             }
           }
+        });
         });
       });
       return;
@@ -5697,6 +5713,7 @@
     var staff = state.settings.staffList || [];
     document.getElementById("tfAssignee").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfInstructor").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
+    document.getElementById("tfChecker").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfVendor").innerHTML = '<option value="">なし</option>' + liveVendors().map(function(v){ return '<option value="'+escapeHtml(v.name)+'">'+escapeHtml(v.name)+'</option>'; }).join("");
     document.getElementById("tfContent").value = "";
     document.getElementById("tfHasDeadline").checked = false;
@@ -5719,6 +5736,7 @@
       document.getElementById("tfContent").value = editing.content || "";
       setSel("tfAssignee", editing.assignee || "");
       setSel("tfInstructor", editing.instructor || "");
+      setSel("tfChecker", editing.checker || "");
       setSel("tfVendor", editing.requestTo || "");
       document.getElementById("tfMethod").value = editing.requestMethod || "gmail";
       document.getElementById("tfHasDeadline").checked = !!editing.hasDeadline;
@@ -5737,6 +5755,7 @@
     if(!content){ toast("内容を入力してください"); return; }
     var assignee = document.getElementById("tfAssignee").value;
     var instructor = document.getElementById("tfInstructor").value;
+    var checker = document.getElementById("tfChecker").value;
     var requestTo = document.getElementById("tfVendor").value;
     var method = document.getElementById("tfMethod").value;
     var hasDeadline = document.getElementById("tfHasDeadline").checked;
@@ -5765,6 +5784,7 @@
       editTarget.content = content;
       editTarget.assignee = assignee||"";
       editTarget.instructor = instructor||"";
+      editTarget.checker = checker||"";
       editTarget.requestTo = requestTo||"";
       editTarget.requestMethod = method;
       editTarget.hasDeadline = hasDeadline;
@@ -5794,7 +5814,7 @@
 
     var t = {
       id: uid("task"), projectId: projectId||null, content: content,
-      assignee: assignee||"", instructor: instructor||"", creator: state.currentUser||"",
+      assignee: assignee||"", instructor: instructor||"", checker: checker||"", creator: state.currentUser||"",
       hasDeadline: hasDeadline, deadline: hasDeadline?deadline:"",
       requestTo: requestTo||"", requestMethod: method,
       attachmentAssetIds: attachmentAssetIds,
@@ -6043,6 +6063,12 @@
     });
   }
 
+  // タスクを作るときの担当者を選ばせる。callback: スタッフ名／""（あとで決める）／キャンセル時null
+  function askAssignee(callback){
+    var staff = state.settings.staffList || [];
+    var choices = staff.map(function(n){ return {label:n, value:n}; }).concat([{label:"（担当者はあとで決める）", value:""}]);
+    askChoice("担当者を選択", "このタスクの担当者を選んでください", choices, callback);
+  }
   // 業者タスクに紐付ける「部位」を、仕様タブの既存カテゴリーから選ばせる。
   // callback には {scope, category, roomId, side, label} かキャンセル時はnullが渡る。
   function specPartCategoryList(scope, proj){
