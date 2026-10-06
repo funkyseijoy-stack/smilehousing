@@ -441,6 +441,15 @@ export default async (req: Request, context: Context) => {
     considerations: ((okaiCustomer && okaiCustomer.considerations) || []).map((x: any) => ({
       title: x.title || "", note: x.note || "", status: x.status || "検討中", createdAt: x.createdAt || "",
     })),
+    // 家づくりの進み具合（スタッフが「おうちノート連携」タブで入力。on:false や未入力なら出さない）
+    houseProgress: (() => {
+      const hp = okaiCustomer && okaiCustomer.houseProgress;
+      if (!hp || hp.on === false || !Array.isArray(hp.steps)) return null;
+      const steps = hp.steps.slice(0, 20).map((x: any) => ({ name: String((x && x.name) || "").slice(0, 40), date: String((x && x.date) || "").slice(0, 40) })).filter((x: any) => x.name);
+      if (!steps.length) return null;
+      const cur = typeof hp.current === "number" && hp.current >= 0 && hp.current < steps.length ? hp.current : -1;
+      return { steps, current: cur };
+    })(),
     ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });
 };

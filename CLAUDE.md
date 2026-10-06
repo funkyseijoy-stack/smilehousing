@@ -118,6 +118,8 @@
 - お客様によるご家族・家電・持ち込み品の入力（2026年10月〜）: 新おうちノート（/note/）のホームに「ご家族・家電・持ち込み品」欄（「入力・変更する」でシート `#famModal`、`FAM_DEFS`／`famOpen`／`famSave`）。`note-data.mts` の `profileSave`（各20行・60文字まで、名前なしの行は捨てる）が `noteExtras` の `customerProfile` に保存し、スタッフへ通知メール。住まいるアプリの「おうちノート連携」タブ（`renderOkaiProfile`）に表示される。
 - スマホ幅の仕様タブ（2026年10月〜）: 文字拡大で `.speccat` の最小幅340pxが画面からはみ出していたため、幅760px以下は1列・最小幅なし。`.spectl-actions` と `.btn.small` は折り返し可。
 
+- 家づくりの進み具合（2026年10月〜）: お客様ホームの進み具合カードに工程のステップ表示（済／いま／これから＋予定日の自由入力）を出す。スタッフは案件の「おうちノート連携」タブ「家づくりの進み具合」で、工程名・予定日（文字）・「現在」を入力し「お客様の画面に表示する」にチェックして保存（`okaiProg*`、既定の工程は `OKAI_PROG_DEFAULT`）。保存先は `noteExtras` の `houseProgress`（`{on,current,steps:[{name,date}]}`、`EXTRAS_KEYS` に追加済み）。`note-data.mts` が `houseProgress` を返し、`public/note/index.html` の `homeHtml` が描画（未設定・非表示のときは従来の「仕様のお打合せ」カードのまま）。仕様のお打合せの％はステップ表示の下に小さく残す。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す

@@ -9,7 +9,7 @@ const STAFF_PASSPHRASE = "sumairu2026"; // 住まいるアプリ内の他Functio
 
 type Store = ReturnType<typeof getStore>;
 
-export const EXTRAS_KEYS = ["customerEstimates", "considerations", "customerProfile", "customerLinks", "nextBookings"];
+export const EXTRAS_KEYS = ["customerEstimates", "considerations", "customerProfile", "customerLinks", "nextBookings", "houseProgress"];
 
 // 旧側から取得。取得できたら customer（無ければ空）を、404なら {}（旧側に記録なし）を返し、
 // 通信エラー等のときは null（＝まだ写せていない）を返す。

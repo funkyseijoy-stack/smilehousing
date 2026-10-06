@@ -144,6 +144,20 @@
   .prog .l{ font-size:.76rem; color:var(--ink2); letter-spacing:.06em; }
   .prog .t{ font-size:1.25rem; font-weight:700; margin:8px 0 6px; }
   .prog .d{ font-size:.82rem; color:var(--ink2); }
+  .stg{ list-style:none; margin:14px 0 4px; padding:0; }
+  .stg li{ display:flex; gap:12px; align-items:flex-start; position:relative; padding-bottom:12px; }
+  .stg li:last-child{ padding-bottom:0; }
+  .stg li:not(:last-child)::before{ content:""; position:absolute; left:10px; top:22px; bottom:0; width:2px; background:rgba(120,100,90,.25); }
+  .stg .mk{ flex:0 0 22px; width:22px; height:22px; border-radius:50%; border:2px solid rgba(120,100,90,.4); background:#fff; display:flex; align-items:center; justify-content:center; font-size:.7rem; color:#fff; z-index:1; }
+  .stg .done .mk{ background:var(--brown2); border-color:var(--brown2); }
+  .stg .now .mk{ background:#fff; border-color:var(--brown2); box-shadow:0 0 0 4px rgba(120,90,70,.18); }
+  .stg .now .mk::after{ content:""; width:10px; height:10px; border-radius:50%; background:var(--brown2); }
+  .stg .nm{ font-size:.95rem; font-weight:700; line-height:1.4; }
+  .stg .todo .nm{ font-weight:500; color:var(--ink2); }
+  .stg .dt{ font-size:.8rem; color:var(--ink2); }
+  .stg .tg{ display:inline-block; font-size:.68rem; font-weight:700; background:var(--brown2); color:#fff; border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
+  .prog .sub2{ border-top:1px solid rgba(120,100,90,.2); margin-top:14px; padding-top:12px; }
+  .prog .sub2 .sl{ font-size:.82rem; color:var(--ink2); }
   .bar{ height:8px; background:rgba(255,255,255,.75); border-radius:999px; margin:14px 0 8px; overflow:hidden; }
   .bar i{ display:block; height:100%; background:var(--brown2); border-radius:999px; }
   .prog .r{ display:flex; justify-content:space-between; font-size:.74rem; color:var(--ink2); }
@@ -583,10 +597,23 @@
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
     // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
     // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
-    out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
-      '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+
-      '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
-      '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div></div>';
+    var hp = data.houseProgress;
+    var specBar = '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
+      '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div>';
+    if(hp && hp.steps && hp.steps.length){
+      var cur = hp.current, now = cur>=0 ? hp.steps[cur] : null;
+      out += '<div class="prog"><div class="l">家づくりの進み具合</div>'+
+        '<div class="t">'+(now ? '現在：'+esc(now.name) : '工程のご案内')+'</div>'+
+        '<ul class="stg">'+hp.steps.map(function(st,i){
+          var cls = cur<0 ? "todo" : (i<cur ? "done" : (i===cur ? "now" : "todo"));
+          return '<li class="'+cls+'"><span class="mk">'+(cls==="done" ? '✓' : '')+'</span><div><div class="nm">'+esc(st.name)+(cls==="now" ? '<span class="tg">いま</span>' : '')+'</div>'+
+            (st.date ? '<div class="dt">'+esc(st.date)+(cls==="done" ? '' : ' 予定')+'</div>' : '')+'</div></li>';
+        }).join("")+'</ul>'+
+        '<div class="sub2"><div class="sl">仕様のお打合せ（決定・仮決定した内容を項目ごとに確認できます）</div>'+specBar+'</div></div>';
+    } else {
+      out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
+        '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+specBar+'</div>';
+    }
 
     // 次回のご予約。以前はヘッダーの小さな文字だけだったが、情報量が少なく
     // 寂しい印象だったので、ホームにもカードとして表示する。
