@@ -202,6 +202,8 @@
   .noteitem .nbox .nboxlabel{ font-size:.85rem; font-weight:700; margin-block-end:3px; }
   .noteitem .nbox.decided{ background:var(--accent-soft); }
   .noteitem .nbox.decided .nboxlabel{ color:var(--accent-ink); }
+  .kc-part{ display:inline-block; background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent); border-radius:999px; padding:3px 12px; margin-block:2px 8px; font-size:.9rem; }
+  .kc-part.none{ background:none; border:1px dashed var(--border); color:var(--muted); }
   .kc-memo{ background:var(--surface-2); border-radius:8px; padding:6px 8px; margin-block-start:6px; font-size:.85rem; white-space:pre-wrap; color:var(--text); }
   .noteitem .nbox.talk{ background:var(--surface-2); }
   .noteitem .nbox.msg{ background:#f1ebf5; }
@@ -2048,7 +2050,7 @@
             (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
           (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
-          (t.vendorSpec?'<div class="muted" style="font-size:.85rem; margin-block-end:4px;">部位：'+escapeHtml(t.vendorSpec.label||"")+'</div>':'')+
+          (t.vendorSpec ? '<div class="kc-part">📍 部位：<b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
           (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
