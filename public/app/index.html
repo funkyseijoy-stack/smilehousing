@@ -50,6 +50,8 @@
   }
 
   *{ box-sizing:border-box; }
+  /* 60代の方でも読みやすいよう、全デバイスで大きめの文字にする（rem基準なので全体が連動）。画面が広いほど少し大きくなる。 */
+  html{ font-size:clamp(18px, 0.35vw + 15.5px, 21px); }
   body{ background:var(--bg); color:var(--ink); font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; padding-inline:clamp(12px,1.6vw,32px); padding-block:0; }
   h1,h2,h3,.display{ font-family:"Zen Maru Gothic","Noto Sans JP",sans-serif; text-wrap:balance; }
   .tabular{ font-variant-numeric: tabular-nums; }
@@ -64,12 +66,12 @@
   .brand-mark{ width:40px; height:40px; border-radius:12px; background: linear-gradient(155deg, var(--accent) 0%, var(--accent-ink) 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow: var(--shadow); }
   .brand-mark svg{ width:24px; height:24px; }
   .brand-text h1{ font-size:1.08rem; font-weight:700; margin:0; line-height:1.15; }
-  .brand-text p{ margin:0; font-size:.72rem; color:var(--muted); }
-  .userpicker{ display:flex; align-items:center; gap:6px; }
-  .userpicker select{ font-size:.78rem; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:inherit; }
+  .brand-text p{ margin:0; font-size:.85rem; color:var(--muted); }
+  .userpicker{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .userpicker select{ font-size:.85rem; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:inherit; }
 
   nav.tabs{ display:flex; gap:2px; margin-block:12px 14px; border-bottom:1px solid var(--border); overflow-x:auto; }
-  nav.tabs button{ appearance:none; border:none; background:none; font-family:"Zen Maru Gothic",sans-serif; font-size:.84rem; font-weight:700; color:var(--muted); padding:8px 11px 10px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+  nav.tabs button{ appearance:none; border:none; background:none; font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; color:var(--muted); padding:8px 11px 10px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
   nav.tabs button.active{ color:var(--accent-ink); border-bottom-color:var(--accent); }
 
   section.panel{ display:none; }
@@ -77,7 +79,7 @@
 
   .statrow{ display:grid; grid-template-columns: repeat(4,1fr); gap:10px; margin-block-end:14px; }
   .stat{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; box-shadow: var(--shadow); }
-  .stat .label{ font-size:.66rem; color:var(--muted); font-weight:500; letter-spacing:.03em; }
+  .stat .label{ font-size:.85rem; color:var(--muted); font-weight:500; letter-spacing:.03em; }
   .stat .value{ font-size:1.4rem; font-weight:700; margin-top:2px; }
   .stat.warn .value{ color:var(--orange); }
   .stat.ok .value{ color:var(--accent-ink); }
@@ -93,28 +95,28 @@
     background:var(--surface); color:var(--ink); min-width:0;
   }
   textarea{ resize:vertical; width:100%; }
-  label.field{ display:flex; flex-direction:column; gap:4px; font-size:.7rem; color:var(--muted); flex:1; min-width:120px; }
+  label.field{ display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:var(--muted); flex:1; min-width:120px; }
 
-  button.btn{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:.82rem; padding:8px 14px; border-radius:999px; border:1px solid transparent; cursor:pointer; background:var(--accent); color:#fff; white-space:nowrap; }
+  button.btn{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:.85rem; padding:8px 14px; border-radius:999px; border:1px solid transparent; cursor:pointer; background:var(--accent); color:#fff; white-space:nowrap; }
   button.btn:disabled{ opacity:.5; cursor:not-allowed; }
   button.btn.secondary{ background:var(--surface-2); color:var(--ink); border-color:var(--border); }
-  button.btn.ghost{ background:transparent; color:var(--accent-ink); border-color:var(--accent); padding:6px 11px; font-size:.76rem; }
-  button.btn.small{ padding:5px 10px; font-size:.72rem; border-radius:8px; }
-  button.btn.danger-ghost{ background:transparent; color:var(--danger); border-color:var(--danger); padding:5px 10px; font-size:.72rem; border-radius:8px; }
-  button.tbtn{ appearance:none; border:1px solid transparent; background:none; cursor:pointer; border-radius:9px; padding:7px 10px; font-size:.78rem; font-weight:700; color:var(--ink); font-family:"Zen Maru Gothic",sans-serif; display:flex; align-items:center; gap:5px; white-space:nowrap; }
+  button.btn.ghost{ background:transparent; color:var(--accent-ink); border-color:var(--accent); padding:6px 11px; font-size:.85rem; }
+  button.btn.small{ padding:5px 10px; font-size:.85rem; border-radius:8px; }
+  button.btn.danger-ghost{ background:transparent; color:var(--danger); border-color:var(--danger); padding:5px 10px; font-size:.85rem; border-radius:8px; }
+  button.tbtn{ appearance:none; border:1px solid transparent; background:none; cursor:pointer; border-radius:9px; padding:7px 10px; font-size:.85rem; font-weight:700; color:var(--ink); font-family:"Zen Maru Gothic",sans-serif; display:flex; align-items:center; gap:5px; white-space:nowrap; }
   button.tbtn:hover{ background:var(--surface-2); }
   button.tbtn.active{ background:var(--accent); color:#fff; }
   button.tbtn:disabled{ opacity:.4; cursor:not-allowed; }
 
   .proj-select{ font-size:.95rem; font-weight:700; padding:9px 12px; }
 
-  table{ width:100%; border-collapse:collapse; font-size:.82rem; }
-  th{ text-align:left; color:var(--muted); font-weight:700; font-size:.66rem; letter-spacing:.03em; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+  th{ text-align:left; color:var(--muted); font-weight:700; font-size:.85rem; letter-spacing:.03em; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
   td{ padding:8px; border-bottom:1px solid var(--border); vertical-align:middle; }
   tr:last-child td{ border-bottom:none; }
   .tablewrap{ overflow-x:auto; }
 
-  .pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+  .pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px; font-size:.85rem; font-weight:700; white-space:nowrap; }
   .pill.status-未依頼{ background:var(--gray-soft); color:var(--muted); }
   .pill.status-依頼済み{ background:var(--blue-soft); color:var(--blue); }
   .pill.status-受領済み{ background:var(--orange-soft); color:var(--orange); }
@@ -124,53 +126,53 @@
   .pill.quote-仕切り{ background:var(--blue-soft); color:var(--blue); }
 
   .muted{ color:var(--muted); }
-  .empty{ color:var(--muted); font-size:.82rem; padding:18px 4px; text-align:center; }
+  .empty{ color:var(--muted); font-size:.85rem; padding:18px 4px; text-align:center; }
   .cellname{ font-weight:700; }
-  .cellsub{ font-size:.7rem; color:var(--muted); }
+  .cellsub{ font-size:.85rem; color:var(--muted); }
 
-  .toast{ position:fixed; left:50%; bottom: calc(18px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding:9px 16px; border-radius:999px; font-size:.8rem; font-weight:700; box-shadow: var(--shadow); opacity:0; pointer-events:none; transition: opacity .25s ease, transform .25s ease; z-index: 90; max-width:90vw; text-align:center; }
+  .toast{ position:fixed; left:50%; bottom: calc(18px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding:9px 16px; border-radius:999px; font-size:.85rem; font-weight:700; box-shadow: var(--shadow); opacity:0; pointer-events:none; transition: opacity .25s ease, transform .25s ease; z-index: 90; max-width:90vw; text-align:center; }
   .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
 
   .addform{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
   .addform label.field{ flex:1 1 120px; }
 
   .filelist{ display:flex; flex-direction:column; gap:6px; margin-block-start:10px; }
-  .filechip{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:7px 9px; font-size:.78rem; }
-  .filechip .ficon{ width:26px; height:26px; border-radius:7px; flex-shrink:0; background:var(--accent-soft); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:700; }
+  .filechip{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:7px 9px; font-size:.85rem; }
+  .filechip .ficon{ width:26px; height:26px; border-radius:7px; flex-shrink:0; background:var(--accent-soft); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; font-size:.85rem; font-weight:700; }
   .filechip .finame{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
-  .filechip .fisize{ color:var(--muted); font-size:.66rem; white-space:nowrap; }
+  .filechip .fisize{ color:var(--muted); font-size:.85rem; white-space:nowrap; }
   .uploadrow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  input[type=file]{ font-size:.78rem; max-width:100%; }
+  input[type=file]{ font-size:.85rem; max-width:100%; }
 
   .vendorlist{ display:flex; flex-wrap:wrap; gap:8px; width:100%; }
-  .vendorchip{ display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:10px; padding:6px 10px; font-size:.8rem; cursor:pointer; background:var(--surface); }
+  .vendorchip{ display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:10px; padding:6px 10px; font-size:.85rem; cursor:pointer; background:var(--surface); }
   .vendorchip input{ accent-color: var(--accent); }
-  .vendorchip .vc-cat{ color:var(--muted); font-size:.7rem; }
+  .vendorchip .vc-cat{ color:var(--muted); font-size:.85rem; }
   input[type=checkbox]{ accent-color: var(--accent); width:16px; height:16px; }
 
   .tagbar{ display:flex; flex-wrap:wrap; gap:6px; margin-block-end:10px; }
-  .tagchip{ padding:4px 11px; border-radius:999px; font-size:.72rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); }
+  .tagchip{ padding:4px 11px; border-radius:999px; font-size:.85rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); }
   .tagchip.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
   .projlist{ display:flex; flex-direction:column; gap:8px; }
   .projrow{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; cursor:pointer; }
   .projrow:hover{ background:var(--surface-2); }
   .projrow .pname{ font-weight:700; flex:1; min-width:0; }
-  .projrow .psub{ font-size:.72rem; color:var(--muted); }
+  .projrow .psub{ font-size:.85rem; color:var(--muted); }
 
   .detailhead{ display:flex; align-items:center; gap:10px; margin-block-end:6px; flex-wrap:wrap; }
-  .backbtn{ background:none; border:none; color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:.82rem; padding:4px 2px; }
+  .backbtn{ background:none; border:none; color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:.85rem; padding:4px 2px; }
 
   .subtabs{ display:flex; gap:4px; margin-block-end:12px; flex-wrap:wrap; }
-  .subtabs button{ font-family:"Zen Maru Gothic",sans-serif; font-size:.78rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; }
+  .subtabs button{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; }
   .subtabs button.active{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   .meetingsubtabs{ display:flex; gap:4px; margin-block-end:12px; flex-wrap:wrap; }
-  .meetingsub-btn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.74rem; font-weight:700; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; }
+  .meetingsub-btn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; }
   .meetingsub-btn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
   .meetingsubpane{ display:none; }
   .meetingsubpane.active{ display:block; }
   .speccatgrid{ display:flex; flex-wrap:wrap; gap:12px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
-  .speccatgrid .speccat{ flex:0 0 calc(50% - 6px); min-width:300px; margin-block-end:0; }
+  .speccatgrid .speccat{ flex:0 0 calc(50% - 6px); min-width:340px; margin-block-end:0; }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
@@ -180,8 +182,8 @@
   .noteitem.reflected{ background:#fff3b0; border:3px solid #e0a800; }
   .noteitem.reflected .ndate{ color:#6b5300; }
   .noteitem.reflected .ntitle{ color:#3d2f00; }
-  .noteitem .nreflbadge{ background:#e0a800; color:#2b2100; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
-  .noteitem .nsentbadge{ background:#e3efe6; color:#1f5a33; border:1px solid #9cc7a9; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .noteitem .nreflbadge{ background:#e0a800; color:#2b2100; font-size:.85rem; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  .noteitem .nsentbadge{ background:#e3efe6; color:#1f5a33; border:1px solid #9cc7a9; font-size:.85rem; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
   .notemenu button.on{ color:#1f5a33; }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]) .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
@@ -191,12 +193,12 @@
   :root[data-theme="dark"] .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
   :root[data-theme="dark"] .noteitem.reflected .ndate{ color:#e8d27a; }
   :root[data-theme="dark"] .noteitem.reflected .ntitle{ color:#fff6cf; }
-  .noteitem .ndate{ font-size:.7rem; color:var(--muted); font-weight:700; }
+  .noteitem .ndate{ font-size:.85rem; color:var(--muted); font-weight:700; }
   .noteitem .ntitle{ font-size:.92rem; font-weight:700; }
   .noteitem .nhead{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
   .noteitem .ntext{ font-size:.85rem; white-space:pre-wrap; }
   .noteitem .nbox{ border-radius:10px; padding:8px 10px; margin-block-end:8px; }
-  .noteitem .nbox .nboxlabel{ font-size:.68rem; font-weight:700; margin-block-end:3px; }
+  .noteitem .nbox .nboxlabel{ font-size:.85rem; font-weight:700; margin-block-end:3px; }
   .noteitem .nbox.decided{ background:var(--accent-soft); }
   .noteitem .nbox.decided .nboxlabel{ color:var(--accent-ink); }
   .noteitem .nbox.open{ background:var(--orange-soft); }
@@ -215,12 +217,12 @@
   .notemenu button.on{ color:var(--accent-ink); font-weight:700; }
   .notemenu-divider{ border-block-start:1px dashed var(--border); margin:5px 2px; }
 
-  .lockbox{ display:flex; align-items:center; gap:8px; background:var(--gold-soft); color:var(--gold); border-radius:10px; padding:8px 10px; font-size:.78rem; font-weight:700; }
+  .lockbox{ display:flex; align-items:center; gap:8px; background:var(--gold-soft); color:var(--gold); border-radius:10px; padding:8px 10px; font-size:.85rem; font-weight:700; }
   .pinrow input{ width:110px; letter-spacing:.15em; }
 
-  .activityitem{ display:flex; gap:8px; padding:7px 0; border-bottom:1px solid var(--border); font-size:.78rem; }
+  .activityitem{ display:flex; gap:8px; padding:7px 0; border-bottom:1px solid var(--border); font-size:.85rem; }
   .activityitem:last-child{ border-bottom:none; }
-  .activityitem .a-ts{ color:var(--muted); font-size:.68rem; white-space:nowrap; }
+  .activityitem .a-ts{ color:var(--muted); font-size:.85rem; white-space:nowrap; }
   .activityitem .a-actor{ font-weight:700; color:var(--accent-ink); }
 
   .brandshow{ display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 10px; }
@@ -236,7 +238,7 @@
   .tool-group:last-child{ border-inline-end:none; padding-inline-end:0; }
   .swatch{ width:22px; height:22px; border-radius:999px; border:2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); cursor:pointer; flex-shrink:0; }
   .swatch.active{ box-shadow: 0 0 0 2px var(--ink); }
-  select.sizeSelect{ font-family:inherit; font-size:.78rem; padding:6px 7px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
+  select.sizeSelect{ font-family:inherit; font-size:.85rem; padding:6px 7px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
   .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; justify-content:center; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
   #pbStageInner{ position:relative; line-height:0; }
   #pbImageCanvas, #pbOverlayCanvas{ border-radius:8px; max-width:100%; height:auto; display:block; }
@@ -245,17 +247,17 @@
   #pbOverlayCanvas{ position:absolute; inset:0; touch-action:none; background:transparent; }
   .textEditor{ position:absolute; z-index:5; min-width:60px; min-height:1.4em; background:transparent; border:1px dashed var(--accent); border-radius:4px; padding:2px 4px; font-family:"Noto Sans JP",sans-serif; outline:none; line-height:1.3; white-space:pre; }
   .pbsourcelist{ display:flex; flex-wrap:wrap; gap:8px; margin-block-end:10px; }
-  .pbsourcechip{ border:1px solid var(--border); border-radius:10px; padding:6px 10px; font-size:.78rem; cursor:pointer; background:var(--surface); }
+  .pbsourcechip{ border:1px solid var(--border); border-radius:10px; padding:6px 10px; font-size:.85rem; cursor:pointer; background:var(--surface); }
   .pbsourcechip:hover{ background:var(--surface-2); }
   .pbheaderbar{ display:flex; justify-content:space-between; gap:8px; margin-block-end:8px; flex-wrap:wrap; }
   #pbItemsLayer{ position:absolute; inset:0; pointer-events:none; }
-  .pbitem{ position:absolute; pointer-events:auto; transform:translate(-50%,-50%); display:flex; align-items:center; gap:3px; background:var(--surface); border:1.5px solid var(--muted); border-radius:8px; padding:3px 7px; font-size:.72rem; font-weight:700; white-space:nowrap; cursor:grab; box-shadow: var(--shadow); user-select:none; touch-action:none; }
+  .pbitem{ position:absolute; pointer-events:auto; transform:translate(-50%,-50%); display:flex; align-items:center; gap:3px; background:var(--surface); border:1.5px solid var(--muted); border-radius:8px; padding:3px 7px; font-size:.85rem; font-weight:700; white-space:nowrap; cursor:grab; box-shadow: var(--shadow); user-select:none; touch-action:none; }
   .pbitem:active{ cursor:grabbing; }
   .pbitem.stamp{ background:var(--gold-soft,#fff3d6); border-color:var(--gold,#c99a2e); color:#6b4e0c; }
   .pbitem.text{ background:none; border:none; box-shadow:none; padding:2px 4px; font-weight:700; white-space:pre-line; text-align:center; }
   .pbitem.text .pbitem-del{ background:var(--surface); border-radius:999px; box-shadow:0 0 0 1px var(--border); padding:0 4px; }
   .pbitem .pbitem-del{ appearance:none; border:none; background:none; cursor:pointer; color:var(--danger); font-weight:900; padding:0 0 0 2px; line-height:1; font-size:.85rem; }
-  #pbZoomLabel{ font-size:.72rem; font-weight:700; min-width:38px; text-align:center; color:var(--muted); }
+  #pbZoomLabel{ font-size:.85rem; font-weight:700; min-width:38px; text-align:center; color:var(--muted); }
 
   @media (max-width: 480px){ button.tbtn span.label{ display:none; } }
 
@@ -264,11 +266,11 @@
   @media (max-width:900px){ .kanbanwrap{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   .kancol{ min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:8px; }
   #reTypeRow[hidden], #reCustRows[hidden]{ display:none; }
-  .kancol h4{ margin:2px 4px; font-size:.78rem; color:var(--muted); display:flex; justify-content:space-between; }
-  .kancard{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 9px; font-size:.78rem; box-shadow: var(--shadow); }
+  .kancol h4{ margin:2px 4px; font-size:.85rem; color:var(--muted); display:flex; justify-content:space-between; }
+  .kancard{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 9px; font-size:.85rem; box-shadow: var(--shadow); }
   .kancard .kc-proj{ font-weight:700; margin-block-end:3px; }
   .kancard .kc-content{ white-space:pre-wrap; margin-block-end:5px; }
-  .kancard .kc-meta{ display:flex; flex-wrap:wrap; gap:4px; margin-block-end:6px; font-size:.66rem; color:var(--muted); }
+  .kancard .kc-meta{ display:flex; flex-wrap:wrap; gap:4px; margin-block-end:6px; font-size:.85rem; color:var(--muted); }
   .kancard .kc-meta span{ background:var(--surface-2); border-radius:999px; padding:1px 7px; }
   .kancard .kc-meta span.due-soon{ background:var(--orange-soft); color:var(--orange); font-weight:700; }
   .kancard .kc-actions{ display:flex; gap:4px; flex-wrap:wrap; }
@@ -279,21 +281,21 @@
 
   /* ---- spec management (仕様) ---- */
   .speccat{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:10px; }
-  .speccat h4{ margin:0 0 8px; font-size:.82rem; }
+  .speccat h4{ margin:0 0 8px; font-size:.85rem; }
   .extspecvalues-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
-  .extspecvalue-field{ display:flex; flex-direction:column; gap:3px; font-size:.72rem; color:var(--muted); font-weight:700; }
-  .extspecvalue-field input{ font-size:.82rem; font-weight:400; color:var(--text); padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); }
+  .extspecvalue-field{ display:flex; flex-direction:column; gap:3px; font-size:.85rem; color:var(--muted); font-weight:700; }
+  .extspecvalue-field input{ font-size:.85rem; font-weight:400; color:var(--text); padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); }
   .specphotos{ display:flex; flex-wrap:wrap; gap:8px; }
   .specphoto{ position:relative; width:72px; height:72px; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface); flex-shrink:0; }
   .specphoto img{ width:100%; height:100%; object-fit:cover; display:block; }
   .specphoto video{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
   .specphoto-playbadge{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-size:1.1rem; text-shadow:0 1px 3px rgba(0,0,0,.6); pointer-events:none; }
   .specphoto-file{ width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:var(--surface-2); font-size:1.4rem; }
-  .specphoto-filelabel{ font-size:.6rem; font-weight:700; color:var(--muted); }
-  .specphoto .spdel{ position:absolute; top:2px; right:2px; background:rgba(20,16,12,.62); color:#fff; border:none; border-radius:999px; width:18px; height:18px; line-height:1; font-size:.68rem; cursor:pointer; padding:0; }
+  .specphoto-filelabel{ font-size:.85rem; font-weight:700; color:var(--muted); }
+  .specphoto .spdel{ position:absolute; top:2px; right:2px; background:rgba(20,16,12,.62); color:#fff; border:none; border-radius:999px; width:18px; height:18px; line-height:1; font-size:.85rem; cursor:pointer; padding:0; }
   .specphoto:not(.specadd){ cursor:pointer; }
-  .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.56rem; text-align:center; padding:1px 0; pointer-events:none; }
-  .specphoto .spby{ position:absolute; top:2px; left:2px; background:rgba(255,255,255,.9); color:var(--text); font-size:.54rem; font-weight:700; border-radius:999px; padding:0 5px; pointer-events:none; }
+  .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.85rem; text-align:center; padding:1px 0; pointer-events:none; }
+  .specphoto .spby{ position:absolute; top:2px; left:2px; background:rgba(255,255,255,.9); color:var(--text); font-size:.85rem; font-weight:700; border-radius:999px; padding:0 5px; pointer-events:none; }
   .specphoto .spby.cust{ background:#b45b6a; color:#fff; }
   .specphoto.specadd{ display:flex; align-items:center; justify-content:center; cursor:pointer; border-style:dashed; color:var(--muted); font-size:1.3rem; }
   .specphoto-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
@@ -306,17 +308,17 @@
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
   .notefiletile{ position:relative; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; text-decoration:none; color:inherit; }
   .notefiletile img, .notefiletile video{ width:100%; height:100%; object-fit:cover; display:block; }
-  .pill.small{ padding:2px 7px; font-size:.6rem; }
+  .pill.small{ padding:2px 7px; font-size:.85rem; }
   .pbentrylist{ display:flex; flex-direction:column; gap:8px; }
   .pbentry{ display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:7px; }
   .pbentry-thumb{ position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; flex-shrink:0; cursor:pointer; border:1px solid var(--border); }
   .pbentry-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .pbentry-latest{ position:absolute; top:0; left:0; background:var(--accent); color:#fff; font-size:.58rem; font-weight:700; padding:1px 5px; border-radius:0 0 6px 0; }
+  .pbentry-latest{ position:absolute; top:0; left:0; background:var(--accent); color:#fff; font-size:.85rem; font-weight:700; padding:1px 5px; border-radius:0 0 6px 0; }
   .pbentry-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1; min-width:0; }
-  .pbentry-meta .splabel2{ font-size:.68rem; color:var(--muted); width:100%; }
+  .pbentry-meta .splabel2{ font-size:.85rem; color:var(--muted); width:100%; }
   .spectl{ display:flex; flex-direction:column; gap:14px; margin-block-start:6px; }
   .spectl-dategroup{ display:flex; flex-direction:column; gap:8px; }
-  .spectl-datehead{ font-size:.72rem; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:6px; }
+  .spectl-datehead{ font-size:.85rem; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:6px; }
   .spectl-card{ display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; background:var(--surface); border:1px solid var(--border); border-inline-start:3px solid var(--border); border-radius:12px; padding:8px 10px 8px 9px; }
   .spectl-card-row{ flex-direction:column; align-items:stretch; gap:8px; }
   .spectl-card.spectl-type-note-border{ border-inline-start-color:var(--blue); }
@@ -329,11 +331,11 @@
   .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
   .spectl-thumbmini{ width:42px; height:42px; border-radius:7px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; text-decoration:none; color:inherit; }
   .spectl-thumbmini img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .spectl-thumbmini-more{ color:var(--muted); font-weight:700; font-size:.76rem; }
+  .spectl-thumbmini-more{ color:var(--muted); font-weight:700; font-size:.85rem; }
   .pill.spectl-type-note{ background:var(--blue-soft); color:var(--blue); }
   .pill.spectl-type-vendor{ background:var(--orange-soft); color:var(--orange); }
   .pill.spectl-type-manual{ background:var(--gray-soft); color:var(--muted); }
-  .pdfbadge{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.62); color:#fff; font-size:.56rem; font-weight:700; text-align:center; padding:1px 0; pointer-events:none; letter-spacing:.02em; }
+  .pdfbadge{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.62); color:#fff; font-size:.85rem; font-weight:700; text-align:center; padding:1px 0; pointer-events:none; letter-spacing:.02em; }
   .pill.reflect{ background:var(--gray-soft); color:var(--muted); cursor:pointer; border:none; font-family:inherit; }
   .pill.reflect.on{ background:var(--accent-soft); color:var(--accent-ink); }
   .pill.estimate-承認{ background:var(--blue-soft); color:var(--blue); }
@@ -341,16 +343,16 @@
   .pill.estimate-未回答{ background:var(--gray-soft); color:var(--muted); }
   .pill.status-未依頼, .pill.status-依頼済み, .pill.status-受領済み{ cursor:pointer; border:none; font-family:inherit; }
   .specsideswrap{ display:flex; gap:18px; flex-wrap:wrap; }
-  .specside .sidelabel{ display:block; font-size:.68rem; color:var(--muted); font-weight:700; margin-block-end:5px; }
+  .specside .sidelabel{ display:block; font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:5px; }
   .roomcard{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:10px; }
   .roomcard .rname{ font-weight:700; font-size:.85rem; }
-  .roomAccentNote{ width:100%; font-family:inherit; font-size:.78rem; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); margin-block-start:6px; }
+  .roomAccentNote{ width:100%; font-family:inherit; font-size:.85rem; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); margin-block-start:6px; }
 
   /* ---- バッジ（契約時仕様／見積もり仕様／次に誰が対応するか） ---- */
   .badgegroup-wrap{ margin-block-start:8px; }
-  .badgegrouplabel{ font-size:.68rem; color:var(--muted); font-weight:700; margin-block-end:3px; }
+  .badgegrouplabel{ font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:3px; }
   .badgegroup{ display:flex; flex-wrap:wrap; gap:6px; margin-block-end:4px; }
-  .badgepill{ display:inline-flex; align-items:center; gap:3px; padding:3px 9px; border-radius:999px; font-size:.68rem; font-weight:700; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; font-family:inherit; line-height:1.4; }
+  .badgepill{ display:inline-flex; align-items:center; gap:3px; padding:3px 9px; border-radius:999px; font-size:.85rem; font-weight:700; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; font-family:inherit; line-height:1.4; }
   .badgepill.on.b-contract{ background:var(--gold-soft); color:var(--gold); border-color:var(--gold); }
   .badgepill.on.b-quote{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   .badgepill.on.b-companytask{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); }
@@ -361,29 +363,29 @@
 
   /* ---- 決定事項サマリー（カテゴリーカードの最上部にピン留め表示） ---- */
   .decidedsummary{ margin:0 0 10px; padding:8px 10px; border-radius:10px; background:var(--accent-soft); border:1px solid var(--accent); }
-  .decidedsummary-label{ font-size:.66rem; font-weight:700; color:var(--accent-ink); margin-block-end:3px; }
-  .decidedsummary-item{ font-size:.8rem; color:var(--ink); display:flex; align-items:flex-start; gap:6px; margin-block-end:2px; }
+  .decidedsummary-label{ font-size:.85rem; font-weight:700; color:var(--accent-ink); margin-block-end:3px; }
+  .decidedsummary-item{ font-size:.85rem; color:var(--ink); display:flex; align-items:flex-start; gap:6px; margin-block-end:2px; }
   .decidedsummary-item:last-child{ margin-block-end:0; }
 
   /* ---- Gmail inbox viewer ---- */
   .gmailrow{ display:flex; flex-direction:column; gap:2px; padding:10px 12px; border-radius:11px; background:var(--surface); border:1px solid var(--border); margin-block-end:8px; cursor:pointer; text-decoration:none; color:inherit; }
   .gmailrow:hover{ background:var(--surface-2); }
-  .gmailrow .gr-top{ display:flex; justify-content:space-between; gap:8px; font-size:.72rem; color:var(--muted); }
+  .gmailrow .gr-top{ display:flex; justify-content:space-between; gap:8px; font-size:.85rem; color:var(--muted); }
   .gmailrow .gr-subject{ font-weight:700; font-size:.85rem; }
-  .gmailrow .gr-snippet{ font-size:.76rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gmailrow .gr-snippet{ font-size:.85rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 
 <div id="staffLoginOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;">
   <div style="max-width:320px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px 22px;box-shadow:var(--shadow);text-align:center;">
     <div id="loginIconSlot" style="width:64px;height:64px;margin:0 auto 14px;border-radius:16px;background:linear-gradient(155deg, var(--accent) 0%, var(--accent-ink) 100%); display:flex;align-items:center;justify-content:center;"></div>
     <h2 style="margin:0 0 4px;">住まいるアプリ</h2>
-    <p class="muted" style="margin:0 0 16px;font-size:.8rem;">社内用アプリです。合い言葉を入力してください。</p>
+    <p class="muted" style="margin:0 0 16px;font-size:.85rem;">社内用アプリです。合い言葉を入力してください。</p>
     <div style="position:relative;margin-bottom:10px;">
       <input type="text" id="staffLoginInput" placeholder="合い言葉" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-form-type="other" style="width:100%;text-align:center;-webkit-text-security:disc;text-security:disc;">
-      <button type="button" id="staffLoginToggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:.72rem;cursor:pointer;padding:4px 6px;">表示</button>
+      <button type="button" id="staffLoginToggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;padding:4px 6px;">表示</button>
     </div>
     <button class="btn" style="width:100%;" id="staffLoginBtn">ログイン</button>
-    <p id="staffLoginError" hidden style="color:var(--danger);font-size:.78rem;margin:10px 0 0;">合い言葉が違います</p>
+    <p id="staffLoginError" hidden style="color:var(--danger);font-size:.85rem;margin:10px 0 0;">合い言葉が違います</p>
   </div>
 </div>
 
@@ -397,7 +399,7 @@
       </div>
     </div>
     <div class="userpicker">
-      <span class="muted" style="font-size:.72rem;">担当者</span>
+      <span class="muted" style="font-size:.85rem;">担当者</span>
       <select id="userSelect"></select>
       <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 最新の内容に更新</button>
       <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span></button>
@@ -438,7 +440,7 @@
     </div>
     <div class="card" id="publicBookingCard">
       <h2 style="margin:0 0 4px;">新規のお客様のご予約</h2>
-      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。予約直後に確認メール、前日の朝9時にリマインドメールが自動で届きます。日時変更・キャンセルなどは「メールを送る」から送れます。</p>
+      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。予約直後に確認メール、前日の朝9時にリマインドメールが自動で届きます。日時変更・キャンセルなどは「メールを送る」から送れます。</p>
       <div id="publicBookingList" style="display:flex; flex-direction:column; gap:8px;"></div>
       <div class="empty" id="publicBookingEmpty" hidden>今後のご予約はありません。</div>
     </div>
@@ -477,7 +479,7 @@
         <div class="row" style="justify-content:space-between; align-items:flex-start;">
           <div>
             <h2 id="detailProjName" style="margin:0 0 4px;">—</h2>
-            <div class="muted" id="detailProjCustomer" style="font-size:.8rem;"></div>
+            <div class="muted" id="detailProjCustomer" style="font-size:.85rem;"></div>
             <span class="pill tag" id="detailProjType" style="margin-block-start:6px; display:inline-block;"></span>
           </div>
           <div class="row" style="gap:6px;">
@@ -499,7 +501,7 @@
           <button class="btn secondary small" id="btnPushOkaiNote">🌐 おうちノートに同期する</button>
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
           <button class="btn ghost small" id="btnCopyOkaiNoteLink">お客様用リンクをコピー</button>
-          <span class="muted" id="okaiNoteStatusLabel" style="font-size:.75rem;"></span>
+          <span class="muted" id="okaiNoteStatusLabel" style="font-size:.85rem;"></span>
         </div>
       </div>
 
@@ -529,7 +531,7 @@
       <div class="subpanel" id="sub-sitecheck">
         <div class="card">
           <h3>確認事項</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">現場で確認・決定する項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">現場で確認・決定する項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
           <div id="specSiteCheckWrap"></div>
         </div>
       </div>
@@ -538,7 +540,7 @@
       <div class="subpanel" id="sub-customer">
         <div class="card">
           <h3>お客様情報</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">家族情報・身長・家電サイズ・持込み家具など、必要な項目を自由に追加できます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">家族情報・身長・家電サイズ・持込み家具など、必要な項目を自由に追加できます。</p>
           <div id="customerInfoList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="addform" style="margin-block-start:10px;">
             <label class="field">項目名<input type="text" id="ciLabel" placeholder="例：ご家族構成"></label>
@@ -552,7 +554,7 @@
       <div class="subpanel" id="sub-confirm">
         <div class="card">
           <h3>お客様への確認</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">お客様への確認事項を登録し、回答を記録できます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">お客様への確認事項を登録し、回答を記録できます。</p>
           <div id="confirmList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="confirmEmpty" hidden>まだ確認事項がありません。</div>
           <div class="addform" style="flex-direction:column; align-items:stretch; margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -575,7 +577,7 @@
         </div>
         <div class="card">
           <h3>お客様の検討事項</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">検討中 → 仮決定 → 決定の順に進めます。これまでの経過は残ります。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">検討中 → 仮決定 → 決定の順に進めます。これまでの経過は残ります。</p>
           <div id="considerList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="considerEmpty" hidden>まだお客様の検討事項がありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -590,7 +592,7 @@
       <div class="subpanel" id="sub-photos">
         <div class="card">
           <h3>家づくり参考写真</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">お客様が気に入った施工事例などの参考写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。クリックで拡大表示できます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">お客様が気に入った施工事例などの参考写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。クリックで拡大表示できます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px;">
             <input type="text" id="refCatInput" placeholder="例：外観">
             <button class="btn secondary small" id="btnAddRefCat">＋ カテゴリー追加</button>
@@ -599,7 +601,7 @@
         </div>
         <div class="card">
           <h3>おうちアルバム</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">工事中〜完成後の記録写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">工事中〜完成後の記録写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px;">
             <input type="text" id="albumCatInput" placeholder="例：着工">
             <button class="btn secondary small" id="btnAddAlbumCat">＋ カテゴリー追加</button>
@@ -608,7 +610,7 @@
         </div>
         <div class="card">
           <h3>お家のイメージ（お客様と共有）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所です。おうちノートの「イメージ」タブに表示されます。お客様が追加した写真には「お客様」と表示され、ここから削除もできます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所です。おうちノートの「イメージ」タブに表示されます。お客様が追加した写真には「お客様」と表示され、ここから削除もできます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px; align-items:center;">
             <select id="imgBoardPlace"></select>
             <label class="btn secondary small" for="imgBoardFile" style="cursor:pointer;">＋ 写真を追加</label>
@@ -618,7 +620,7 @@
         </div>
         <div class="card" id="sitePhotoCard" hidden>
           <h3>現場写真（スタッフ限定）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">リフォームの現場で撮った写真を、スタッフだけで共有する場所です。お客様のおうちノートには表示されません。複数枚をまとめて追加でき、自動で軽量化されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">リフォームの現場で撮った写真を、スタッフだけで共有する場所です。お客様のおうちノートには表示されません。複数枚をまとめて追加でき、自動で軽量化されます。</p>
           <div class="row" style="margin-block-end:8px; gap:6px; align-items:center; flex-wrap:wrap;">
             <select id="sitePhotoPlace"></select>
             <input type="date" id="sitePhotoDate" aria-label="撮影日">
@@ -636,7 +638,7 @@
       <div class="subpanel" id="sub-reservation">
         <div class="card">
           <h3>予約を追加</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">受付時間は9:00〜17:00・30分単位です。日曜日は定休日のため登録できません（祝日は各自ご確認ください）。登録するとGoogleカレンダーにも予定が追加されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">受付時間は9:00〜17:00・30分単位です。日曜日は定休日のため登録できません（祝日は各自ご確認ください）。登録するとGoogleカレンダーにも予定が追加されます。</p>
           <div class="addform" style="flex-direction:column; align-items:stretch;">
             <div class="row">
               <label class="field">種別<select id="resType">
@@ -667,7 +669,7 @@
       <div class="subpanel" id="sub-message">
         <div class="card">
           <h3>メッセージ</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">現時点は社内向けの案件メモとして使えます（お客様用「おうちノート」ができ次第、双方向のやり取りに拡張します）。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">現時点は社内向けの案件メモとして使えます（お客様用「おうちノート」ができ次第、双方向のやり取りに拡張します）。</p>
           <div class="notelist" id="messageList"></div>
           <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
           <div class="row" style="margin-block-start:10px;">
@@ -681,8 +683,8 @@
       <div class="subpanel" id="sub-okainote">
         <div class="card" style="border:2px solid var(--accent);">
           <h3 style="margin:0;">新しいおうちノート（試作版）</h3>
-          <p class="muted" style="margin:6px 0 10px; font-size:.76rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。下の「追加見積り」「ご家族・家電・持ち込み品」「家づくりリスト」「A's 3Dリンク」も、今までのおうちノート（本番サイト）の内容がそのまま表示されます。お客様は各項目を「仮決定」「決定」できます。今のおうちノートとは別のページなので、確認してから切り替えられます。</p>
-          <div id="newNoteLinkArea" style="font-size:.8rem; word-break:break-all;"></div>
+          <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。下の「追加見積り」「ご家族・家電・持ち込み品」「家づくりリスト」「A's 3Dリンク」も、今までのおうちノート（本番サイト）の内容がそのまま表示されます。お客様は各項目を「仮決定」「決定」できます。今のおうちノートとは別のページなので、確認してから切り替えられます。</p>
+          <div id="newNoteLinkArea" style="font-size:.85rem; word-break:break-all;"></div>
           <div class="row" style="margin-block-start:10px; gap:6px; flex-wrap:wrap;">
             <button class="btn small" id="btnNewNoteIssue">リンクを発行する</button>
             <button class="btn secondary small" id="btnNewNoteCopy" hidden>リンクをコピー</button>
@@ -695,7 +697,7 @@
             <h3 style="margin:0;">お客様用リンク</h3>
             <button class="btn secondary small" id="btnOkaiRefresh">更新</button>
           </div>
-          <p class="muted" style="margin:6px 0 10px; font-size:.76rem;">お客様がスマホ等で開く「おうちノート」専用リンクです。発行すると、お客様専用のページ（ご家族・家電情報の入力、設備仕様の仮決定、追加見積りの承認、検討リストなどができます）が使えるようになります。</p>
+          <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">お客様がスマホ等で開く「おうちノート」専用リンクです。発行すると、お客様専用のページ（ご家族・家電情報の入力、設備仕様の仮決定、追加見積りの承認、検討リストなどができます）が使えるようになります。</p>
           <div id="okaiLinkArea" style="display:flex; flex-direction:column; gap:6px;"></div>
           <div class="row" style="margin-block-start:10px;">
             <button class="btn small" id="btnOkaiIssueLink">リンクを発行する</button>
@@ -705,7 +707,7 @@
 
         <div class="card">
           <h3>予約状況（お客様がおうちノートで確認・予約）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">Googleカレンダーに既存の予定がある場合は、ここから手動で追加するとお客様のおうちノートにも表示されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">Googleカレンダーに既存の予定がある場合は、ここから手動で追加するとお客様のおうちノートにも表示されます。</p>
           <div id="okaiBookingList" style="display:flex; flex-direction:column; gap:6px;"></div>
           <div class="empty" id="okaiBookingEmpty" hidden>予約はまだありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -719,20 +721,20 @@
 
         <div class="card">
           <h3>設備仕様の状況（お客様側の表示）</h3>
-          <div id="okaiSpecStatus" style="display:flex; flex-direction:column; gap:4px; font-size:.82rem;"></div>
+          <div id="okaiSpecStatus" style="display:flex; flex-direction:column; gap:4px; font-size:.85rem;"></div>
         </div>
 
         <div class="card">
           <h3>サンプル請求・検討リストの投稿（お客様から）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">メッセージのやり取りは対象外です。サンプル請求・写真共有・仕様の仮決定などお客様からの投稿がここに並びます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">メッセージのやり取りは対象外です。サンプル請求・写真共有・仕様の仮決定などお客様からの投稿がここに並びます。</p>
           <div id="okaiInboxList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiInboxEmpty" hidden>まだ投稿はありません。</div>
         </div>
 
         <div class="card">
           <h3>追加見積り</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">住まいるから追加見積りを送ると、お客様がおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面と「投稿」欄に届きます。</p>
-          <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.8rem; font-weight:700;" hidden></p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">住まいるから追加見積りを送ると、お客様がおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面と「投稿」欄に届きます。</p>
+          <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.85rem; font-weight:700;" hidden></p>
           <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -745,19 +747,19 @@
 
         <div class="card">
           <h3>ご家族・家電・持ち込み品（お客様入力）</h3>
-          <div id="okaiProfileArea" style="font-size:.82rem; line-height:1.8;"></div>
+          <div id="okaiProfileArea" style="font-size:.85rem; line-height:1.8;"></div>
         </div>
 
         <div class="card">
           <h3>家づくりリスト（お客様・スタッフ共有の検討項目）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここには直接追加できません。「打合せ記録」から「お客様への確認」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここには直接追加できません。「打合せ記録」から「お客様への確認」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
           <div id="okaiConsiderList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiConsiderEmpty" hidden>まだ項目がありません。</div>
         </div>
 
         <div class="card">
           <h3>A's 3D リンク</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">この案件専用のA's 3Dリンクです（お客様ごとに異なるもの）。お客様のおうちノートに表示されます。https:// で始まるURLを入力してください。※ポイントカードは全お客様共通のリンクのため、ここでは設定できません。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">この案件専用のA's 3Dリンクです（お客様ごとに異なるもの）。お客様のおうちノートに表示されます。https:// で始まるURLを入力してください。※ポイントカードは全お客様共通のリンクのため、ここでは設定できません。</p>
           <div class="row">
             <input type="text" id="okaiAce3dUrl" placeholder="https://..." style="flex:1;">
             <button class="btn secondary small" id="btnOkaiSaveAce3d">保存</button>
@@ -771,7 +773,7 @@
       <div class="subpanel" id="sub-quote">
         <div class="card">
           <h3>添付資料（平面図・見積書など）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（定価／仕切り）を指定して登録できます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（定価／仕切り）を指定して登録できます。</p>
           <div class="uploadrow">
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
@@ -793,7 +795,7 @@
 
         <div class="card" id="requestFormCard">
           <h3>見積依頼を追加</h3>
-          <p class="muted" style="margin:0 0 8px; font-size:.76rem;">複数の業者にまとめて依頼できます。</p>
+          <p class="muted" style="margin:0 0 8px; font-size:.85rem;">複数の業者にまとめて依頼できます。</p>
           <div class="row" style="justify-content:space-between; margin-block-end:6px;">
             <div class="vendorlist" id="reqVendorList"></div>
           </div>
@@ -822,7 +824,7 @@
 
         <div class="card" id="changeRequestForm" hidden>
           <h3>変更依頼を送る（<span id="changeRequestVendorLabel"></span>）</h3>
-          <p class="muted" style="margin:0 0 8px; font-size:.76rem;">打合せで決まった変更内容を入力してください。登録済みの添付資料も一緒に送られます。</p>
+          <p class="muted" style="margin:0 0 8px; font-size:.85rem;">打合せで決まった変更内容を入力してください。登録済みの添付資料も一緒に送られます。</p>
           <div class="addform" style="flex-direction:column; align-items:stretch;">
             <label class="field"><textarea id="changeRequestNote" rows="4" placeholder="例：キッチンの仕様変更に伴い、天板色をホワイトグレーに変更してください。"></textarea></label>
             <div class="row"><button class="btn" id="btnSendChangeRequest">Gmailで変更依頼を送信</button><button class="btn secondary" id="btnCancelChangeRequest">キャンセル</button></div>
@@ -834,7 +836,7 @@
       <div class="subpanel" id="sub-plan">
         <div class="card">
           <h3>この案件の図面</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面の一覧です。タップするとそのままプランボードで開き、見たり書き込んだりできます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">見積タブで登録した図面の一覧です。タップするとそのままプランボードで開き、見たり書き込んだりできます。</p>
           <div class="pbsourcelist" id="drawingsList"></div>
           <div class="empty" id="drawingsEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
         </div>
@@ -861,17 +863,17 @@
             <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
             <div class="row" style="align-items:center; gap:8px; margin-block-start:4px;">
-              <span class="muted" style="font-size:.76rem;">部位：</span>
-              <span id="meetingNoteSpecPartLabel" style="font-size:.82rem; font-weight:700;">（未設定）</span>
+              <span class="muted" style="font-size:.85rem;">部位：</span>
+              <span id="meetingNoteSpecPartLabel" style="font-size:.85rem; font-weight:700;">（未設定）</span>
               <button type="button" class="btn secondary small" id="btnSetMeetingNoteSpecPart">部位を選択</button>
             </div>
             <div id="meetingNoteBadgePicker"></div>
-            <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.76rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
+            <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.85rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
           </div>
           <div class="card">
             <h3>これまでの記録</h3>
-            <p class="muted" style="margin:0 0 8px; font-size:.76rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認でき、該当する仕様タブに自動で切り替わります。</p>
+            <p class="muted" style="margin:0 0 8px; font-size:.85rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認でき、該当する仕様タブに自動で切り替わります。</p>
             <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
             <div class="notelist" id="meetingNoteList"></div>
             <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
@@ -882,7 +884,7 @@
         <div class="meetingsubpane" id="meetingsubpane-exterior">
           <div class="card">
             <h3>外部仕様</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
             <div id="specExteriorWrap"></div>
           </div>
         </div>
@@ -895,14 +897,14 @@
         <div class="meetingsubpane" id="meetingsubpane-equipment">
           <div class="card">
             <h3>暖房・換気・電気設備</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
             <div id="specEquipmentWrap"></div>
           </div>
         </div>
         <div class="meetingsubpane" id="meetingsubpane-interiorColor">
           <div class="card">
             <h3>インテリア基本色</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
             <div class="row" style="margin-block-end:10px; gap:6px;">
               <input type="text" id="interiorColorCatInput" placeholder="例：手すり">
               <button class="btn secondary small" id="btnAddInteriorColorCat">＋ カテゴリー追加</button>
@@ -913,7 +915,7 @@
         <div class="meetingsubpane" id="meetingsubpane-room">
           <div class="card">
             <h3>部屋別インテリア</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
             <div class="row" style="margin-block-end:10px; gap:6px;">
               <input type="text" id="roomCatInput" placeholder="例：造作収納">
               <button class="btn secondary small" id="btnAddRoomCat">＋ 項目を追加</button>
@@ -929,7 +931,7 @@
         <div class="meetingsubpane" id="meetingsubpane-planboard">
           <div class="card">
             <h3>プランボード</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.76rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
             <div class="pbsourcelist" id="planSourceList"></div>
             <div class="empty" id="planSourceEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
             <div class="row" style="margin-block-start:10px;">
@@ -950,7 +952,7 @@
         <h2 style="margin:0;">全案件から「依頼済みのまま未受領」を一覧表示</h2>
         <button class="btn small secondary" id="btnCheckReplies">Gmail受信を確認</button>
       </div>
-      <p class="muted" style="margin:0 0 10px; font-size:.78rem;">経過日数が長い順に並びます。</p>
+      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">経過日数が長い順に並びます。</p>
       <div class="tablewrap">
         <table><thead><tr><th>お客様名</th><th>業者</th><th>方法</th><th>依頼日</th><th>経過日数</th><th>Gmail</th><th></th></tr></thead>
           <tbody id="pendingTableBody"></tbody>
@@ -981,7 +983,7 @@
 
     <div class="card">
       <h3>おうちノートの「お知らせ・豆知識」</h3>
-      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">ここで登録した内容は、すべてのお客様の新しいおうちノート（ホーム画面）に表示されます。</p>
+      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここで登録した内容は、すべてのお客様の新しいおうちノート（ホーム画面）に表示されます。</p>
       <div class="addform">
         <label class="field">表示場所<select id="ntcKind">
           <option value="notice">お知らせ・豆知識</option>
@@ -1013,13 +1015,13 @@
 
     <div class="card">
       <h3>見積書「仕切り」ロック用の暗証番号</h3>
-      <p class="muted" style="font-size:.76rem; margin:0 0 8px;">「仕切り」扱いの見積書を見るときに求める番号です。業者向けメールには見積の種類は表示されません。</p>
+      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「仕切り」扱いの見積書を見るときに求める番号です。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
 
     <div class="card">
       <h3>Gmail連携（プランボードの下書き作成用）</h3>
-      <p class="muted" style="font-size:.76rem; margin:0 0 8px;">プランボード画面の「Gmail下書きを作成」を使うには、最初に一度だけ smilehousing8@gmail.com でこの連携を許可してください。一度許可すれば、以後は操作不要です。</p>
+      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">プランボード画面の「Gmail下書きを作成」を使うには、最初に一度だけ smilehousing8@gmail.com でこの連携を許可してください。一度許可すれば、以後は操作不要です。</p>
       <div class="row" style="align-items:center; gap:10px;">
         <span id="gmailConnStatus" class="muted">確認中…</span>
         <button class="btn secondary small" id="btnConnectGmail">Gmailと連携する</button>
@@ -1035,12 +1037,12 @@
         <h2 style="margin:0;">Gmail受信箱</h2>
         <button class="btn small secondary" id="btnRefreshGmail">更新</button>
       </div>
-      <p class="muted" style="margin:0 0 10px; font-size:.76rem;">メールをクリックするとGmailでそのメールが開きます。添付ファイルはGmail側から保存し、各案件の仕様タブ・見積タブから手動で取り込んでください。</p>
+      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">メールをクリックするとGmailでそのメールが開きます。添付ファイルはGmail側から保存し、各案件の仕様タブ・見積タブから手動で取り込んでください。</p>
       <div class="row" style="margin-block-end:10px;">
         <input type="text" id="gmailSearchInput" placeholder="例：メーカー名や件名で絞り込み（空欄で受信箱全体）" style="flex:1;">
         <button class="btn secondary small" id="btnSearchGmail">検索</button>
       </div>
-      <label class="row" style="gap:6px; align-items:center; margin-block-end:10px; font-size:.8rem;">
+      <label class="row" style="gap:6px; align-items:center; margin-block-end:10px; font-size:.85rem;">
         <input type="checkbox" id="gmailHumanOnly" checked style="width:auto;">
         人が送ったメールのみ表示（広告・通知メールなどを除く）
       </label>
@@ -1059,7 +1061,7 @@
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
     <div class="card">
       <h2 style="margin:0 0 10px;">ゴミ箱（削除した項目）</h2>
-      <p class="muted" style="font-size:.76rem; margin:0 0 10px;">削除してもすぐには消えず、ここから復元できます。</p>
+      <p class="muted" style="font-size:.85rem; margin:0 0 10px;">削除してもすぐには消えず、ここから復元できます。</p>
       <div id="trashList"></div>
       <div class="empty" id="trashEmpty" hidden>ゴミ箱は空です。</div>
     </div>
@@ -1075,7 +1077,7 @@
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
     <div class="card">
       <h2 style="margin:0 0 4px;">アプリアイコン</h2>
-      <p class="muted" style="font-size:.8rem; margin:0 0 10px;">住まいるハウジングの「家」と「笑顔（スマイル）」をモチーフにした、社内アプリ共通のアイコンです。</p>
+      <p class="muted" style="font-size:.85rem; margin:0 0 10px;">住まいるハウジングの「家」と「笑顔（スマイル）」をモチーフにした、社内アプリ共通のアイコンです。</p>
       <div class="brandshow">
         <div class="bigicon" id="bigIconSlot"></div>
         <button class="btn secondary" id="btnDownloadIcon">アイコン画像を保存（PNG）</button>
@@ -1201,7 +1203,7 @@
       </div>
       <div class="row" style="align-items:center; gap:8px;">
         <button type="button" class="btn secondary small" id="btnPickVendorSpec">部位を選ぶ（任意）</button>
-        <span class="muted" id="tfVendorSpecLabel" style="font-size:.78rem;">未選択</span>
+        <span class="muted" id="tfVendorSpecLabel" style="font-size:.85rem;">未選択</span>
       </div>
       <div class="row">
         <label class="field" style="flex-direction:row; align-items:center; gap:6px;"><input type="checkbox" id="tfHasDeadline"> 期限あり</label>
@@ -1221,9 +1223,9 @@
 <div class="taskform-modal" id="custMailModal" hidden>
   <div class="taskform-card">
     <h3 style="margin:0 0 6px;">お客様へメールを送る</h3>
-    <p class="muted" style="margin:0 0 10px; font-size:.76rem;">共有Gmail（smilehousing8@gmail.com）から、差出人名「住まいるハウジング」で送ります。お客様が返信すると、そのGmailに届き、ホームの「やりとりを見る」やGmailタブで読めます。</p>
+    <p class="muted" style="margin:0 0 10px; font-size:.85rem;">共有Gmail（smilehousing8@gmail.com）から、差出人名「住まいるハウジング」で送ります。お客様が返信すると、そのGmailに届き、ホームの「やりとりを見る」やGmailタブで読めます。</p>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
-      <div class="muted" id="cmTo" style="font-size:.84rem;"></div>
+      <div class="muted" id="cmTo" style="font-size:.85rem;"></div>
       <label class="field">文面の雛形<select id="cmKind">
         <option value="free">自由なメッセージ</option>
         <option value="change">ご予約日時の変更のお知らせ</option>
@@ -1266,7 +1268,7 @@
         <label class="field">所要時間（分）<input type="number" id="reDuration" step="30" min="30" max="480"></label>
       </div>
       <label class="field">メモ<textarea id="reNotes" rows="3"></textarea></label>
-      <div class="muted" id="reHint" style="font-size:.76rem;"></div>
+      <div class="muted" id="reHint" style="font-size:.85rem;"></div>
       <div class="row" style="margin-block-start:6px;">
         <button class="btn" id="reSave">保存</button>
         <button class="btn secondary" id="reClose">キャンセル</button>
@@ -1280,7 +1282,7 @@
   <div class="taskform-card">
     <h3 style="margin:0 0 6px;">履歴を編集</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
-      <div class="muted" id="spEditInfo" style="font-size:.78rem;"></div>
+      <div class="muted" id="spEditInfo" style="font-size:.85rem;"></div>
       <label class="field" id="spEditDateRow">日付<input type="date" id="spEditDate"></label>
       <label class="field">メモ（スタッフ用・お客様には表示されません）<textarea id="spEditMemo" rows="4"></textarea></label>
       <div class="row" style="margin-block-start:6px;">
@@ -1813,7 +1815,7 @@
     var d = noteDecisionFor(noteCatIdFor(scope, category), roomId);
     if(!d || d.status==="検討中") return "";
     var on = d.status==="決定";
-    return ' <span class="pill" style="font-size:.66rem; '+(on?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'" title="お客様がおうちノートで選択（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）">お客様：'+escapeHtml(d.status)+'</span>';
+    return ' <span class="pill" style="font-size:.85rem; '+(on?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'" title="お客様がおうちノートで選択（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）">お客様：'+escapeHtml(d.status)+'</span>';
   }
   function newNoteUrl(proj){
     return location.origin + "/note/?p=" + encodeURIComponent(proj.id) + "&t=" + encodeURIComponent(proj.noteToken);
@@ -1832,8 +1834,8 @@
     var dWrap = document.getElementById("newNoteDecisions");
     var ds = (state.noteDecisions||[]).filter(function(d){ return proj && d.projectId===proj.id && !d.deletedAt && d.status!=="検討中"; })
       .sort(function(a,b){ return (b.decidedAt||"").localeCompare(a.decidedAt||""); });
-    dWrap.innerHTML = ds.length ? '<div style="font-size:.76rem; font-weight:700; margin-block-end:4px;">お客様の決定状況</div>'+ds.map(function(d){
-      return '<div class="row" style="gap:6px; font-size:.8rem;"><span class="pill" style="'+(d.status==="決定"?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'">'+escapeHtml(d.status)+'</span>'+
+    dWrap.innerHTML = ds.length ? '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">お客様の決定状況</div>'+ds.map(function(d){
+      return '<div class="row" style="gap:6px; font-size:.85rem;"><span class="pill" style="'+(d.status==="決定"?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'">'+escapeHtml(d.status)+'</span>'+
         escapeHtml(noteDecisionName(proj, d))+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
     }).join("") : "";
   }
@@ -1865,7 +1867,7 @@
       .sort(function(a,b){ return (a.kind||"").localeCompare(b.kind||"") || (Number(a.order||0)-Number(b.order||0)); });
     wrap.innerHTML = rows.length ? rows.map(function(n){
       return '<div class="row" style="justify-content:space-between; gap:8px; background:var(--surface-2); border-radius:9px; padding:8px 10px; flex-wrap:wrap;">'+
-        '<span style="font-size:.82rem;"><span class="pill" style="font-size:.66rem;">'+escapeHtml(NOTICE_KIND_LABELS[n.kind]||n.kind)+'</span> '+
+        '<span style="font-size:.85rem;"><span class="pill" style="font-size:.85rem;">'+escapeHtml(NOTICE_KIND_LABELS[n.kind]||n.kind)+'</span> '+
         (n.tag?'<span class="muted">['+escapeHtml(n.tag)+']</span> ':'')+'<strong>'+escapeHtml(n.title||"")+'</strong>'+(n.linkUrl?' 🔗':'')+'</span>'+
         '<span class="row" style="gap:4px;"><button class="btn secondary small" data-editntc="'+n.id+'">編集</button><button class="btn danger-ghost small" data-delntc="'+n.id+'">削除</button></span></div>';
     }).join("") : '<div class="empty">まだ登録がありません。</div>';
@@ -2029,9 +2031,9 @@
         return '<div class="kancard" data-taskid="'+t.id+'">'+
           '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+
             (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
-            (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.68rem;">🔒自分だけ</span>':'')+'</div>'+
+            (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
-          (t.vendorSpec?'<div class="muted" style="font-size:.7rem; margin-block-end:4px;">部位：'+escapeHtml(t.vendorSpec.label||"")+'</div>':'')+
+          (t.vendorSpec?'<div class="muted" style="font-size:.85rem; margin-block-end:4px;">部位：'+escapeHtml(t.vendorSpec.label||"")+'</div>':'')+
           (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
@@ -2042,7 +2044,7 @@
           (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
             var st = v.status||"未連絡";
             var done = VENDOR_STATUS.indexOf(st) >= 1;
-            return '<div style="display:flex; align-items:center; gap:6px; font-size:.78rem;"><span>依頼先 '+escapeHtml(v.name)+'</span>'+
+            return '<div style="display:flex; align-items:center; gap:6px; font-size:.85rem;"><span>依頼先 '+escapeHtml(v.name)+'</span>'+
               '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(done?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
           }).join("")+'</div>' : '')+
           '<div class="kc-actions">'+
@@ -2206,7 +2208,7 @@
   function renderVendorCheckboxList(){
     var wrap = document.getElementById("reqVendorList");
     var vendors = liveVendors();
-    if(vendors.length === 0){ wrap.innerHTML = '<span class="muted" style="font-size:.8rem;">業者マスタから登録してください</span>'; return; }
+    if(vendors.length === 0){ wrap.innerHTML = '<span class="muted" style="font-size:.85rem;">業者マスタから登録してください</span>'; return; }
     wrap.innerHTML = vendors.map(function(v){
       var checked = !!uiSelectedVendors[v.id];
       return '<label class="vendorchip"><input type="checkbox" data-vendor-id="'+v.id+'" '+(checked?"checked":"")+'><span>'+escapeHtml(v.name)+'</span>'+(v.category?'<span class="vc-cat">'+escapeHtml(v.category)+'</span>':'')+'</label>';
@@ -2265,7 +2267,7 @@
       var isLate = row.elapsed >= 5;
       var gmailCell = row.req.method !== "gmail" ? '<span class="muted">—</span>'
         : row.req.replyDetected ? '<span class="pill status-受領済み" title="'+escapeHtml(row.req.replySnippet||"")+'">返信あり</span>'
-        : '<span class="muted" style="font-size:.72rem;">未確認</span>';
+        : '<span class="muted" style="font-size:.85rem;">未確認</span>';
       var receiveBtnClass = row.req.replyDetected ? "btn small" : "btn small secondary";
       return '<tr><td class="cellname">'+escapeHtml(row.project.customer||row.project.name)+'</td><td>'+escapeHtml(row.vendor.name)+'</td><td>'+methodPill(row.req.method)+'</td>'+
         '<td class="tabular">'+fmtDate(row.req.requestedAt)+'</td><td class="tabular" style="'+(isLate?'color:var(--danger);font-weight:700;':'')+'">'+(row.elapsed>=0?row.elapsed+"日":"—")+'</td>'+
@@ -2772,7 +2774,7 @@
     var valuesBlockHtml = '<div class="speccat">'+
       '<h4>色・仕様（サッシ・ガラスなど）'+noteDecisionPill("exterior",null)+'</h4>'+
       '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
-      '<span style="font-size:.72rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
+      '<span style="font-size:.85rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
       '<button type="button" class="btn secondary small" id="btnReflectExteriorSpecValues">🌐 おうちノートに反映する</button>'+
       '</div>'+
       '<div class="extspecvalues-grid">'+
@@ -2795,7 +2797,7 @@
         decidedSummaryHtml("exterior",cat,null,null)+
         '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml((proj && proj.exteriorNotes && proj.exteriorNotes[cat])||"")+'</textarea>'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-start:12px; margin-block-end:5px; flex-wrap:wrap; gap:6px;">'+
-        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">写真・プランボード・図面の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</span>'+
+        '<span style="font-size:.85rem; color:var(--muted); font-weight:700;">写真・プランボード・図面の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</span>'+
         '<span class="row" style="gap:6px;">'+
         '<label class="btn secondary small" for="exteriorPbUploadInput_'+encodeURIComponent(cat)+'" style="cursor:pointer;">＋ 図面を取り込む</label>'+
         '<input type="file" id="exteriorPbUploadInput_'+encodeURIComponent(cat)+'" accept="image/*,application/pdf" hidden data-exterior-pb-cat="'+escapeHtml(cat)+'">'+
@@ -2873,7 +2875,7 @@
       return p.projectId===state.currentProjectId && p.scope==="facility" && !p.reflected;
     }).length;
     var reflectAllHtml = '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
-      '<span style="font-size:.72rem; color:var(--muted);">各カテゴリーの写真・プランボードの「反映」ボタンでも個別に送れます。</span>'+
+      '<span style="font-size:.85rem; color:var(--muted);">各カテゴリーの写真・プランボードの「反映」ボタンでも個別に送れます。</span>'+
       '<button type="button" class="btn secondary small" id="btnReflectAllFacility">🌐 未反映の写真をすべておうちノートに反映する'+(facilityUnreflectedCount?'（'+facilityUnreflectedCount+'件）':'')+'</button>'+
       '</div>';
     var catsGridHtml = '<div class="speccatgrid">'+facilityCatsToShow.map(function(cat){
@@ -2881,7 +2883,7 @@
         decidedSummaryHtml("facility",cat,null,null)+
         '<textarea class="facilityNote" data-facilitynote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         '<div class="row" style="justify-content:space-between; align-items:center; margin-block-start:12px; margin-block-end:5px; flex-wrap:wrap; gap:6px;">'+
-        '<span style="font-size:.72rem; color:var(--muted); font-weight:700;">写真・プランボード・図面の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</span>'+
+        '<span style="font-size:.85rem; color:var(--muted); font-weight:700;">写真・プランボード・図面の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</span>'+
         '<span class="row" style="gap:6px;">'+
         '<label class="btn secondary small" for="facilityPbUploadInput_'+encodeURIComponent(cat)+'" style="cursor:pointer;">＋ 図面を取り込む</label>'+
         '<input type="file" id="facilityPbUploadInput_'+encodeURIComponent(cat)+'" accept="image/*,application/pdf" hidden data-facility-pb-cat="'+escapeHtml(cat)+'">'+
@@ -2938,7 +2940,7 @@
     var catsGridHtml = '<div class="speccatgrid">'+equipmentCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("equipment",cat)+'</h4>'+
         decidedSummaryHtml("equipment",cat,null,null)+
-        '<div style="font-size:.72rem; color:var(--muted); margin-block-end:6px;">写真の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</div>'+
+        '<div style="font-size:.85rem; color:var(--muted); margin-block-end:6px;">写真の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</div>'+
         '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("equipment",cat,null,null)+
         '</div>';
@@ -3230,7 +3232,7 @@
     var box = document.createElement("div");
     box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:360px;width:100%;box-shadow:var(--shadow);max-height:85vh;overflow:auto;";
     box.innerHTML = '<h3 style="margin:0 0 6px;">依頼先の業者を選択</h3>'+
-      '<p class="muted" style="margin:0 0 10px; font-size:.8rem;">複数社に頼むときは、すべてチェックしてください（選ばなければ、あとで入力）</p>'+
+      '<p class="muted" style="margin:0 0 10px; font-size:.85rem;">複数社に頼むときは、すべてチェックしてください（選ばなければ、あとで入力）</p>'+
       '<div style="display:flex; flex-direction:column; gap:6px; margin-block-end:12px;">'+
       (vs.length ? vs.map(function(v){ return '<label style="display:flex; align-items:center; gap:8px; font-size:.9rem;"><input type="checkbox" data-vpick="'+escapeHtml(v.id)+'"> '+escapeHtml(v.name)+'</label>'; }).join("") : '<div class="muted">業者が登録されていません</div>')+
       '</div>'+
@@ -3520,12 +3522,12 @@
         '<span class="pill small '+typeClass+'">'+typeLabel+'</span>'+
         (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
         '</div>'+
-        (snippet?'<div class="muted" style="font-size:.72rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
+        (snippet?'<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
       var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
       var delBtnHtml = '<button class="spdel" data-delspec="'+p.id+'" title="この履歴を削除">×</button>';
       var editBtnHtml = '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-edit="'+p.id+'">✏️ 編集</button>';
       var memoHtml = p.memo
-        ? '<div style="flex-basis:100%; margin-block-start:5px; padding:6px 8px; border-radius:8px; background:var(--surface-2); font-size:.76rem; white-space:pre-wrap;">📝 '+escapeHtml(p.memo)+'</div>'
+        ? '<div style="flex-basis:100%; margin-block-start:5px; padding:6px 8px; border-radius:8px; background:var(--surface-2); font-size:.85rem; white-space:pre-wrap;">📝 '+escapeHtml(p.memo)+'</div>'
         : '';
       var spSent = specSentInfo(p);
       var spSentTypes = SPEC_SEND_TYPES.filter(function(t){ return spSent[t.type]; });
@@ -3587,7 +3589,7 @@
         g.cards.join("")+
         '</div>';
     }).join("");
-    return '<div style="margin-block-start:10px;"><div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
+    return '<div style="margin-block-start:10px;"><div style="font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
   }
   function toggleMeetingReflected(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
@@ -3664,7 +3666,7 @@
     var copyBtn = document.getElementById("btnOkaiCopyLink2");
     var link = data && data.link;
     if(link && link.url){
-      area.innerHTML = '<div class="muted" style="font-size:.8rem; word-break:break-all;">'+escapeOkai(link.url)+'</div>';
+      area.innerHTML = '<div class="muted" style="font-size:.85rem; word-break:break-all;">'+escapeOkai(link.url)+'</div>';
       copyBtn.hidden = false;
       copyBtn.onclick = function(){
         if(navigator.clipboard && navigator.clipboard.writeText){
@@ -3672,7 +3674,7 @@
         } else { toast(link.url); }
       };
     } else {
-      area.innerHTML = '<div class="muted" style="font-size:.8rem;">まだリンクが発行されていません。</div>';
+      area.innerHTML = '<div class="muted" style="font-size:.85rem;">まだリンクが発行されていません。</div>';
       copyBtn.hidden = true;
     }
   }
@@ -3686,7 +3688,7 @@
       var key = escapeOkai(b.date)+"|"+escapeOkai(b.time);
       return '<div class="card" style="padding:8px 10px;"><div class="row" style="justify-content:space-between; align-items:center;">'+
         '<span>'+escapeOkai(b.dateLabel||b.date)+' '+escapeOkai(b.time)+'〜'+escapeOkai(b.endTime)+'　<span class="pill tag">'+escapeOkai(b.service)+'</span></span>'+
-        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-booking="'+key+'">削除</button>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-booking="'+key+'">削除</button>'+
         '</div></div>';
     }).join("");
   }
@@ -3715,10 +3717,10 @@
       return '<div class="card" style="padding:8px 10px;">'+
         '<div class="row" style="justify-content:space-between; align-items:center;">'+
         '<span class="pill tag">'+escapeOkai(label)+'</span>'+
-        '<span class="muted" style="font-size:.72rem;">'+escapeOkai((e.createdAt||"").slice(0,16).replace("T"," "))+'</span>'+
+        '<span class="muted" style="font-size:.85rem;">'+escapeOkai((e.createdAt||"").slice(0,16).replace("T"," "))+'</span>'+
         '</div>'+
         (e.text?'<div style="margin-block-start:6px; font-size:.85rem; white-space:pre-wrap;">'+escapeOkai(e.text)+'</div>':'')+
-        (e.attachments&&e.attachments.length?'<div class="muted" style="font-size:.72rem; margin-block-start:4px;">添付 '+e.attachments.length+'件</div>':'')+
+        (e.attachments&&e.attachments.length?'<div class="muted" style="font-size:.85rem; margin-block-start:4px;">添付 '+e.attachments.length+'件</div>':'')+
         '<div style="margin-block-start:6px;">'+readBtn+'</div>'+
         '</div>';
     }).join("");
@@ -3756,11 +3758,11 @@
       return '<div class="card" style="padding:8px 10px;">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
         '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '<span class="pill tag">金額確認中</span>')+'</div>'+
-        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
         '</div>'+
-        (it.note?'<div class="muted" style="font-size:.8rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
+        (it.note?'<div class="muted" style="font-size:.85rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">お客様の回答：'+okaiEstimateResponsePill(it.customerResponse)+
-        (it.customerRespondedAt?'<span class="muted" style="font-size:.7rem;">'+escapeOkai(new Date(it.customerRespondedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}))+'</span>':'')+
+        (it.customerRespondedAt?'<span class="muted" style="font-size:.85rem;">'+escapeOkai(new Date(it.customerRespondedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}))+'</span>':'')+
         '</div>'+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">'+
         '<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" value="'+escapeOkai(it.amount||"")+'" placeholder="金額（例：¥48,000）" style="flex:1; min-width:0;">'+
@@ -3805,9 +3807,9 @@
         '<div class="row" style="justify-content:space-between; align-items:center;">'+
         '<span>'+escapeOkai(it.title)+'</span>'+
         '<span class="row" style="gap:6px; align-items:center;"><span class="pill tag">'+escapeOkai(it.status)+'</span>'+
-        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.72rem;" data-okai-del-consider="'+escapeOkai(it.id)+'">削除</button></span>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-consider="'+escapeOkai(it.id)+'">削除</button></span>'+
         '</div>'+
-        (it.note?'<div class="muted" style="font-size:.8rem;">'+escapeOkai(it.note)+'</div>':'')+
+        (it.note?'<div class="muted" style="font-size:.85rem;">'+escapeOkai(it.note)+'</div>':'')+
         '</div>';
     }).join("");
   }
@@ -4370,9 +4372,9 @@
   }
   function taskAttachmentsHtml(taskId, atts){
     return (atts||[]).map(function(a){
-      return '<div style="display:inline-flex; align-items:center; gap:4px; background:var(--surface-2); padding:2px 8px; border-radius:4px; font-size:.75rem;">'+
+      return '<div style="display:inline-flex; align-items:center; gap:4px; background:var(--surface-2); padding:2px 8px; border-radius:4px; font-size:.85rem;">'+
         '<a href="'+a.url+'" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">📎 '+escapeHtml(a.name||"添付")+'</a>'+
-        '<button data-delattach="'+taskId+'" data-attid="'+escapeHtml(a.id)+'" style="background:none; border:none; color:var(--muted); cursor:pointer; padding:0; font-size:.8rem; line-height:1;">✕</button>'+
+        '<button data-delattach="'+taskId+'" data-attid="'+escapeHtml(a.id)+'" style="background:none; border:none; color:var(--muted); cursor:pointer; padding:0; font-size:.85rem; line-height:1;">✕</button>'+
       '</div>';
     }).join(" ");
   }
@@ -4664,7 +4666,7 @@
       var deadlineHtml = it.hasDeadline && it.deadline ? '<span class="pill tag">期限 '+escapeHtml(it.deadline)+'</span>' : "";
       var answerHtml;
       if(answered){
-        answerHtml = '<div class="muted" style="font-size:.78rem;">回答：<strong>'+escapeHtml(it.answer)+'</strong>（'+fmtTs(it.answeredAt)+'）</div>';
+        answerHtml = '<div class="muted" style="font-size:.85rem;">回答：<strong>'+escapeHtml(it.answer)+'</strong>（'+fmtTs(it.answeredAt)+'）</div>';
       } else if(it.responseType==="自由入力"){
         answerHtml = '<div class="row"><input type="text" class="cfFreeInput" placeholder="回答を入力" style="flex:1;"><button class="btn small" data-cfanswerfree="'+it.id+'">記録</button></div>';
       } else {
@@ -4696,7 +4698,7 @@
       var nextLabel = CONSIDER_STATUS_ORDER[CONSIDER_STATUS_ORDER.indexOf(status)+1];
       var pillClass = status==="決定" ? "status-受領済み" : (status==="仮決定" ? "status-依頼済み" : "status-未依頼");
       var historyHtml = (it.statusHistory||[]).map(function(h){
-        return '<div style="font-size:.68rem; color:var(--muted);">'+fmtTs(h.ts)+' - '+escapeHtml(h.status)+'</div>';
+        return '<div style="font-size:.85rem; color:var(--muted);">'+fmtTs(h.ts)+' - '+escapeHtml(h.status)+'</div>';
       }).join("");
       return '<div class="noteitem" data-confirmitem="'+it.id+'">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
@@ -4977,7 +4979,7 @@
           return '<div class="specphoto-wrap" style="width:72px;"><div class="specphoto"><img src="'+escapeHtml(p.url)+'" alt="">'+
             '<a href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
             '<button class="spdel" data-delsitephoto="'+p.id+'">×</button></div>'+
-            (cap ? '<div class="muted" title="'+escapeHtml(cap)+'" style="font-size:.6rem; width:72px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+escapeHtml(cap)+'</div>' : '')+
+            (cap ? '<div class="muted" title="'+escapeHtml(cap)+'" style="font-size:.85rem; width:72px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+escapeHtml(cap)+'</div>' : '')+
             '</div>';
         }).join("")+'</div></div>';
     });
@@ -5224,7 +5226,7 @@
           (r.phone ? '<a href="tel:'+escapeHtml(String(r.phone).replace(/[^0-9+]/g,""))+'">'+escapeHtml(r.phone)+'</a>' : '')+
           (r.email ? '　<a href="mailto:'+escapeHtml(r.email)+'">'+escapeHtml(r.email)+'</a>' : '')+'</div>'+
         (r.notes ? '<div class="ntext" style="margin-block-start:4px;">'+escapeHtml(r.notes)+'</div>' : "")+
-        (log ? '<div class="muted" style="font-size:.74rem; margin-block-start:4px;">送信履歴：'+log+'</div>' : '')+
+        (log ? '<div class="muted" style="font-size:.85rem; margin-block-start:4px;">送信履歴：'+log+'</div>' : '')+
         (r.email ? '<div class="row" style="margin-block-start:8px; gap:6px;">'+
           '<button class="btn secondary small" data-mailpublicbooking="'+r.id+'">✉ メールを送る</button>'+
           '<button class="btn ghost small" data-viewmailthread="'+r.id+'">📥 やりとりを見る</button></div>' : '')+
@@ -6007,7 +6009,7 @@
     checkedNames.forEach(function(n){ if(names.indexOf(n)<0) names.push(n); });
     box.innerHTML = names.length ? names.map(function(n){
       return '<label style="display:flex; align-items:center; gap:6px; font-size:.88rem;"><input type="checkbox" data-tfvendor="'+escapeHtml(n)+'"'+(checkedNames.indexOf(n)>=0?" checked":"")+'> '+escapeHtml(n)+'</label>';
-    }).join("") : '<span class="muted" style="font-size:.8rem;">業者が登録されていません</span>';
+    }).join("") : '<span class="muted" style="font-size:.85rem;">業者が登録されていません</span>';
   }
   function closeTaskForm(){ document.getElementById("taskFormModal").hidden = true; }
 
@@ -6314,7 +6316,7 @@
     var box = document.createElement("div");
     box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:320px;width:100%;box-shadow:var(--shadow);";
     box.innerHTML = '<h3 style="margin:0 0 8px;">'+escapeHtml(title)+'</h3>'+
-      (message ? '<p class="muted" style="margin:0 0 14px; font-size:.8rem;">'+escapeHtml(message)+'</p>' : '')+
+      (message ? '<p class="muted" style="margin:0 0 14px; font-size:.85rem;">'+escapeHtml(message)+'</p>' : '')+
       '<div style="display:flex; flex-direction:column; gap:8px;">'+
       choices.map(function(c,i){ return '<button class="btn'+(i===0?"":" secondary")+'" data-choiceval="'+i+'" style="width:100%;">'+escapeHtml(c.label)+'</button>'; }).join("")+
       '<button class="btn secondary" data-choiceval="cancel" style="width:100%;">キャンセル</button>'+
@@ -6413,7 +6415,7 @@
     var checks = [];
     for(var i=1;i<=numPages;i++){ checks.push(i); }
     box.innerHTML = '<h3 style="margin:0 0 8px;">'+escapeHtml(title)+'</h3>'+
-      '<p class="muted" style="margin:0 0 10px; font-size:.8rem;">選んだページは1つのファイルにまとめて保存されます。</p>'+
+      '<p class="muted" style="margin:0 0 10px; font-size:.85rem;">選んだページは1つのファイルにまとめて保存されます。</p>'+
       '<div style="display:flex; gap:8px; margin-block-end:10px;">'+
       '<button class="btn secondary small" id="ppSelectAll" type="button">全て選択</button>'+
       '<button class="btn secondary small" id="ppSelectNone" type="button">全て解除</button>'+
