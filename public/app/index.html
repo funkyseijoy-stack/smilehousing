@@ -337,7 +337,7 @@
   .pill.spectl-type-manual{ background:var(--gray-soft); color:var(--muted); }
   .pdfbadge{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.62); color:#fff; font-size:.85rem; font-weight:700; text-align:center; padding:1px 0; pointer-events:none; letter-spacing:.02em; }
   .pill.reflect{ background:var(--gray-soft); color:var(--muted); cursor:pointer; border:none; font-family:inherit; }
-  .pill.reflect.on{ background:var(--accent-soft); color:var(--accent-ink); }
+  .pill.reflect.on{ background:var(--accent); color:#fff; font-weight:700; }
   .pill.estimate-承認{ background:var(--blue-soft); color:var(--blue); }
   .pill.estimate-見送り{ background:var(--danger-soft); color:var(--danger); }
   .pill.estimate-未回答{ background:var(--gray-soft); color:var(--muted); }
@@ -2037,7 +2037,7 @@
             '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
-            (t.vendorSpec?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映中':'反映する')+'</button>':'')+
+            (t.vendorSpec?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
             (canBack?'<button class="btn small secondary" data-taskact="back" data-id="'+t.id+'">←戻す</button>':'')+
             (canForward?'<button class="btn small" data-taskact="forward" data-id="'+t.id+'">次へ→</button>':'')+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
@@ -2385,7 +2385,7 @@
         '<button data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
         '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
         '<div class="notemenu-divider"></div>'+
-        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
+        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
         '<div class="notemenu-divider"></div>'+
         noteSendButtonHtml(n, sent, "companytask")+
         noteSendButtonHtml(n, sent, "vendortask")+
@@ -2398,7 +2398,7 @@
       }).join("");
       return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
-        (n.reflected ? '<span class="nreflbadge">🌐 おうちノート反映済み</span>' : '')+
+        (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         sentBadgeHtml+
         (specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
@@ -2716,7 +2716,7 @@
           '</div>'+
           '<div class="pbentry-meta">'+
           '<button class="pill status-'+reqStatus+'" data-cyclereq="'+p.id+'">'+reqStatus+'</button>'+
-          '<button class="pill reflect'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"おうちノート反映済み":"おうちノートに反映")+'</button>'+
+          '<button class="pill reflect'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>'+
           '<button class="spdel" data-delspec="'+p.id+'">×</button>'+
           '</div>'+
           '</div>';
@@ -2740,7 +2740,7 @@
       var tileHtml = '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
         thumbInner+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
-      var reflectBtnHtml = '<button class="pill reflect small'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"反映済み":"反映")+'</button>';
+      var reflectBtnHtml = '<button class="pill reflect small'+(p.reflected?" on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>';
       return '<div class="specphoto-wrap">'+tileHtml+reflectBtnHtml+'</div>';
     }).join("");
     if(!opts.noAdd){
@@ -2760,8 +2760,7 @@
     var valuesBlockHtml = '<div class="speccat">'+
       '<h4>色・仕様（サッシ・ガラスなど）'+noteDecisionPill("exterior",null)+'</h4>'+
       '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px; flex-wrap:wrap; gap:6px;">'+
-      '<span style="font-size:.85rem; color:var(--muted);">ここに入力した内容が、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
-      '<button type="button" class="btn secondary small" id="btnReflectExteriorSpecValues">🌐 おうちノートに反映する</button>'+
+      '<span style="font-size:.85rem; color:var(--muted);">ここに入力した内容は、保存すると、お客様の「色・仕様」ページにそのまま表示されます。</span>'+
       '</div>'+
       '<div class="extspecvalues-grid">'+
       EXTERIOR_SPEC_VALUE_FIELDS.map(function(f){
@@ -2794,8 +2793,6 @@
         '</div>';
     }).join("")+'</div>';
     wrap.innerHTML = valuesBlockHtml + scopeMergeBarHtml("exterior") + catsGridHtml;
-    var reflectBtn = document.getElementById("btnReflectExteriorSpecValues");
-    if(reflectBtn) reflectBtn.addEventListener("click", function(){ pushExteriorSpecValuesToOkai(proj); });
     wrap.addEventListener("change", function(e){
       var noteField = e.target.closest("textarea.exteriorNote");
       if(noteField) updateExteriorNote(noteField.dataset.exteriornote, noteField.value);
@@ -2899,11 +2896,7 @@
     });
     render();
     logActivity(specPartGroupLabel(scope)+"の写真"+targets.length+"件をまとめておうちノートに反映しました");
-    toast("✅ "+targets.length+"件をおうちノートに反映中です…");
-    for(var i=0;i<targets.length;i++){
-      await pushSpecPhotoToOkai(proj, targets[i]);
-    }
-    render();
+    toast("✅ "+targets.length+"件を反映しました");
   }
   async function updateFacilityNote(cat, value){
     var proj = projectById(state.currentProjectId);
@@ -3135,12 +3128,6 @@
     render();
     saveDoc("specPhotos", p.id, p);
     logActivity((p.category||"")+"のプランボードを"+(p.reflected?"おうちノートに反映しました":"反映解除しました"));
-    // 「反映」の印をつけた時点で、実際のおうちノートへ自動で送信する
-    // （一度送ったものは取り消せないため、反映を外しても送信済みの内容はそのまま残る）
-    if(p.reflected){
-      var proj = projectById(p.projectId);
-      if(proj) pushSpecPhotoToOkai(proj, p).then(function(){ render(); });
-    }
   }
   // 仕様写真・図面を「決定」としてマークする。同じ部位（scope/category/roomId/side）の
   // 中では「決定」は常に1件だけになるよう、他のdecidedは解除する。
@@ -3527,7 +3514,7 @@
       // ボタンは、ギャラリーを廃止してもこのタイムラインから引き続き操作できるようにする
       // （打ち合わせ記録由来＝kind:"note" はメモそのものなので対象外）。
       var reqBtnHtml = (p.kind==="planboard") ? '<button class="pill status-'+(p.reqStatus||"未依頼")+'" style="cursor:pointer; border:none; font-family:inherit;" data-cyclereq="'+p.id+'">'+(p.reqStatus||"未依頼")+'</button>' : '';
-      var reflectBtnHtml = (p.kind!=="note") ? '<button class="pill reflect small'+(p.reflected?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-togglereflect="'+p.id+'">'+(p.reflected?"反映済み":"おうちノートに反映")+'</button>' : '';
+      var reflectBtnHtml = (p.kind!=="note") ? '<button class="pill reflect small'+(p.reflected?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>' : '';
       // バッジ（打合せ記録は6種類すべて、写真・プランボードは分類用の2種類のみ、トグル可能）。
       var badgeRowHtml = (p.kind==="note")
         ? (relatedNote ? '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("note:"+relatedNote.id, relatedNote.badges)+'</div>' : "")
@@ -3585,10 +3572,6 @@
     render();
     saveDoc("meetingNotes", n.id, n);
     logActivity("打合せ記録を"+(n.reflected?"おうちノートに反映しました":"反映解除しました"));
-    // 反映一覧（meetings配列）は毎回全件で置き換えるため、反映を外した場合は
-    // 次にどちらかを更新した時点でおうちノートの一覧からも外れる
-    var proj = projectById(n.projectId);
-    if(proj) pushMeetingNotesToOkai(proj);
   }
 
   // ================= おうちノート（お客様向けサイト）への反映 =================

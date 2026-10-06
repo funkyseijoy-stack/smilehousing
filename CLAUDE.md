@@ -109,6 +109,8 @@
 
 - 追加見積りの状態切り替え（2026年10月〜）: 「おうちノート連携」タブの追加見積りの各カードに「状態」の選択欄（金額確認中／承認依頼／承認済み／見送り、`OKAI_EST_STATES`・`okaiSetEstimateState`）。選んだ値は `customerEstimates` の `estimateState` に保存し、旧おうちノート側の `customerResponse`（承認／見送り／未回答）も合わせて更新する。`estimateState` が無い古いデータは金額・回答から自動判定（`okaiEstimateState`）。新おうちノート（`note-data.mts`→`public/note/index.html`）は `estimateState` が「金額確認中」なら金額が入っていても「金額確認中」と表示。保存後に返ってきた一覧に `estimateState` が入っているか確認し、入っていなければエラー表示（旧おうちノート本体のサーバーが未知の項目を捨てる場合の検知）。
 
+- 「反映」スイッチの統一（2026年10月〜）: 打合せ記録・仕様履歴（写真／PDF／プランボード）・業者タスクの「反映」ボタンは、すべて「反映する」⇔「✓反映済み」の表記で、反映済みは緑のベタ塗り（`.pill.reflect.on`）。新おうちノート（/note/）は `reflected` フラグを直接読むだけで、旧おうちノートへ送る処理は呼ばない（旧への自動送信・外部「色・仕様」の反映ボタン・一括反映内の旧送信を削除。`pushSpecPhotoToOkai` 等の関数と `syncAllToOkaiNote` は呼び出し元の無い残骸）。追加見積り・家づくりリストへの反映（`okaiUpdateList`）は新おうちノートの表示元データなので残してある。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す
