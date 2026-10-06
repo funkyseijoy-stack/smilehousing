@@ -50,10 +50,10 @@
   }
 
   *{ box-sizing:border-box; }
-  body{ background:var(--bg); color:var(--ink); font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; padding-inline:16px; padding-block:0; }
+  body{ background:var(--bg); color:var(--ink); font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; padding-inline:clamp(12px,1.6vw,32px); padding-block:0; }
   h1,h2,h3,.display{ font-family:"Zen Maru Gothic","Noto Sans JP",sans-serif; text-wrap:balance; }
   .tabular{ font-variant-numeric: tabular-nums; }
-  .wrap{ max-width: 1040px; margin:0 auto; padding-block-end:40px; }
+  .wrap{ max-width:none; margin:0 auto; padding-block-end:40px; }
 
   header.top{
     position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30;
