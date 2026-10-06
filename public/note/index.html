@@ -978,7 +978,7 @@
   }
   // 統合した項目（トイレ・暖房換気・電気あかり）と、各部屋を含むインテリアは、
   // 「どの部位の写真・記録か」が分かるように部位名（例：LDK・天井）を添える
-  var LABEL_CATS = ["toilet","climate","electric","interior","rooms"];
+  var LABEL_CATS = ["exterior","dressing","other","toilet","climate","electric","interior","rooms"];
   function partOf(c, x){
     if(!x.label || x.label===c.name || LABEL_CATS.indexOf(c.id)<0) return "";
     if(c.id==="rooms"){ var i = x.label.indexOf("・"); return i>=0 ? x.label.slice(i+1) : ""; } // 部屋名は見出しに出すので部位名だけ

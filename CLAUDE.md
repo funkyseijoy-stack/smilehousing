@@ -143,6 +143,8 @@
 
 - 「確認事項」タブの分割（2026年10月〜）: 案件の上段にあった「確認事項」（固定6項目、`scope:"siteCheck"`）は廃止し、項目ごとに分けた。**ポスト**は外部仕様のカード（`EXTERIOR_CATS`）、**ランドリーバー**は設備仕様のカード（`FACILITY_CATS`、脱衣室の隣。お客様画面は新しい項目「脱衣室」（id `dressing`、洗面の次）に出る。脱衣室・ランドリーバーは洗面から分けた：`note-data.mts` の `NOTE_CATS`／`noteCatFor` と、住まいるアプリの `noteCatIdFor`／`NOTE_CAT_NAMES` の2か所に同じ対応）。残りの**外部散水栓・インターホン親機・給湯リモコン・床下点検口**は、打合せ記録のサブタブの並びにそれぞれ別のタブ（`SITECHECK_TABS`、キー `sc_*`、`renderSpecSiteCheck` が `#siteCheckPanes` に描画）として出す（これらは `scope:"siteCheck"` のままで、お客様画面には出ない）。以前 siteCheck に入れたポスト／ランドリーバーの写真・記録・タスク・メモは、起動時に `migrateSiteCheckMoves` が新しい場所へ移す（何度動かしても同じ結果）。
 
+- お客様画面の部位名と「その他の確認」（2026年10月〜）: 外部・脱衣室にも部位名（ポスト・ランドリーバーなど）をカードに付ける（`public/note/index.html` の `LABEL_CATS`）。外部散水栓・インターホン親機・給湯リモコン・床下点検口（`scope:"siteCheck"`）は、反映したものだけお客様画面の新しい項目「その他の確認」（id `other`）に出す（`note-data.mts` の `noteCatFor`／`NOTE_CATS`、住まいるアプリの `noteCatIdFor`／`NOTE_CAT_NAMES` の2か所に同じ対応）。
+
 ## 編集を依頼する人向け：進め方の目安
 
 1. まず `public/app/index.html` を読んで、該当する画面・関数を探す
