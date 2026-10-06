@@ -151,6 +151,26 @@ export default async (req: Request, context: Context) => {
       await store.setJSON(`noteDecisions/${id}`, doc);
       return json({ ok: true, decision: doc });
     }
+    if (body.action === "decideCard") {
+      // 記録・図面の「カード1枚ごと」の仮決定／決定。項目全体の状態は、いちばん新しい決定にそろう。
+      const cat = String(body.category || "");
+      const status = String(body.status || "");
+      const cardKey = String(body.cardKey || "");
+      if (!NOTE_CATS.some((c) => c.id === cat) || cat === "plan") return json({ error: "unknown_category" }, 400);
+      if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
+      if (!/^[nt]:[A-Za-z0-9_\-]{1,80}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
+      let roomId: string | null = null;
+      if (cat === "rooms") {
+        roomId = String(body.roomId || "");
+        if (!(project.rooms || []).some((r: any) => r.id === roomId)) return json({ error: "unknown_room" }, 400);
+      }
+      const now = new Date().toISOString();
+      const id = `${projectId}__card__${cardKey.replace(":", "_")}`;
+      const doc: any = { id, projectId, category: cat, cardKey, status, label: String(body.label || "").slice(0, 60), by: "お客様", decidedAt: now, updatedAt: now };
+      if (roomId) doc.roomId = roomId;
+      await store.setJSON(`noteDecisions/${id}`, doc);
+      return json({ ok: true, decision: doc });
+    }
     if (body.action === "message") {
       const text = String(body.text || "").trim().slice(0, 2000);
       if (!text) return json({ error: "empty" }, 400);
@@ -295,6 +315,7 @@ export default async (req: Request, context: Context) => {
       label: partLabel(project, p.scope, p.category, p.roomId),
       roomId: p.roomId || null,
       file: fileOf(p),
+      key: srcTask ? "t:" + srcTask.id : undefined,
       source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
@@ -319,6 +340,7 @@ export default async (req: Request, context: Context) => {
         label: partLabel(project, vs.scope, vs.category, vs.roomId),
         roomId: vs.roomId || null,
         file: fileOf(att),
+        key: "t:" + t.id,
         source: { taskId: t.id, noteSnippet: String(t.content || "").slice(0, 60) },
         contentType: att.contentType || "",
         spec: { contract: false, quote: false },
@@ -330,6 +352,8 @@ export default async (req: Request, context: Context) => {
     const sp = n.specPart || {};
     push(noteCatFor(sp.scope, sp.category), {
       type: "note",
+      id: n.id,
+      key: "n:" + n.id,
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,
       at: (n.date ? n.date + "T12:00:00" : "") || n.createdAt || "",
@@ -349,6 +373,18 @@ export default async (req: Request, context: Context) => {
     .sort((a, b) => String(a.uploadedAt || "").localeCompare(String(b.uploadedAt || "")))
     .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "" }));
 
+  // カード1枚ごとの仮決定／決定（key が付いた記録・図面）。まだ選んでいないカードは「検討中」。
+  const cardDecByKey: Record<string, any> = {};
+  for (const d of decisions) if (d.cardKey) cardDecByKey[d.cardKey] = d;
+  for (const arr of Object.values(timelineByCat)) {
+    for (const it of arr) {
+      if (!it.key) continue;
+      const d = cardDecByKey[it.key];
+      it.cardStatus = d ? d.status : "検討中";
+      it.cardDecidedAt = d ? d.decidedAt : null;
+    }
+  }
+
   const decisionByCat: Record<string, any> = {};
   for (const d of decisions.slice().sort((a, b) => String(a.decidedAt || "").localeCompare(String(b.decidedAt || "")))) {
     decisionByCat[LEGACY_CAT_MAP[d.category] || d.category] = d; // 新しい日付のものが残る
@@ -356,7 +392,9 @@ export default async (req: Request, context: Context) => {
 
   // 各部屋：部屋ごとに写真・記録と決定状況をまとめる（内容のある部屋だけをお客様に見せる）
   const roomDecisionById: Record<string, any> = {};
-  for (const d of decisions) if (d.category === "rooms" && d.roomId) roomDecisionById[d.roomId] = d;
+  for (const d of decisions.slice().sort((a, b) => String(a.decidedAt || "").localeCompare(String(b.decidedAt || "")))) {
+    if (d.category === "rooms" && d.roomId) roomDecisionById[d.roomId] = d;
+  }
   const roomItemsById: Record<string, any[]> = {};
   for (const it of timelineByCat["rooms"] || []) {
     if (!it.roomId) continue;

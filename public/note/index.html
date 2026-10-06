@@ -137,6 +137,21 @@
   .btn:disabled{ opacity:.5; cursor:default; }
   .linkbtn{ background:none; border:none; color:var(--brown2); text-decoration:underline; cursor:pointer; font-size:.8rem; padding:0; margin-top:8px; }
 
+  /* 時系列のカード（打ち合わせ記録・変更後の図面） */
+  .feed{ position:relative; margin:4px 0 20px 8px; padding-left:16px; border-left:3px solid var(--line2); }
+  .fcard{ position:relative; border:1.5px solid var(--line2); border-left-width:6px; border-radius:14px; background:#fff; padding:12px 14px; margin-bottom:14px; }
+  .fcard::before{ content:""; position:absolute; left:-27px; top:18px; width:14px; height:14px; border-radius:50%; background:var(--line2); border:3px solid var(--page); }
+  .fcard.st-仮決定{ background:#fdf3d6; border-color:#e0b23c; }
+  .fcard.st-仮決定::before{ background:#e0b23c; }
+  .fcard.st-決定{ background:#e3f1e8; border-color:#4c9a68; }
+  .fcard.st-決定::before{ background:#4c9a68; }
+  .fhd{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .fhd .fd{ font-weight:700; font-size:.9rem; color:var(--ink); }
+  .tag.pdf{ background:#fbeede; color:#b4691f; }
+  .cdec{ margin-top:12px; padding-top:10px; border-top:1px dashed rgba(0,0,0,.15); }
+  .cdec .cnow{ font-size:.8rem; color:var(--ink2); margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .cdec .btn{ padding:12px 6px; font-size:.95rem; }
+
   /* home */
   .greet{ font-size:1.5rem; font-weight:700; margin:4px 0 6px; letter-spacing:.04em; }
   .newmsg{ color:var(--rose); font-weight:700; font-size:.92rem; margin:-2px 0 12px; letter-spacing:.06em; }
@@ -1006,44 +1021,55 @@
         '</div></div></div>';
     }
 
-    // 打ち合わせ記録と「変更後のPDF」を、1つの時系列（新しい順）に混ぜて出す。
-    // 同じタスクの同じ日のPDFは1つにまとめ、同じファイルが重複して出ないようにする。
+    // 打ち合わせ記録と「変更後のPDF」を、1つの時系列（新しい順）にカードで並べる。
+    // カードごとに「仮決定／決定」を選べる。色は状態で分ける（検討中＝白／仮決定＝黄／決定＝緑）。
+    // 同じタスクのPDFは1枚のカードにまとめ、同じファイル（url）は重複させない。
     var seenPdf = {};
     var pdfGroups = {};
     taskPdfs.forEach(function(x){
       var u = x.file && x.file.url; if(!u || seenPdf[u]) return; seenPdf[u] = true;
-      var k = x.source.taskId+"|"+String(x.at||"").slice(0,10);
-      if(!pdfGroups[k]) pdfGroups[k] = { at: x.at||"", snippet: x.source.noteSnippet||"", files: [], changing: false };
+      var k = x.source.taskId;
+      if(!pdfGroups[k]) pdfGroups[k] = { at: x.at||"", snippet: x.source.noteSnippet||"", files: [], key: x.key||("t:"+k), cardStatus: x.cardStatus||"検討中" };
+      if(String(x.at||"") > String(pdfGroups[k].at)) pdfGroups[k].at = x.at;
       pdfGroups[k].files.push(x.file);
     });
     var feed = [];
     notes.forEach(function(n){ feed.push({ at: n.at||"", kind:"note", n:n }); });
     Object.keys(pdfGroups).forEach(function(k){ feed.push({ at: pdfGroups[k].at, kind:"pdf", g:pdfGroups[k] }); });
     feed.sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); });
+    var roomIdOfTab = (c.id==="rooms" && String(tabKey).indexOf(":")>0) ? String(tabKey).split(":")[1] : "";
+    function cardDecHtml(key, status, label){
+      if(!key) return "";
+      var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(label||"").slice(0,40))+'" data-ccat="'+esc(c.id)+'"';
+      return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span></div>'+
+        '<div class="btns"><button class="btn ol" data-cdecide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
+        '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>決定する</button></div>'+
+        ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
+    }
     if(feed.length){
-      out += '<div class="section meeting">'+
-        '<div class="section-header"><span class="section-icon">💬</span><span>打ち合わせ記録・変更後の図面</span></div>'+
-        '<div class="section-content">'+
-        feed.map(function(it){
+      out += '<div class="sechd"><h3>打ち合わせ記録・変更後の図面</h3><span class="countpill">新しい順</span></div>'+
+        '<div class="feed">'+
+        feed.map(function(it, i){
+          var newest = i===0 ? '<span class="tag new">最新</span>' : '';
           if(it.kind==="pdf"){
             var g = it.g;
-            return '<div class="section-item">'+
-              '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+fmtD(g.at)+' <span class="tag note" style="background:#fbeede; color:#b4691f;">📄 変更後のPDF</span></div>'+
-              (g.snippet ? '<div class="section-item-desc">'+esc(g.snippet)+'</div>' : '')+
-              '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div></div>';
+            return '<div class="fcard st-'+esc(g.cardStatus)+'">'+
+              '<div class="fhd"><span class="fd">'+fmtD(g.at)+'</span><span class="tag pdf">📄 変更後のPDF</span>'+newest+'</div>'+
+              (g.snippet ? '<div class="section-item-desc" style="font-size:.88rem;">'+esc(g.snippet)+'</div>' : '')+
+              '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>'+
+              cardDecHtml(g.key, g.cardStatus, g.snippet)+'</div>';
           }
           var n = it.n;
-          var html = '<div class="section-item">'+
-            '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+fmtD(n.date)+(n.changing?' <span class="tag chg">変更依頼中</span>':'')+'</div>';
+          var html = '<div class="fcard st-'+esc(n.cardStatus||"検討中")+'">'+
+            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録</span>'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
           if(n.open) html += '<div class="section-item-desc"><strong>確認：</strong>'+esc(n.open)+'</div>';
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
-          html += '</div>';
+          html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open)+'</div>';
           return html;
-        }).join("")+
-        '</div></div>';
+        }).join("")+'</div>';
     }
 
     // 写真・資料section（部位に直接登録された写真・PDFなど。打合せ記録やプランボード・
@@ -1115,14 +1141,11 @@
       return out + rms.map(function(r){
         return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
           (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
-          itemsSectionsHtml(c, r.items || [], c.id+":"+r.id)+
-          decideBoxHtml(r.name, r.status, r.decidedAt, r.id);
+          itemsSectionsHtml(c, r.items || [], c.id+":"+r.id);
       }).join("");
     }
 
     out += itemsSectionsHtml(c, c.items || [], c.id);
-
-    out += decideBoxHtml(c.name, c.status, c.decidedAt, "");
     return out;
   }
   // ---------- ご家族・家電・持ち込み品の入力シート ----------
@@ -1214,6 +1237,31 @@
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
 
+  // カード1枚ごとの仮決定／決定
+  async function decideCard(status, key, roomId, label, catId){
+    var c = data.categories.find(function(x){ return x.id===catId; });
+    if(!c) return;
+    var msg = status==="決定" ? "この内容で「決定」にします。よろしいですか？" :
+      (status==="仮決定" ? "この内容を「仮決定」にします。よろしいですか？" : "この内容を「検討中」に戻します。よろしいですか？");
+    if(!window.confirm(msg)) return;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decideCard", category:catId, cardKey:key, status:status, label:label, roomId:roomId||undefined }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      var lists = roomId ? ((c.rooms||[]).find(function(r){ return r.id===roomId; })||{}).items||[] : (c.items||[]);
+      lists.forEach(function(it){ if(it.key===key){ it.cardStatus = status; it.cardDecidedAt = j.decision.decidedAt; } });
+      // 項目全体の状態は、いちばん新しい決定にそろえる
+      if(roomId){
+        var room = (c.rooms||[]).find(function(r){ return r.id===roomId; });
+        if(room){ room.status = status; room.decidedAt = j.decision.decidedAt; }
+        var rs = c.rooms||[], n = rs.filter(function(r){ return r.status==="決定"; }).length;
+        c.status = n===rs.length ? "決定" : (n===0 && rs.some(function(r){ return r.status==="仮決定"; }) ? "仮決定" : "検討中");
+        c.sub = n+"/"+rs.length+"部屋 決定";
+      } else { c.status = status; c.decidedAt = j.decision.decidedAt; }
+      render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
+    }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
+  }
+
   // ---------- イベント ----------
   document.getElementById("nav").addEventListener("click", function(e){
     var b = e.target.closest("button[data-tab]"); if(!b) return;
@@ -1236,6 +1284,7 @@
     if(e.target.closest("[data-famopen]")){ famOpen(); return; }
     var er = e.target.closest("[data-estresp]"); if(er){ respondEstimate(er.dataset.estid, er.dataset.estresp); return; }
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
+    var cd = e.target.closest("[data-cdecide]"); if(cd){ decideCard(cd.dataset.cdecide, cd.dataset.ckey, cd.dataset.croom||"", cd.dataset.clabel||"", cd.dataset.ccat); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; render(); return; }
     var rd = e.target.closest("[data-rvdate]"); if(rd){ rv.date = rd.dataset.rvdate; rv.start = ""; render(); return; }

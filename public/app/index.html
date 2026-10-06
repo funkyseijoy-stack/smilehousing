@@ -1837,8 +1837,10 @@
     var nm = NOTE_CAT_NAMES[key]||d.category;
     if(key==="rooms"){
       var room = ((proj && proj.rooms)||[]).find(function(r){ return r.id===d.roomId; });
-      return nm+"・"+(room?room.name:"部屋");
+      nm = nm+"・"+(room?room.name:"部屋");
     }
+    // カード1枚ごとの決定は、どの記録・図面か分かるよう内容を添える
+    if(d.cardKey && d.label) nm += "「"+d.label+"」";
     return nm;
   }
   function noteDecisionPill(scope, category, roomId){
