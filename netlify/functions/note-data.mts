@@ -299,6 +299,30 @@ export default async (req: Request, context: Context) => {
       changing: isChanging(p),
     });
   }
+  // 「反映済み」の業者タスクの添付（変更後のPDFなど）は、仕様写真へのコピーの有無にかかわらず
+  // タスクから直接お客様画面に出す（コピーが作られていない・反映前に作られたコピーでも出るように）。
+  // すでに反映済みの仕様写真として出ているファイルは、重複して出さない。
+  const shownUrls = new Set(specPhotos.filter((p: any) => p.reflected && p.url).map((p: any) => p.url));
+  for (const t of tasks) {
+    if (!t.reflected || t.deletedAt || t.private) continue;
+    const vs = t.vendorSpec || {};
+    if (!vs.scope || vs.scope === "general" || !vs.category) continue;
+    for (const att of t.attachments || []) {
+      if (!att || !att.url || shownUrls.has(att.url)) continue;
+      shownUrls.add(att.url);
+      push(noteCatFor(vs.scope, vs.category), {
+        type: "photo",
+        at: t.reflectedAt || t.updatedAt || t.createdAt || "",
+        label: partLabel(project, vs.scope, vs.category, vs.roomId),
+        roomId: vs.roomId || null,
+        file: fileOf(att),
+        source: { taskId: t.id, noteSnippet: String(t.content || "").slice(0, 30) },
+        contentType: att.contentType || "",
+        spec: { contract: false, quote: false },
+        changing: false,
+      });
+    }
+  }
   for (const n of reflectedNotes) {
     const sp = n.specPart || {};
     push(noteCatFor(sp.scope, sp.category), {

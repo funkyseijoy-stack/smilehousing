@@ -6335,6 +6335,13 @@
     render();
     await saveDoc("tasks", t.id, t);
     logActivity("タスク「"+(t.content||"").slice(0,20)+"」を"+(t.reflected?"おうちノートに反映しました":"反映解除しました"));
+    // このタスクの添付から作った仕様写真のコピーも、反映のON/OFFに合わせる
+    var copies = liveSpecPhotos().filter(function(sp){ return sp.source && sp.source.taskId===t.id && !!sp.reflected !== !!t.reflected; });
+    for(var ci=0; ci<copies.length; ci++){
+      copies[ci].reflected = !!t.reflected;
+      copies[ci].reflectedAt = t.reflected ? nowIso() : null;
+      await saveDoc("specPhotos", copies[ci].id, copies[ci]);
+    }
 
     // 反映をONにした場合、既存のファイルも一緒に部位に反映する
     if(t.reflected && t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category && (t.attachments||[]).length){
