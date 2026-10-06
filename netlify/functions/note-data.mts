@@ -284,15 +284,18 @@ export default async (req: Request, context: Context) => {
     (timelineByCat[cat] = timelineByCat[cat] || []).push(item);
   };
 
+  const taskById = new Map<string, any>(tasks.map((t: any) => [t.id, t]));
   for (const p of specPhotos) {
     if (!p.reflected || p.kind === "note" || !p.url) continue;
+    // タスクの添付から作られたコピーは、日付と内容をタスク側に合わせる（コピーを作った日ではなく、反映した日を出す）
+    const srcTask = p.source && p.source.taskId ? taskById.get(p.source.taskId) : null;
     push(noteCatFor(p.scope, p.category), {
       type: p.kind === "planboard" ? "planboard" : "photo",
-      at: p.createdAt || "",
+      at: (srcTask && (srcTask.reflectedAt || srcTask.updatedAt)) || p.createdAt || "",
       label: partLabel(project, p.scope, p.category, p.roomId),
       roomId: p.roomId || null,
       file: fileOf(p),
-      source: p.source || null,
+      source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
       spec: specBadge(p.badges),
@@ -316,7 +319,7 @@ export default async (req: Request, context: Context) => {
         label: partLabel(project, vs.scope, vs.category, vs.roomId),
         roomId: vs.roomId || null,
         file: fileOf(att),
-        source: { taskId: t.id, noteSnippet: String(t.content || "").slice(0, 30) },
+        source: { taskId: t.id, noteSnippet: String(t.content || "").slice(0, 60) },
         contentType: att.contentType || "",
         spec: { contract: false, quote: false },
         changing: false,

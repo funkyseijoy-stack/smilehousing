@@ -1006,12 +1006,33 @@
         '</div></div></div>';
     }
 
-    // 新しい打ち合わせ記録 section
-    if(notes.length){
+    // 打ち合わせ記録と「変更後のPDF」を、1つの時系列（新しい順）に混ぜて出す。
+    // 同じタスクの同じ日のPDFは1つにまとめ、同じファイルが重複して出ないようにする。
+    var seenPdf = {};
+    var pdfGroups = {};
+    taskPdfs.forEach(function(x){
+      var u = x.file && x.file.url; if(!u || seenPdf[u]) return; seenPdf[u] = true;
+      var k = x.source.taskId+"|"+String(x.at||"").slice(0,10);
+      if(!pdfGroups[k]) pdfGroups[k] = { at: x.at||"", snippet: x.source.noteSnippet||"", files: [], changing: false };
+      pdfGroups[k].files.push(x.file);
+    });
+    var feed = [];
+    notes.forEach(function(n){ feed.push({ at: n.at||"", kind:"note", n:n }); });
+    Object.keys(pdfGroups).forEach(function(k){ feed.push({ at: pdfGroups[k].at, kind:"pdf", g:pdfGroups[k] }); });
+    feed.sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); });
+    if(feed.length){
       out += '<div class="section meeting">'+
-        '<div class="section-header"><span class="section-icon">💬</span><span>新しい打ち合わせ記録</span></div>'+
+        '<div class="section-header"><span class="section-icon">💬</span><span>打ち合わせ記録・変更後の図面</span></div>'+
         '<div class="section-content">'+
-        notes.slice().reverse().map(function(n){
+        feed.map(function(it){
+          if(it.kind==="pdf"){
+            var g = it.g;
+            return '<div class="section-item">'+
+              '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+fmtD(g.at)+' <span class="tag note" style="background:#fbeede; color:#b4691f;">📄 変更後のPDF</span></div>'+
+              (g.snippet ? '<div class="section-item-desc">'+esc(g.snippet)+'</div>' : '')+
+              '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div></div>';
+          }
+          var n = it.n;
           var html = '<div class="section-item">'+
             '<div style="font-size:.74rem; color:var(--muted); font-weight:700; margin-bottom:6px;">'+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+fmtD(n.date)+(n.changing?' <span class="tag chg">変更依頼中</span>':'')+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
@@ -1023,17 +1044,6 @@
           return html;
         }).join("")+
         '</div></div>';
-    }
-
-    // 変更後のPDF section
-    if(taskPdfs.length){
-      out += '<div class="section pdf">'+
-        '<div class="section-header"><span class="section-icon">📄</span><span>変更後のPDF</span></div>'+
-        '<div class="section-content"><div class="section-thumbs">'+
-        taskPdfs.slice().reverse().map(function(x){
-          return thumbHtml(x.file, "");
-        }).join("")+
-        '</div></div></div>';
     }
 
     // 写真・資料section（部位に直接登録された写真・PDFなど。打合せ記録やプランボード・
