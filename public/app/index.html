@@ -5834,6 +5834,11 @@
   // ================= tasks (社内タスク管理・最重要) =================
   var taskFormVendorSpec = null;
   var editingTaskId = null;
+  // 確認者を選んだタスクは、その人の「確認中」の列へ移す（社長→社長確認中／朋子→朋子確認中）。該当の列がない人は進捗を変えない。
+  function checkStatusFor(checker){
+    var st = (checker||"")+"確認中";
+    return STATUS_ORDER.indexOf(st) >= 0 ? st : null;
+  }
   function openTaskForm(taskId){
     var editing = (typeof taskId === "string") ? state.tasks.find(function(x){ return x.id===taskId; }) : null;
     editingTaskId = editing ? editing.id : null;
@@ -5841,7 +5846,7 @@
     projSel.innerHTML = liveProjects().map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; }).join("") || '<option value="">案件がありません</option>';
     var staff = state.settings.staffList || [];
     document.getElementById("tfAssignee").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
-    document.getElementById("tfInstructor").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
+    document.getElementById("tfInstructor").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfChecker").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfVendor").innerHTML = '<option value="">なし</option>' + liveVendors().map(function(v){ return '<option value="'+escapeHtml(v.name)+'">'+escapeHtml(v.name)+'</option>'; }).join("");
     document.getElementById("tfContent").value = "";
@@ -5913,7 +5918,10 @@
       editTarget.content = content;
       editTarget.assignee = assignee||"";
       editTarget.instructor = instructor||"";
+      var prevChecker = editTarget.checker || "";
       editTarget.checker = checker||"";
+      var jumpTo = (checker && checker!==prevChecker) ? checkStatusFor(checker) : null;
+      if(jumpTo) editTarget.status = jumpTo;
       editTarget.requestTo = requestTo||"";
       editTarget.requestMethod = method;
       editTarget.hasDeadline = hasDeadline;
@@ -5926,7 +5934,8 @@
       render();
       await saveDoc("tasks", editTarget.id, editTarget);
       logActivity("タスクを編集しました（"+content.slice(0,20)+"）");
-      toast("タスクを保存しました");
+      toast(jumpTo ? "タスクを保存しました（「"+jumpTo+"」へ移しました）" : "タスクを保存しました");
+      if(jumpTo) goToTaskBoard(editTarget.id);
       return;
     }
     if(assets && files && files.length){
@@ -5951,14 +5960,15 @@
       vendorSpec: taskFormVendorSpec || null,
       private: isPrivate,
       reflected: false, reflectedAt: null,
-      status: "未着手", createdAt: nowIso(), updatedAt: nowIso()
+      status: checkStatusFor(checker) || "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
     state.tasks.push(t);
     closeTaskForm();
     render();
     await saveDoc("tasks", t.id, t);
     logActivity("タスクを追加しました（"+content.slice(0,20)+"）");
-    toast("タスクを追加しました");
+    toast(checkStatusFor(checker) ? "タスクを追加しました（「"+t.status+"」に入れました）" : "タスクを追加しました");
+    if(checkStatusFor(checker)) goToTaskBoard(t.id);
   }
 
   async function moveTask(id, dir){
@@ -7411,6 +7421,10 @@
     document.getElementById("btnNewTask").addEventListener("click", openTaskForm);
     document.getElementById("tfCancel").addEventListener("click", closeTaskForm);
     document.getElementById("tfSubmit").addEventListener("click", submitTaskForm);
+    document.getElementById("tfChecker").addEventListener("change", function(e){
+      // 確認依頼のときは指示者は不要なので、空に切り替える（あとから選び直せる）
+      if(e.target.value) document.getElementById("tfInstructor").value = "";
+    });
     document.getElementById("btnPickVendorSpec").addEventListener("click", function(){
       askSpecPart(function(part){
         if(!part) return;
