@@ -301,6 +301,14 @@
   .taskform-modal[hidden]{ display:none; }
   #cmCancelRow[hidden]{ display:none; }
   .taskform-card{ background:var(--bg); border-radius:18px; max-width:520px; width:100%; padding:16px; box-shadow: var(--shadow); }
+  /* スマホ幅で、入力欄や横並びの項目が枠からはみ出さないようにする */
+  .taskform-card{ box-sizing:border-box; min-width:0; overflow-x:hidden; }
+  .taskform-card *{ box-sizing:border-box; }
+  .taskform-card div.field{ display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:var(--muted); flex:1; }
+  .taskform-card label.field, .taskform-card .field, .taskform-card .row > *{ min-width:0; max-width:100%; }
+  .taskform-card input:not([type=checkbox]):not([type=radio]), .taskform-card select, .taskform-card textarea{ max-width:100%; min-width:0; width:100%; }
+  .taskform-card input[type=file]{ width:100%; font-size:.85rem; }
+  @media (max-width:600px){ .taskform-card .row > .field, .taskform-card .row > label.field{ flex:1 1 100%; } .taskform-card{ padding:14px 12px; } }
 
   /* ---- spec management (仕様) ---- */
   .speccat{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:10px; }
