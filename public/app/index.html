@@ -860,7 +860,10 @@
           <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
           <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア基本色</button>
           <button class="meetingsub-btn" data-meetingsub="room">部屋別インテリア</button>
-          <button class="meetingsub-btn" data-meetingsub="siteCheck">外部散水栓など</button>
+          <button class="meetingsub-btn" data-meetingsub="sc_sansui">外部散水栓</button>
+          <button class="meetingsub-btn" data-meetingsub="sc_intercom">インターホン親機</button>
+          <button class="meetingsub-btn" data-meetingsub="sc_remocon">給湯リモコン</button>
+          <button class="meetingsub-btn" data-meetingsub="sc_yukashita">床下点検口</button>
           <button class="meetingsub-btn" id="btnAddCustomPart" type="button" style="border-style:dashed;">＋追加</button>
           <button class="meetingsub-btn" data-meetingsub="planboard">プランボード</button>
         </div>
@@ -946,13 +949,7 @@
             <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
           </div>
         </div>
-        <div class="meetingsubpane" id="meetingsubpane-siteCheck">
-          <div class="card">
-            <h3>外部散水栓など</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">打合せで確認して、漏れがないようにする項目のチェックリストです。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</p>
-            <div id="specSiteCheckWrap"></div>
-          </div>
-        </div>
+        <div id="siteCheckPanes"></div>
         <div id="customPartPanes"></div>
         <div class="meetingsubpane" id="meetingsubpane-planboard">
           <div class="card">
@@ -1370,7 +1367,7 @@
   // ================= state =================
   var STATUS_ORDER = ["未着手","対応中","社長確認中","朋子確認中","業者連絡済み","お客様へ連絡済み","完了"];
   var STATUS_COLORS = {"未着手":"#8a8a85","対応中":"#2f6fb3","社長確認中":"#c2703a","朋子確認中":"#c2703a","業者連絡済み":"#2a8a7a","お客様へ連絡済み":"#7a5ab0","完了":"#4a7c59"};
-  var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア"];
+  var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア","ポスト"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
   var EXTERIOR_SPEC_VALUE_FIELDS = [
@@ -1409,9 +1406,11 @@
     {key:"consider", label:"お客様に検討してもらうこと", cls:"b-consider", group:"next"}
   ];
   var BADGE_AUTO_KEYS = ["companytask","vendortask","confirm","consider"]; // 自動登録を伴うバッジ
-  var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室"];
+  var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室","ランドリーバー"];
   var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
-  var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口","ポスト","ランドリーバー"];
+  var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口"];
+  // 上の4項目は、打合せ記録のサブタブにそれぞれ別のタブとして出す（タブのキー）
+  var SITECHECK_TABS = { "外部散水栓（水道）":{key:"sc_sansui", label:"外部散水栓"}, "インターホン親機":{key:"sc_intercom", label:"インターホン親機"}, "給湯リモコン":{key:"sc_remocon", label:"給湯リモコン"}, "床下点検口":{key:"sc_yukashita", label:"床下点検口"} };
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
@@ -1423,7 +1422,7 @@
     {label:"外部仕様", value:"exterior"},
     {label:"設備仕様", value:"facility"},
     {label:"暖房・換気・電気設備", value:"equipment"},
-    {label:"外部散水栓など", value:"siteCheck"},
+    {label:"外部散水栓・インターホンなど", value:"siteCheck"},
     {label:"インテリア基本色", value:"interiorColor"},
     {label:"部屋別インテリア", value:"room"}
   ];
@@ -1677,9 +1676,44 @@
     }
     render();
     populateUserSelect();
+    migrateSiteCheckMoves();
     repairReflectedTaskCopies();
   }
   // 「✓反映済み」なのに設備仕様に入っていない図面を、タスクの案件の設備仕様へ入れて直す（起動時に1回）。
+  // 「ポスト」は外部仕様、「ランドリーバー」は設備仕様へ移した。以前に現場確認（siteCheck）へ入れたデータを新しい場所へ移す
+  // （何度動かしても同じ結果になるよう、まだ移っていないものだけ書き換える）
+  var SITECHECK_MOVED = { "ポスト":{scope:"exterior", notes:"exteriorNotes"}, "ランドリーバー":{scope:"facility", notes:"facilityNotes"} };
+  function migrateSiteCheckMoves(){
+    try{
+      state.specPhotos.forEach(function(p){
+        var m = p && p.scope==="siteCheck" && SITECHECK_MOVED[p.category];
+        if(!m) return;
+        p.scope = m.scope; saveDoc("specPhotos", p.id, p);
+      });
+      state.meetingNotes.forEach(function(n){
+        var sp = n && n.specPart; var m = sp && sp.scope==="siteCheck" && SITECHECK_MOVED[sp.category];
+        if(!m) return;
+        sp.scope = m.scope; sp.label = (m.scope==="exterior"?"外部仕様・":"設備仕様・")+sp.category; saveDoc("meetingNotes", n.id, n);
+      });
+      state.tasks.forEach(function(t){
+        var vs = t && t.vendorSpec; var m = vs && vs.scope==="siteCheck" && SITECHECK_MOVED[vs.category];
+        if(!m) return;
+        vs.scope = m.scope; vs.label = (m.scope==="exterior"?"外部仕様・":"設備仕様・")+vs.category; saveDoc("tasks", t.id, t);
+      });
+      state.projects.forEach(function(pr){
+        var notes = pr && pr.siteCheckNotes; if(!notes) return;
+        var changed = false;
+        Object.keys(SITECHECK_MOVED).forEach(function(cat){
+          if(notes[cat]==null) return;
+          var m = SITECHECK_MOVED[cat];
+          pr[m.notes] = pr[m.notes] || {};
+          if(!pr[m.notes][cat]) pr[m.notes][cat] = notes[cat];
+          delete notes[cat]; changed = true;
+        });
+        if(changed) saveDoc("projects", pr.id, pr);
+      });
+    }catch(e){ console.warn("siteCheck migration failed", e); }
+  }
   async function repairReflectedTaskCopies(){
     try{
       var fixed = 0;
@@ -1825,7 +1859,7 @@
   // お客様画面の項目IDとの対応（netlify/functions/note-data.mts の noteCatFor と同じ内容）
   function noteCatIdFor(scope, category){
     if(scope==="exterior") return "exterior";
-    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"wash","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
+    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"wash","ランドリーバー":"wash","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "rooms";
@@ -2417,7 +2451,7 @@
     wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
-  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room", siteCheck:"siteCheck" };
+  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room" };
   function switchMeetingSubTab(key){
     var bar = document.getElementById("meetingSubTabBar");
     if(!bar) return;
@@ -2768,6 +2802,7 @@
       return (room?room.name:"部屋")+"・"+(rc?rc.label:category);
     }
     if(scope==="custom") return customPartName(proj, category);
+    if(scope==="siteCheck") return category;
     if(scope==="interiorColor") return specPartGroupLabel(scope)+"・"+category+(side?"（"+side+"）":"");
     return specPartGroupLabel(scope)+"・"+category;
   }
@@ -3060,16 +3095,21 @@
     await saveDoc("projects", proj.id, proj);
   }
   function renderSpecSiteCheck(){
-    var wrap = document.getElementById("specSiteCheckWrap");
+    var wrap = document.getElementById("siteCheckPanes");
     if(!wrap) return;
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.siteCheckNotes) || {};
-    wrap.innerHTML = scopeMergeBarHtml("siteCheck") + SITECHECK_CATS.map(function(cat){
-      return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+buildSpecGallery("siteCheck",cat,null,null)+
+    wrap.innerHTML = SITECHECK_CATS.map(function(cat){
+      var t = SITECHECK_TABS[cat];
+      return '<div class="meetingsubpane" id="meetingsubpane-'+t.key+'"><div class="card"><div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
+        '<div class="muted" style="font-size:.85rem; margin-block:4px 8px;">打合せで確認して、漏れがないようにする項目です。写真・ファイル・メモを登録できます。おうちノートに反映すると、反映済みの写真がお客様にも表示されます。</div>'+
+        buildSpecGallery("siteCheck",cat,null,null)+
         '<textarea class="siteCheckNote" data-sitechecknote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）" style="margin-block-start:8px;">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("siteCheck",cat,null,null)+
-        '</div>';
+        '</div></div></div>';
     }).join("");
+    var cur = state.meetingSubTab;
+    if(cur && cur.indexOf("sc_")===0) switchMeetingSubTab(cur);
   }
   async function updateSiteCheckNote(cat, value){
     var proj = projectById(state.currentProjectId);
@@ -7734,7 +7774,7 @@
       var dl = e.target.closest("[data-delntc]"); if(dl){ if(confirm2()) deleteNotice(dl.dataset.delntc); return; }
     });
 
-    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","specSiteCheckWrap","specInteriorWrap","specRoomsWrap","customPartPanes"].forEach(function(wrapId){
+    ["specExteriorWrap","specFacilityWrap","specEquipmentWrap","siteCheckPanes","specInteriorWrap","specRoomsWrap","customPartPanes"].forEach(function(wrapId){
       var wrap = document.getElementById(wrapId);
       if(!wrap) return;
       wrap.addEventListener("change", function(e){
@@ -8044,7 +8084,7 @@
           state.noteSpecFilter = part;
           renderMeetingNotes();
           renderSpecTab();
-          var subKey = part.scope==="custom" ? "custom_"+part.category : MEETING_SUBTAB_BY_SCOPE[part.scope];
+          var subKey = part.scope==="custom" ? "custom_"+part.category : (part.scope==="siteCheck" ? (SITECHECK_TABS[part.category]||{}).key : MEETING_SUBTAB_BY_SCOPE[part.scope]);
           if(subKey) switchMeetingSubTab(subKey);
         });
       }

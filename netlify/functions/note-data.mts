@@ -75,7 +75,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   if (scope === "facility") {
     if (category === "キッチン") return "kitchen";
     if (category === "お風呂") return "bath";
-    if (category === "洗面" || category === "脱衣室") return "wash";
+    if (category === "洗面" || category === "脱衣室" || category === "ランドリーバー") return "wash";
     if (category === "1階トイレ" || category === "2階トイレ") return "toilet";
     return null;
   }
