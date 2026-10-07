@@ -65,6 +65,25 @@ function partLabel(project: any, scope?: string, category?: string | null, roomI
 }
 
 // 固定の項目＋この案件で追加された部位（削除済みは除く）
+// お客様が「仮決定」「決定」を選んだら、スタッフのメッセージ欄に1件入れて、共有Gmailへ通知する。
+// 状態が変わらないとき（同じ状態を選び直しただけ）や「検討中」に戻したときは何もしない。
+async function notifyDecision(store: any, project: any, projectId: string, what: string, status: string, prevStatus: string | null) {
+  if (!["仮決定", "決定"].includes(status) || prevStatus === status) return;
+  try {
+    const id = genId("msg");
+    const now = new Date().toISOString();
+    const text = `【${status}】${what}を「${status}」にしました。`;
+    await store.setJSON(`messages/${id}`, {
+      id, projectId, content: text, sender: (project.customer || "お客様") + "（おうちノート）",
+      fromCustomer: true, kind: "decision", createdAt: now, updatedAt: now,
+    });
+    await sendNotifyMail(
+      `【おうちノート】${project.customer || "お客様"}様が「${status}」を選びました`,
+      `${project.customer || "お客様"}様（${project.name || ""}）が、おうちノートで次を「${status}」にしました。\n\n${what}\n\n住まいるアプリの仕様タブ（「お客様：${status}」のバッジ）と「メッセージ」で確認できます。`
+    );
+  } catch { /* 通知に失敗しても、決定の保存は成功扱い */ }
+}
+
 function catsOf(project: any) {
   const extra = ((project && project.customParts) || [])
     .filter((c: any) => c && c.id && !c.deletedAt)
@@ -180,7 +199,11 @@ export default async (req: Request, context: Context) => {
       }
       const doc: any = { id, projectId, category: cat, status, by: "お客様", decidedAt: now, updatedAt: now };
       if (roomId) doc.roomId = roomId;
+      const prev: any = await store.get(`noteDecisions/${id}`, { type: "json" });
       await store.setJSON(`noteDecisions/${id}`, doc);
+      const catName = catsOf(project).find((c) => c.id === cat)?.name || cat;
+      const roomName = roomId ? ((project.rooms || []).find((r: any) => r.id === roomId)?.name || "") : "";
+      await notifyDecision(store, project, projectId, roomName ? `${catName}（${roomName}）` : catName, status, prev ? prev.status : null);
       return json({ ok: true, decision: doc });
     }
     if (body.action === "decideCard") {
@@ -200,7 +223,12 @@ export default async (req: Request, context: Context) => {
       const id = `${projectId}__card__${cardKey.replace(":", "_")}`;
       const doc: any = { id, projectId, category: cat, cardKey, status, label: String(body.label || "").slice(0, 60), by: "お客様", decidedAt: now, updatedAt: now };
       if (roomId) doc.roomId = roomId;
+      const prev: any = await store.get(`noteDecisions/${id}`, { type: "json" });
       await store.setJSON(`noteDecisions/${id}`, doc);
+      const catName = catsOf(project).find((c) => c.id === cat)?.name || cat;
+      const roomName = roomId ? ((project.rooms || []).find((r: any) => r.id === roomId)?.name || "") : "";
+      const where = roomName ? `${catName}（${roomName}）` : catName;
+      await notifyDecision(store, project, projectId, doc.label ? `${where}「${doc.label}」` : where, status, prev ? prev.status : null);
       return json({ ok: true, decision: doc });
     }
     if (body.action === "message") {
