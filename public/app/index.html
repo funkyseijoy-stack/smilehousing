@@ -891,6 +891,7 @@
             <div id="meetingNoteBadgePicker"></div>
             <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.85rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは追加のみ可能です）。</p>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
+            <div class="row" style="margin-block-start:10px;"><button type="button" class="btn secondary small" id="btnOpenNoteImport">📥 まとめて取り込む（貼り付け）</button></div>
           </div>
           <div class="card">
             <h3>これまでの記録</h3>
@@ -6267,6 +6268,164 @@
     await applyNewlyOnBadges(n, badgesToApply, vendorIdToApply, assigneeToApply);
     logActivity("打合せ内容を記録しました");
   }
+
+  // ================= 打合せ記録の貼り付け取り込み =================
+  // 他のシート等にあった記録を、部位ごとに分けてまとめて入れるための画面。
+  // 貼り付ける形式: {"source":"名前","notes":[{"date":"2026-09-08","title":"","text":"","method":"","author":"",
+  //   "part":{"scope":"equipment","category":"電気配線"}}]}
+  // part の書き方: facility/equipment/siteCheck は category、room は room（部屋名）、custom は custom（追加部位名）、general は scope のみ。
+  function noteImportResolve(proj, it, roomMap){
+    var pt = it.part || {scope:"general"};
+    var sc = pt.scope;
+    if(sc==="general") return {scope:"general", category:null, roomId:null, side:null, label:"総合"};
+    if(sc==="facility"||sc==="equipment"||sc==="siteCheck"){
+      var list = sc==="facility" ? FACILITY_CATS : sc==="equipment" ? EQUIPMENT_CATS : SITECHECK_CATS;
+      if(list.indexOf(pt.category)<0) return null;
+      return {scope:sc, category:pt.category, roomId:null, side:null, label:specPartGroupLabel(sc)+"・"+pt.category};
+    }
+    if(sc==="room"){
+      var rid = roomMap[pt.room];
+      if(!rid) return null;
+      return {scope:"room", category:null, roomId:rid, side:null, label:(roomMap.__names&&roomMap.__names[rid])||pt.room};
+    }
+    if(sc==="custom"){
+      var c = customPartsOf(proj).find(function(x){ return x.name===pt.custom; });
+      return {scope:"custom", category:c?c.id:"__new__"+pt.custom, roomId:null, side:null, label:pt.custom};
+    }
+    return null;
+  }
+  function openNoteImport(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:12px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:720px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow);";
+    box.innerHTML = '<h3 style="margin:0 0 8px;">打合せ記録をまとめて取り込む</h3>'+
+      '<p class="muted" style="margin:0 0 8px; font-size:.85rem;">用意したデータを下に貼り付けて「内容を確認」を押してください。この時点ではまだ何も保存されません。取り込んだ記録は、部位ごとの履歴に入り、お客様のおうちノートにも反映されます（取り込み後に「反映」を外せば非表示にできます）。</p>'+
+      '<textarea id="niText" rows="6" style="width:100%;" placeholder="ここに貼り付け"></textarea>'+
+      '<div id="niPreview" style="margin-block:10px;"></div>'+
+      '<div class="row" style="gap:8px; flex-wrap:wrap;"><button type="button" class="btn secondary" id="niCheck">内容を確認</button>'+
+      '<button type="button" class="btn" id="niGo" disabled>この内容で取り込む</button>'+
+      '<button type="button" class="btn secondary" id="niClose">閉じる</button></div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    var plan = null;
+    var $ = function(id){ return box.querySelector("#"+id); };
+    $("niClose").addEventListener("click", function(){ overlay.remove(); });
+
+    function exists(key){ return state.meetingNotes.some(function(n){ return !n.deletedAt && n.projectId===proj.id && n.importKey===key; }); }
+    function build(){
+      var data;
+      try{ data = JSON.parse($("niText").value); }catch(e){ $("niPreview").innerHTML='<div style="color:#b00020;">貼り付けた内容を読み取れませんでした。コピーし直してください。</div>'; $("niGo").disabled=true; plan=null; return; }
+      var notes = (data && Array.isArray(data.notes)) ? data.notes : null;
+      if(!notes || !notes.length){ $("niPreview").innerHTML='<div style="color:#b00020;">記録が見つかりません。</div>'; $("niGo").disabled=true; plan=null; return; }
+      var src = String(data.source||"import").slice(0,40);
+      // 部屋の割り当て
+      var roomNames = [];
+      notes.forEach(function(n){ if(n.part && n.part.scope==="room" && roomNames.indexOf(n.part.room)<0) roomNames.push(n.part.room); });
+      var rooms = proj.rooms||[];
+      var prevSel = {};
+      box.querySelectorAll("[data-niroom]").forEach(function(sel){ prevSel[sel.dataset.niroom]=sel.value; });
+      var roomHtml = roomNames.map(function(nm){
+        var def = prevSel[nm];
+        if(def==null){ var hit = rooms.find(function(r){ return r.name===nm; }); def = hit ? hit.id : "__new"; }
+        return '<div style="margin:4px 0; font-size:.85rem;">部屋「'+escapeHtml(nm)+'」 → <select data-niroom="'+escapeHtml(nm)+'">'+
+          '<option value="__new"'+(def==="__new"?" selected":"")+'>新しく作る</option>'+
+          rooms.map(function(r){ return '<option value="'+escapeHtml(r.id)+'"'+(def===r.id?" selected":"")+'>'+escapeHtml(r.name)+'</option>'; }).join("")+'</select></div>';
+      }).join("");
+      // 日付は空欄なら直前の日付を引き継ぐ
+      var last = "";
+      var items = notes.map(function(n,i){
+        var d = /^\d{4}-\d{2}-\d{2}/.test(n.date||"") ? String(n.date).slice(0,10) : last;
+        if(d) last = d;
+        return { i:i, date:d||todayStr(), n:n, key: src+":"+i };
+      });
+      var counts = {}, dup = 0, bad = 0;
+      var roomMap = {__names:{}};
+      box.querySelectorAll("[data-niroom]").forEach(function(sel){ roomMap[sel.dataset.niroom]=sel.value; });
+      roomNames.forEach(function(nm){ if(roomMap[nm]==null){ var hit = rooms.find(function(r){ return r.name===nm; }); roomMap[nm] = hit?hit.id:"__new"; } });
+      var resolved = items.map(function(it){
+        var rm = Object.assign({}, roomMap);
+        if(it.n.part && it.n.part.scope==="room"){ var v = roomMap[it.n.part.room]; rm[it.n.part.room] = v==="__new" ? "__newroom" : v; var r0 = rooms.find(function(r){ return r.id===v; }); rm.__names = {}; if(r0) rm.__names[r0.id]=r0.name; }
+        var part = noteImportResolve(proj, it.n, rm);
+        var isDup = exists(it.key);
+        if(isDup) dup++; else if(!part) bad++;
+        var lab = part ? part.label : "（部位を判定できません）";
+        if(!isDup) counts[lab] = (counts[lab]||0)+1;
+        return {it:it, part:part, dup:isDup};
+      });
+      plan = {src:src, resolved:resolved, roomNames:roomNames};
+      var newCustoms = [];
+      resolved.forEach(function(r){ var pt=r.it.n.part; if(!r.dup && pt && pt.scope==="custom" && !customPartsOf(proj).some(function(c){return c.name===pt.custom;}) && newCustoms.indexOf(pt.custom)<0) newCustoms.push(pt.custom); });
+      var willNew = roomNames.filter(function(nm){ return roomMap[nm]==="__new"; });
+      $("niPreview").innerHTML = '<div style="font-size:.85rem;"><b>'+(items.length-dup-bad)+'件</b>を取り込みます'+(dup?'（取り込み済み '+dup+'件はスキップ）':'')+(bad?'<span style="color:#b00020;">（判定できない '+bad+'件は取り込みません）</span>':'')+'</div>'+
+        (roomHtml?'<div style="margin-block:6px;">'+roomHtml+'</div>':'')+
+        (willNew.length?'<div style="font-size:.85rem;">新しく作る部屋：'+willNew.map(escapeHtml).join("、")+'</div>':'')+
+        (newCustoms.length?'<div style="font-size:.85rem;">新しく作る部位：'+newCustoms.map(escapeHtml).join("、")+'</div>':'')+
+        '<div style="margin-block-start:6px; font-size:.85rem;">部位ごとの件数：'+Object.keys(counts).map(function(k){ return escapeHtml(k)+" "+counts[k]; }).join(" ／ ")+'</div>'+
+        '<details style="margin-block-start:6px; font-size:.85rem;"><summary>1件ずつ確認する</summary>'+resolved.map(function(r){
+          return '<div style="border-top:1px solid #0001; padding:4px 0;'+(r.dup?'opacity:.5;':'')+'">'+escapeHtml(r.it.date)+'｜<b>'+escapeHtml(r.part?r.part.label:"？")+'</b>'+(r.it.n.title?'（'+escapeHtml(r.it.n.title)+'）':'')+'<br>'+escapeHtml(r.it.n.text||"")+'</div>';
+        }).join("")+'</details>';
+      $("niGo").disabled = (items.length-dup-bad)<=0;
+      box.querySelectorAll("[data-niroom]").forEach(function(sel){ sel.addEventListener("change", build); });
+    }
+    $("niCheck").addEventListener("click", build);
+    $("niGo").addEventListener("click", async function(){
+      if(!plan) return;
+      var go = $("niGo"); go.disabled = true; go.textContent = "取り込み中…";
+      var failed = 0, done = 0;
+      try{
+        // 部屋・追加部位を先に作る
+        var roomIds = {};
+        box.querySelectorAll("[data-niroom]").forEach(function(sel){ roomIds[sel.dataset.niroom]=sel.value; });
+        var projChanged = false;
+        plan.roomNames.forEach(function(nm){
+          if(roomIds[nm]==="__new"){
+            var r = {id:uid("room"), name:nm, accentNote:""};
+            proj.rooms = (proj.rooms||[]).concat([r]); roomIds[nm]=r.id; projChanged = true;
+          }
+        });
+        var customIds = {};
+        plan.resolved.forEach(function(r){
+          var pt = r.it.n.part;
+          if(r.dup || !pt || pt.scope!=="custom" || customIds[pt.custom]) return;
+          var c = customPartsOf(proj).find(function(x){ return x.name===pt.custom; });
+          if(!c){ c = {id:uid("cp"), name:pt.custom, createdAt:nowIso()}; proj.customParts=(proj.customParts||[]).concat([c]); projChanged = true; }
+          customIds[pt.custom] = c.id;
+        });
+        if(projChanged){ var okp = await saveDoc("projects", proj.id, proj); if(okp===false){ toast("部屋・部位の保存に失敗したため、取り込みを中止しました"); go.textContent="この内容で取り込む"; go.disabled=false; return; } }
+        for(var k=0;k<plan.resolved.length;k++){
+          var r = plan.resolved[k]; if(r.dup) continue;
+          var n0 = r.it.n, pt = n0.part||{scope:"general"}, part;
+          if(pt.scope==="room"){
+            var rid = roomIds[pt.room]; var rr = (proj.rooms||[]).find(function(x){ return x.id===rid; });
+            part = {scope:"room", category:null, roomId:rid, side:null, label: rr?rr.name:pt.room};
+          } else if(pt.scope==="custom"){
+            part = {scope:"custom", category:customIds[pt.custom], roomId:null, side:null, label:pt.custom};
+          } else part = r.part;
+          if(!part){ failed++; continue; }
+          var text = String(n0.text||"").trim();
+          var mm = ("0"+Math.floor(r.it.i/60)).slice(-2)+":"+("0"+(r.it.i%60)).slice(-2);
+          var note = { id:uid("note"), projectId:proj.id, title:String(n0.title||"").trim(), decided:text, open:"",
+            talk: n0.method ? "打合せ方法："+n0.method : "", message:"", content: meetingNoteDerivedContent(text,""),
+            date: r.it.date, files:[], author: String(n0.author||"")||state.currentUser||"",
+            createdAt: r.it.date+"T"+mm+":00.000Z", specPart: part, badges:{}, autoCreated:{},
+            reflected:true, reflectedAt:nowIso(), importKey:r.it.key };
+          state.meetingNotes.push(note);
+          var ok = await saveDoc("meetingNotes", note.id, note);
+          if(ok===false){ failed++; state.meetingNotes = state.meetingNotes.filter(function(x){ return x.id!==note.id; }); continue; }
+          upsertNoteSpecEntry(note);
+          done++;
+        }
+        logActivity("打合せ記録を"+done+"件、貼り付けで取り込みました");
+      }catch(e){ failed++; }
+      render();
+      overlay.remove();
+      toast(done+"件を取り込みました"+(failed?"（"+failed+"件は失敗しました。もう一度開いて確認してください）":""));
+    });
+  }
+
   function editMeetingNote(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
     if(!n){ toast("記録が見つかりませんでした"); return; }
@@ -7727,6 +7886,7 @@
 
     document.getElementById("meetingNoteInput");
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
+    document.getElementById("btnOpenNoteImport").addEventListener("click", openNoteImport);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
     document.getElementById("btnSetMeetingNoteSpecPart").addEventListener("click", function(){
       askSpecPart(function(part){
