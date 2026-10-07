@@ -6307,12 +6307,32 @@
       '<div id="niPreview" style="margin-block:10px;"></div>'+
       '<div class="row" style="gap:8px; flex-wrap:wrap;"><button type="button" class="btn secondary" id="niCheck">内容を確認</button>'+
       '<button type="button" class="btn" id="niGo" disabled>この内容で取り込む</button>'+
-      '<button type="button" class="btn secondary" id="niClose">閉じる</button></div>';
+      '<button type="button" class="btn secondary" id="niClose">閉じる</button></div>'+
+      '<div style="margin-block-start:14px; padding-block-start:10px; border-top:1px solid #0002;"><p class="muted" style="margin:0 0 6px; font-size:.85rem;">取り込み済みの記録で、文章が「決定事項」に入っているものを「未決・お客様に確認すること」へ移します（部位・日付はそのまま）。</p><button type="button" class="btn secondary small" id="niMove">取り込み済みの記録を「未決」へ移す</button></div>';
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     var plan = null;
     var $ = function(id){ return box.querySelector("#"+id); };
     $("niClose").addEventListener("click", function(){ overlay.remove(); });
+    $("niMove").addEventListener("click", async function(){
+      var targets = state.meetingNotes.filter(function(n){ return !n.deletedAt && n.projectId===proj.id && n.importKey && n.decided && !n.open; });
+      if(!targets.length){ toast("移す記録はありません"); return; }
+      if(!confirm("取り込み済みの記録 "+targets.length+"件の文章を「未決・お客様に確認すること」へ移します。よろしいですか？")) return;
+      var mv = $("niMove"); mv.disabled = true; mv.textContent = "移動中…";
+      var done = 0, failed = 0;
+      for(var i=0;i<targets.length;i++){
+        var n = targets[i];
+        var bk = {decided:n.decided, open:n.open, content:n.content, updatedAt:n.updatedAt};
+        n.open = n.decided; n.decided = ""; n.content = meetingNoteDerivedContent("", n.open); n.updatedAt = nowIso();
+        var ok = await saveDoc("meetingNotes", n.id, n);
+        if(ok===false){ n.decided=bk.decided; n.open=bk.open; n.content=bk.content; n.updatedAt=bk.updatedAt; failed++; continue; }
+        if(n.specPart) upsertNoteSpecEntry(n);
+        done++;
+      }
+      logActivity("取り込み済みの打合せ記録 "+done+"件を「未決」へ移しました");
+      render(); overlay.remove();
+      toast(done+"件を「未決」へ移しました"+(failed?"（"+failed+"件は失敗）":""));
+    });
 
     function exists(key){ return state.meetingNotes.some(function(n){ return !n.deletedAt && n.projectId===proj.id && n.importKey===key; }); }
     function build(){
@@ -6355,7 +6375,7 @@
         if(!isDup) counts[lab] = (counts[lab]||0)+1;
         return {it:it, part:part, dup:isDup};
       });
-      plan = {src:src, resolved:resolved, roomNames:roomNames};
+      plan = {src:src, resolved:resolved, roomNames:roomNames, field:(data.field==="decided"?"decided":"open")};
       var newCustoms = [];
       resolved.forEach(function(r){ var pt=r.it.n.part; if(!r.dup && pt && pt.scope==="custom" && !customPartsOf(proj).some(function(c){return c.name===pt.custom;}) && newCustoms.indexOf(pt.custom)<0) newCustoms.push(pt.custom); });
       var willNew = roomNames.filter(function(nm){ return roomMap[nm]==="__new"; });
@@ -6407,8 +6427,9 @@
           if(!part){ failed++; continue; }
           var text = String(n0.text||"").trim();
           var mm = ("0"+Math.floor(r.it.i/60)).slice(-2)+":"+("0"+(r.it.i%60)).slice(-2);
-          var note = { id:uid("note"), projectId:proj.id, title:String(n0.title||"").trim(), decided:text, open:"",
-            talk: n0.method ? "打合せ方法："+n0.method : "", message:"", content: meetingNoteDerivedContent(text,""),
+          var fld = (plan.field==="decided") ? "decided" : "open";
+          var note = { id:uid("note"), projectId:proj.id, title:String(n0.title||"").trim(), decided:(fld==="decided"?text:""), open:(fld==="open"?text:""),
+            talk: n0.method ? "打合せ方法："+n0.method : "", message:"", content: meetingNoteDerivedContent(fld==="decided"?text:"", fld==="open"?text:""),
             date: r.it.date, files:[], author: String(n0.author||"")||state.currentUser||"",
             createdAt: r.it.date+"T"+mm+":00.000Z", specPart: part, badges:{}, autoCreated:{},
             reflected:true, reflectedAt:nowIso(), importKey:r.it.key };
