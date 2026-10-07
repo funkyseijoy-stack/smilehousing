@@ -1,6 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { sendTaskAssignedMail } from "../lib/task-mail.mts";
+import { sendTaskAssignedMail, sendTaskDoneMails, queueTaskNotice, isQuietHourJst } from "../lib/task-mail.mts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -123,11 +123,19 @@ export default async (req: Request, context: Context) => {
     if (collection === "tasks" && !doc.deletedAt && !doc.private) {
       const by = String(body.by || "");
       const jobs: Promise<any>[] = [];
+      // 昼は都度メール、夜（18時〜翌9時）は翌朝9時にまとめて送る
+      const quiet = isQuietHourJst();
+      const notify = (role: "assignee" | "checker", name: string) =>
+        (quiet ? queueTaskNotice(store, doc, role, name, by) : sendTaskAssignedMail(store, doc, role, name, by)).catch(() => false);
       if (doc.assignee && doc.assignee !== by && doc.assignee !== (prevTask && prevTask.assignee)) {
-        jobs.push(sendTaskAssignedMail(store, doc, "assignee", doc.assignee, by).catch(() => false));
+        jobs.push(notify("assignee", doc.assignee));
       }
       if (doc.checker && doc.checker !== by && doc.checker !== (prevTask && prevTask.checker)) {
-        jobs.push(sendTaskAssignedMail(store, doc, "checker", doc.checker, by).catch(() => false));
+        jobs.push(notify("checker", doc.checker));
+      }
+      // 「完了」になったら、社長・朋子・依頼者へ報告する
+      if (doc.status === "完了" && prevTask && prevTask.status !== "完了") {
+        jobs.push(sendTaskDoneMails(store, doc, by).catch(() => false));
       }
       if (jobs.length) {
         const all = Promise.all(jobs);
