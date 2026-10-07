@@ -431,9 +431,10 @@
       </div>
     </div>
     <div class="userpicker">
-      <span class="muted" style="font-size:.85rem;">担当者</span>
-      <select id="userSelect"></select>
+      <span class="muted" style="font-size:.85rem;" title="記録や変更履歴に名前が残ります">いま使っている人</span>
+      <select id="userSelect" title="ここで選んだ名前が、記録・タスク・変更履歴に残ります"></select>
       <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 最新の内容に更新</button>
+      <span class="muted" id="syncStamp" style="font-size:.85rem;"></span>
       <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span></button>
     </div>
   </header>
@@ -1726,7 +1727,7 @@
 
   async function syncFromServer(){
     var btn = document.getElementById("btnSyncNow");
-    var origText = btn ? btn.textContent : "";
+    var okLabel = ""; var origText = btn ? btn.textContent : "";
     if(btn){ btn.disabled = true; btn.textContent = "🔄 更新中…"; }
     try{
       var results = await Promise.all(DATA_COLLECTIONS.map(function(c){ return apiGet(c); }));
@@ -1748,10 +1749,19 @@
       render();
       populateUserSelect();
       toast("最新の内容に更新しました");
+      var d = new Date(), stamp = document.getElementById("syncStamp");
+      if(stamp) stamp.textContent = "✅ "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+" に更新しました";
+      okLabel = "✅ 更新しました";
     }catch(e){
       if(String(e && e.message)!=="unauthorized") toast("更新に失敗しました（詳細: "+String(e && e.message || e)+"）");
+      var stamp2 = document.getElementById("syncStamp");
+      if(stamp2) stamp2.textContent = "⚠️ 更新に失敗しました。もう一度押してください";
     } finally {
-      if(btn){ btn.disabled = false; btn.textContent = origText || "🔄 最新の内容に更新"; }
+      if(btn){
+        btn.disabled = false;
+        if(okLabel){ btn.textContent = okLabel; setTimeout(function(){ btn.textContent = origText || "🔄 最新の内容に更新"; }, 2500); }
+        else btn.textContent = origText || "🔄 最新の内容に更新";
+      }
     }
   }
 
@@ -2126,7 +2136,13 @@
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
       // 部位ごとにまとまり、各部位の中では古い→新しい（時系列）に並ぶようにする。
       // 部位未設定のものは最後にまとめる。
+      // 期限つきのタスクは一番上に、期限が近い順に並べる。
       rows.sort(function(a,b){
+        var da = (a.hasDeadline && a.deadline) ? a.deadline : "";
+        var db = (b.hasDeadline && b.deadline) ? b.deadline : "";
+        if(da && !db) return -1;
+        if(!da && db) return 1;
+        if(da && db && da!==db) return da.localeCompare(db);
         var la = (a.vendorSpec && a.vendorSpec.label) || "";
         var lb = (b.vendorSpec && b.vendorSpec.label) || "";
         if(!la && lb) return 1;
@@ -7735,6 +7751,7 @@
     document.getElementById("userSelect").addEventListener("change", function(e){
       state.currentUser = e.target.value;
       saveLocalUser(state.currentUser);
+      toast(state.currentUser ? "いま使っている人を「"+state.currentUser+"」にしました" : "名前が選ばれていません（記録に名前が残りません）");
     });
     document.getElementById("btnSyncNow").addEventListener("click", syncFromServer);
     var fsBtn = document.getElementById("btnFullscreen");
