@@ -1,5 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
+import { sendTaskAssignedMail } from "../lib/task-mail.mts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -109,6 +110,8 @@ export default async (req: Request, context: Context) => {
     // replace:true は Firestore の .set() と同じ「完全上書き」。住まいるアプリ本体は
     // クライアント側で常にドキュメント全体を組み立てて保存するため、こちらを使う。
     // 省略時（他アプリの既存の呼び出し）は従来通りマージ更新のまま。
+    // タスクの担当者・確認者が新しく決まったら、その人へ個人のメールで知らせる（自分で自分に入れたときは送らない）。
+    const prevTask: any = collection === "tasks" ? await store.get(key, { type: "json" }) : null;
     let doc;
     if (body.replace) {
       doc = { ...(body.data || {}), id, updatedAt: new Date().toISOString() };
@@ -117,6 +120,20 @@ export default async (req: Request, context: Context) => {
       doc = { ...existing, ...(body.data || {}), id, updatedAt: new Date().toISOString() };
     }
     await store.setJSON(key, doc);
+    if (collection === "tasks" && !doc.deletedAt && !doc.private) {
+      const by = String(body.by || "");
+      const jobs: Promise<any>[] = [];
+      if (doc.assignee && doc.assignee !== by && doc.assignee !== (prevTask && prevTask.assignee)) {
+        jobs.push(sendTaskAssignedMail(store, doc, "assignee", doc.assignee, by).catch(() => false));
+      }
+      if (doc.checker && doc.checker !== by && doc.checker !== (prevTask && prevTask.checker)) {
+        jobs.push(sendTaskAssignedMail(store, doc, "checker", doc.checker, by).catch(() => false));
+      }
+      if (jobs.length) {
+        const all = Promise.all(jobs);
+        if (context && (context as any).waitUntil) (context as any).waitUntil(all); else await all;
+      }
+    }
     return new Response(JSON.stringify(doc), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

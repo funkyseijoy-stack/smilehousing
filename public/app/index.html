@@ -1036,6 +1036,9 @@
       <h3>担当者一覧</h3>
       <div class="row"><input type="text" id="newStaffInput" placeholder="例：朋子"><button class="btn secondary small" id="btnAddStaff">追加</button></div>
       <div class="tagbar" id="settingsStaffList" style="margin-block-start:10px;"></div>
+      <h4 style="margin:16px 0 4px;">担当者への通知メール</h4>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">タスクの担当者・確認者になったとき、期限の前日と当日の朝（9時）に、その人のメールへお知らせします。メールアドレスを入れた人にだけ届きます（入力欄を出たときに保存されます）。</p>
+      <div id="settingsStaffMail"></div>
     </div>
 
     <div class="card">
@@ -1512,7 +1515,7 @@
       var res = await fetch('/api/staff-data', {
         method:'PUT',
         headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
-        body: JSON.stringify({ collection:collection, id:id, data:data, replace:true })
+        body: JSON.stringify({ collection:collection, id:id, data:data, replace:true, by: state.currentUser||"" })
       });
       if(res.status===401){
         showLoginScreen("認証エラー（保存: " + collection + "）。もう一度ログインしてください");
@@ -1675,6 +1678,7 @@
       if(s){
         if(s.progressTags) state.settings.progressTags = s.progressTags;
         if(s.staffList) state.settings.staffList = s.staffList;
+        if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
         if(s.pin) state.settings.pin = s.pin;
       } else {
         await saveDoc("settings","main", state.settings);
@@ -1761,6 +1765,7 @@
       if(s){
         if(s.progressTags) state.settings.progressTags = s.progressTags;
         if(s.staffList) state.settings.staffList = s.staffList;
+        if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
         if(s.pin) state.settings.pin = s.pin;
       }
       render();
@@ -5772,11 +5777,27 @@
       return '<span class="tagchip active">'+escapeHtml(t)+' <span data-deltag="'+escapeHtml(t)+'" style="cursor:pointer;">×</span></span>';
     }).join("");
   }
+  function renderSettingsStaffMail(){
+    var wrap = document.getElementById("settingsStaffMail");
+    if(!wrap) return;
+    var em = state.settings.staffEmails || {};
+    wrap.innerHTML = (state.settings.staffList||[]).map(function(n){
+      return '<label class="field" style="margin-block-end:6px;">'+escapeHtml(n)+'<input type="email" inputmode="email" autocomplete="off" data-staffmail="'+escapeHtml(n)+'" value="'+escapeHtml(em[n]||"")+'" placeholder="例：'+escapeHtml(n)+'@example.com"></label>';
+    }).join("");
+  }
+  async function saveStaffMail(name, value){
+    value = (value||"").trim();
+    if(value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)){ toast("メールアドレスの形が正しくありません"); return; }
+    state.settings.staffEmails = Object.assign({}, state.settings.staffEmails||{});
+    if(value) state.settings.staffEmails[name] = value; else delete state.settings.staffEmails[name];
+    var ok = await saveDoc("settings","main", state.settings);
+    toast(ok===false ? "保存できませんでした" : (value ? name+"さんのメールを保存しました" : name+"さんのメールを消しました"));
+  }
   function renderSettingsStaff(){
     var wrap = document.getElementById("settingsStaffList");
     wrap.innerHTML = (state.settings.staffList||[]).map(function(s){
       return '<span class="tagchip active">'+escapeHtml(s)+' <span data-delstaff="'+escapeHtml(s)+'" style="cursor:pointer;">×</span></span>';
-    }).join("");
+    }).join("");    renderSettingsStaffMail();
   }
 
   function renderTrash(){
@@ -8375,6 +8396,10 @@
       removeProgressTag(x.dataset.deltag);
     });
     document.getElementById("btnAddStaff").addEventListener("click", addStaff);
+    document.getElementById("settingsStaffMail").addEventListener("change", function(e){
+      var inp = e.target.closest("[data-staffmail]");
+      if(inp) saveStaffMail(inp.dataset.staffmail, inp.value);
+    });
     document.getElementById("settingsStaffList").addEventListener("click", function(e){
       var x = e.target.closest("[data-delstaff]");
       if(!x) return;
