@@ -1500,7 +1500,14 @@
     var j = await res.json();
     return j.items||[];
   }
+  // 保存中の件数（自動更新が、保存途中の画面を古いデータで上書きしないよう見張るため）
+  var pendingSaves = 0, lastSaveAt = 0;
   async function saveDoc(collection, id, data){
+    pendingSaves++;
+    try{ return await saveDocInner(collection, id, data); }
+    finally{ pendingSaves--; lastSaveAt = Date.now(); }
+  }
+  async function saveDocInner(collection, id, data){
     try{
       var res = await fetch('/api/staff-data', {
         method:'PUT',
@@ -1725,12 +1732,22 @@
     }catch(e){}
   }
 
-  async function syncFromServer(){
-    var btn = document.getElementById("btnSyncNow");
+  var syncRunning = false;
+  async function syncFromServer(opts){
+    var silent = !!(opts && opts.silent);
+    if(syncRunning) return;
+    syncRunning = true;
+    var btn = silent ? null : document.getElementById("btnSyncNow");
     var okLabel = ""; var origText = btn ? btn.textContent : "";
     if(btn){ btn.disabled = true; btn.textContent = "🔄 更新中…"; }
     try{
       var results = await Promise.all(DATA_COLLECTIONS.map(function(c){ return apiGet(c); }));
+      if(silent){
+        // 読み込み中に保存が始まっていたら、古いデータで上書きしないようにやめる
+        if(pendingSaves>0 || Date.now()-lastSaveAt<3000) return;
+        var same = DATA_COLLECTIONS.every(function(c, i){ try{ return JSON.stringify(state[c])===JSON.stringify(results[i]); }catch(e){ return false; } });
+        if(same) return;
+      }
       DATA_COLLECTIONS.forEach(function(c, i){ state[c] = results[i]; });
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
@@ -1748,21 +1765,82 @@
       }
       render();
       populateUserSelect();
+      if(silent) return;
       toast("最新の内容に更新しました");
       var d = new Date(), stamp = document.getElementById("syncStamp");
       if(stamp) stamp.textContent = "✅ "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+" に更新しました";
       okLabel = "✅ 更新しました";
     }catch(e){
+      if(silent) return;
       if(String(e && e.message)!=="unauthorized") toast("更新に失敗しました（詳細: "+String(e && e.message || e)+"）");
       var stamp2 = document.getElementById("syncStamp");
       if(stamp2) stamp2.textContent = "⚠️ 更新に失敗しました。もう一度押してください";
     } finally {
+      syncRunning = false;
       if(btn){
         btn.disabled = false;
         if(okLabel){ btn.textContent = okLabel; setTimeout(function(){ btn.textContent = origText || "🔄 最新の内容に更新"; }, 2500); }
         else btn.textContent = origText || "🔄 最新の内容に更新";
       }
     }
+  }
+
+
+  // ================= 自動更新 =================
+  // ①アプリに戻ってきたとき・開きっぱなしの間（3分おき）に、最新のデータを静かに読み込む。
+  //   入力中・ウィンドウを開いている間・保存中は更新しない（書きかけを消さないため）。
+  // ②新しい版が公開されたら、画面の上にお知らせを出す（自動で読み込み直しはしない）。
+  var autoHiddenAt = 0, appEtag = null, versionBannerShown = false;
+  function userIsBusy(){
+    var ae = document.activeElement;
+    if(ae && ae.id!=="userSelect" && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return true;
+    var kids = document.body.children;
+    for(var i=0;i<kids.length;i++){
+      var el = kids[i];
+      if(el.id==="toast" || el.id==="versionBanner" || el.tagName==="SCRIPT") continue;
+      var cs = getComputedStyle(el);
+      if(cs.position!=="fixed" || cs.display==="none" || cs.visibility==="hidden" || cs.opacity==="0") continue;
+      var r = el.getBoundingClientRect();
+      if(r.width>200 && r.height>200) return true;
+    }
+    return false;
+  }
+  function autoRefreshTick(){
+    if(document.hidden || !getStaffToken()) return;
+    if(pendingSaves>0 || userIsBusy()) return;
+    syncFromServer({silent:true});
+  }
+  async function checkNewVersion(){
+    if(versionBannerShown || document.hidden) return;
+    try{
+      var res = await fetch(location.pathname, { method:"HEAD", cache:"no-store" });
+      var et = res.headers.get("etag") || res.headers.get("last-modified") || "";
+      if(!et) return;
+      if(appEtag===null){ appEtag = et; return; }
+      if(et!==appEtag) showVersionBanner();
+    }catch(e){}
+  }
+  function showVersionBanner(){
+    if(versionBannerShown) return;
+    versionBannerShown = true;
+    var b = document.createElement("div");
+    b.id = "versionBanner";
+    b.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:99;background:var(--accent,#2f6b4f);color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:.85rem;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.25);";
+    b.innerHTML = '<span>✨ アプリが新しくなりました</span><button type="button" id="vbNow" style="background:#fff;color:#2f6b4f;border:none;border-radius:999px;padding:6px 14px;font-weight:700;font-family:inherit;cursor:pointer;">今すぐ更新</button><button type="button" id="vbLater" style="background:transparent;color:#fff;border:1px solid #fff9;border-radius:999px;padding:6px 12px;font-family:inherit;cursor:pointer;">あとで</button>';
+    document.body.appendChild(b);
+    b.querySelector("#vbNow").addEventListener("click", function(){ location.reload(); });
+    b.querySelector("#vbLater").addEventListener("click", function(){ b.remove(); setTimeout(function(){ versionBannerShown = false; }, 10*60*1000); });
+  }
+  function startAutoRefresh(){
+    if(startAutoRefresh._on) return; startAutoRefresh._on = true;
+    checkNewVersion();
+    document.addEventListener("visibilitychange", function(){
+      if(document.hidden){ autoHiddenAt = Date.now(); return; }
+      // 30秒以上離れていたら、戻ってきた時点で更新
+      if(Date.now()-autoHiddenAt > 30000){ autoRefreshTick(); checkNewVersion(); }
+    });
+    setInterval(autoRefreshTick, 3*60*1000);
+    setInterval(checkNewVersion, 5*60*1000);
   }
 
   async function initDb(){
@@ -7753,7 +7831,8 @@
       saveLocalUser(state.currentUser);
       toast(state.currentUser ? "いま使っている人を「"+state.currentUser+"」にしました" : "名前が選ばれていません（記録に名前が残りません）");
     });
-    document.getElementById("btnSyncNow").addEventListener("click", syncFromServer);
+    document.getElementById("btnSyncNow").addEventListener("click", function(){ syncFromServer({}); });
+    startAutoRefresh();
     var fsBtn = document.getElementById("btnFullscreen");
     if(fsBtn){
       if(!isFullscreenSupported()) fsBtn.hidden = true;
