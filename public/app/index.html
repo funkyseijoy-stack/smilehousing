@@ -1599,6 +1599,12 @@
           uploadFile = await heicToJpegBlob(file);
         }
       }catch(e){ uploadFile = file; }
+      // 書類・図面・サンプルを撮った写真は、影や暗さを自動で整える（アルバム等は noClean で対象外）
+      var shadowCleaned = false;
+      if(!(opts && opts.noClean)){
+        var cl = await cleanDocShadow(uploadFile);
+        if(cl){ uploadFile = cl; shadowCleaned = true; }
+      }
       function fail(msg, code){ var er = new Error(code||"upload_failed"); er.userMessage = msg; er.code = code||"upload_failed"; return er; }
       // サーバー（Netlify）は1回に約6MBまでしか受け取れない。写真は送るとき約1.37倍に膨らむので、先に確かめて、理由を伝える
       var mb = (uploadFile.size/1048576);
@@ -1634,7 +1640,7 @@
           return {
             id: slug + "/" + j.key,
             url: '/api/get-photo?slug='+encodeURIComponent(slug)+'&key='+encodeURIComponent(j.key),
-            contentType: (opts && opts.type) || uploadFile.type,
+            contentType: shadowCleaned ? uploadFile.type : ((opts && opts.type) || uploadFile.type),
             sizeBytes: uploadFile.size
           };
         }catch(e){
@@ -3755,6 +3761,7 @@
       var upFile = f;
       if((f.type||"").indexOf("image")===0 || isHeicFile(f)){
         try{ upFile = await compressImageFile(f); }catch(e){ upFile = f; }
+        if(!(upFile instanceof File)){ try{ upFile = new File([upFile], f.name, {type: upFile.type || "image/jpeg"}); }catch(e){} }
       }
       if(upFile.size > SPEC_UPLOAD_MAX_BYTES){
         toast(f.name+"：ファイルサイズが大きすぎるため登録できませんでした（4MBまで。動画は短く撮影するか圧縮してください）");
@@ -5561,6 +5568,104 @@
       return out || file;
     }catch(e){ return file; }
   }
+  // ---- 書類・図面・サンプルを撮った写真の「影」を自動で整える ----
+  // 紙のような明るい背景が大半を占める写真だけを対象にする（室内・現場の写真や、色のついた部分は触らない）。
+  // 明るさだけを均して色味は変えない。対象でない写真・整える必要のない写真は、元のまま（null を返す）。
+  async function cleanDocShadow(file){
+    try{
+      if(!(file instanceof File) || file._shadowDone) return null;
+      if((file.type||"").indexOf("image/")!==0 || file.size < 30*1024) return null;
+      if(typeof createImageBitmap !== "function") return null;
+      var bmp = await createImageBitmap(file, {imageOrientation:"from-image"});
+      var w = bmp.width, h = bmp.height;
+      var sc = Math.min(1, 2000/Math.max(w, h));
+      var cw = Math.max(1, Math.round(w*sc)), ch = Math.max(1, Math.round(h*sc));
+      var canvas = document.createElement("canvas"); canvas.width = cw; canvas.height = ch;
+      var ctx = canvas.getContext("2d");
+      if(!ctx){ if(bmp.close) bmp.close(); return null; }
+      ctx.fillStyle = "#fff"; ctx.fillRect(0,0,cw,ch);
+      ctx.drawImage(bmp, 0, 0, cw, ch);
+      if(bmp.close) bmp.close();
+      var img = ctx.getImageData(0,0,cw,ch), d = img.data;
+      var B = Math.max(16, Math.round(Math.max(cw,ch)/40));
+      var gx = Math.ceil(cw/B), gy = Math.ceil(ch/B), N = gx*gy;
+      var bg = new Float32Array(N), sat = new Float32Array(N);
+      var bx, by, x, y, hist = new Uint16Array(64);
+      for(by=0; by<gy; by++) for(bx=0; bx<gx; bx++){
+        hist.fill(0); var cnt = 0, sSum = 0;
+        var x1 = Math.min(cw, (bx+1)*B), y1 = Math.min(ch, (by+1)*B);
+        for(y=by*B; y<y1; y+=2) for(x=bx*B; x<x1; x+=2){
+          var o = (y*cw+x)*4, r = d[o], g = d[o+1], b = d[o+2];
+          var Y = 0.299*r + 0.587*g + 0.114*b;
+          hist[Math.min(63, Y>>2)]++; cnt++;
+          var mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+          sSum += mx ? (mx-mn)/mx : 0;
+        }
+        var acc = 0, target = cnt*0.85, k = 0;
+        for(; k<64; k++){ acc += hist[k]; if(acc >= target) break; }
+        bg[by*gx+bx] = Math.min(255, k*4+2);
+        sat[by*gx+bx] = cnt ? sSum/cnt : 0;
+      }
+      // 紙のような（明るくて色味の少ない）ブロックが多い写真だけを対象にする
+      var paper = [], i2;
+      for(i2=0; i2<N; i2++) if(bg[i2] >= 150 && sat[i2] < 0.22) paper.push(bg[i2]);
+      if(paper.length < N*0.45) return null;
+      paper.sort(function(a,b){ return a-b; });
+      var glob = paper[Math.floor(paper.length/2)];
+      // 暗い字・図・色のついた部分のブロックは、自分の明るさで補正せず、まわりの紙の明るさを借りる
+      var valid = new Uint8Array(N);
+      for(i2=0; i2<N; i2++) valid[i2] = (bg[i2] >= glob*0.5 && sat[i2] < 0.30) ? 1 : 0;
+      var fill = new Float32Array(N);
+      for(by=0; by<gy; by++) for(bx=0; bx<gx; bx++){
+        var id = by*gx+bx;
+        if(valid[id]){ fill[id] = bg[id]; continue; }
+        var vs = [];
+        for(var dy=-3; dy<=3; dy++) for(var dx=-3; dx<=3; dx++){
+          var yy = by+dy, xx = bx+dx;
+          if(yy<0||yy>=gy||xx<0||xx>=gx) continue;
+          if(valid[yy*gx+xx]) vs.push(bg[yy*gx+xx]);
+        }
+        if(vs.length){ vs.sort(function(a,b){ return a-b; }); fill[id] = vs[Math.floor(vs.length/2)]; } else fill[id] = glob;
+      }
+      for(var pass=0; pass<2; pass++){
+        var tmp = new Float32Array(N);
+        for(by=0; by<gy; by++) for(bx=0; bx<gx; bx++){
+          var sum = 0, c2 = 0;
+          for(var ey=-1; ey<=1; ey++) for(var ex=-1; ex<=1; ex++){
+            var y2 = by+ey, x2 = bx+ex;
+            if(y2<0||y2>=gy||x2<0||x2>=gx) continue;
+            sum += fill[y2*gx+x2]; c2++;
+          }
+          tmp[by*gx+bx] = sum/c2;
+        }
+        fill = tmp;
+      }
+      // 画素ごとに、ブロックの明るさを補間して、紙の色（約236）に近づける（最大2.2倍）
+      var gainSum = 0;
+      for(y=0; y<ch; y++){
+        var fy = Math.max(0, Math.min(gy-1, y/B-0.5)), y0 = Math.floor(fy), y1b = Math.min(gy-1, y0+1), wy = fy-y0;
+        for(x=0; x<cw; x++){
+          var fx = Math.max(0, Math.min(gx-1, x/B-0.5)), x0 = Math.floor(fx), x1b = Math.min(gx-1, x0+1), wx = fx-x0;
+          var v = (fill[y0*gx+x0]*(1-wx)+fill[y0*gx+x1b]*wx)*(1-wy) + (fill[y1b*gx+x0]*(1-wx)+fill[y1b*gx+x1b]*wx)*wy;
+          var gn = Math.max(1, Math.min(2.2, 236/Math.max(40, v)));
+          gainSum += gn;
+          if(gn > 1.01){
+            var oo = (y*cw+x)*4;
+            d[oo] = Math.min(255, d[oo]*gn); d[oo+1] = Math.min(255, d[oo+1]*gn); d[oo+2] = Math.min(255, d[oo+2]*gn);
+          }
+        }
+      }
+      if(gainSum/(cw*ch) < 1.04) return null; // もともと均一で、整える必要がない
+      ctx.putImageData(img, 0, 0);
+      var blob = await new Promise(function(resolve){ canvas.toBlob(function(b){ resolve(b); }, "image/jpeg", 0.88); });
+      if(!blob || blob.size > 4.2*1048576) return null;
+      var out = new File([blob], file.name, {type: "image/jpeg"});
+      out._shadowDone = true;
+      var now = Date.now();
+      if(!cleanDocShadow._t || now - cleanDocShadow._t > 3000){ cleanDocShadow._t = now; toast("📄 書類・図面の写真の影を自動で整えました"); }
+      return out;
+    }catch(e){ return null; }
+  }
   // 画像を長辺maxDim・画質qualityのJPEGに縮める。失敗・時間切れのときはnull
   async function compressOnce(srcFile, maxDim, quality){
     var work = (async function(){
@@ -5621,7 +5726,7 @@
       var f = files[i];
       try{
         var compressed = await compressImageFile(f);
-        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg", noClean: true});
         var doc = { id: uid("al"), projectId: pid0, kind: kind, categoryId: categoryId || null, assetId: res.id, url: res.url,
           contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso() };
         blobCache[res.id] = compressed;
@@ -5800,7 +5905,7 @@
       var f = files[i];
       try{
         var compressed = await compressImageFile(f);
-        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg", noClean: true});
         var doc = { id: uid("img"), projectId: pid0, place: place, by: "staff", url: res.url,
           contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso(), updatedAt: nowIso() };
         state.imageBoard.push(doc);
@@ -5867,7 +5972,7 @@
       var f = files[i];
       try{
         var compressed = await compressImageFile(f);
-        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg", noClean: true});
         var doc = { id: uid("site"), projectId: pid0, place: place, takenDate: takenDate||"", memo: memo||"",
           by: state.currentUser||"", url: res.url, contentType: res.contentType || compressed.type || f.type,
           fileName: f.name, createdAt: nowIso(), updatedAt: nowIso() };
