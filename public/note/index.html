@@ -965,6 +965,11 @@
       out += data.notes.length ? '<div class="catlist">'+data.notes.map(function(n){
         return '<div class="tli flat">'+noteBody(n, true)+'</div>';
       }).join("")+'</div>' : '<div class="empty">まだ記録はありません。</div>';
+    } else if(view.plansOnly){
+      // ホームの「わが家の平面図」から開いたときは、平面図だけを出す（他の資料は「資料をすべて見る」から）
+      out += '<h2 class="big">平面図</h2><p class="sub">わが家の平面図です。タップで大きく表示します。</p>';
+      out += data.plans.length ? '<div class="thumbs">'+data.plans.map(function(f){ return thumbHtml(f, fmtD(f.date)); }).join("")+'</div>' : '<div class="empty">まだ平面図はありません。</div>';
+      out += '<div style="margin-top:14px;"><button class="btn" data-docsall="1" style="background:none; border:1.5px solid var(--line); border-radius:999px; padding:10px 16px; font-weight:700; cursor:pointer; color:inherit;">資料をすべて見る</button></div>';
     } else {
       var files = [];
       data.plans.forEach(function(f){ files.push({f:f, cap:"平面図"}); });
@@ -1294,12 +1299,13 @@
     var img = e.target.closest("[data-img]");
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
-    var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; render(); window.scrollTo(0,0); return; }
+    var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
+    var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var imf = e.target.closest("[data-imgfilter]"); if(imf){ view.imgFilter = imf.dataset.imgfilter; render(); return; }
     var imd = e.target.closest("[data-imgdel]"); if(imd){ deleteImage(imd.dataset.imgdel); return; }
     var stb = e.target.closest("[data-spectab]"); if(stb){ var sp = stb.dataset.spectab.split("|"); view.specTab[sp[0]] = sp[1]; render(); return; }
-    var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; render(); return; }
+    var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; view.plansOnly = false; render(); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
     if(e.target.closest("[data-famopen]")){ famOpen(); return; }
