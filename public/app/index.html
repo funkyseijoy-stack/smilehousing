@@ -1356,6 +1356,25 @@
   </div>
 </div>
 
+<!-- ========== 業者の編集 MODAL ========== -->
+<div class="taskform-modal" id="venEditModal" hidden>
+  <div class="taskform-card">
+    <h3 style="margin:0 0 6px;">業者を編集</h3>
+    <div class="addform" style="flex-direction:column; align-items:stretch;">
+      <label class="field">業者名<input type="text" id="venEditName"></label>
+      <label class="field">カテゴリ<input type="text" id="venEditCategory"></label>
+      <label class="field">メールアドレス<input type="email" id="venEditEmail" placeholder="任意"></label>
+      <label class="field">既定の依頼方法<select id="venEditMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option></select></label>
+      <div class="muted" style="font-size:.85rem;">これまでの見積依頼の表示も、新しい業者名になります。</div>
+      <div class="row" style="margin-block-start:6px;">
+        <button class="btn" id="venEditSave">保存</button>
+        <button class="btn secondary" id="venEditClose">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="reqAttachInput" multiple hidden>
+
 <!-- ========== 見積依頼の編集 MODAL ========== -->
 <div class="taskform-modal" id="reqEditModal" hidden>
   <div class="taskform-card">
@@ -2809,13 +2828,20 @@
       else if(r.status==="依頼済み") actionHtml = '<button class="btn small secondary" data-act="receive" data-id="'+r.id+'">受領登録</button>';
       else if(r.method==="gmail") actionHtml = '<button class="btn small ghost" data-act="changerequest" data-id="'+r.id+'">変更依頼</button>';
       else actionHtml = '<button class="btn small ghost" data-act="reopen" data-id="'+r.id+'">再依頼</button>';
+      actionHtml += ' <button class="btn small ghost" data-act="attachreq" data-id="'+r.id+'" title="この業者の見積書を添付">📎 見積書</button>';
       actionHtml += ' <button class="btn small ghost" data-act="editrequest" data-id="'+r.id+'">編集</button>';
       actionHtml += ' <button class="btn danger-ghost" data-act="delrequest" data-id="'+r.id+'" title="削除">×</button>';
       var checkboxHtml = r.status==="未依頼" ? '<input type="checkbox" data-req-id="'+r.id+'" '+(uiSelectedRequests[r.id]?"checked":"")+'>' : "";
       var dueDays = r.dueDate ? daysSince(r.dueDate) : null;
       var isOverdue = r.status!=="受領済み" && dueDays!==null && dueDays>=0;
       var dueHtml = r.dueDate ? '<span class="'+(isOverdue?"due-soon":"")+'">'+escapeHtml(r.dueDate)+(isOverdue?"（期限超過）":"")+'</span>' : '<span class="muted">—</span>';
-      return '<tr><td>'+checkboxHtml+'</td><td class="cellname">'+escapeHtml(v.name)+'</td><td>'+methodPill(r.method)+'</td><td>'+statusPill(r.status)+'</td>'+
+      var reqAtts = liveAttachments().filter(function(a){ return a.requestId===r.id; });
+      var attHtml = reqAtts.map(function(a){
+        var locked = a.quoteType === "仕切り" && !state.quoteUnlocked;
+        if(locked) return '<div class="lockbox" style="cursor:pointer; margin-block-start:4px;">🔒 見積書あり（タップして解除）</div>';
+        return '<div style="margin-block-start:4px; font-size:.85rem;"><span data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;">📎 '+escapeHtml(a.name)+'</span> '+quotePill(a.quoteType)+'</div>';
+      }).join("");
+      return '<tr><td>'+checkboxHtml+'</td><td class="cellname">'+escapeHtml(v.name)+attHtml+'</td><td>'+methodPill(r.method)+'</td><td>'+statusPill(r.status)+'</td>'+
         '<td class="muted">'+escapeHtml(r.requestedBy||"—")+'</td>'+
         '<td class="tabular">'+fmtDate(r.requestedAt)+'</td><td class="tabular">'+dueHtml+'</td>'+
         '<td class="muted">'+escapeHtml(r.receivedBy||"—")+'</td>'+
@@ -2853,7 +2879,7 @@
     empty.hidden = rows.length !== 0;
     body.innerHTML = rows.map(function(v){
       return '<tr><td class="cellname">'+escapeHtml(v.name)+'</td><td class="muted">'+escapeHtml(v.category||"—")+'</td><td>'+methodPill(v.method||"gmail")+'</td>'+
-        '<td class="muted">'+escapeHtml(v.email||"—")+'</td><td><button class="btn danger-ghost" data-act="delvendor" data-id="'+v.id+'">削除</button></td></tr>';
+        '<td class="muted">'+escapeHtml(v.email||"—")+'</td><td class="row" style="gap:4px;flex-wrap:nowrap;"><button class="btn small ghost" data-act="editvendor" data-id="'+v.id+'">編集</button> <button class="btn danger-ghost" data-act="delvendor" data-id="'+v.id+'">削除</button></td></tr>';
     }).join("");
   }
 
@@ -6423,7 +6449,7 @@
     }
     throw lastErr;
   }
-  async function uploadAttachments(files, kind, quoteType){
+  async function uploadAttachments(files, kind, quoteType, requestId){
     if(!assets){ toast("この画面では添付ファイルの登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("先に案件を選択してください"); return; }
     var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
@@ -6435,6 +6461,7 @@
         var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:f.name, url: res.url,
           contentType: res.contentType || f.type, sizeBytes: res.sizeBytes || f.size, uploadedAt: todayStr(),
           kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"仕切り") : undefined };
+        if(requestId){ att.requestId = requestId; var rq0 = state.requests.find(function(x){ return x.id===requestId; }); if(rq0) att.vendorId = rq0.vendorId; }
         blobCache[res.id] = f;
         state.attachments.push(att);
         await saveDoc("attachments", att.id, att);
@@ -6839,6 +6866,36 @@
       markReceivedFinish(r, name);
     });
   }
+  // ---- 業者の編集 ----
+  var pendingReqAttachId = null;
+  var editingVendorId = null;
+  function openVendorEdit(id){
+    var v = vendorById(id);
+    if(!v) return;
+    editingVendorId = id;
+    document.getElementById("venEditName").value = v.name || "";
+    document.getElementById("venEditCategory").value = v.category || "";
+    document.getElementById("venEditEmail").value = v.email || "";
+    document.getElementById("venEditMethod").value = v.method==="fax" ? "fax" : "gmail";
+    document.getElementById("venEditModal").hidden = false;
+  }
+  async function saveVendorEdit(){
+    var v = vendorById(editingVendorId);
+    if(!v){ document.getElementById("venEditModal").hidden = true; return; }
+    var name = document.getElementById("venEditName").value.trim();
+    if(!name){ toast("業者名を入力してください"); return; }
+    v.name = name;
+    v.category = document.getElementById("venEditCategory").value.trim();
+    v.email = document.getElementById("venEditEmail").value.trim();
+    v.method = document.getElementById("venEditMethod").value;
+    document.getElementById("venEditModal").hidden = true;
+    render();
+    var ok = await saveDoc("vendors", v.id, v);
+    if(ok===false){ toast("保存に失敗しました。もう一度お試しください"); return; }
+    logActivity("業者「"+name+"」を編集しました");
+    toast("業者を保存しました");
+  }
+
   // ---- 見積依頼の編集（記録だけを直す。メール・下書きは作らない）----
   var editingRequestId = null;
   function fillStaffSelect(sel, cur){
@@ -8706,6 +8763,27 @@
     });
     document.getElementById("btnBulkRequest").addEventListener("click", bulkMarkRequested);
     document.getElementById("reqEditSave").addEventListener("click", saveRequestEdit);
+    document.getElementById("venEditSave").addEventListener("click", saveVendorEdit);
+    document.getElementById("venEditClose").addEventListener("click", function(){ document.getElementById("venEditModal").hidden = true; });
+    document.getElementById("reqAttachInput").addEventListener("change", function(e){
+      var input = e.target; var files = input.files ? Array.prototype.slice.call(input.files) : [];
+      var rid = pendingReqAttachId; input.value = "";
+      if(!files.length || !rid) return;
+      askChoice("見積書の種類", "仕切りは暗証番号でロックされます。", [{label:"仕切り", value:"仕切り"},{label:"定価", value:"定価"}], function(qt){
+        if(qt===null) return;
+        uploadAttachments(files, "quote", qt, rid);
+      });
+    });
+    document.getElementById("projectTableBody").addEventListener("click", function(e){
+      var openEl = e.target.closest("[data-openatt]");
+      if(openEl){ openAttachment(openEl.dataset.openatt); return; }
+      var lockEl = e.target.closest(".lockbox");
+      if(!lockEl) return;
+      askPin(function(val){
+        if(val === state.settings.pin){ state.quoteUnlocked = true; render(); toast("解除しました"); scheduleQuoteAutoLock(); }
+        else if(val !== null){ toast("暗証番号が違います"); }
+      });
+    });
     document.getElementById("reqEditClose").addEventListener("click", function(){ document.getElementById("reqEditModal").hidden = true; });
     document.getElementById("btnCheckReplies").addEventListener("click", checkGmailReplies);
     document.getElementById("btnRefreshGmail").addEventListener("click", function(){ loadGmailInbox(document.getElementById("gmailSearchInput").value); });
@@ -9154,6 +9232,8 @@
       else if(act==="receive") markReceived(id);
       else if(act==="reopen") reopenRequest(id);
       else if(act==="editrequest") openRequestEdit(id);
+      else if(act==="attachreq"){ pendingReqAttachId = id; document.getElementById("reqAttachInput").click(); }
+      else if(act==="editvendor") openVendorEdit(id);
       else if(act==="changerequest") openChangeRequestForm(id);
       else if(act==="delrequest"){ if(confirm2()) deleteRequest(id); }
       else if(act==="delvendor"){ if(confirm2()) deleteVendor(id); }
