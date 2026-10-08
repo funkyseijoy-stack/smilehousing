@@ -3632,6 +3632,7 @@
   async function uploadSpecPhotos(scope, category, roomId, side, fileList, source, autoReflect){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     var files = Array.prototype.slice.call(fileList||[]);
     for(var i=0;i<files.length;i++){
       var f = files[i];
@@ -3648,7 +3649,7 @@
       }
       try{
         var res = await assets.upload(upFile, {type: upFile.type || f.type});
-        var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: scope, category: category,
+        var doc = { id: uid("sp"), projectId: pid0, scope: scope, category: category,
           roomId: roomId || null, side: side || null, assetId: res.id, url: res.url, kind: "photo",
           contentType: res.contentType || upFile.type || f.type, fileName: f.name, createdAt: nowIso() };
         if(source){ doc.source = source; }
@@ -3667,9 +3668,10 @@
   async function uploadSpecPlanboardRaw(scope, category, file){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     try{
       var res = await assets.upload(file);
-      var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: scope, category: category,
+      var doc = { id: uid("sp"), projectId: pid0, scope: scope, category: category,
         roomId: null, side: null, assetId: res.id, url: res.url, kind: "planboard",
         contentType: res.contentType || file.type, fileName: file.name, createdAt: nowIso(),
         reqStatus: null, reflected: false, reflectedAt: null };
@@ -5471,13 +5473,14 @@
   async function uploadAlbumPhotos(kind, fileList, categoryId){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     var files = Array.prototype.slice.call(fileList||[]);
     for(var i=0;i<files.length;i++){
       var f = files[i];
       try{
         var compressed = await compressImageFile(f);
         var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
-        var doc = { id: uid("al"), projectId: state.currentProjectId, kind: kind, categoryId: categoryId || null, assetId: res.id, url: res.url,
+        var doc = { id: uid("al"), projectId: pid0, kind: kind, categoryId: categoryId || null, assetId: res.id, url: res.url,
           contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso() };
         blobCache[res.id] = compressed;
         state.albumPhotos.push(doc);
@@ -5606,6 +5609,7 @@
   async function uploadImageBoard(fileList, place){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     var files = Array.prototype.slice.call(fileList||[]);
     var added = 0;
     for(var i=0;i<files.length;i++){
@@ -5613,7 +5617,7 @@
       try{
         var compressed = await compressImageFile(f);
         var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
-        var doc = { id: uid("img"), projectId: state.currentProjectId, place: place, by: "staff", url: res.url,
+        var doc = { id: uid("img"), projectId: pid0, place: place, by: "staff", url: res.url,
           contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso(), updatedAt: nowIso() };
         state.imageBoard.push(doc);
         var saved = await saveDoc("imageBoard", doc.id, doc);
@@ -5672,6 +5676,7 @@
   async function uploadSitePhotos(fileList, place, takenDate, memo){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
+    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     var files = Array.prototype.slice.call(fileList||[]);
     var added = 0;
     for(var i=0;i<files.length;i++){
@@ -5679,7 +5684,7 @@
       try{
         var compressed = await compressImageFile(f);
         var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg"});
-        var doc = { id: uid("site"), projectId: state.currentProjectId, place: place, takenDate: takenDate||"", memo: memo||"",
+        var doc = { id: uid("site"), projectId: pid0, place: place, takenDate: takenDate||"", memo: memo||"",
           by: state.currentUser||"", url: res.url, contentType: res.contentType || compressed.type || f.type,
           fileName: f.name, createdAt: nowIso(), updatedAt: nowIso() };
         state.sitePhotos.push(doc);
@@ -6083,12 +6088,13 @@
   async function uploadAttachments(files, kind, quoteType){
     if(!assets){ toast("この画面では添付ファイルの登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("先に案件を選択してください"); return; }
+    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     var list = Array.prototype.slice.call(files);
     for(var i=0;i<list.length;i++){
       var f = list[i];
       try{
         var res = await uploadAssetWithRetry(f, 2);
-        var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:f.name, url: res.url,
+        var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:f.name, url: res.url,
           contentType: res.contentType || f.type, sizeBytes: res.sizeBytes || f.size, uploadedAt: todayStr(),
           kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"仕切り") : undefined };
         blobCache[res.id] = f;
@@ -7419,6 +7425,7 @@
     askChoice("どの打合せ記録に添付しますか？", "", choices, callback);
   }
   async function attachBlobsToMeetingNote(noteId, blobs, baseName, contentType){
+    var pid0 = state.currentProjectId;
     contentType = contentType || "image/png";
     var ext = contentType === "application/pdf" ? ".pdf" : ".png";
     var uploaded = [];
@@ -7429,7 +7436,7 @@
       uploaded.push({ id: res.id, url: res.url, contentType:contentType, name: baseName+(blobs.length>1?("_p"+(i+1)):"")+ext });
     }
     if(noteId === "__new__"){
-      var n = { id:uid("note"), projectId: state.currentProjectId, content: baseName, date: todayStr(), files: uploaded, author: state.currentUser||"", createdAt: nowIso() };
+      var n = { id:uid("note"), projectId: pid0, content: baseName, date: todayStr(), files: uploaded, author: state.currentUser||"", createdAt: nowIso() };
       state.meetingNotes.push(n);
       await saveDoc("meetingNotes", n.id, n);
     } else {
@@ -7917,7 +7924,7 @@
       // target.kindが無い場合（白紙から新規作成・新しい図面の取り込み）は
       // これまで通り、設備仕様の図面はプランボード扱いにする。
       var kind2 = target.kind || ((target.scope==="facility") ? "planboard" : "photo");
-      var doc = { id: uid("sp"), projectId: state.currentProjectId, scope: target.scope, category: target.category,
+      var doc = { id: uid("sp"), projectId: (pb.pid || state.currentProjectId), scope: target.scope, category: target.category,
         roomId: target.roomId || null, side: target.side || null, assetId: res2.id, url: res2.url, kind: kind2,
         contentType: "image/png", fileName: name2, createdAt: nowIso() };
       blobCache[res2.id] = blob;
@@ -7941,6 +7948,7 @@
   async function pbSaveToProject(){
     if(pb.saving) return; // 連打による二重・三重保存を防ぐ
     if(!state.currentProjectId){ toast("案件が選択されていません"); return; }
+    var pid0 = state.currentProjectId; pb.pid = pid0;
     if(!assets){ toast("この画面では保存が利用できません"); return; }
     pb.saving = true;
     pbSetSaveButtonsBusy(true);
@@ -8000,7 +8008,7 @@
         if(dest==="attachment"){
           if(bundleAsPdf && mergedBlob){
             var resPdf = await assets.upload(mergedBlob, {type:"application/pdf"});
-            var attPdf = { id:uid("att"), projectId: state.currentProjectId, assetId: resPdf.id, name: baseName+".pdf", url: resPdf.url,
+            var attPdf = { id:uid("att"), projectId: pid0, assetId: resPdf.id, name: baseName+".pdf", url: resPdf.url,
               contentType:"application/pdf", sizeBytes: resPdf.sizeBytes||mergedBlob.size, uploadedAt: todayStr(), kind:"plan" };
             blobCache[resPdf.id] = mergedBlob;
             state.attachments.push(attPdf);
@@ -8010,7 +8018,7 @@
               if(!blobs[bi]) continue;
               var res = await assets.upload(blobs[bi], {type:"image/png"});
               var attName = baseName+(blobs.length>1?("_p"+(bi+1)):"")+".png";
-              var att = { id:uid("att"), projectId: state.currentProjectId, assetId: res.id, name:attName, url: res.url,
+              var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:attName, url: res.url,
                 contentType:"image/png", sizeBytes: res.sizeBytes||blobs[bi].size, uploadedAt: todayStr(), kind:"plan" };
               blobCache[res.id] = blobs[bi];
               state.attachments.push(att);
