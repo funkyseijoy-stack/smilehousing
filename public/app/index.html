@@ -1466,8 +1466,7 @@
     {label:"暖房・換気・電気設備", value:"equipment"},
     {label:"外部散水栓・インターホンなど", value:"siteCheck"},
     {label:"インテリア基本色", value:"interiorColor"},
-    {label:"部屋別インテリア", value:"room"},
-    {label:"プランボード", value:"planboard"}
+    {label:"部屋別インテリア", value:"room"}
   ];
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
@@ -1772,6 +1771,7 @@
     populateUserSelect();
     migrateSiteCheckMoves();
     migrateToiletMerge();
+    migratePlanboardPartRemoval();
     repairReflectedTaskCopies();
   }
   // 「✓反映済み」なのに設備仕様に入っていない図面を、タスクの案件の設備仕様へ入れて直す（起動時に1回）。
@@ -1781,6 +1781,24 @@
   // 2026年10月：設備仕様の「1階トイレ」「2階トイレ」を「トイレ」1つにまとめた。
   // これまでの写真・記録・タスクの部位、案件のメモ（facilityNotes）を「トイレ」へ移す（何度動かしても同じ結果）。
   var OLD_TOILET = { "1階トイレ":1, "2階トイレ":1 };
+  // 2026年10月：部位の選択肢「プランボード」をやめた。これまでその部位で登録した記録・タスクは内容を残して部位を「未設定」に戻し、
+  // 仕様履歴の写真・PDFは「総合」へ移す（何度動かしても同じ結果）。
+  function migratePlanboardPartRemoval(){
+    try{
+      state.meetingNotes.forEach(function(n){
+        if(n && n.specPart && n.specPart.scope==="planboard"){ n.specPart = null; saveDoc("meetingNotes", n.id, n); }
+      });
+      state.tasks.forEach(function(t){
+        if(t && t.vendorSpec && t.vendorSpec.scope==="planboard"){ t.vendorSpec = null; saveDoc("tasks", t.id, t); }
+      });
+      state.specPhotos.forEach(function(p){
+        if(!p || p.scope!=="planboard") return;
+        if(p.kind==="note"){ p.deletedAt = nowIso(); } // 記録の写し。記録の部位を外したので消す（記録そのものは残る）
+        else { p.scope = "general"; p.category = null; }
+        saveDoc("specPhotos", p.id, p);
+      });
+    }catch(e){ console.warn("planboard part removal failed", e); }
+  }
   function migrateToiletMerge(){
     try{
       state.specPhotos.forEach(function(p){
@@ -2076,7 +2094,6 @@
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "rooms";
-    if(scope==="planboard") return "planboard"; // プランボード（note-data.mts の noteCatFor と同じ）
     if(scope==="siteCheck") return "other"; // 外部散水栓・インターホン親機・給湯リモコン・床下点検口
     if(scope==="custom") return category ? "cp_"+category : null; // 追加した部位は1つずつ別の項目（note-data.mts の noteCatFor と同じ）
     return null;
@@ -2848,7 +2865,7 @@
     wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
-  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room", planboard:"planboard" };
+  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room" };
   function switchMeetingSubTab(key){
     var bar = document.getElementById("meetingSubTabBar");
     if(!bar) return;
@@ -7514,11 +7531,6 @@
             callback({scope:"room", category:catId, roomId:roomId, side:null, label:roomName+"・"+(rc?rc.label:catId)});
           });
         });
-        return;
-      }
-      if(scope==="planboard"){
-        // プランボード：カテゴリーは選ばず、これだけで確定。お客様のおうちノートでは「プランボード」項目に出る
-        callback({scope:"planboard", category:"プランボード", roomId:null, side:null, label:"プランボード"});
         return;
       }
       if(scope==="exterior"){
