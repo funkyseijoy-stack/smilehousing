@@ -1433,7 +1433,7 @@
     {key:"consider", label:"お客様に検討してもらうこと", cls:"b-consider", group:"next"}
   ];
   var BADGE_AUTO_KEYS = ["companytask","vendortask","confirm","consider"]; // 自動登録を伴うバッジ
-  var FACILITY_CATS = ["キッチン","お風呂","洗面","1階トイレ","2階トイレ","脱衣室","ランドリーバー"];
+  var FACILITY_CATS = ["キッチン","お風呂","洗面","トイレ","脱衣室","ランドリーバー"];
   var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
   var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口"];
   // 上の4項目は、打合せ記録のサブタブにそれぞれ別のタブとして出す（タブのキー）
@@ -1734,12 +1734,43 @@
     render();
     populateUserSelect();
     migrateSiteCheckMoves();
+    migrateToiletMerge();
     repairReflectedTaskCopies();
   }
   // 「✓反映済み」なのに設備仕様に入っていない図面を、タスクの案件の設備仕様へ入れて直す（起動時に1回）。
   // 「ポスト」は外部仕様、「ランドリーバー」は設備仕様へ移した。以前に現場確認（siteCheck）へ入れたデータを新しい場所へ移す
   // （何度動かしても同じ結果になるよう、まだ移っていないものだけ書き換える）
   var SITECHECK_MOVED = { "ポスト":{scope:"exterior", notes:"exteriorNotes"}, "ランドリーバー":{scope:"facility", notes:"facilityNotes"} };
+  // 2026年10月：設備仕様の「1階トイレ」「2階トイレ」を「トイレ」1つにまとめた。
+  // これまでの写真・記録・タスクの部位、案件のメモ（facilityNotes）を「トイレ」へ移す（何度動かしても同じ結果）。
+  var OLD_TOILET = { "1階トイレ":1, "2階トイレ":1 };
+  function migrateToiletMerge(){
+    try{
+      state.specPhotos.forEach(function(p){
+        if(p && p.scope==="facility" && OLD_TOILET[p.category]){ p.category = "トイレ"; saveDoc("specPhotos", p.id, p); }
+      });
+      state.meetingNotes.forEach(function(n){
+        var sp = n && n.specPart;
+        if(sp && sp.scope==="facility" && OLD_TOILET[sp.category]){ sp.category = "トイレ"; sp.label = "設備仕様・トイレ"; saveDoc("meetingNotes", n.id, n); }
+      });
+      state.tasks.forEach(function(t){
+        var vs = t && t.vendorSpec;
+        if(vs && vs.scope==="facility" && OLD_TOILET[vs.category]){ vs.category = "トイレ"; vs.label = "設備仕様・トイレ"; saveDoc("tasks", t.id, t); }
+      });
+      state.projects.forEach(function(pr){
+        var fn = pr && pr.facilityNotes; if(!fn) return;
+        var a = fn["1階トイレ"], b = fn["2階トイレ"];
+        if(a==null && b==null) return;
+        var parts = [];
+        if(fn["トイレ"]) parts.push(fn["トイレ"]);
+        if(a) parts.push("【1階】"+a);
+        if(b) parts.push("【2階】"+b);
+        fn["トイレ"] = parts.join("\n");
+        delete fn["1階トイレ"]; delete fn["2階トイレ"];
+        saveDoc("projects", pr.id, pr);
+      });
+    }catch(e){ console.warn("toilet merge failed", e); }
+  }
   function migrateSiteCheckMoves(){
     try{
       state.specPhotos.forEach(function(p){
@@ -2003,7 +2034,7 @@
   // お客様画面の項目IDとの対応（netlify/functions/note-data.mts の noteCatFor と同じ内容）
   function noteCatIdFor(scope, category){
     if(scope==="exterior") return "exterior";
-    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"dressing","ランドリーバー":"dressing","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
+    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"dressing","ランドリーバー":"dressing","トイレ":"toilet","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "rooms";
