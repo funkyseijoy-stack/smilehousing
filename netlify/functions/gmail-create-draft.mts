@@ -146,7 +146,7 @@ export default async (req: Request, context: Context) => {
     if (!draftRes.ok) {
       return jsonResponse({ error: "gmail_api_error", detail: draftData }, 502);
     }
-    return jsonResponse({ ok: true, id: draftData.id, attachmentCount: attachments.length });
+    return jsonResponse({ ok: true, id: draftData.id, threadId: draftData.message?.threadId || null, attachmentCount: attachments.length });
   } catch (e: any) {
     return jsonResponse({ error: "unexpected_error", detail: e?.message || String(e) }, 500);
   }

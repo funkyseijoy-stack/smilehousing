@@ -1107,7 +1107,8 @@ function homeHtml(){
     var planboards = items.filter(function(x){ return x.type==="planboard"; });
     var notes = items.filter(function(x){ return x.type==="note"; });
     var taskPdfs = items.filter(function(x){ return x.type==="photo" && x.source && x.source.taskId; });
-    var photos = items.filter(function(x){ return x.type==="photo" && (!x.source || !x.source.taskId); });
+    var quotes = items.filter(function(x){ return x.type==="photo" && x.isQuote; });
+    var photos = items.filter(function(x){ return x.type==="photo" && !x.isQuote && (!x.source || !x.source.taskId); });
 
     // プランボード section
     if(planboards.length){
@@ -1193,8 +1194,19 @@ function homeHtml(){
         '</div></div></div>';
     }
 
+    // 見積書（定価）。スタッフが部位を指定して出したものだけ
+    if(quotes.length){
+      out += '<div class="section decided">'+
+        '<div class="section-header"><span class="section-icon">💴</span><span>見積書（定価）</span></div>'+
+        '<div class="section-content"><div class="section-thumbs">'+
+        quotes.slice().reverse().map(function(x){
+          return thumbHtml(x.file, capOf(c, x, fmtD(x.at)));
+        }).join("")+
+        '</div></div></div>';
+    }
+
     // Timeline for any other items
-    if(items.length && !planboards.length && !notes.length && !taskPdfs.length && !photos.length){
+    if(items.length && !planboards.length && !notes.length && !taskPdfs.length && !photos.length && !quotes.length){
       out += '<div class="sechd"><h3>これまでの経過</h3><span class="countpill">時系列</span></div>';
       out += '<div class="tl">'+items.map(function(x, i){
         var latest = i===items.length-1;

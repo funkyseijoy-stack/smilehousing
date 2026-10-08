@@ -2456,6 +2456,7 @@
             '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
+            '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
             (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
             (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
             '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
@@ -2839,7 +2840,7 @@
       var attHtml = reqAtts.map(function(a){
         var locked = a.quoteType === "仕切り" && !state.quoteUnlocked;
         if(locked) return '<div class="lockbox" style="cursor:pointer; margin-block-start:4px;">🔒 見積書あり（タップして解除）</div>';
-        return '<div style="margin-block-start:4px; font-size:.85rem;"><span data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;">📎 '+escapeHtml(a.name)+'</span> '+quotePill(a.quoteType)+'</div>';
+        return '<div style="margin-block-start:4px; font-size:.85rem;"><span data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;">📎 '+escapeHtml(a.name)+'</span> '+quotePill(a.quoteType)+quoteShareHtml(a)+'</div>';
       }).join("");
       return '<tr><td>'+checkboxHtml+'</td><td class="cellname">'+escapeHtml(v.name)+attHtml+'</td><td>'+methodPill(r.method)+'</td><td>'+statusPill(r.status)+'</td>'+
         '<td class="muted">'+escapeHtml(r.requestedBy||"—")+'</td>'+
@@ -2900,8 +2901,15 @@
       var ext = (a.name.split(".").pop()||"").slice(0,4).toUpperCase();
       var kindLabel = a.kind === "quote" ? quotePill(a.quoteType) : (a.kind === "plan" ? '<span class="pill tag">図面</span>' : "");
       return '<div class="filechip"><div class="ficon">'+escapeHtml(ext)+'</div><div class="finame" data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;" title="タップして開く">'+escapeHtml(a.name)+'</div>'+kindLabel+
-        '<div class="fisize tabular">'+fmtSize(a.sizeBytes)+'</div><button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
+        '<div class="fisize tabular">'+fmtSize(a.sizeBytes)+'</div>'+quoteShareHtml(a)+'<button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
     }).join("");
+  }
+  // 定価の見積書だけ、部位を指定してお客様のおうちノートに出せる（仕切りは出せない）
+  function quoteShareHtml(a){
+    if(!(a && a.kind==="quote" && a.quoteType==="定価")) return "";
+    var partOk = taskPartReflectable(a.specPart);
+    return '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="お客様に出す部位を選ぶ">📍 '+(partOk ? escapeHtml(a.specPart.label||"部位") : "部位")+'</button>'+
+      '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="定価の見積書をお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
   }
 
   // 図面/プランボードの一覧チップ。タップで編集（表示）、⬇でダウンロード
@@ -6511,6 +6519,7 @@
     }catch(e){ return null; }
   }
   async function buildGmailAttachments(projectId){
+    var eachLimit = mcp ? 700000 : 3500000; // サーバーで下書きを作る場合は大きめでも可（合計4MBまでは下書き作成時に確認）
     var atts = liveAttachments().filter(function(a){ return a.projectId===projectId && a.kind !== "quote"; });
     var out = []; var assetListCache = {value:null};
     for(var i=0;i<atts.length;i++){
@@ -6520,7 +6529,7 @@
       if(fileArgsSupported){
         out.push({ filename:a.name, mimeType:a.contentType||"application/octet-stream", content:{ $file:{ data:blob, name:a.name, type:a.contentType||"application/octet-stream" } } });
       } else {
-        if(blob.size > 700000){ toast(a.name+" は大きすぎるため添付できませんでした"); continue; }
+        if(blob.size > eachLimit){ toast(a.name+" は大きすぎるため添付できませんでした"); continue; }
         var b64 = await blobToBase64(blob);
         out.push({ filename:a.name, mimeType:a.contentType||"application/octet-stream", content:b64 });
       }
@@ -6561,8 +6570,25 @@
   }
 
   // ================= Gmail (quote requests) =================
+  // Gmailの下書きを作る共通の入口。画面にMCPがあればそれを使い、なければサーバー（/api/gmail-create-draft）で作る。
+  // input: { to:[メール], subject, body, attachments:[{filename, mimeType, content(base64)}] }
+  async function gmailCreateDraft(input){
+    if(mcp) return await mcp.callTool("Gmail","create_draft", input);
+    var atts = input.attachments || [];
+    var total = atts.reduce(function(n,a){ return n + (typeof a.content==="string" ? a.content.length*0.75 : 0); }, 0);
+    if(total > 4*1024*1024) throw new Error("添付が大きすぎます（約"+Math.round(total/1048576)+"MB）。合計4MB以内にしてください");
+    var res = await fetch("/api/gmail-create-draft", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
+      body: JSON.stringify({ to: input.to || [], subject: input.subject || "", body: input.body || "", attachments: atts })
+    });
+    if(res.status===409) throw new Error("Gmail連携がまだ設定されていません。設定画面の「Gmailと連携する」から連携してください");
+    if(res.status===401) throw new Error("ログインの有効期限が切れました。ログインし直してください");
+    if(!res.ok) throw new Error("サーバーエラー（"+res.status+"）");
+    var j = await res.json();
+    return { payload: { threadId: j.threadId || null, id: j.id || null } };
+  }
   async function sendGmailRequest(project, vendors){
-    if(!mcp){ toast("この画面ではGmail連携が利用できません"); return {ok:false}; }
     var subject = "【見積依頼】"+(project?project.name:"")+" 案件について";
     var body = "お世話になっております。住まいるハウジングでございます。\n下記案件につきまして、お見積りをお願いしたくご連絡いたしました。\n\n案件名："+(project?project.name:"")+"\n\n添付の図面等をご確認のうえ、ご対応のほど、よろしくお願いいたします。\n\n住まいるハウジング";
     var attachments = project ? await buildGmailAttachments(project.id) : [];
@@ -6570,7 +6596,7 @@
     var input = { to:to, subject:subject, body:body };
     if(attachments.length) input.attachments = attachments;
     try{
-      var result = await mcp.callTool("Gmail","create_draft", input);
+      var result = await gmailCreateDraft(input);
       var payload = (result && result.payload) || {};
       var msg = "Gmail下書きを作成しました";
       if(to.length) msg += "（宛先"+to.length+"件）";
@@ -6579,7 +6605,7 @@
       toast(msg);
       logActivity("見積依頼のGmail下書きを作成しました");
       return { ok:true, threadId: payload.threadId||null };
-    }catch(e){ toast("Gmail下書きの作成に失敗しました"); return {ok:false, threadId:null}; }
+    }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); return {ok:false, threadId:null}; }
   }
 
   async function checkGmailReplies(){
@@ -6866,6 +6892,83 @@
       markReceivedFinish(r, name);
     });
   }
+  // ---- タスクからGmail下書き ----
+  async function taskGmailDraft(id){
+    var t = state.tasks.find(function(x){ return x.id===id; });
+    if(!t) return;
+    var project = projectById(t.projectId);
+    var names = taskVendors(t).map(function(v){ return v.name; });
+    var to = []; var noEmail = [];
+    names.forEach(function(n){
+      var v = liveVendors().find(function(x){ return x.name===n; });
+      if(v && v.email) { if(to.indexOf(v.email)===-1) to.push(v.email); } else noEmail.push(n);
+    });
+    var firstLine = String(t.content||"").split("\n")[0].slice(0,30);
+    var subject = "【"+(project?project.name:"住まいるハウジング")+"】"+firstLine;
+    var lines = ["お世話になっております。住まいるハウジングです。",""];
+    if(project) lines.push("案件："+project.name);
+    if(t.vendorSpec && t.vendorSpec.label) lines.push("部位："+t.vendorSpec.label);
+    lines.push("内容："+String(t.content||""));
+    if(t.hasDeadline && t.deadline) lines.push("期限："+t.deadline);
+    lines.push("","よろしくお願いいたします。","","株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798");
+    var atts = []; var skipped = 0;
+    var list = (t.attachments||[]);
+    for(var i=0;i<list.length;i++){
+      var a = list[i];
+      try{
+        var res = await fetch(a.url);
+        if(!res.ok) throw new Error("fetch");
+        var blob = await res.blob();
+        if(blob.size > 3500000){ skipped++; continue; }
+        atts.push({ filename:a.name||"添付", mimeType:a.contentType||blob.type||"application/octet-stream", content: await blobToBase64(blob) });
+      }catch(e){ skipped++; }
+    }
+    try{
+      await gmailCreateDraft({ to:to, subject:subject, body:lines.join("\n"), attachments:atts });
+      var msg = "✅ Gmail下書きを作成しました";
+      if(to.length) msg += "（宛先"+to.length+"件）"; else msg += "（宛先なし。下書きで宛先を入れてください）";
+      if(atts.length) msg += "・添付"+atts.length+"件";
+      if(noEmail.length) msg += "。メール未登録："+noEmail.join("、");
+      if(skipped) msg += "。大きすぎる／読めない添付"+skipped+"件は付けていません";
+      toast(msg);
+      logActivity("タスクのGmail下書きを作成しました");
+    }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
+  }
+
+  // ---- 定価の見積書をお客様に出す（部位を指定して反映）----
+  async function setQuotePart(id){
+    var a = state.attachments.find(function(x){ return x.id===id; });
+    if(!a || a.quoteType!=="定価") return;
+    askSpecPart(async function(part){
+      if(!part) return;
+      a.specPart = part; render();
+      var ok = await saveDoc("attachments", a.id, a);
+      if(ok===false) toast("保存に失敗しました。もう一度お試しください");
+    }, a.projectId);
+  }
+  async function toggleQuoteReflect(id){
+    var a = state.attachments.find(function(x){ return x.id===id; });
+    if(!a) return;
+    if(a.quoteType!=="定価"){ toast("お客様に出せるのは定価の見積書だけです"); return; }
+    if(!a.reflected && !taskPartReflectable(a.specPart)){
+      askSpecPart(function(part){
+        if(!part) return;
+        a.specPart = part; doToggleQuoteReflect(a);
+      }, a.projectId);
+      return;
+    }
+    doToggleQuoteReflect(a);
+  }
+  async function doToggleQuoteReflect(a){
+    a.reflected = !a.reflected;
+    a.reflectedAt = a.reflected ? nowIso() : null;
+    render();
+    var ok = await saveDoc("attachments", a.id, a);
+    if(ok===false){ toast("保存に失敗しました。もう一度お試しください"); return; }
+    logActivity("定価の見積書「"+a.name+"」を"+(a.reflected?"おうちノートに反映しました":"反映解除しました"));
+    toast(a.reflected ? "✅ 「"+((a.specPart&&a.specPart.label)||"")+"」のおうちノートに、定価の見積書を出しました" : "反映を解除しました");
+  }
+
   // ---- 業者の編集 ----
   var pendingReqAttachId = null;
   var editingVendorId = null;
@@ -6979,7 +7082,7 @@
     var input = { to:[vendor.email], subject:subject, body:body };
     if(attachments.length) input.attachments = attachments;
     try{
-      var result = await mcp.callTool("Gmail","create_draft", input);
+      var result = await gmailCreateDraft(input);
       var payload = (result && result.payload) || {};
       r.status="依頼済み"; r.requestedAt=todayStr(); r.receivedAt=""; r.note=note; r.replyDetected=false; r.replySnippet=""; r.replyDate="";
       if(payload.threadId) r.gmailThreadId = payload.threadId;
@@ -6988,7 +7091,7 @@
       await saveDoc("requests", r.id, r);
       logActivity("変更依頼のGmail下書きを作成しました");
       toast("変更依頼のGmail下書きを作成しました"+(attachments.length?"（添付"+attachments.length+"件）":""));
-    }catch(e){ toast("変更依頼の送信に失敗しました"); }
+    }catch(e){ toast("変更依頼の下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
 
   // ================= meeting notes (⑧) =================
@@ -9147,6 +9250,7 @@
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
       else if(act==="edit") openTaskForm(id);
       else if(act==="setpart") setTaskSpecPart(id);
+      else if(act==="gmaildraft") taskGmailDraft(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
       else if(act==="toggleask") toggleTaskAskDecision(id);
     });
@@ -9234,6 +9338,8 @@
       else if(act==="editrequest") openRequestEdit(id);
       else if(act==="attachreq"){ pendingReqAttachId = id; document.getElementById("reqAttachInput").click(); }
       else if(act==="editvendor") openVendorEdit(id);
+      else if(act==="setquotepart") setQuotePart(id);
+      else if(act==="togglequotereflect") toggleQuoteReflect(id);
       else if(act==="changerequest") openChangeRequestForm(id);
       else if(act==="delrequest"){ if(confirm2()) deleteRequest(id); }
       else if(act==="delvendor"){ if(confirm2()) deleteVendor(id); }

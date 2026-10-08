@@ -431,6 +431,24 @@ export default async (req: Request, context: Context) => {
       });
     }
   }
+  // 定価の見積書（スタッフが部位を指定して「反映」したものだけ）。仕切りの見積書は、反映の有無にかかわらず出さない。
+  for (const a of attachments) {
+    if (a.kind !== "quote" || a.quoteType !== "定価" || !a.reflected || !a.url) continue;
+    const sp = a.specPart || {};
+    if (!sp.scope) continue;
+    if (!sp.category && sp.scope !== "general" && sp.scope !== "exterior" && !(sp.scope === "room" && sp.roomId)) continue;
+    push(noteCatFor(sp.scope, sp.category), {
+      type: "photo",
+      isQuote: true,
+      at: a.reflectedAt || a.uploadedAt || "",
+      label: partLabel(project, sp.scope, sp.category, sp.roomId),
+      roomId: sp.roomId || null,
+      file: fileOf(a),
+      contentType: a.contentType || "",
+      spec: { contract: false, quote: false },
+      changing: false,
+    });
+  }
   for (const n of reflectedNotes) {
     const sp = n.specPart || {};
     push(noteCatFor(sp.scope, sp.category), {
