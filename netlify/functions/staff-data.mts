@@ -130,8 +130,16 @@ export default async (req: Request, context: Context) => {
       if (doc.assignee && doc.assignee !== by && doc.assignee !== (prevTask && prevTask.assignee)) {
         jobs.push(notify("assignee", doc.assignee));
       }
+      let checkerNotified = "";
       if (doc.checker && doc.checker !== by && doc.checker !== (prevTask && prevTask.checker)) {
         jobs.push(notify("checker", doc.checker));
+        checkerNotified = doc.checker;
+      }
+      // 進捗が「○○確認中」（社長確認中・朋子確認中など）に移ったら、その人へも知らせる
+      // （確認者を選んだ保存で、すでに同じ人へ送った場合は重ねて送らない）
+      const m = String(doc.status || "").match(/^(.+)確認中$/);
+      if (m && doc.status !== (prevTask && prevTask.status) && m[1] !== by && m[1] !== checkerNotified) {
+        jobs.push(notify("checker", m[1]));
       }
       // 「完了」になったら、社長・朋子・依頼者へ報告する
       if (doc.status === "完了" && prevTask && prevTask.status !== "完了") {
