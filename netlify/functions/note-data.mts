@@ -429,6 +429,8 @@ export default async (req: Request, context: Context) => {
       spec: specBadge(n.badges),
       changing: isChanging(n),
       message: n.message || "",
+      talk: n.talkPublic ? (n.talk || "") : "", // スタッフが「お客様にも見せる」にした記録だけ
+      channel: n.channel || "",
     });
   }
 
@@ -545,6 +547,8 @@ export default async (req: Request, context: Context) => {
         decided: n.decided != null ? n.decided : n.content || "",
         open: n.open || "",
         message: n.message || "",
+        talk: n.talkPublic ? (n.talk || "") : "",
+        channel: n.channel || "",
         changing: isChanging(n),
         part: (n.specPart && n.specPart.label) || "",
         files: (n.files || []).map(fileOf),

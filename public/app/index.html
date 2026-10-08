@@ -898,7 +898,9 @@
             <h3>打合せ内容を記録</h3>
             <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
             <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
-            <label class="field">打合せ内容（社内メモ・お客様には出ません）<textarea id="meetingNoteTalk" rows="3" placeholder="打合せで話した内容・経過など"></textarea></label>
+            <label class="field">連絡方法<select id="meetingNoteChannel"><option value="打合せ">打合せ</option><option value="LINE">LINE</option><option value="電話">電話</option><option value="メール">メール</option></select></label>
+            <label class="field">打合せ内容（LINEで来た変更点などもここに）<textarea id="meetingNoteTalk" rows="3" placeholder="打合せで話した内容・経過、LINEで来たご要望など"></textarea></label>
+            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 打合せ内容をお客様にも見せる（「反映する」とおうちノートに出ます）</label>
             <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
             <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
             <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
@@ -2846,11 +2848,12 @@
     wrap.innerHTML = rows.map(function(n){
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
       var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files)+'</div>' : "";
+      var chHtml = (n.channel && n.channel!=="打合せ") ? '<span class="pill" style="background:#06c755; color:#fff; font-weight:700;">'+escapeHtml(n.channel)+'</span> ' : "";
       var specHtml = n.specPart ?
         '<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
       var decided = n.decided!=null ? n.decided : (n.content||"");
       var open = n.open!=null ? n.open : "";
-      var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（社内メモ）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
+      var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（'+(n.talkPublic?'お客様にも表示':'社内メモ・お客様には出ません')+'）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
       var msgHtml = n.message ? '<div class="nbox msg"><div class="nboxlabel">お客様へのメッセージ</div><div class="ntext">'+escapeHtml(n.message)+'</div></div>' : "";
       var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">未決・お客様に確認すること</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
       var sent = noteSentInfo(n);
@@ -2881,7 +2884,7 @@
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         (isChangeRequesting(n) ? '<span class="nchgbadge">変更依頼中</span>' : '')+
         sentBadgeHtml+
-        (specHtml ? specHtml : '')+
+        chHtml+(specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
@@ -6558,6 +6561,8 @@
     var open = (openInput && openInput.value || "").trim();
     var talk = (document.getElementById("meetingNoteTalk").value || "").trim();
     var message = (document.getElementById("meetingNoteMessage").value || "").trim();
+    var channel = document.getElementById("meetingNoteChannel").value || "打合せ";
+    var talkPublic = !!document.getElementById("meetingNoteTalkShow").checked;
     // PDF・写真などの資料を添付する場合は、決定事項・未決事項が空でも記録できる（契約書類の保管など）。
     var hasFilePicked = !!(document.getElementById("meetingNoteFile") && document.getElementById("meetingNoteFile").files && document.getElementById("meetingNoteFile").files.length);
     var editingHasFiles = false;
@@ -6584,6 +6589,8 @@
       existing.decided = decided;
       existing.open = open;
       existing.talk = talk;
+      existing.talkPublic = talkPublic;
+      existing.channel = channel;
       existing.message = message;
       existing.content = meetingNoteDerivedContent(decided, open);
       existing.date = noteDate;
@@ -6601,7 +6608,7 @@
       return;
     }
 
-    var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open, talk:talk, message:message,
+    var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
@@ -6805,6 +6812,8 @@
     if(openInput) openInput.value = n.open || "";
     document.getElementById("meetingNoteTalk").value = n.talk || "";
     document.getElementById("meetingNoteMessage").value = n.message || "";
+    document.getElementById("meetingNoteChannel").value = n.channel || "打合せ";
+    document.getElementById("meetingNoteTalkShow").checked = !!n.talkPublic; // これまでの記録は社内メモ扱いのまま（チェックを入れた記録だけお客様に出る）
     if(dateInput) dateInput.value = n.date || todayStr();
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = n.specPart || null;
@@ -6834,6 +6843,8 @@
     if(openInput) openInput.value = "";
     document.getElementById("meetingNoteTalk").value = "";
     document.getElementById("meetingNoteMessage").value = "";
+    document.getElementById("meetingNoteChannel").value = "打合せ";
+    document.getElementById("meetingNoteTalkShow").checked = true;
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = null;
