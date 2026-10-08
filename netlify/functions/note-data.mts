@@ -601,6 +601,13 @@ export default async (req: Request, context: Context) => {
       const cur = typeof hp.current === "number" && hp.current >= 0 && hp.current < steps.length ? hp.current : -1;
       return { steps, current: cur };
     })(),
+    // 次回の打合せの予定（スタッフが「おうちノート連携」タブで入力。on:false や空なら出さない）
+    nextMeeting: (() => {
+      const nm = okaiCustomer && okaiCustomer.nextMeeting;
+      if (!nm || nm.on === false) return null;
+      const text = String(nm.text || "").trim().slice(0, 2000);
+      return text ? { text } : null;
+    })(),
     ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });
 };

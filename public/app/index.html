@@ -749,6 +749,13 @@
           </div>
         </div>
         <div class="card">
+          <h3>打合せの予定（お客様のホーム「次回のご予約」の下に表示）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">次回の打合せで決める内容などを自由に書けます。書き換えて保存すると、お客様の画面も書き換わります。</p>
+          <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiNextMeetOn"> お客様の画面に表示する</label>
+          <textarea id="okaiNextMeetText" rows="4" style="width:100%;" placeholder="例：外壁・屋根の色を決めます。サンプルをご覧いただきます。"></textarea>
+          <div class="row" style="gap:6px; margin-block-start:10px;"><button class="btn small" id="btnOkaiNextMeetSave">保存</button></div>
+        </div>
+        <div class="card">
           <h3>予約状況（お客様がおうちノートで確認・予約）</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.85rem;">Googleカレンダーに既存の予定がある場合は、ここから手動で追加するとお客様のおうちノートにも表示されます。</p>
           <div id="okaiBookingList" style="display:flex; flex-direction:column; gap:6px;"></div>
@@ -4519,6 +4526,7 @@
       renderOkaiProfile(dataRes.body.customer);
       renderOkaiConsider(dataRes.body.customer);
       okaiProgFromCustomer(dataRes.body.customer);
+      okaiNextMeetFromCustomer(dataRes.body.customer);
       document.getElementById("okaiAce3dUrl").value = (dataRes.body.customer && dataRes.body.customer.customerLinks && dataRes.body.customer.customerLinks.ace3dUrl) || "";
     }).catch(function(){ unavailable.hidden = false; });
   }
@@ -4697,6 +4705,29 @@
       if(!res.ok || !res.body.customer || !res.body.customer.houseProgress){ toast("保存に失敗しました"); return; }
       okaiProgFromCustomer(res.body.customer);
       toast("✅ 保存しました" + (hp.on ? "（お客様の画面に表示されます）" : "（お客様の画面には表示しません）"));
+    }).catch(function(){ toast("保存に失敗しました"); });
+  }
+
+  // ---- 打合せの予定（noteExtras.nextMeeting = {on, text}）----
+  function okaiNextMeetFromCustomer(customer){
+    var nm = customer && customer.nextMeeting;
+    var on = document.getElementById("okaiNextMeetOn"), tx = document.getElementById("okaiNextMeetText");
+    if(!on || !tx) return;
+    on.checked = !!(nm && nm.on!==false && String(nm.text||"").trim());
+    tx.value = (nm && nm.text) || "";
+  }
+  function okaiNextMeetSave(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var nm = { on: document.getElementById("okaiNextMeetOn").checked, text: document.getElementById("okaiNextMeetText").value.trim() };
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { nextMeeting: nm } })
+    }).then(function(res){
+      if(!res.ok || !res.body.customer || !res.body.customer.nextMeeting){ toast("保存に失敗しました"); return; }
+      okaiNextMeetFromCustomer(res.body.customer);
+      toast("✅ 保存しました" + (nm.on && nm.text ? "（お客様の画面に表示されます）" : "（お客様の画面には表示しません）"));
     }).catch(function(){ toast("保存に失敗しました"); });
   }
 
@@ -8296,6 +8327,7 @@
     document.getElementById("btnOkaiAddEstimate").addEventListener("click", okaiAddEstimate);
     document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
     document.getElementById("btnOkaiProgSave").addEventListener("click", okaiProgSave);
+    document.getElementById("btnOkaiNextMeetSave").addEventListener("click", okaiNextMeetSave);
     document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); });
     document.getElementById("okaiProgRows").addEventListener("click", function(e){
       var d = e.target.closest("[data-progdel]"); if(!d) return;

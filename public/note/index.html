@@ -659,6 +659,12 @@
       }).join("")+'</div>';
     } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
 
+    // 次回の打合せの予定（スタッフが入力した文章）
+    if(data.nextMeeting && data.nextMeeting.text){
+      out += '<div class="sechd"><h3>📝 打合せの予定</h3></div>'+
+        '<div class="rv" style="display:block;"><div class="tm" style="white-space:pre-wrap; line-height:1.7; color:var(--ink,inherit);">'+esc(data.nextMeeting.text)+'</div></div>';
+    }
+
     // 最近のお打合せ記録（2件）。決定事項・確認事項が見える具体的な内容なので、
     // ホームの情報量を増やすのにちょうどよい。
     if(data.notes.length){
