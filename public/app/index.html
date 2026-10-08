@@ -7226,9 +7226,18 @@
   }
   // タスクの添付（図面など）を、そのタスクの案件の設備仕様の履歴に入れる／部位や反映の状態をそろえる。
   // ※画面が今どの案件を開いているかに関係なく、必ずタスクの案件（t.projectId）に入れる。
+  // タスクの部位が「おうちノートの項目に出せる」ものか。
+  // 外部仕様（項目を選ばず「外部仕様」だけ）と、部屋そのもの（項目を限定しない）は category が空でも出せる。
+  function taskPartReflectable(vs){
+    if(!vs || !vs.scope || vs.scope==="general") return false;
+    if(vs.category) return true;
+    if(vs.scope==="exterior") return true;
+    if(vs.scope==="room" && vs.roomId) return true;
+    return false;
+  }
   async function syncTaskSpecCopies(t){
     var vs = t.vendorSpec;
-    if(!vs || vs.scope==="general" || !vs.category || !t.projectId) return 0;
+    if(!taskPartReflectable(vs) || !t.projectId) return 0;
     var created = 0;
     var atts = t.attachments || [];
     for(var i=0; i<atts.length; i++){
@@ -7277,7 +7286,7 @@
     await saveDoc("tasks", t.id, t);
     logActivity((t.requestTo?"業者タスク":"社内タスク")+"「"+(t.content||"").slice(0,20)+"」に資料を添付しました");
     toast("✅ 添付しました");
-    if(t.reflected && t.vendorSpec && t.vendorSpec.scope!=="general" && t.vendorSpec.category){
+    if(t.reflected && taskPartReflectable(t.vendorSpec)){
       var nSync = await syncTaskSpecCopies(t);
       render();
       if(nSync) toast("✅ 「"+(t.vendorSpec.label||"")+"」の設備仕様・おうちノートにも反映しました");
@@ -7287,7 +7296,7 @@
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t) return;
     // 反映をONにするときに部位が未設定なら、先に部位を選んでもらう
-    if(!t.reflected && (!t.vendorSpec || !t.vendorSpec.category)){
+    if(!t.reflected && !taskPartReflectable(t.vendorSpec)){
       if(!t.projectId){ toast("案件が未設定のタスクは反映できません。編集で案件を選んでください"); return; }
       askSpecPart(function(part){
         if(!part) return;
@@ -7307,7 +7316,7 @@
     logActivity("タスク「"+(t.content||"").slice(0,20)+"」を"+(t.reflected?"おうちノートに反映しました":"反映解除しました"));
     // 添付（図面）を、そのタスクの案件の設備仕様の履歴へ入れる（OFFのときは反映だけ外す）
     var vs = t.vendorSpec;
-    if(vs && vs.scope!=="general" && vs.category){
+    if(taskPartReflectable(vs)){
       var n = await syncTaskSpecCopies(t);
       render();
       if(t.reflected){
