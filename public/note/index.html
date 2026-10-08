@@ -616,7 +616,31 @@
     var done = cats.filter(function(c){ return c.status==="決定"; }).length;
     return { total:cats.length, done:done, pct: cats.length ? Math.round(done*100/cats.length) : 0 };
   }
-  function homeHtml(){
+  // 追加見積りの合計（金額確認中・見送りは除く。「承認済み」は承認した分だけ）
+function estAmountNum(v){
+  var t=String(v||"").replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);}).replace(/[,，\s円¥￥]/g,"");
+  var m=t.match(/^(\d+(?:\.\d+)?)(万)?/); if(!m) return null;
+  return Math.round(parseFloat(m[1])*(m[2]?10000:1));
+}
+function estTotalHtml(list){
+  var all=0, ok=0, n=0, bad=0;
+  list.forEach(function(x){
+    var r=x.customerResponse||"未回答";
+    var pend = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
+    if(pend || r==="見送り" || x.estimateState==="見送り") return;
+    var a=estAmountNum(x.amount);
+    if(a==null){ bad++; return; }
+    n++; all+=a; if(r==="承認") ok+=a;
+  });
+  if(!n) return "";
+  var yen=function(v){ return v.toLocaleString("ja-JP")+"円"; };
+  return '<div class="rv" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:8px;">'+
+    '<div style="display:flex; justify-content:space-between;"><span class="ty">追加見積りの合計</span><span class="ty">'+yen(all)+'</span></div>'+
+    '<div style="display:flex; justify-content:space-between;"><span class="tm">うち承認済み</span><span class="tm">'+yen(ok)+'</span></div>'+
+    '<div class="tm">※金額確認中・見送りの項目は含みません'+(bad?'（金額を数字で読み取れない'+bad+'件も含みません）':'')+'</div></div>';
+}
+
+function homeHtml(){
     var h = new Date().getHours();
     var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
     var name = (data.project.customer || "お客様").replace(/様$/, "");
@@ -723,7 +747,7 @@
         }
         return '<div class="rv" style="flex-wrap:wrap;"><div style="flex:1; min-width:0;"><div class="ty">'+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
           (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
-      }).join("")+'</div>';
+      }).join("")+'</div>'+estTotalHtml(data.estimates);
     }
 
     // 家づくりリスト（打合せ記録からスタッフが反映した検討事項）
