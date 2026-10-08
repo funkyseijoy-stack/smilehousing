@@ -2070,6 +2070,7 @@
   // ================= 新おうちノート（/note/） =================
   // お客様画面の項目IDとの対応（netlify/functions/note-data.mts の noteCatFor と同じ内容）
   function noteCatIdFor(scope, category){
+    if(scope==="general") return "general"; // 総合（note-data.mts の noteCatFor と同じ）
     if(scope==="exterior") return "exterior";
     if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"dressing","ランドリーバー":"dressing","トイレ":"toilet","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
@@ -2080,7 +2081,7 @@
     if(scope==="custom") return category ? "cp_"+category : null; // 追加した部位は1つずつ別の項目（note-data.mts の noteCatFor と同じ）
     return null;
   }
-  var NOTE_CAT_NAMES = { exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", dressing:"脱衣室", toilet:"トイレ",
+  var NOTE_CAT_NAMES = { general:"総合", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", dressing:"脱衣室", toilet:"トイレ",
     climate:"暖房・換気", electric:"電気・あかり", interior:"インテリアメイン", rooms:"各部屋", other:"その他の確認", planboard:"プランボード" };
   // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
   var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
@@ -7229,9 +7230,9 @@
   // タスクの部位が「おうちノートの項目に出せる」ものか。
   // 外部仕様（項目を選ばず「外部仕様」だけ）と、部屋そのもの（項目を限定しない）は category が空でも出せる。
   function taskPartReflectable(vs){
-    if(!vs || !vs.scope || vs.scope==="general") return false;
+    if(!vs || !vs.scope) return false;
     if(vs.category) return true;
-    if(vs.scope==="exterior") return true;
+    if(vs.scope==="general" || vs.scope==="exterior") return true;
     if(vs.scope==="room" && vs.roomId) return true;
     return false;
   }
@@ -7324,7 +7325,7 @@
         else toast("✅ 反映しました（添付を追加すると、図面も一緒に反映されます）");
       }
     }else if(t.reflected){
-      toast("部位が「総合」などのため、おうちノートの項目には出ません。「部位を変更」で項目を選んでください");
+      toast("部位が未設定のため、おうちノートの項目には出ません。「部位を変更」で項目を選んでください");
     }
   }
   async function deleteTaskAttachment(taskId, attId){

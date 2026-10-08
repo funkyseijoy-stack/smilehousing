@@ -28,6 +28,8 @@ function genId(prefix: string) {
 // お客様画面の「設備仕様」一覧。玄関は外部に統合している。
 // match: [scope, category|null]（nullはそのscopeの全カテゴリー）
 const NOTE_CATS = [
+  // 部位を「総合（部位を限定しない）」にした記録・業者タスクの添付・仕様履歴（反映済みのもの）
+  { id: "general", name: "総合", sub: "全体にかかわるお打合せ・資料", icon: "house" },
   { id: "exterior", name: "外部", sub: "外壁・屋根・破風・サッシ・玄関", icon: "house" },
   { id: "kitchen", name: "キッチン", sub: "プランボード・設備仕様", icon: "kitchen" },
   { id: "bath", name: "お風呂", sub: "プランボード・設備仕様", icon: "bath" },
@@ -95,6 +97,7 @@ function catsOf(project: any) {
 
 function noteCatFor(scope?: string, category?: string | null): string | null {
   if (!scope) return null;
+  if (scope === "general") return "general";
   if (scope === "exterior") return "exterior";
   if (scope === "facility") {
     if (category === "キッチン") return "kitchen";
@@ -396,8 +399,8 @@ export default async (req: Request, context: Context) => {
     if (!t.reflected || t.deletedAt || t.private) continue;
     const vs = t.vendorSpec || {};
     // 外部仕様（項目を選ばず「外部仕様」だけ）と、部屋そのもの（項目を限定しない）は category が空でも出す
-    if (!vs.scope || vs.scope === "general") continue;
-    if (!vs.category && vs.scope !== "exterior" && !(vs.scope === "room" && vs.roomId)) continue;
+    if (!vs.scope) continue;
+    if (!vs.category && vs.scope !== "general" && vs.scope !== "exterior" && !(vs.scope === "room" && vs.roomId)) continue;
     for (const att of t.attachments || []) {
       if (!att || !att.url || shownUrls.has(att.url)) continue;
       shownUrls.add(att.url);
