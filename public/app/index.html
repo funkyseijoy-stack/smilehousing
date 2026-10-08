@@ -504,6 +504,11 @@
         <div class="projlist" id="fullProjList"></div>
         <div class="empty" id="fullProjEmpty" hidden>案件がありません。</div>
       </div>
+      <div class="card" id="finishedProjCard" hidden>
+        <h2 style="margin:0 0 4px;">🏁 完工・保存</h2>
+        <p class="muted" style="margin:0 0 10px; font-size:.85rem;">工事が終わった案件です。記録・仕様・写真・タスク履歴などはそのまま見られます。案件を開いて「保存を解除する」で元の一覧に戻せます。</p>
+        <div class="projlist" id="finishedProjList"></div>
+      </div>
     </div>
 
     <div id="projectDetailView" hidden>
@@ -519,6 +524,8 @@
           </div>
           <div class="row" style="gap:6px;">
             <button class="btn secondary small" id="btnEditProject">編集</button>
+            <button class="btn secondary small" id="btnExportProject" title="この案件の記録・仕様・タスク・写真などをまとめてZIPで保存します">📦 全情報をダウンロード</button>
+            <button class="btn secondary small" id="btnFinishProject">🏁 工事完了として保存</button>
             <button class="btn danger-ghost" id="btnDeleteProject">案件を削除</button>
           </div>
         </div>
@@ -532,6 +539,7 @@
             <button class="btn secondary" id="btnCancelEditProject">キャンセル</button>
           </div>
         </div>
+        <div id="finishedBanner" hidden style="margin-block-start:10px; padding:8px 12px; border-radius:8px; background:var(--gray-soft); font-weight:700;"></div>
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
@@ -550,7 +558,18 @@
         <button class="sub-btn" data-sub="plan">図面</button>
         <button class="sub-btn" data-sub="reservation">予約</button>
         <button class="sub-btn" data-sub="message">メッセージ</button>
+        <button class="sub-btn" data-sub="taskhistory">タスク履歴</button>
         <button class="sub-btn" data-sub="okainote">おうちノート連携</button>
+      </div>
+
+      <!-- タスク履歴（アーカイブ済みタスク） subpanel -->
+      <div class="subpanel" id="sub-taskhistory">
+        <div class="card">
+          <h3>タスク履歴（アーカイブ）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">「完了」にして3日たったタスクは、ホームのタスク画面から外れてここに移ります。内容の確認と「元に戻す」ができます。</p>
+          <div id="taskHistoryList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="empty" id="taskHistoryEmpty" hidden>アーカイブされたタスクはまだありません。</div>
+        </div>
       </div>
 
       <!-- 概要 subpanel -->
@@ -1328,6 +1347,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1370,8 +1390,8 @@
   function confirm2(){ return true; } // confirm() is inert in the artifact viewer
 
   // ================= state =================
-  var STATUS_ORDER = ["未着手","対応中","社長確認中","朋子確認中","業者連絡済み","お客様へ連絡済み","完了"];
-  var STATUS_COLORS = {"未着手":"#8a8a85","対応中":"#2f6fb3","社長確認中":"#c2703a","朋子確認中":"#c2703a","業者連絡済み":"#2a8a7a","お客様へ連絡済み":"#7a5ab0","完了":"#4a7c59"};
+  var STATUS_ORDER = ["未着手","対応中","社長確認依頼中","朋子確認依頼中","業者連絡済み","お客様へ連絡済み","完了"];
+  var STATUS_COLORS = {"未着手":"#8a8a85","対応中":"#2f6fb3","社長確認依頼中":"#c2703a","朋子確認依頼中":"#c2703a","業者連絡済み":"#2a8a7a","お客様へ連絡済み":"#7a5ab0","完了":"#4a7c59"};
   var EXTERIOR_CATS = ["外壁","外壁アクセント","屋根","破風","鼻隠し","玄関ドア","ポスト"];
   // おうちノート（customer app.js）の labels 辞書と同じキー名。ここに入力した値が
   // そのまま「色・仕様」ページに表示されるため、キー名は勝手に変えないこと。
@@ -1654,14 +1674,34 @@
 
   // 進捗「対応済み」を廃止して「業者連絡済み」に統合した（2026年10月）。
   // 既存の「対応済み」のタスクは、画面から消えないよう「業者連絡済み」に移して保存し直す。
+  // 2026年10月：「社長確認中」「朋子確認中」→「…確認依頼中」に名称変更。旧名称のタスクは起動時に自動で移す。
+  var LEGACY_STATUS_MAP = {"対応済み":"業者連絡済み","社長確認中":"社長確認依頼中","朋子確認中":"朋子確認依頼中"};
   function migrateLegacyTaskStatus(){
     (state.tasks||[]).forEach(function(t){
-      if(t.status==="対応済み"){
-        t.status = "業者連絡済み";
+      var nu = LEGACY_STATUS_MAP[t.status];
+      if(nu){
+        t.status = nu;
         t.updatedAt = nowIso();
         saveDoc("tasks", t.id, t);
       }
     });
+  }
+
+  // 完了から3日たったタスクは、ホームのタスク画面から外して案件の「タスク履歴」へ移す（archivedAt を付けるだけ。消えない）。
+  // 完了日（completedAt）が無い古いタスクは、最後に更新した日を完了日とみなす。
+  var ARCHIVE_AFTER_MS = 3*24*60*60*1000;
+  function autoArchiveTasks(){
+    var now = Date.now(), n = 0;
+    (state.tasks||[]).forEach(function(t){
+      if(t.deletedAt || t.archivedAt || t.status!=="完了") return;
+      var at = Date.parse(t.completedAt || t.updatedAt || t.createdAt || "");
+      if(isNaN(at) || now-at < ARCHIVE_AFTER_MS) return;
+      t.archivedAt = nowIso();
+      if(!t.completedAt) t.completedAt = new Date(at).toISOString();
+      saveDoc("tasks", t.id, t);
+      n++;
+    });
+    return n;
   }
 
   async function boot(){
@@ -1672,6 +1712,7 @@
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
       migrateLegacyTaskStatus();
+      autoArchiveTasks();
       state.currentProjectId = state.projects.find(function(p){return !p.deletedAt;}) ? state.projects.find(function(p){return !p.deletedAt;}).id : null;
       var settingsItems = await apiGet("settings");
       var s = settingsItems.find(function(x){ return x.id==="main"; });
@@ -1756,6 +1797,7 @@
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
       migrateLegacyTaskStatus();
+      autoArchiveTasks();
       if(state.currentProjectId && !state.projects.some(function(p){ return p.id===state.currentProjectId; })){
         var firstLive = state.projects.find(function(p){return !p.deletedAt;});
         state.currentProjectId = firstLive ? firstLive.id : null;
@@ -1893,7 +1935,9 @@
     logActivity(label + "を完全に削除しました");
   }
 
-  function liveProjects(){ return state.projects.filter(function(p){ return !p.deletedAt; }); }
+  function liveProjects(){ return state.projects.filter(function(p){ return !p.deletedAt && !p.finishedAt; }); }
+  // 工事が終わって「完工・保存」にした案件
+  function finishedProjects(){ return state.projects.filter(function(p){ return !p.deletedAt && !!p.finishedAt; }); }
   function liveVendors(){ return state.vendors.filter(function(v){ return !v.deletedAt; }); }
   function liveRequests(){ return state.requests.filter(function(r){ return !r.deletedAt; }); }
   function liveAttachments(){ return state.attachments.filter(function(a){ return !a.deletedAt; }); }
@@ -1901,6 +1945,7 @@
   function liveTasks(){
     return state.tasks.filter(function(t){
       if(t.deletedAt) return false;
+      if(t.archivedAt) return false; // アーカイブ済みは案件の「タスク履歴」で見る
       // 「自分だけのタスク」は作成した本人以外には見せない
       if(t.private && t.creator && t.creator!==state.currentUser) return false;
       return true;
@@ -1925,7 +1970,9 @@
     renderProgressFilterBar();
     renderProjectTypeFilterBar();
     renderFullProjList();
+    renderFinishedProjList();
     renderProjectDetail();
+    renderTaskHistory();
     renderVendorCheckboxList();
     renderProjectTable();
     renderPendingTable();
@@ -2214,7 +2261,7 @@
       if(state.taskKindFilter==="check") return !!t.checker;
       return true;
     });
-    if(!state.taskOpen) state.taskOpen = {"未着手":true,"対応中":true,"社長確認中":true,"朋子確認中":true};
+    if(!state.taskOpen) state.taskOpen = {"未着手":true,"対応中":true,"社長確認依頼中":true,"朋子確認依頼中":true};
     wrap.innerHTML = STATUS_ORDER.filter(function(st){ return !state.taskStatusFilter || st===state.taskStatusFilter; }).map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
       // 部位ごとにまとまり、各部位の中では古い→新しい（時系列）に並ぶようにする。
@@ -2331,6 +2378,178 @@
     }).join("");
   }
 
+  function renderFinishedProjList(){
+    var card = document.getElementById("finishedProjCard");
+    if(!card) return;
+    var rows = finishedProjects().sort(function(a,b){ return String(b.finishedAt).localeCompare(String(a.finishedAt)); });
+    card.hidden = rows.length===0;
+    document.getElementById("finishedProjList").innerHTML = rows.map(function(p){
+      return '<div class="projrow" data-open-project="'+p.id+'"><div class="pname">'+escapeHtml(p.name)+(p.customer?'<span class="psub"> '+escapeHtml(p.customer)+'</span>':'')+'</div>'+projectTypePill(p.type)+'<span class="pill tag">完工 '+escapeHtml(String(p.finishedAt).slice(0,10))+'</span></div>';
+    }).join("");
+  }
+
+  // 案件の「タスク履歴」：アーカイブ済みのタスクを新しい順に出す
+  function renderTaskHistory(){
+    var wrap = document.getElementById("taskHistoryList");
+    if(!wrap) return;
+    var empty = document.getElementById("taskHistoryEmpty");
+    var pid = state.currentProjectId;
+    var rows = (state.tasks||[]).filter(function(t){
+      if(t.deletedAt || !t.archivedAt || t.projectId!==pid) return false;
+      if(t.private && t.creator && t.creator!==state.currentUser) return false;
+      return true;
+    }).sort(function(a,b){ return String(b.completedAt||b.archivedAt).localeCompare(String(a.completedAt||a.archivedAt)); });
+    empty.hidden = rows.length!==0;
+    wrap.innerHTML = rows.map(function(t){
+      return '<div class="kancard" style="margin:0;">'+
+        '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+        (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
+        (t.vendorSpec ? '<div class="kc-part">📍 部位：<b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '')+
+        (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+(t.attachments||[]).map(function(a){ return '<a href="'+a.url+'" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none; background:var(--surface-2); padding:2px 8px; border-radius:4px;">📎 '+escapeHtml(a.name||"添付")+'</a>'; }).join(" ")+'</div>' : '')+
+        '<div class="kc-meta">'+
+          '<span>完了 '+escapeHtml(String(t.completedAt||t.archivedAt).slice(0,10))+'</span>'+
+          (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
+          (t.requestTo?'<span>依頼先 '+escapeHtml(t.requestTo)+'</span>':'')+
+          (t.checker?'<span>確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
+        '</div>'+
+        '<div class="kc-actions"><button class="btn small secondary" data-taskunarchive="'+t.id+'">元に戻す</button></div>'+
+      '</div>';
+    }).join("");
+  }
+  async function unarchiveTask(id){
+    var t = state.tasks.find(function(x){ return x.id===id; });
+    if(!t) return;
+    // 完了のまま通常の画面へ戻す（3日間はそこに残る）。やり直すときは「進捗を変更する」で動かす。
+    t.archivedAt = null;
+    t.completedAt = nowIso();
+    t.updatedAt = nowIso();
+    render();
+    await saveDoc("tasks", t.id, t);
+    logActivity("タスク「"+(t.content||"").slice(0,20)+"」をタスク履歴から元に戻しました");
+    toast("ホームのタスク画面（完了）へ戻しました");
+  }
+
+  // ---- 完工・保存 ----
+  async function toggleFinishProject(){
+    var p = projectById(state.currentProjectId);
+    if(!p) return;
+    if(p.finishedAt){
+      if(!window.confirm("「"+p.name+"」の完工・保存を解除して、案件一覧に戻しますか？")) return;
+      p.finishedAt = null;
+      render();
+      await saveDoc("projects", p.id, p);
+      logActivity("案件「"+p.name+"」の完工・保存を解除しました");
+      toast("案件一覧に戻しました");
+      return;
+    }
+    var open = (state.tasks||[]).filter(function(t){ return !t.deletedAt && t.projectId===p.id && t.status!=="完了"; }).length;
+    var msg = "「"+p.name+"」を工事完了として「完工・保存」へ移します。\n記録・仕様・写真・タスク履歴などはそのまま残り、いつでも見られます。"+(open?"\n\n※まだ完了していないタスクが"+open+"件あります（ホームのタスク画面には残ります）。":"")+"\n\nよろしいですか？";
+    if(!window.confirm(msg)) return;
+    p.finishedAt = nowIso();
+    p.finishedBy = state.currentUser || "";
+    render();
+    await saveDoc("projects", p.id, p);
+    logActivity("案件「"+p.name+"」を工事完了として保存しました");
+    toast("🏁 「完工・保存」へ移しました");
+    closeProjectDetail();
+    document.querySelector('.tab-btn[data-tab="projects"]').click();
+  }
+
+  // 案件の全情報を1つのZIPにまとめてダウンロードする（記録の一覧＝読める形のHTML、全データ＝JSON、写真・PDFなどのファイル）
+  async function exportProjectZip(){
+    var p = projectById(state.currentProjectId);
+    if(!p) return;
+    if(typeof JSZip==="undefined"){ toast("ZIP機能の読み込みに失敗しました。ページを再読み込みしてください"); return; }
+    var btn = document.getElementById("btnExportProject");
+    var orig = btn.textContent; btn.disabled = true;
+    try{
+      var zip = new JSZip();
+      var cols = ["meetingNotes","tasks","messages","specPhotos","confirmItems","albumPhotos","reservations","noteDecisions","imageBoard","sitePhotos","attachments","requests"];
+      var data = { exportedAt: nowIso(), project: p };
+      cols.forEach(function(c){
+        data[c] = (state[c]||[]).filter(function(x){ return x && x.projectId===p.id && !x.deletedAt && !(x.private && x.creator && x.creator!==state.currentUser); });
+      });
+      // ファイル（写真・PDFなど）を集める
+      var files = [], seen = {};
+      cols.forEach(function(c){
+        data[c].forEach(function(x){
+          var list = [];
+          if(x.url) list.push({url:x.url, name:x.fileName||x.name||x.id});
+          (x.attachments||[]).forEach(function(a){ if(a && a.url) list.push({url:a.url, name:a.name||a.id}); });
+          list.forEach(function(f){
+            if(seen[f.url]) return; seen[f.url]=1;
+            files.push({col:c, url:f.url, name:f.name, key:x.id});
+          });
+        });
+      });
+      var failed = [], done = 0;
+      for(var i=0;i<files.length;i++){
+        btn.textContent = "📦 ファイル取得中… "+(i+1)+" / "+files.length;
+        var f = files[i];
+        try{
+          var res = await fetch(f.url);
+          if(!res.ok) throw new Error("http "+res.status);
+          var blob = await res.blob();
+          var safe = String(f.name||"file").replace(/[\\/:*?"<>|]/g,"_");
+          f.path = "files/"+f.col+"/"+String(f.key).slice(-6)+"_"+safe;
+          zip.file(f.path, blob);
+          done++;
+        }catch(e){ failed.push(f.name+"（"+f.col+"）"); f.path = ""; }
+      }
+      var pathOf = {}; files.forEach(function(f){ if(f.path) pathOf[f.url]=f.path; });
+      zip.file("data.json", JSON.stringify(data, null, 2));
+      zip.file("読み物.html", buildProjectExportHtml(p, data, pathOf, failed));
+      btn.textContent = "📦 ZIPを作成中…";
+      var out = await zip.generateAsync({type:"blob"});
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(out);
+      a.download = String(p.name||"案件").replace(/[\\/:*?"<>|]/g,"_")+"_全情報_"+nowIso().slice(0,10)+".zip";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 60000);
+      logActivity("案件「"+p.name+"」の全情報をダウンロードしました");
+      toast(failed.length ? "ダウンロードしました（取得できなかったファイル "+failed.length+" 件）" : "✅ 全情報をダウンロードしました");
+    }catch(e){
+      toast("ダウンロードに失敗しました");
+    }finally{
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
+  function buildProjectExportHtml(p, d, pathOf, failed){
+    var E = escapeHtml;
+    function fl(u){ return pathOf[u] ? '<a href="'+E(pathOf[u])+'">'+E(pathOf[u].split("/").pop())+'</a>' : ''; }
+    function filesOf(x){
+      var out = [];
+      if(x.url && pathOf[x.url]) out.push(fl(x.url));
+      (x.attachments||[]).forEach(function(a){ if(a && a.url && pathOf[a.url]) out.push(fl(a.url)); });
+      return out.length ? '<div>📎 '+out.join(" ／ ")+'</div>' : '';
+    }
+    var h = '<!doctype html><html lang="ja"><meta charset="utf-8"><title>'+E(p.name)+' 全情報</title>'+
+      '<style>body{font-family:sans-serif;max-width:900px;margin:20px auto;padding:0 12px;line-height:1.7}h2{border-bottom:2px solid #ccc;margin-top:28px}.i{border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin:8px 0}.m{color:#666;font-size:.9em}</style>'+
+      '<h1>'+E(p.name)+'</h1><p class="m">お客様：'+E(p.customer||"")+'　種別：'+E(p.type||"")+'　進捗：'+E(p.progressTag||"")+(p.finishedAt?'　完工：'+E(String(p.finishedAt).slice(0,10)):'')+'　書き出し：'+E(d.exportedAt.slice(0,10))+'</p>';
+    h += '<h2>打合せ記録（'+d.meetingNotes.length+'件）</h2>';
+    d.meetingNotes.slice().sort(function(a,b){ return String(a.date||a.createdAt).localeCompare(String(b.date||b.createdAt)); }).forEach(function(n){
+      h += '<div class="i"><b>'+E(n.date||String(n.createdAt||"").slice(0,10))+' '+E(n.title||"")+'</b> <span class="m">'+E((n.specPart&&n.specPart.label)||"")+'</span><div>'+E(n.content||n.text||"").replace(/\n/g,"<br>")+'</div>'+
+        (n.talk?'<div class="m">社内メモ：'+E(n.talk).replace(/\n/g,"<br>")+'</div>':'')+filesOf(n)+'</div>';
+    });
+    h += '<h2>タスク（'+d.tasks.length+'件）</h2>';
+    d.tasks.slice().sort(function(a,b){ return String(a.createdAt).localeCompare(String(b.createdAt)); }).forEach(function(t){
+      h += '<div class="i"><b>'+E(t.content||"")+'</b><div class="m">'+E(t.status||"")+(t.assignee?'／担当 '+E(t.assignee):'')+(t.requestTo?'／依頼先 '+E(t.requestTo):'')+(t.completedAt?'／完了 '+E(String(t.completedAt).slice(0,10)):'')+'</div>'+(t.memo?'<div>📝 '+E(t.memo)+'</div>':'')+filesOf(t)+'</div>';
+    });
+    h += '<h2>仕様の写真・資料（'+d.specPhotos.length+'件）</h2>';
+    d.specPhotos.forEach(function(s){ h += '<div class="i">'+E(s.category||"")+' '+E(s.fileName||"")+(s.memo?'<div>📝 '+E(s.memo)+'</div>':'')+filesOf(s)+'</div>'; });
+    h += '<h2>アルバム・お家のイメージ・現場写真（'+(d.albumPhotos.length+d.imageBoard.length+d.sitePhotos.length)+'件）</h2>';
+    d.albumPhotos.concat(d.imageBoard).concat(d.sitePhotos).forEach(function(s){ h += '<div class="i">'+E(s.category||s.place||"")+' '+E(s.fileName||"")+filesOf(s)+'</div>'; });
+    h += '<h2>お客様とのメッセージ（'+d.messages.length+'件）</h2>';
+    d.messages.slice().sort(function(a,b){ return String(a.createdAt).localeCompare(String(b.createdAt)); }).forEach(function(m){ h += '<div class="i"><span class="m">'+E(String(m.createdAt||"").slice(0,16).replace("T"," "))+' '+(m.fromCustomer?'お客様':'スタッフ')+'</span><div>'+E(m.text||m.content||"").replace(/\n/g,"<br>")+'</div></div>'; });
+    h += '<h2>予約（'+d.reservations.length+'件）</h2>';
+    d.reservations.forEach(function(r){ h += '<div class="i">'+E(r.date||"")+' '+E(r.time||"")+' '+E(r.type||"")+'</div>'; });
+    h += '<h2>見積・図面（'+(d.attachments.length+d.requests.length)+'件）</h2>';
+    d.attachments.forEach(function(a){ h += '<div class="i">'+E(a.kind||"")+' '+E(a.name||"")+filesOf(a)+'</div>'; });
+    if(failed.length) h += '<h2>取得できなかったファイル</h2><ul>'+failed.map(function(f){ return '<li>'+E(f)+'</li>'; }).join("")+'</ul>';
+    h += '<p class="m">※すべての項目の元データは data.json に入っています。</p>';
+    return h;
+  }
+
   function renderProjectDetail(){
     var proj = projectById(state.currentProjectId);
     var listView = document.getElementById("projectListView");
@@ -2344,6 +2563,10 @@
     typeEl.textContent = proj.type || "";
     typeEl.style.display = proj.type ? "inline-block" : "none";
     document.getElementById("editProjectForm").hidden = !state.editingProject;
+    var fb = document.getElementById("finishedBanner");
+    fb.hidden = !proj.finishedAt;
+    fb.textContent = proj.finishedAt ? "🏁 完工・保存済み（"+String(proj.finishedAt).slice(0,10)+"）" : "";
+    document.getElementById("btnFinishProject").textContent = proj.finishedAt ? "↩ 保存を解除する" : "🏁 工事完了として保存";
     var tagBar = document.getElementById("detailTagBar");
     var tags = state.settings.progressTags || [];
     tagBar.innerHTML = tags.map(function(t){
@@ -6631,9 +6854,9 @@
   // ================= tasks (社内タスク管理・最重要) =================
   var taskFormVendorSpec = null;
   var editingTaskId = null;
-  // 確認者を選んだタスクは、その人の「確認中」の列へ移す（社長→社長確認中／朋子→朋子確認中）。該当の列がない人は進捗を変えない。
+  // 確認者を選んだタスクは、その人の「確認依頼中」の列へ移す（社長→社長確認依頼中／朋子→朋子確認依頼中）。該当の列がない人は進捗を変えない。
   function checkStatusFor(checker){
-    var st = (checker||"")+"確認中";
+    var st = (checker||"")+"確認依頼中";
     return STATUS_ORDER.indexOf(st) >= 0 ? st : null;
   }
   function openTaskForm(taskId){
@@ -6791,6 +7014,8 @@
     if((t.status||"未着手")===newStatus){ render(); return; }
     t.status = newStatus;
     t.updatedAt = nowIso();
+    if(newStatus==="完了"){ t.completedAt = nowIso(); t.archivedAt = null; }
+    else { t.completedAt = null; t.archivedAt = null; }
     state.taskOpen = state.taskOpen || {};
     state.taskOpen[newStatus] = true;
     render();
@@ -7872,6 +8097,16 @@
     document.getElementById("btnBackToList").addEventListener("click", closeProjectDetail);
     document.getElementById("btnDeleteProject").addEventListener("click", function(){ if(confirm2()) deleteProject(); });
     document.getElementById("btnEditProject").addEventListener("click", openEditProjectForm);
+    document.getElementById("btnFinishProject").addEventListener("click", toggleFinishProject);
+    document.getElementById("btnExportProject").addEventListener("click", exportProjectZip);
+    document.getElementById("taskHistoryList").addEventListener("click", function(e){
+      var b = e.target.closest("[data-taskunarchive]");
+      if(b) unarchiveTask(b.dataset.taskunarchive);
+    });
+    document.getElementById("finishedProjList").addEventListener("click", function(e){
+      var row = e.target.closest("[data-open-project]");
+      if(row) openProjectDetail(row.dataset.openProject);
+    });
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);

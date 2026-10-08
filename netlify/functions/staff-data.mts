@@ -135,10 +135,14 @@ export default async (req: Request, context: Context) => {
         jobs.push(notify("checker", doc.checker));
         checkerNotified = doc.checker;
       }
-      // 進捗が「○○確認中」（社長確認中・朋子確認中など）に移ったら、その人へも知らせる
+      // 進捗が「○○確認依頼中」（社長確認依頼中・朋子確認依頼中など）に移ったら、その人へも知らせる
       // （確認者を選んだ保存で、すでに同じ人へ送った場合は重ねて送らない）
-      const m = String(doc.status || "").match(/^(.+)確認中$/);
-      if (m && doc.status !== (prevTask && prevTask.status) && m[1] !== by && m[1] !== checkerNotified) {
+      // （旧名称「○○確認中」から新名称「○○確認依頼中」への自動移行では、重ねて送らない）
+      const checkRe = /^(.+?)確認(?:依頼)?中$/;
+      const m = String(doc.status || "").match(checkRe);
+      const pm = String((prevTask && prevTask.status) || "").match(checkRe);
+      const sameCheck = !!(m && pm && m[1] === pm[1]);
+      if (m && doc.status !== (prevTask && prevTask.status) && !sameCheck && m[1] !== by && m[1] !== checkerNotified) {
         jobs.push(notify("checker", m[1]));
       }
       // 「完了」になったら、社長・朋子・依頼者へ報告する

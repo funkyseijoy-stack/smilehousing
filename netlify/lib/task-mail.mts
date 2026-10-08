@@ -96,7 +96,7 @@ export async function flushTaskQueue(store: any) {
     if (!q) { dead.push(key); continue; }
     const t: any = await store.get("tasks/" + q.taskId, { type: "json" });
     const stillMine = t && !t.deletedAt && !t.private && (t.status || "") !== "完了" &&
-      (q.role === "checker" ? (t.checker === q.name || t.status === q.name + "確認中") : t.assignee === q.name);
+      (q.role === "checker" ? (t.checker === q.name || t.status === q.name + "確認依頼中" || t.status === q.name + "確認中") : t.assignee === q.name);
     if (!stillMine) { dead.push(key); continue; }
     if (!groups.has(q.name)) groups.set(q.name, []);
     groups.get(q.name)!.push({ key, task: t, role: q.role });
