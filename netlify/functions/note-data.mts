@@ -41,6 +41,8 @@ const NOTE_CATS = [
   { id: "rooms", name: "各部屋", sub: "天井・壁・アクセント", icon: "room" },
   // 外部散水栓・インターホン親機・給湯リモコン・床下点検口（打合せで確認する項目）
   { id: "other", name: "その他の確認", sub: "散水栓・インターホン・給湯リモコン・床下点検口", icon: "house" },
+  // 部位の選択で「プランボード」を選んだ記録・タスク・資料
+  { id: "planboard", name: "プランボード", sub: "プランボード・図面", icon: "house" },
 ];
 
 // 統合前（12項目だった頃）の項目IDで保存済みのお客様の「仮決定／決定」を、新しい項目IDに読み替える
@@ -114,6 +116,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   }
   if (scope === "room") return "rooms";
   if (scope === "siteCheck") return "other";
+  if (scope === "planboard") return "planboard";
   // 案件ごとに追加した部位は、1つずつ別の項目（id は cp_<部位ID>）として出す
   if (scope === "custom") return category ? "cp_" + category : null;
   return null;
