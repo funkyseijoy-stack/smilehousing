@@ -913,6 +913,7 @@
             <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
             <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
             <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
+            <div id="meetingNoteExistingFiles" hidden></div>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
             <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteAsPlan"> 添付したPDF・写真を「図面」にも登録する（図面タブ・プランボードの元図面・お客様の平面図に入ります）</label>
             <div class="row" style="align-items:center; gap:8px; margin-block-start:4px;">
@@ -6748,7 +6749,7 @@
     var editingHasFiles = false;
     if(editingMeetingNoteId){
       var ex0 = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
-      editingHasFiles = !!(ex0 && ex0.files && ex0.files.length);
+      editingHasFiles = !!(ex0 && ex0.files && ex0.files.length) && editNoteFiles.some(function(e){ return !e.removed; });
     }
     if(!decided && !open && !talk && !message && !hasFilePicked && !editingHasFiles){ toast("打合せ内容・決定事項・未決事項などを入力するか、資料を添付してください"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
@@ -6792,7 +6793,20 @@
       existing.message = message;
       existing.content = meetingNoteDerivedContent(decided, open);
       existing.date = noteDate;
-      if(newFiles.length) existing.files = (existing.files||[]).concat(newFiles);
+      // 既存の添付：削除・差し替えを反映（差し替えは同じ位置に入れる）。新しく追加したファイルは最後に足す。
+      var keptFiles = [], replFailed = 0;
+      for(var ei=0; ei<editNoteFiles.length; ei++){
+        var ent = editNoteFiles[ei];
+        if(ent.removed) continue;
+        if(ent.repl){
+          var up = await uploadFilesAsAttachmentsArray([ent.repl]);
+          if(up.length){ keptFiles.push(up[0]); continue; }
+          replFailed++;
+        }
+        keptFiles.push(ent.f);
+      }
+      existing.files = keptFiles.concat(newFiles);
+      if(replFailed) toast("差し替えに失敗したファイルが "+replFailed+" 件あります（元のファイルのままです）");
       if(newMeetingNoteSpecPart) existing.specPart = newMeetingNoteSpecPart;
       existing.badges = badgesToApply;
       existing.autoCreated = existing.autoCreated || {};
@@ -6998,10 +7012,44 @@
     });
   }
 
+  // 編集フォームに出す「いまの添付」：一つずつ削除・差し替えができる（「更新」を押すまで保存されない）
+  var editNoteFiles = [];
+  function renderEditNoteFiles(){
+    var box = document.getElementById("meetingNoteExistingFiles");
+    if(!box) return;
+    if(!editNoteFiles.length){ box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = '<div class="muted" style="font-size:.85rem; font-weight:700; margin-block-end:4px;">いまの添付（削除・差し替えは「更新」を押すと保存されます）</div>'+
+      editNoteFiles.map(function(e, i){
+        var f = e.f, ct = f.contentType||"";
+        var inner = ct.indexOf("pdf")>=0 ? pdfThumbInnerHtml(f.url) : (ct.indexOf("video")>=0 ? '▶' : '<img src="'+f.url+'" alt="">');
+        var state2 = e.removed ? '<span class="pill small status-未依頼">削除します</span>' : (e.repl ? '<span class="pill small status-受領済み">→ '+escapeHtml(e.repl.name)+' に差し替え</span>' : '');
+        return '<div class="row" style="gap:8px; align-items:center; margin-block-end:6px; flex-wrap:wrap;'+(e.removed?' opacity:.5;':'')+'">'+
+          '<a href="'+f.url+'" target="_blank" rel="noopener" class="notefiletile" style="width:56px; height:56px;">'+inner+'</a>'+
+          '<span style="font-size:.85rem; flex:1; min-width:120px; word-break:break-all;">'+escapeHtml(f.name||"添付")+'</span>'+state2+
+          (e.removed
+            ? '<button type="button" class="btn secondary small" data-nf-undo="'+i+'">元に戻す</button>'
+            : '<button type="button" class="btn secondary small" data-nf-repl="'+i+'">差し替え</button><button type="button" class="btn danger-ghost small" data-nf-del="'+i+'">削除</button>')+
+          '</div>';
+      }).join("");
+    box.onclick = function(ev){
+      var b = ev.target.closest("button"); if(!b) return;
+      var del = b.getAttribute("data-nf-del"), und = b.getAttribute("data-nf-undo"), rp = b.getAttribute("data-nf-repl");
+      if(del!=null){ editNoteFiles[+del].removed = true; editNoteFiles[+del].repl = null; renderEditNoteFiles(); }
+      else if(und!=null){ editNoteFiles[+und].removed = false; renderEditNoteFiles(); }
+      else if(rp!=null){
+        var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".pdf,image/*";
+        inp.onchange = function(){ if(inp.files && inp.files[0]){ editNoteFiles[+rp].repl = inp.files[0]; renderEditNoteFiles(); } };
+        inp.click();
+      }
+    };
+  }
   function editMeetingNote(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
     if(!n){ toast("記録が見つかりませんでした"); return; }
     editingMeetingNoteId = id;
+    editNoteFiles = (n.files||[]).map(function(f){ return { f: f, removed: false, repl: null }; });
+    renderEditNoteFiles();
     var titleInput = document.getElementById("meetingNoteTitle");
     var decidedInput = document.getElementById("meetingNoteDecided");
     var openInput = document.getElementById("meetingNoteOpen");
@@ -7033,6 +7081,7 @@
   }
   function cancelEditMeetingNote(){
     editingMeetingNoteId = null;
+    editNoteFiles = []; renderEditNoteFiles();
     var titleInput = document.getElementById("meetingNoteTitle");
     var decidedInput = document.getElementById("meetingNoteDecided");
     var openInput = document.getElementById("meetingNoteOpen");
