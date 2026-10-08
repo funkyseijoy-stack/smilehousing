@@ -1788,7 +1788,8 @@
   function migrateExteriorNoteEntries(){
     try{
       state.meetingNotes.forEach(function(n){
-        if(n && !n.deletedAt && n.specPart && n.specPart.scope==="exterior" && !n.specPart.category) upsertNoteSpecEntry(n);
+        var sp0 = n && !n.deletedAt && n.specPart;
+        if(sp0 && !sp0.category && (sp0.scope==="exterior" || sp0.scope==="general" || (sp0.scope==="room" && sp0.roomId))) upsertNoteSpecEntry(n);
       });
     }catch(e){ console.warn("exterior note entries failed", e); }
   }
@@ -3075,7 +3076,7 @@
   function upsertNoteSpecEntry(note){
     var existing = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===note.id; });
     var part = note.specPart;
-    var usable = part && part.scope!=="general" && (part.category || part.scope==="exterior");
+    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || (part.scope==="room" && part.roomId));
     if(!usable){
       if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
       return;
@@ -3107,7 +3108,7 @@
       upsertNoteSpecEntry(note);
       render();
       saveDoc("meetingNotes", note.id, note);
-      logActivity("打合せ記録に部位「"+part.label+"」を設定しました"+(part.scope==="general" ? "" : "（仕様タブの時系列にも反映）"));
+      logActivity("打合せ記録に部位「"+part.label+"」を設定しました"+"（仕様タブの時系列にも反映）");
     });
   }
 
@@ -3362,11 +3363,13 @@
     }
     // カテゴリーごとの「メモ（自由記述）」欄は削除（横一列で見やすくするため）。
     // 同じ内容は上の「色・仕様」欄で入力できるため、入力先はそちらに一本化している。
-    // 項目を選ばず「外部仕様」だけを部位にした記録・資料は、ここにまとめて出す。
+    // 項目を選ばず「外部仕様」だけを部位にした記録・資料と、「総合」の記録・資料は、ここにまとめて出す。
     var exteriorWholeHtml = "";
     if(!(state.noteSpecFilter && state.noteSpecFilter.scope==="exterior" && state.noteSpecFilter.category)){
+      var generalTl = renderSpecTimeline("general",null,null,null);
+      if(generalTl) exteriorWholeHtml += '<div class="speccat"><h4>総合（部位を限定しない）</h4>'+decidedSummaryHtml("general",null,null,null)+generalTl+'</div>';
       var wholeTl = renderSpecTimeline("exterior",null,null,null);
-      if(wholeTl) exteriorWholeHtml = '<div class="speccat"><h4>外部全体（項目を選ばない記録）</h4>'+decidedSummaryHtml("exterior",null,null,null)+wholeTl+'</div>';
+      if(wholeTl) exteriorWholeHtml += '<div class="speccat"><h4>外部全体（項目を選ばない記録）</h4>'+decidedSummaryHtml("exterior",null,null,null)+wholeTl+'</div>';
     }
     var catsGridHtml = '<div class="speccatgrid">'+exteriorWholeHtml+exteriorCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
@@ -3630,7 +3633,10 @@
         '<span class="rname">'+escapeHtml(r.name)+noteDecisionPill("room",null,r.id)+'</span>'+
         '<button class="btn danger-ghost small" data-delroom="'+r.id+'">部屋を削除</button>'+
         '</div>'+
-        '<div class="speccatgrid">'+roomCatsToShow.map(function(rc){
+        '<div class="speccatgrid">'+(roomFilter && roomFilter.category ? "" : (function(){
+          var wt = renderSpecTimeline("room",null,r.id,null);
+          return wt ? '<div class="speccat"><h4>項目を限定しない</h4>'+decidedSummaryHtml("room",null,r.id,null)+wt+'</div>' : "";
+        })())+roomCatsToShow.map(function(rc){
           var noteHtml = rc.id==="accent" ?
             '<input type="text" class="roomAccentNote" data-roomnote="'+r.id+'" placeholder="アクセント位置のメモ（例：リビング北側の壁）" value="'+escapeHtml(r.accentNote||"")+'">' : "";
           return '<div class="speccat"><h4>'+escapeHtml(rc.label)+
