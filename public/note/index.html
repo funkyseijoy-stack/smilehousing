@@ -260,6 +260,15 @@
   .msg .mm{ font-size:.66rem; opacity:.65; margin-bottom:3px; }
   .msg.staff{ background:var(--card); border:1.5px solid var(--line); align-self:flex-start; border-bottom-left-radius:4px; }
   .msg.me{ background:var(--brown); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+  .hintbar{ display:flex; align-items:flex-start; gap:10px; background:#fff7e0; border:1px solid #ecd9a0; border-radius:14px; padding:12px 14px; margin:0 0 14px; font-size:.88rem; line-height:1.6; color:var(--ink); }
+  .hintbar b{ display:inline-flex; align-items:center; justify-content:center; min-width:1.6em; height:1.6em; border-radius:50%; background:var(--ink); color:#fff; font-size:.85rem; }
+  .hintbar .hx{ margin-left:auto; flex-shrink:0; border:none; background:none; font-size:1.3rem; line-height:1; color:var(--muted); cursor:pointer; padding:0 4px; }
+  .nmbox{ background:var(--card); border:1px solid var(--line2); border-radius:14px; padding:12px 14px; margin:0 0 16px; font-size:.85rem; line-height:1.7; }
+  .nmbox h3{ margin:0 0 4px; font-size:.95rem; }
+  .nmbox .nmrow{ display:flex; gap:8px; margin-top:8px; }
+  .nmbox input{ flex:1; min-width:0; font-size:1rem; padding:9px 10px; border:1px solid var(--line2); border-radius:10px; background:#fff; }
+  .nmbox button{ border:none; border-radius:10px; padding:9px 14px; font-weight:700; background:var(--ink); color:#fff; cursor:pointer; }
+  .nmbox button.ghost{ background:none; color:var(--ink2); border:1px solid var(--line2); }
   .composer{ position:sticky; bottom:calc(76px + env(safe-area-inset-bottom)); display:flex; gap:8px; margin-top:16px; background:var(--bg); padding:8px 0; }
   .composer textarea{ flex:1; border:1.5px solid var(--line2); border-radius:14px; padding:10px 12px; font:inherit; font-size:.9rem; resize:none; min-height:46px; background:#fff; }
   .composer button{ border:none; background:var(--brown); color:#fff; border-radius:14px; padding:0 18px; font-weight:700; cursor:pointer; }
@@ -618,6 +627,8 @@
     var pg = progress();
     var out = '<div class="greet">'+greet+'、'+esc(name)+'様</div>'+
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
+    // 初めての方への案内。「×」で閉じたら、この端末では出さない
+    if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
     // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
     // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
     var hp = data.houseProgress;
@@ -846,8 +857,32 @@
   }
 
   // ---------- メッセージ ----------
+  function hintClosed(){ try{ return localStorage.getItem("okaiHintClosed")==="1"; }catch(e){ return false; } }
+  function nmHtml(){
+    var em = data.notifyEmail || "";
+    var out = '<div class="nmbox"><h3>📧 メッセージのお知らせメール</h3>'+
+      '住まいるハウジングからメッセージを送ったときに、メールでお知らせします（メッセージの内容は書かず、このノートを開くリンクだけをお送りします）。これまで通り、LINEでメッセージをいただいても大丈夫です。';
+    if(em){
+      out += '<div style="margin-top:6px;">登録中：<b>'+esc(em)+'</b></div><div class="nmrow"><input id="nmInput" type="email" inputmode="email" autocomplete="email" placeholder="新しいアドレス"><button id="nmSave">変更</button><button class="ghost" id="nmClear">解除</button></div>';
+    } else {
+      out += '<div class="nmrow"><input id="nmInput" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス（任意）"><button id="nmSave">登録</button></div>';
+    }
+    return out+'</div>';
+  }
+  async function nmSave(clear){
+    var el = document.getElementById("nmInput");
+    var email = clear ? "" : ((el && el.value) || "").trim();
+    if(!clear && !email){ toast("メールアドレスを入力してください"); return; }
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"notifyEmailSave", email:email }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.notifyEmail = j.email || "";
+      render(); toast(j.email ? "登録しました" : "解除しました");
+    }catch(e){ toast(e && e.message==="invalid_email" ? "メールアドレスの形式をご確認ください" : "保存できませんでした。もう一度お試しください"); }
+  }
   function msgHtml(){
-    var out = '<h2 class="big">メッセージ</h2><p class="sub">ご質問・ご相談・ご予約の変更などはこちらからどうぞ。</p>';
+    var out = '<h2 class="big">メッセージ</h2><p class="sub">ご質問・ご相談・ご予約の変更などはこちらからどうぞ。</p>'+nmHtml();
     out += data.messages.length ? '<div class="msgs">'+data.messages.map(function(m){
       var me = m.fromCustomer;
       return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+fmtD(m.createdAt)+'</div>'+esc(m.content)+'</div>';
@@ -1300,6 +1335,9 @@
     var img = e.target.closest("[data-img]");
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
+    var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
+    if(e.target.closest("#nmSave")){ nmSave(false); return; }
+    if(e.target.closest("#nmClear")){ nmSave(true); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
     var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
@@ -1361,6 +1399,8 @@
     if(Date.now() - lastLoadAt < 30000) return; // 直近30秒以内に読み込み済みならスキップ
     var mi = document.getElementById("msgInput");
     if(mi && mi.value.trim()){ return; } // メッセージ入力中は上書きしない
+    var ni = document.getElementById("nmInput");
+    if(ni && ni.value.trim()){ return; } // メールアドレス入力中は上書きしない
     if(view.imgBusy){ return; } // 写真の追加中は上書きしない
     var mo = document.getElementById("memoInput");
     if(mo && document.activeElement===mo){ return; } // メモ入力中は上書きしない

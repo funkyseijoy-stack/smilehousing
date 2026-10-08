@@ -715,13 +715,14 @@
       <div class="subpanel" id="sub-message">
         <div class="card">
           <h3>メッセージ</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">現時点は社内向けの案件メモとして使えます（お客様用「おうちノート」ができ次第、双方向のやり取りに拡張します）。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様がお知らせメールを登録している場合は、下のチェックで、メールでも知らせられます。</p>
           <div class="notelist" id="messageList"></div>
           <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
           <div class="row" style="margin-block-start:10px;">
             <input type="text" id="messageInput" placeholder="メッセージを入力" style="flex:1;">
             <button class="btn small" id="btnSendMessage">送信</button>
           </div>
+          <label class="field" id="messageNotifyWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageNotify" checked><span id="messageNotifyLabel" style="font-size:.85rem;"></span></label>
         </div>
       </div>
 
@@ -3181,6 +3182,21 @@
       return '<div class="noteitem"><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+'</div><div class="ntext">'+escapeHtml(m.content)+'</div></div>';
     }).join("");
   }
+  // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
+  async function refreshMessageNotify(){
+    var wrap = document.getElementById("messageNotifyWrap"), lab = document.getElementById("messageNotifyLabel"), cb = document.getElementById("messageNotify");
+    if(!wrap || !lab || !state.currentProjectId) return;
+    var pid = state.currentProjectId, email = "";
+    try{
+      var c = await okaiFetchCustomerData(pid);
+      email = (c && c.notifyEmail && c.notifyEmail.email) || "";
+    }catch(e){ email = ""; }
+    if(state.currentProjectId !== pid) return;
+    wrap.dataset.email = email;
+    cb.disabled = !email;
+    if(!email) cb.checked = false;
+    lab.textContent = email ? "お客様にメールで知らせる（"+email+"。メッセージの内容は書かず、ノートのリンクだけ送ります）" : "お客様は、お知らせメールをまだ登録していません（おうちノートのメッセージ画面で、お客様が登録します）";
+  }
   async function sendMessage(){
     var input = document.getElementById("messageInput");
     var content = input.value.trim();
@@ -3189,8 +3205,18 @@
     var m = { id:uid("msg"), projectId: state.currentProjectId, content:content, sender: state.currentUser||"", createdAt: nowIso() };
     state.messages.push(m);
     input.value = "";
+    var notifyOn = !!(document.getElementById("messageNotify") && document.getElementById("messageNotify").checked && !document.getElementById("messageNotify").disabled);
     render();
-    await saveDoc("messages", m.id, m);
+    var okMsg = await saveDoc("messages", m.id, m);
+    if(okMsg!==false && notifyOn){
+      try{
+        var nres = await fetch('/api/note-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, by: state.currentUser||"" }) });
+        var nj = await nres.json().catch(function(){ return {}; });
+        if(nres.ok && nj.sent) toast("📧 お客様にメールで知らせました");
+        else if(nres.ok) toast("お客様のメールアドレスが登録されていないため、メールは送っていません");
+        else toast("メッセージは保存しましたが、お客様へのメールは送れませんでした");
+      }catch(e){ toast("メッセージは保存しましたが、お客様へのメールは送れませんでした"); }
+    }
   }
 
   // ================= 仕様管理（外部・設備・インテリア・部屋別インテリア） =================
@@ -8534,6 +8560,7 @@
         currentSub = btn.dataset.sub;
         document.getElementById("sub-"+currentSub).classList.add("active");
         if(currentSub === "okainote") loadOkaiNotePanel();
+        if(currentSub === "message") refreshMessageNotify();
       });
     });
 

@@ -251,6 +251,21 @@ export default async (req: Request, context: Context) => {
       );
       return json({ ok: true, message: doc });
     }
+    // お知らせメール（スタッフからメッセージが届いたときに知らせる宛先。お客様が自分で登録・変更・解除する）
+    if (body.action === "notifyEmailSave") {
+      const email = String(body.email == null ? "" : body.email).trim().slice(0, 120);
+      if (email && !/^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(email)) return json({ error: "invalid_email" }, 400);
+      const extras: any = await getExtras(store, projectId);
+      if (!extras) return json({ error: "unavailable" }, 502);
+      extras.notifyEmail = email ? { email, at: new Date().toISOString() } : null;
+      await saveExtras(store, extras);
+      await sendNotifyMail(
+        `【おうちノート】${project.customer || "お客様"}様が、お知らせメールを${email ? "登録" : "解除"}しました`,
+        `${project.customer || "お客様"}様（${project.name || ""}）が、おうちノートで「メッセージのお知らせメール」を${email ? "登録・変更しました" : "解除しました"}。\n\n` +
+        (email ? `登録されたアドレスは、住まいるアプリの「メッセージ」画面で確認できます。` : "")
+      );
+      return json({ ok: true, email });
+    }
     // ご家族・家電・持ち込み品（お客様が入力する）
     if (body.action === "profileSave") {
       const src = body.profile && typeof body.profile === "object" ? body.profile : {};
@@ -586,6 +601,7 @@ export default async (req: Request, context: Context) => {
       id: x.id || "", title: x.title || "", amount: x.amount || "", note: x.note || "",
       customerResponse: x.customerResponse || "未回答", estimateState: x.estimateState || "", createdAt: x.createdAt || "",
     })),
+    notifyEmail: (okaiCustomer && okaiCustomer.notifyEmail && okaiCustomer.notifyEmail.email) || "",
     familyProfile: okaiCustomer && okaiCustomer.customerProfile ? {
       familyMembers: okaiCustomer.customerProfile.familyMembers || [],
       appliances: okaiCustomer.customerProfile.appliances || [],
