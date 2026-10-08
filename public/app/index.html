@@ -914,6 +914,7 @@
             <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
             <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
+            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteAsPlan"> 添付したPDF・写真を「図面」にも登録する（図面タブ・プランボードの元図面・お客様の平面図に入ります）</label>
             <div class="row" style="align-items:center; gap:8px; margin-block-start:4px;">
               <span class="muted" style="font-size:.85rem;">部位：</span>
               <span id="meetingNoteSpecPartLabel" style="font-size:.85rem; font-weight:700;">（未設定）</span>
@@ -6715,7 +6716,25 @@
     var dateInput = document.getElementById("meetingNoteDate");
     var noteDate = (dateInput && dateInput.value) ? dateInput.value : todayStr();
     var fileInput = document.getElementById("meetingNoteFile");
+    var pidNote = state.currentProjectId; // アップロード中に別の案件を開いても、最初の案件に保存する
+    var asPlan = !!(document.getElementById("meetingNoteAsPlan") && document.getElementById("meetingNoteAsPlan").checked);
     var newFiles = await uploadFilesAsAttachmentsArray(fileInput ? fileInput.files : null);
+    // 「図面にも登録する」: 添付したPDF・写真を、見積タブの「図面」と同じ形（kind:"plan"）でも登録する
+    var planFailed = 0;
+    if(asPlan && newFiles.length){
+      for(var pi=0; pi<newFiles.length; pi++){
+        var pf = newFiles[pi];
+        var okType = (pf.contentType||"").indexOf("pdf")>=0 || (pf.contentType||"").indexOf("image")===0;
+        if(!okType){ planFailed++; continue; }
+        var attId = "att_n_"+pf.id; // 同じファイルを二重に登録しない
+        if(state.attachments.some(function(a){ return a.id===attId; })) continue;
+        var attDoc = { id: attId, projectId: pidNote, assetId: pf.id, name: pf.name||"図面", url: pf.url,
+          contentType: pf.contentType, sizeBytes: (blobCache[pf.id] && blobCache[pf.id].size) || 0, uploadedAt: todayStr(), kind:"plan" };
+        state.attachments.push(attDoc);
+        var okAtt = await saveDoc("attachments", attDoc.id, attDoc);
+        if(okAtt===false){ state.attachments = state.attachments.filter(function(a){ return a.id!==attDoc.id; }); planFailed++; }
+      }
+    }
 
     // cancelEditMeetingNote() で下書き（バッジ・業者選択）がリセットされる前に控えておく。
     var badgesToApply = Object.assign({}, newMeetingNoteBadges);
@@ -6744,11 +6763,12 @@
       await saveDoc("meetingNotes", existing.id, existing);
       if(existing.specPart) upsertNoteSpecEntry(existing);
       await applyNewlyOnBadges(existing, badgesToApply, vendorIdToApply, assigneeToApply);
+      if(asPlan && newFiles.length) toast(planFailed ? ("図面に登録できなかったファイルが "+planFailed+" 件あります") : "図面にも登録しました");
       logActivity("打合せ内容を編集しました");
       return;
     }
 
-    var n = { id:uid("note"), projectId: state.currentProjectId, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, channel:channel, message:message,
+    var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
@@ -6757,6 +6777,7 @@
     await saveDoc("meetingNotes", n.id, n);
     if(n.specPart) upsertNoteSpecEntry(n);
     await applyNewlyOnBadges(n, badgesToApply, vendorIdToApply, assigneeToApply);
+    if(asPlan && newFiles.length) toast(planFailed ? ("図面に登録できなかったファイルが "+planFailed+" 件あります") : "図面にも登録しました");
     logActivity("打合せ内容を記録しました");
   }
 
@@ -6987,6 +7008,7 @@
     document.getElementById("meetingNoteTalkShow").checked = true;
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
+    var asPlanBox = document.getElementById("meetingNoteAsPlan"); if(asPlanBox) asPlanBox.checked = false;
     newMeetingNoteSpecPart = null;
     updateMeetingNoteSpecPartLabel();
     lastAutoFilledMeetingNoteTitle = "";
