@@ -132,6 +132,7 @@
 
   .toast{ position:fixed; left:50%; bottom: calc(18px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding:9px 16px; border-radius:999px; font-size:.85rem; font-weight:700; box-shadow: var(--shadow); opacity:0; pointer-events:none; transition: opacity .25s ease, transform .25s ease; z-index: 90; max-width:90vw; text-align:center; }
   .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
+  .toast{ white-space:pre-line; text-align:center; max-width:min(92vw,560px); border-radius:18px; }
 
   .addform{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
   .addform label.field{ flex:1 1 120px; }
@@ -1384,10 +1385,15 @@
   function fmtDate(s){ return s || "—"; }
   function fmtSize(bytes){ if(!bytes && bytes!==0) return ""; if(bytes<1024) return bytes+"B"; if(bytes<1024*1024) return Math.round(bytes/1024)+"KB"; return (bytes/1024/1024).toFixed(1)+"MB"; }
   function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]; }); }
-  function toast(msg){
+  function toast(msg, ms){
     var t = document.getElementById("toast");
     t.textContent = msg; t.classList.add("show");
-    clearTimeout(t._timer); t._timer = setTimeout(function(){ t.classList.remove("show"); }, 2600);
+    clearTimeout(t._timer); t._timer = setTimeout(function(){ t.classList.remove("show"); }, ms || 2600);
+  }
+  // 写真・ファイルのアップロードに失敗したとき、理由つきで長めに表示する
+  function uploadFailToast(name, e){
+    var why = (e && e.userMessage) ? e.userMessage : "通信に失敗しました。もう一度お試しください";
+    toast(name+" を追加できませんでした：\n"+why, 9000);
   }
   function confirm2(){ return true; } // confirm() is inert in the artifact viewer
 
@@ -1584,29 +1590,51 @@
           uploadFile = await heicToJpegBlob(file);
         }
       }catch(e){ uploadFile = file; }
-      return new Promise(function(resolve, reject){
+      function fail(msg, code){ var er = new Error(code||"upload_failed"); er.userMessage = msg; er.code = code||"upload_failed"; return er; }
+      // サーバー（Netlify）は1回に約6MBまでしか受け取れない。写真は送るとき約1.37倍に膨らむので、先に確かめて、理由を伝える
+      var mb = (uploadFile.size/1048576);
+      if(uploadFile.size*1.37 > 5.8*1048576){
+        throw fail("ファイルの容量が大きすぎます（"+mb.toFixed(1)+"MB）。写真は小さくしてから追加してください（4MB以下が目安です）", "too_large");
+      }
+      var dataUrl = await new Promise(function(resolve, reject){
         var reader = new FileReader();
-        reader.onload = async function(){
-          try{
-            var slug = state.currentProjectId || "_global";
-            var res = await fetch('/api/staff-upload-photo', {
-              method:'POST',
-              headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
-              body: JSON.stringify({ slug: slug, dataUrl: reader.result })
-            });
-            if(!res.ok) throw new Error('upload_failed');
-            var j = await res.json();
-            resolve({
-              id: slug + "/" + j.key,
-              url: '/api/get-photo?slug='+encodeURIComponent(slug)+'&key='+encodeURIComponent(j.key),
-              contentType: (opts && opts.type) || uploadFile.type,
-              sizeBytes: uploadFile.size
-            });
-          }catch(e){ reject(e); }
-        };
-        reader.onerror = reject;
+        reader.onload = function(){ resolve(reader.result); };
+        reader.onerror = function(){ reject(fail("ファイルを読み込めませんでした", "read_failed")); };
         reader.readAsDataURL(uploadFile);
       });
+      var slug = state.currentProjectId || "_global";
+      var lastErr = null;
+      for(var attempt=0; attempt<2; attempt++){
+        try{
+          var res = await fetch('/api/staff-upload-photo', {
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
+            body: JSON.stringify({ slug: slug, dataUrl: dataUrl })
+          });
+          if(res.status===401){
+            showLoginScreen("ログインの有効期限が切れました。もう一度ログインしてから、写真を追加してください");
+            throw fail("ログインの有効期限が切れました。ログインし直してください", "unauthorized");
+          }
+          if(res.status===413) throw fail("ファイルの容量が大きすぎます（"+mb.toFixed(1)+"MB）。小さくしてから追加してください", "too_large");
+          if(!res.ok){
+            lastErr = fail("サーバーが受け付けませんでした（エラー "+res.status+"）。少し待ってもう一度お試しください", "http_"+res.status);
+            if(res.status>=500 && attempt===0){ await new Promise(function(r){ setTimeout(r, 1200); }); continue; }
+            throw lastErr;
+          }
+          var j = await res.json();
+          return {
+            id: slug + "/" + j.key,
+            url: '/api/get-photo?slug='+encodeURIComponent(slug)+'&key='+encodeURIComponent(j.key),
+            contentType: (opts && opts.type) || uploadFile.type,
+            sizeBytes: uploadFile.size
+          };
+        }catch(e){
+          if(e && e.code && e.code!=="network") throw e; // 理由が分かっている失敗はやり直さない
+          lastErr = fail("通信に失敗しました。ネットワークを確認して、もう一度お試しください", "network");
+          if(attempt===0){ await new Promise(function(r){ setTimeout(r, 1200); }); continue; } // 一時的な通信の失敗は1回だけ自動でやり直す
+        }
+      }
+      throw lastErr || fail("アップロードに失敗しました");
     }
   };
 
@@ -3695,7 +3723,7 @@
         blobCache[res.id] = upFile;
         state.specPhotos.push(doc);
         await saveDoc("specPhotos", doc.id, doc);
-      }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
+      }catch(e){ uploadFailToast(f.name, e); }
     }
     render();
     logActivity(category+"の写真を追加しました");
@@ -5460,6 +5488,36 @@
       return out || file;
     }catch(e){ return file; }
   }
+  // 画像を長辺maxDim・画質qualityのJPEGに縮める。失敗・時間切れのときはnull
+  async function compressOnce(srcFile, maxDim, quality){
+    var work = (async function(){
+      var bmp = null, img = null, url = null, w, h;
+      try{
+        if(typeof createImageBitmap === "function"){
+          bmp = await createImageBitmap(srcFile, {imageOrientation:"from-image"});
+          w = bmp.width; h = bmp.height;
+        }else{
+          url = URL.createObjectURL(srcFile);
+          img = await new Promise(function(resolve, reject){ var im = new Image(); im.onload = function(){ resolve(im); }; im.onerror = reject; im.src = url; });
+          w = img.naturalWidth; h = img.naturalHeight;
+        }
+        var scale = Math.min(1, maxDim/Math.max(w, h));
+        var cw = Math.max(1, Math.round(w*scale)), ch = Math.max(1, Math.round(h*scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = cw; canvas.height = ch;
+        var ctx = canvas.getContext("2d");
+        if(!ctx) return null;
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch); // 透明なPNGが真っ黒にならないように
+        ctx.drawImage(bmp || img, 0, 0, cw, ch);
+        return await new Promise(function(resolve){ canvas.toBlob(function(b){ resolve(b); }, "image/jpeg", quality); });
+      }catch(e){ return null; }
+      finally{ if(bmp && bmp.close) bmp.close(); if(url) URL.revokeObjectURL(url); }
+    })();
+    // 大きな写真でも待てるよう、時間切れは長め（25秒）にする
+    var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, 25000); });
+    return Promise.race([work, timeout]);
+  }
+  // 写真を軽くする。サーバーに送れる量（約4.5MB）を超えないよう、まだ大きければ段階的にさらに小さくする。
   async function compressImageFile(file, maxDim, quality){
     maxDim = maxDim || 1600; quality = quality || 0.82;
     var srcFile = file;
@@ -5469,48 +5527,23 @@
       }
     }catch(e){ srcFile = file; }
     if(!srcFile || !srcFile.type || srcFile.type.indexOf("image")!==0){ return srcFile || file; }
-
-    // キャンバスでの軽量化処理は、端末やブラウザの状態によって稀に失敗・停止する
-    // ことがある（何のエラーも出ないまま固まる場合もある）。その場合でも必ず
-    // 数秒以内に処理を進め、元のファイルのままアップロードできるようにする。
-    var compressPromise = new Promise(function(resolve){
-      try{
-        var reader = new FileReader();
-        reader.onload = function(){
-          try{
-            var img = new Image();
-            img.onload = function(){
-              try{
-                var scale = Math.min(1, maxDim/Math.max(img.naturalWidth, img.naturalHeight));
-                var w = Math.max(1, Math.round(img.naturalWidth*scale)), h = Math.max(1, Math.round(img.naturalHeight*scale));
-                var canvas = document.createElement("canvas");
-                canvas.width = w; canvas.height = h;
-                var ctx = canvas.getContext("2d");
-                if(!ctx){ resolve(srcFile); return; }
-                ctx.drawImage(img, 0, 0, w, h);
-                canvas.toBlob(function(blob){
-                  resolve(blob && blob.size < srcFile.size ? blob : srcFile);
-                }, "image/jpeg", quality);
-              }catch(e){ resolve(srcFile); }
-            };
-            img.onerror = function(){ resolve(srcFile); };
-            img.src = reader.result;
-          }catch(e){ resolve(srcFile); }
-        };
-        reader.onerror = function(){ resolve(srcFile); };
-        reader.readAsDataURL(srcFile);
-      }catch(e){ resolve(srcFile); }
-    });
-    var timeoutPromise = new Promise(function(resolve){
-      setTimeout(function(){ resolve(srcFile); }, 6000);
-    });
-    return Promise.race([compressPromise, timeoutPromise]);
+    var LIMIT = 3.2*1048576;
+    var steps = [[maxDim, quality], [1280, 0.72], [1000, 0.62], [800, 0.55]];
+    var best = null;
+    for(var i=0; i<steps.length; i++){
+      var b = await compressOnce(srcFile, steps[i][0], steps[i][1]);
+      if(b && (!best || b.size < best.size)) best = b;
+      if(best && best.size <= LIMIT) break;
+    }
+    // 縮められて、元より小さければ縮めたものを使う。縮められなかったときは元のまま（大きすぎれば、送る時に理由を伝える）
+    return (best && best.size < srcFile.size) ? best : srcFile;
   }
   async function uploadAlbumPhotos(kind, fileList, categoryId){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
     var files = Array.prototype.slice.call(fileList||[]);
+    var okCount = 0;
     for(var i=0;i<files.length;i++){
       var f = files[i];
       try{
@@ -5521,15 +5554,18 @@
         blobCache[res.id] = compressed;
         state.albumPhotos.push(doc);
         var saved = await saveDoc("albumPhotos", doc.id, doc);
+        if(saved) okCount++;
         if(!saved){
           // サーバー保存に失敗した場合、画面上だけ「追加済み」に見えてしまわないよう
           // ローカルの一覧からも取り除く（saveDoc側でエラーのtoastは表示済み）。
           state.albumPhotos = state.albumPhotos.filter(function(x){ return x.id!==doc.id; });
         }
-      }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
+      }catch(e){ uploadFailToast(f.name, e); }
     }
     render();
-    logActivity((kind==="reference"?"参考写真":"おうちアルバム")+"を追加しました（"+files.length+"件）");
+    if(okCount>0) logActivity((kind==="reference"?"参考写真":"おうちアルバム")+"を追加しました（"+okCount+"件）");
+    if(files.length>1 && okCount<files.length) toast(files.length+"枚のうち"+okCount+"枚を追加しました。"+(files.length-okCount)+"枚は追加できていません", 9000);
+    else if(okCount>0) toast("✅ "+okCount+"枚を追加しました");
   }
   function deleteAlbumPhoto(id){
     var p = state.albumPhotos.find(function(x){ return x.id===id; });
@@ -5659,7 +5695,7 @@
         var saved = await saveDoc("imageBoard", doc.id, doc);
         if(!saved){ state.imageBoard = state.imageBoard.filter(function(x){ return x.id!==doc.id; }); }
         else added++;
-      }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
+      }catch(e){ uploadFailToast(f.name, e); }
     }
     render();
     if(added) logActivity("お家のイメージ写真を追加しました（"+added+"件）");
@@ -5728,7 +5764,7 @@
         if(!saved){ state.sitePhotos = state.sitePhotos.filter(function(x){ return x.id!==doc.id; }); }
         else added++;
         if(i % 3 === 2) render();
-      }catch(e){ toast(f.name+" のアップロードに失敗しました"); }
+      }catch(e){ uploadFailToast(f.name, e); }
     }
     render();
     if(added){ toast("✅ 現場写真を"+added+"枚追加しました"); logActivity("現場写真を追加しました（"+added+"件）"); }
