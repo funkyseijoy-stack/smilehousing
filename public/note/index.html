@@ -415,6 +415,28 @@
       <li><b>わたしのメモ</b>：気になったことを自由に書き留められます（この端末にのみ保存されます）</li>
     </ul>
 
+    <h3>✅ 仮決定・決定ボタン</h3>
+    <ul>
+      <li>「家づくり」の各項目にある打合せ記録や図面のカードに、<b>「仮決定にする」「決定する」</b>のボタンが出ることがあります（スタッフが必要なカードにだけ表示します）</li>
+      <li><b>検討中</b>（白）→ <b>仮決定</b>（黄）→ <b>決定</b>（緑）と、カードの色が変わります</li>
+      <li>迷っているときは「仮決定」でも大丈夫です。あとから「検討中に戻す」で変更できます</li>
+      <li>押した内容は住まいるハウジングにも共有されます</li>
+    </ul>
+
+    <h3>💴 追加見積りの承認・見送り</h3>
+    <ul>
+      <li>ホームの「追加見積り」に金額が入ると、<b>「承認する」「見送る」</b>のボタンが出ます（金額が決まるまでは「金額確認中」です）</li>
+      <li>押し間違えても、「回答をやり直す」で選び直せます</li>
+      <li>一覧の下の「追加見積りの合計」は、金額確認中と見送りを除いた合計です。「うち承認済み」は承認した分だけの合計です</li>
+    </ul>
+
+    <h3>🏠 ご家族・家電・持ち込み品のご入力</h3>
+    <ul>
+      <li><b>ご家族・家電・持ち込み品は、必ずご入力ください。</b></li>
+      <li><b>工事の際に参考にしますので、洗濯機と冷蔵庫のサイズは、必ずご入力ください。</b></li>
+      <li>ホームの下のほうにある「入力する」（入力済みの場合は「入力・変更する」）から入れられます</li>
+    </ul>
+
     <div class="help-note">ご不明な点がございましたら、打合せの際にお気軽にスタッフへお尋ねください。</div>
   </div>
 </div>
@@ -762,6 +784,7 @@ function homeHtml(){
     var fp = data.familyProfile || {familyMembers:[],appliances:[],bringIns:[]};
     var fpHas = fp.familyMembers.length || fp.appliances.length || fp.bringIns.length;
     out += '<div class="sechd"><h3>ご家族・家電・持ち込み品</h3><button class="famedit" data-famopen="1">'+(fpHas?'入力・変更する':'入力する')+'</button></div>';
+    out += '<div class="tm" style="margin:-4px 2px 10px; line-height:1.7;"><b>ご家族・家電・持ち込み品は、必ずご入力ください。</b><br>工事の際に参考にしますので、<b>洗濯機と冷蔵庫のサイズ</b>は、必ずご入力ください。</div>';
     if(fpHas){
       out += '<div class="speclist">'+
         (fp.familyMembers.length ? '<div class="spec"><div><div class="k">ご家族</div><div class="v">'+esc(fp.familyMembers.map(function(m){ return m.name+(m.heightCm?'（身長'+m.heightCm+'cm）':''); }).join("、"))+'</div></div></div>' : '')+
