@@ -1356,6 +1356,28 @@
   </div>
 </div>
 
+<!-- ========== 見積依頼の編集 MODAL ========== -->
+<div class="taskform-modal" id="reqEditModal" hidden>
+  <div class="taskform-card">
+    <h3 style="margin:0 0 6px;">見積依頼を編集</h3>
+    <div class="addform" style="flex-direction:column; align-items:stretch;">
+      <div class="muted" id="reqEditInfo" style="font-size:.85rem;"></div>
+      <label class="field">依頼方法<select id="reqEditMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option></select></label>
+      <label class="field">状況<select id="reqEditStatus"><option value="未依頼">未依頼</option><option value="依頼済み">依頼済み</option><option value="受領済み">受領済み</option></select></label>
+      <label class="field">依頼日<input type="date" id="reqEditRequestedAt"></label>
+      <label class="field">回答期限<input type="date" id="reqEditDueDate"></label>
+      <label class="field">依頼者<select id="reqEditRequestedBy"></select></label>
+      <label class="field">受領日<input type="date" id="reqEditReceivedAt"></label>
+      <label class="field">受領者<select id="reqEditReceivedBy"></select></label>
+      <div class="muted" style="font-size:.85rem;">ここで直しても、Gmailの下書きやメールは作られません（記録だけが変わります）。</div>
+      <div class="row" style="margin-block-start:6px;">
+        <button class="btn" id="reqEditSave">保存</button>
+        <button class="btn secondary" id="reqEditClose">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -2787,6 +2809,7 @@
       else if(r.status==="依頼済み") actionHtml = '<button class="btn small secondary" data-act="receive" data-id="'+r.id+'">受領登録</button>';
       else if(r.method==="gmail") actionHtml = '<button class="btn small ghost" data-act="changerequest" data-id="'+r.id+'">変更依頼</button>';
       else actionHtml = '<button class="btn small ghost" data-act="reopen" data-id="'+r.id+'">再依頼</button>';
+      actionHtml += ' <button class="btn small ghost" data-act="editrequest" data-id="'+r.id+'">編集</button>';
       actionHtml += ' <button class="btn danger-ghost" data-act="delrequest" data-id="'+r.id+'" title="削除">×</button>';
       var checkboxHtml = r.status==="未依頼" ? '<input type="checkbox" data-req-id="'+r.id+'" '+(uiSelectedRequests[r.id]?"checked":"")+'>' : "";
       var dueDays = r.dueDate ? daysSince(r.dueDate) : null;
@@ -6754,14 +6777,27 @@
     toast(created.length+"件の見積依頼を追加しました");
   }
 
+  // Gmailで依頼するとき、下書きを作るか、すでに自分で送ったので記録だけにするかを選ばせる（"draft"／"record"／キャンセル時null）
+  function askDraftOrRecord(cb){
+    askChoice("Gmailの依頼", "すでにメールを送っている場合は、下書きを作らず記録だけ「依頼済み」にできます。", [
+      {label:"Gmailの下書きを作る", value:"draft"},
+      {label:"下書きは作らず、記録だけ依頼済みにする", value:"record"}
+    ], cb);
+  }
   async function markRequested(id){
     var r = state.requests.find(function(x){ return x.id===id; });
     if(!r) return;
     var vendor = vendorById(r.vendorId); var project = projectById(r.projectId);
-    if(r.method==="gmail" && vendor){ var sent = await sendGmailRequest(project,[vendor]); if(sent.threadId) r.gmailThreadId = sent.threadId; }
+    var mode = "draft";
+    if(r.method==="gmail" && vendor){
+      mode = await new Promise(function(res){ askDraftOrRecord(res); });
+      if(mode===null) return;
+      if(mode==="draft"){ var sent = await sendGmailRequest(project,[vendor]); if(sent.threadId) r.gmailThreadId = sent.threadId; }
+    }
     r.status="依頼済み"; r.requestedAt=todayStr();
     render();
-    await saveDoc("requests", r.id, r);
+    var ok = await saveDoc("requests", r.id, r);
+    if(ok!==false && mode==="record") toast("記録だけ「依頼済み」にしました（下書きは作っていません）");
   }
   async function bulkMarkRequested(){
     var ids = Object.keys(uiSelectedRequests).filter(function(id){ return uiSelectedRequests[id]; });
@@ -6772,9 +6808,13 @@
     var gmailRows = rows.filter(function(r){ return r.method==="gmail"; });
     var faxRows = rows.filter(function(r){ return r.method!=="gmail"; });
     if(gmailRows.length){
-      var vendors = gmailRows.map(function(r){ return vendorById(r.vendorId); });
-      var sent = await sendGmailRequest(project, vendors);
-      if(sent.threadId) gmailRows.forEach(function(r){ r.gmailThreadId = sent.threadId; });
+      var bulkMode = await new Promise(function(res){ askDraftOrRecord(res); });
+      if(bulkMode===null) return;
+      if(bulkMode==="draft"){
+        var vendors = gmailRows.map(function(r){ return vendorById(r.vendorId); });
+        var sent = await sendGmailRequest(project, vendors);
+        if(sent.threadId) gmailRows.forEach(function(r){ r.gmailThreadId = sent.threadId; });
+      }
     }
     var allRows = gmailRows.concat(faxRows);
     allRows.forEach(function(r){ r.status="依頼済み"; r.requestedAt=todayStr(); });
@@ -6799,6 +6839,54 @@
       markReceivedFinish(r, name);
     });
   }
+  // ---- 見積依頼の編集（記録だけを直す。メール・下書きは作らない）----
+  var editingRequestId = null;
+  function fillStaffSelect(sel, cur){
+    var staff = (state.settings.staffList || []).slice();
+    if(cur && staff.indexOf(cur)===-1) staff.push(cur);
+    sel.innerHTML = '<option value="">（未設定）</option>' + staff.map(function(n){ return '<option value="'+escapeHtml(n)+'"'+(n===cur?' selected':'')+'>'+escapeHtml(n)+'</option>'; }).join("");
+  }
+  function openRequestEdit(id){
+    var r = state.requests.find(function(x){ return x.id===id; });
+    if(!r) return;
+    editingRequestId = id;
+    var v = vendorById(r.vendorId) || {name:"（削除済み業者）"};
+    var pr = projectById(r.projectId);
+    document.getElementById("reqEditInfo").textContent = v.name + (pr ? "　／　" + (pr.customer || pr.name || "") : "");
+    document.getElementById("reqEditMethod").value = r.method==="fax" ? "fax" : "gmail";
+    document.getElementById("reqEditStatus").value = r.status || "未依頼";
+    document.getElementById("reqEditRequestedAt").value = r.requestedAt || "";
+    document.getElementById("reqEditDueDate").value = r.dueDate || "";
+    document.getElementById("reqEditReceivedAt").value = r.receivedAt || "";
+    fillStaffSelect(document.getElementById("reqEditRequestedBy"), r.requestedBy || "");
+    fillStaffSelect(document.getElementById("reqEditReceivedBy"), r.receivedBy || "");
+    document.getElementById("reqEditModal").hidden = false;
+  }
+  async function saveRequestEdit(){
+    var r = state.requests.find(function(x){ return x.id===editingRequestId; });
+    if(!r){ document.getElementById("reqEditModal").hidden = true; return; }
+    var status = document.getElementById("reqEditStatus").value;
+    var requestedAt = document.getElementById("reqEditRequestedAt").value;
+    var receivedAt = document.getElementById("reqEditReceivedAt").value;
+    if(status!=="未依頼" && !requestedAt) requestedAt = todayStr();
+    if(status==="受領済み" && !receivedAt) receivedAt = todayStr();
+    if(status!=="受領済み") receivedAt = "";
+    if(status==="未依頼") requestedAt = "";
+    r.method = document.getElementById("reqEditMethod").value;
+    r.status = status;
+    r.requestedAt = requestedAt; r.receivedAt = receivedAt;
+    r.dueDate = document.getElementById("reqEditDueDate").value;
+    r.requestedBy = document.getElementById("reqEditRequestedBy").value;
+    r.receivedBy = status==="受領済み" ? document.getElementById("reqEditReceivedBy").value : "";
+    if(status!=="依頼済み"){ r.replyDetected = false; r.replySnippet = ""; r.replyDate = ""; }
+    document.getElementById("reqEditModal").hidden = true;
+    render();
+    var ok = await saveDoc("requests", r.id, r);
+    if(ok===false){ toast("保存に失敗しました。もう一度お試しください"); return; }
+    logActivity("見積依頼を編集しました");
+    toast("見積依頼を保存しました");
+  }
+
   async function reopenRequest(id){
     var r = state.requests.find(function(x){ return x.id===id; });
     if(!r) return;
@@ -8617,6 +8705,8 @@
       });
     });
     document.getElementById("btnBulkRequest").addEventListener("click", bulkMarkRequested);
+    document.getElementById("reqEditSave").addEventListener("click", saveRequestEdit);
+    document.getElementById("reqEditClose").addEventListener("click", function(){ document.getElementById("reqEditModal").hidden = true; });
     document.getElementById("btnCheckReplies").addEventListener("click", checkGmailReplies);
     document.getElementById("btnRefreshGmail").addEventListener("click", function(){ loadGmailInbox(document.getElementById("gmailSearchInput").value); });
     document.getElementById("btnSearchGmail").addEventListener("click", function(){ loadGmailInbox(document.getElementById("gmailSearchInput").value); });
@@ -9063,6 +9153,7 @@
       if(act==="request") markRequested(id);
       else if(act==="receive") markReceived(id);
       else if(act==="reopen") reopenRequest(id);
+      else if(act==="editrequest") openRequestEdit(id);
       else if(act==="changerequest") openChangeRequestForm(id);
       else if(act==="delrequest"){ if(confirm2()) deleteRequest(id); }
       else if(act==="delvendor"){ if(confirm2()) deleteVendor(id); }
