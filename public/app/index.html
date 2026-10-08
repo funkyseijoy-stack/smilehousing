@@ -6609,33 +6609,58 @@
   }
 
   async function checkGmailReplies(){
-    var candidates = liveRequests().filter(function(r){ return r.status==="依頼済み" && r.method==="gmail" && r.gmailThreadId; });
-    if(candidates.length===0){ toast("確認対象の依頼がありません"); return; }
-    var threadIds = [];
-    candidates.forEach(function(r){ if(threadIds.indexOf(r.gmailThreadId)===-1) threadIds.push(r.gmailThreadId); });
+    var all = liveRequests().filter(function(r){ return r.status==="依頼済み" && r.method==="gmail"; });
+    if(all.length===0){ toast("確認対象の依頼がありません（Gmailで「依頼済み」の依頼がありません）"); return; }
     toast("Gmailを確認しています…");
-    var threadMessages = {};
-    for(var i=0;i<threadIds.length;i++){
-      try{
-        var res = await fetch("/api/gmail-get-thread?threadId="+encodeURIComponent(threadIds[i]), {
-          headers:{ "X-Staff-Token": getStaffToken()||"" }
-        });
-        if(!res.ok){ threadMessages[threadIds[i]] = []; continue; }
-        var data = await res.json();
-        threadMessages[threadIds[i]] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date }; });
-      }catch(e){ threadMessages[threadIds[i]] = []; }
-    }
-    var foundCount = 0; var touched = [];
-    candidates.forEach(function(r){
+    var hdr = { "X-Staff-Token": getStaffToken()||"" };
+    var noEmail = 0, errCount = 0, foundCount = 0, checked = 0, touched = [];
+    var threadCache = {};
+    for(var i=0;i<all.length;i++){
+      var r = all[i];
       var vendor = vendorById(r.vendorId);
-      if(!vendor || !vendor.email) return;
-      var messages = threadMessages[r.gmailThreadId] || [];
-      var reply = messages.find(function(m){ return m.sender && m.sender.toLowerCase().indexOf(vendor.email.toLowerCase())!==-1; });
+      if(!vendor || !vendor.email){ noEmail++; continue; }
+      var email = vendor.email.toLowerCase();
+      var reply = null;
+      try{
+        if(r.gmailThreadId){
+          // 下書きから作った依頼：そのスレッドの中に業者のメールがあるか
+          if(!threadCache[r.gmailThreadId]){
+            var res = await fetch("/api/gmail-get-thread?threadId="+encodeURIComponent(r.gmailThreadId), { headers:hdr });
+            if(!res.ok) throw new Error("thread "+res.status);
+            var data = await res.json();
+            threadCache[r.gmailThreadId] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date }; });
+          }
+          reply = threadCache[r.gmailThreadId].find(function(m){ return m.sender && m.sender.toLowerCase().indexOf(email)!==-1; }) || null;
+        } else {
+          // スレッドIDが無い依頼（記録だけ依頼済み・Gmailから直接送った分）：業者から届いたメールを検索
+          var d = new Date((r.requestedAt||"")+"T00:00:00+09:00");
+          if(isNaN(d.getTime())) d = new Date(Date.now()-30*86400000);
+          d = new Date(d.getTime()-86400000); // 時差ぶん1日前から
+          var ds = d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate();
+          var q = "from:"+vendor.email+" after:"+ds;
+          var res2 = await fetch("/api/gmail-search-threads?maxResults=5&q="+encodeURIComponent(q), { headers:hdr });
+          if(res2.status===409){ toast("Gmailが連携されていません。「業者・設定」でGmail連携をしてください"); return; }
+          if(!res2.ok) throw new Error("search "+res2.status);
+          var d2 = await res2.json();
+          var th = (d2.threads||[]);
+          if(th.length){
+            var mine = th.find(function(t){ return t.sender && t.sender.toLowerCase().indexOf(email)!==-1; }) || th[0];
+            reply = { snippet:mine.snippet, date:mine.date };
+            r.gmailThreadId = mine.id;
+          }
+        }
+      }catch(e){ errCount++; continue; }
+      checked++;
       if(reply){ r.replyDetected=true; r.replySnippet=reply.snippet||""; r.replyDate=reply.date||""; foundCount++; touched.push(r); }
-    });
+    }
     render();
-    for(var j=0;j<touched.length;j++){ await saveDoc("requests", touched[j].id, touched[j]); }
-    toast(foundCount>0 ? foundCount+"件、業者からの返信を確認しました" : "新しい返信は見つかりませんでした");
+    var saveFail = 0;
+    for(var j=0;j<touched.length;j++){ var ok = await saveDoc("requests", touched[j].id, touched[j]); if(ok===false) saveFail++; }
+    var msg = all.length+"件を確認：返信あり"+foundCount+"件・返信なし"+(checked-foundCount)+"件";
+    if(noEmail) msg += "・メール未登録"+noEmail+"件（業者の編集でアドレスを入れてください）";
+    if(errCount) msg += "・確認できず"+errCount+"件";
+    if(saveFail) msg += "・保存に失敗"+saveFail+"件";
+    toast(msg, 9000);
   }
 
   // ================= Gmail受信箱ビュー（見るだけ・添付は手動で取り込み） =================
