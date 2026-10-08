@@ -327,6 +327,7 @@
   .specphoto-filelabel{ font-size:.85rem; font-weight:700; color:var(--muted); }
   .specphoto .spdel{ position:absolute; top:2px; right:2px; background:rgba(20,16,12,.62); color:#fff; border:none; border-radius:999px; width:18px; height:18px; line-height:1; font-size:.85rem; cursor:pointer; padding:0; }
   .specphoto:not(.specadd){ cursor:pointer; }
+  .specphoto .spdate{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.7); color:#fff; border:none; font-size:.85rem; text-align:center; padding:1px 0; cursor:pointer; z-index:2; }
   .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.85rem; text-align:center; padding:1px 0; pointer-events:none; }
   .specphoto .spby{ position:absolute; top:2px; left:2px; background:rgba(255,255,255,.9); color:var(--text); font-size:.85rem; font-weight:700; border-radius:999px; padding:0 5px; pointer-events:none; }
   .specphoto .spby.cust{ background:#b45b6a; color:#fff; }
@@ -5577,7 +5578,46 @@
   function photoTileHtml(p){
     return '<div class="specphoto"><img src="'+p.url+'" alt="">'+
       '<a href="'+p.url+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
-      '<button class="spdel" data-delalbum="'+p.id+'">×</button></div>';
+      '<button class="spdel" data-delalbum="'+p.id+'">×</button>'+
+      '<button class="spdate" data-albdate="'+p.id+'" title="日付を変更（お客様画面に出る日付）">'+albumDateShort(p.createdAt)+' ✎</button></div>';
+  }
+  function albumDateShort(iso){
+    var d = jstDateOf(iso);
+    return d ? (parseInt(d.slice(5,7),10)+"/"+parseInt(d.slice(8,10),10)) : "日付";
+  }
+  // 日本時間での日付（YYYY-MM-DD）
+  function jstDateOf(iso){
+    if(!iso) return "";
+    var t = new Date(iso);
+    if(isNaN(t.getTime())) return String(iso).slice(0,10);
+    var j = new Date(t.getTime()+9*3600*1000);
+    return j.toISOString().slice(0,10);
+  }
+  // アルバム写真の日付を変える（お客様画面の日付・並び順に反映）
+  function changeAlbumDate(id){
+    var p = state.albumPhotos.find(function(x){ return x.id===id; });
+    if(!p) return;
+    var inp = document.createElement("input");
+    inp.type = "date"; inp.value = jstDateOf(p.createdAt);
+    inp.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+    document.body.appendChild(inp);
+    var done = false;
+    async function apply(){
+      if(done) return; done = true;
+      var d = inp.value;
+      if(inp.parentNode) inp.parentNode.removeChild(inp);
+      if(!d || d===jstDateOf(p.createdAt)) return;
+      var updated = Object.assign({}, p, {createdAt: d+"T03:00:00.000Z"}); // 日本時間の正午
+      var ok = false;
+      try{ ok = await saveDoc("albumPhotos", p.id, updated); }catch(e){ ok = false; }
+      if(ok===false){ toast("日付を変更できませんでした"); return; }
+      Object.assign(p, updated);
+      render();
+      toast("日付を "+d.replace(/-/g,".")+" に変更しました");
+    }
+    inp.addEventListener("change", apply);
+    inp.addEventListener("blur", function(){ setTimeout(apply, 200); });
+    try{ if(inp.showPicker){ inp.showPicker(); } else { inp.focus(); inp.click(); } }catch(e){ inp.focus(); }
   }
   function renderPhotoCategorySection(kind, wrapId){
     var wrap = document.getElementById(wrapId);
@@ -8557,6 +8597,8 @@
           deletePhotoCategory(cparts[0], cparts[1]);
           return;
         }
+        var dt = e.target.closest("[data-albdate]");
+        if(dt){ e.preventDefault(); e.stopPropagation(); changeAlbumDate(dt.dataset.albdate); return; }
         var del = e.target.closest("[data-delalbum]");
         if(del){ e.preventDefault(); if(confirm2()) deleteAlbumPhoto(del.dataset.delalbum); }
       });
