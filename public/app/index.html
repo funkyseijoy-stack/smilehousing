@@ -1772,6 +1772,7 @@
     migrateSiteCheckMoves();
     migrateToiletMerge();
     migratePlanboardPartRemoval();
+    migrateExteriorNoteEntries();
     repairReflectedTaskCopies();
   }
   // 「✓反映済み」なのに設備仕様に入っていない図面を、タスクの案件の設備仕様へ入れて直す（起動時に1回）。
@@ -1783,6 +1784,14 @@
   var OLD_TOILET = { "1階トイレ":1, "2階トイレ":1 };
   // 2026年10月：部位の選択肢「プランボード」をやめた。これまでその部位で登録した記録・タスクは内容を残して部位を「未設定」に戻し、
   // 仕様履歴の写真・PDFは「総合」へ移す（何度動かしても同じ結果）。
+  // 「外部仕様」だけを部位にした既存の打合せ記録にも、仕様タブの履歴を作る（何度動かしても同じ結果）。
+  function migrateExteriorNoteEntries(){
+    try{
+      state.meetingNotes.forEach(function(n){
+        if(n && !n.deletedAt && n.specPart && n.specPart.scope==="exterior" && !n.specPart.category) upsertNoteSpecEntry(n);
+      });
+    }catch(e){ console.warn("exterior note entries failed", e); }
+  }
   function migratePlanboardPartRemoval(){
     try{
       state.meetingNotes.forEach(function(n){
@@ -3066,12 +3075,12 @@
   function upsertNoteSpecEntry(note){
     var existing = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===note.id; });
     var part = note.specPart;
-    var usable = part && part.scope!=="general" && part.category;
+    var usable = part && part.scope!=="general" && (part.category || part.scope==="exterior");
     if(!usable){
       if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
       return;
     }
-    var sameSpot = existing && existing.scope===part.scope && existing.category===part.category &&
+    var sameSpot = existing && existing.scope===part.scope && (existing.category||null)===(part.category||null) &&
       (existing.roomId||null)===(part.roomId||null) && (existing.side||null)===(part.side||null);
     if(sameSpot){
       existing.source = { noteId: note.id, noteSnippet: (note.content||"").slice(0,40) };
@@ -3080,7 +3089,7 @@
     }
     if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
     var doc = {
-      id: uid("sp"), projectId: note.projectId, scope: part.scope, category: part.category,
+      id: uid("sp"), projectId: note.projectId, scope: part.scope, category: part.category||null,
       roomId: part.roomId||null, side: part.side||null, kind: "note",
       createdAt: note.date ? (note.date+"T00:00:00.000Z") : (note.createdAt||nowIso()),
       source: { noteId: note.id, noteSnippet: (note.content||"").slice(0,40) },
@@ -3353,7 +3362,13 @@
     }
     // カテゴリーごとの「メモ（自由記述）」欄は削除（横一列で見やすくするため）。
     // 同じ内容は上の「色・仕様」欄で入力できるため、入力先はそちらに一本化している。
-    var catsGridHtml = '<div class="speccatgrid">'+exteriorCatsToShow.map(function(cat){
+    // 項目を選ばず「外部仕様」だけを部位にした記録・資料は、ここにまとめて出す。
+    var exteriorWholeHtml = "";
+    if(!(state.noteSpecFilter && state.noteSpecFilter.scope==="exterior" && state.noteSpecFilter.category)){
+      var wholeTl = renderSpecTimeline("exterior",null,null,null);
+      if(wholeTl) exteriorWholeHtml = '<div class="speccat"><h4>外部全体（項目を選ばない記録）</h4>'+decidedSummaryHtml("exterior",null,null,null)+wholeTl+'</div>';
+    }
+    var catsGridHtml = '<div class="speccatgrid">'+exteriorWholeHtml+exteriorCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+'</h4>'+
         decidedSummaryHtml("exterior",cat,null,null)+
         '<textarea class="exteriorNote" data-exteriornote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml((proj && proj.exteriorNotes && proj.exteriorNotes[cat])||"")+'</textarea>'+
