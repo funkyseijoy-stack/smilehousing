@@ -1,5 +1,6 @@
 import { sendMailTo } from "./google.mts";
 import { nowJst } from "./booking.mts";
+import { sendWorksDM, worksConfigured } from "./lineworks.mts";
 
 // タスクの担当者・確認者へ、個人のメールで知らせる。
 // 宛先は 設定（settings/main）の staffEmails（名前 → メールアドレス）。登録がない人には送らない。
@@ -12,6 +13,31 @@ export async function staffEmailOf(store: any, name: string): Promise<string> {
   const m = s && s.staffEmails;
   const v = m && typeof m[name] === "string" ? m[name].trim() : "";
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : "";
+}
+
+// スタッフの LINE WORKS ユーザーID（設定 settings/main の staffWorksIds：名前 → ID）
+export async function staffWorksIdOf(store: any, name: string): Promise<string> {
+  if (!name) return "";
+  const s: any = await store.get("settings/main", { type: "json" });
+  const m = s && s.staffWorksIds;
+  const v = m && typeof m[name] === "string" ? m[name].trim() : "";
+  return /^\S+$/.test(v) ? v : "";
+}
+
+// タスクの通知を1人に送る。LINE WORKS の接続情報とその人のユーザーIDがあれば LINE WORKS だけ。
+// 未設定の人・送れなかったときは、これまでどおりメールで送る（通知が届かなくなるのを防ぐ）。
+const MAIL_FOOTER = "（このメールは住まいるアプリから自動で送っています）";
+async function notifyStaff(store: any, name: string, subject: string, body: string): Promise<boolean> {
+  if (worksConfigured()) {
+    const wid = await staffWorksIdOf(store, name);
+    if (wid) {
+      const text = subject + "\n\n" + body.replace(MAIL_FOOTER, "（住まいるアプリからの自動通知です）");
+      if (await sendWorksDM(wid, text)) return true;
+    }
+  }
+  const to = await staffEmailOf(store, name);
+  if (!to) return false;
+  return (await sendMailTo({ to, subject, body, fromName: FROM_NAME })).ok;
 }
 
 function taskLines(t: any, projectName: string): string[] {
@@ -27,8 +53,6 @@ function taskLines(t: any, projectName: string): string[] {
 
 // role: "assignee"（担当者になった）／"checker"（確認を頼まれた）
 export async function sendTaskAssignedMail(store: any, task: any, role: "assignee" | "checker", name: string, by: string) {
-  const to = await staffEmailOf(store, name);
-  if (!to) return false;
   let projectName = "";
   if (task.projectId) {
     const p: any = await store.get("projects/" + task.projectId, { type: "json" });
@@ -48,12 +72,11 @@ export async function sendTaskAssignedMail(store: any, task: any, role: "assigne
     "",
     "（このメールは住まいるアプリから自動で送っています）",
   ].join("\n");
-  return (await sendMailTo({ to, subject, body, fromName: FROM_NAME })).ok;
+  return await notifyStaff(store, name, subject, body);
 }
 
 export async function sendDeadlineDigest(store: any, name: string, when: "today" | "tomorrow", items: { task: any; projectName: string; role: string }[]) {
-  const to = await staffEmailOf(store, name);
-  if (!to || !items.length) return false;
+  if (!items.length) return false;
   const label = when === "today" ? "今日" : "明日";
   const subject = "【住まいる】" + label + "が期限のタスクが" + items.length + "件あります";
   const body = [
@@ -68,7 +91,7 @@ export async function sendDeadlineDigest(store: any, name: string, when: "today"
     "",
     "（このメールは住まいるアプリから自動で送っています）",
   ].join("\n");
-  return (await sendMailTo({ to, subject, body, fromName: FROM_NAME })).ok;
+  return await notifyStaff(store, name, subject, body);
 }
 
 // ---- 夜（18:00〜翌9:00 日本時間）に入ったタスクは、翌朝9時にまとめて通知する ----
@@ -102,8 +125,6 @@ export async function flushTaskQueue(store: any) {
     groups.get(q.name)!.push({ key, task: t, role: q.role });
   }
   for (const [name, list] of groups) {
-    const to = await staffEmailOf(store, name);
-    if (!to) { dead.push(...list.map((x) => x.key)); continue; }
     const items: string[] = [];
     for (let i = 0; i < list.length; i++) {
       const t = list[i].task;
@@ -112,8 +133,10 @@ export async function flushTaskQueue(store: any) {
       items.push((i + 1) + ". " + (list[i].role === "checker" ? "【確認のお願い】" : "【担当】") + "\n   " + taskLines(t, projectName).join("\n   "));
     }
     const body = [name + "さん", "", "昨日の夕方以降に届いたタスクをまとめてお知らせします。", "", ...items, "", "▼ 住まいるアプリを開く", APP_URL, "", "（このメールは住まいるアプリから自動で送っています）"].join("\n");
-    const ok = (await sendMailTo({ to, subject: "【住まいる】夜のあいだに届いたタスクが" + list.length + "件あります", body, fromName: FROM_NAME })).ok;
-    if (ok) dead.push(...list.map((x) => x.key));
+    const ok = await notifyStaff(store, name, "【住まいる】夜のあいだに届いたタスクが" + list.length + "件あります", body);
+    // 送り先が1つも無い人（ワークスもメールも未登録）の分は、たまり続けないよう捨てる
+    const hasDest = (worksConfigured() && (await staffWorksIdOf(store, name))) || (await staffEmailOf(store, name));
+    if (ok || !hasDest) dead.push(...list.map((x) => x.key));
   }
   for (const k of dead) await store.delete(k);
 }
@@ -129,10 +152,8 @@ export async function sendTaskDoneMails(store: any, task: any, by: string) {
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
   const subject = "【住まいる】タスクが完了しました：" + String(task.content || "").replace(/\s+/g, " ").slice(0, 30);
   for (const name of names) {
-    const to = await staffEmailOf(store, name);
-    if (!to) continue;
     const body = [name + "さん", "", (by ? by + "さんが、" : "") + "次のタスクを完了にしました。", "", ...taskLines(task, projectName),
       ...(task.assignee ? ["担当：" + task.assignee] : []), "", "▼ 住まいるアプリを開く", APP_URL, "", "（このメールは住まいるアプリから自動で送っています）"].join("\n");
-    await sendMailTo({ to, subject, body, fromName: FROM_NAME });
+    await notifyStaff(store, name, subject, body);
   }
 }

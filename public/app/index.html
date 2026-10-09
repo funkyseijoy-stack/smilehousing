@@ -1086,8 +1086,8 @@
       <h3>担当者一覧</h3>
       <div class="row"><input type="text" id="newStaffInput" placeholder="例：朋子"><button class="btn secondary small" id="btnAddStaff">追加</button></div>
       <div class="tagbar" id="settingsStaffList" style="margin-block-start:10px;"></div>
-      <h4 style="margin:16px 0 4px;">担当者への通知メール</h4>
-      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">タスクの担当者・確認者になったとき、期限の前日と当日の朝（9時）に、その人のメールへお知らせします。メールアドレスを入れた人にだけ届きます（入力欄を出たときに保存されます）。</p>
+      <h4 style="margin:16px 0 4px;">担当者への通知（ワークス／メール）</h4>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">タスクの担当者・確認者になったとき、期限の前日と当日の朝（9時）、完了のときに、その人へお知らせします。「ワークスのユーザーID」を入れた人にはワークス（LINE WORKS）の個人宛メッセージだけ、入れていない人（またはワークスに送れなかったとき）にはメールで届きます。どちらも空の人には届きません（入力欄を出たときに保存されます）。</p>
       <div id="settingsStaffMail"></div>
     </div>
 
@@ -1826,6 +1826,7 @@
         if(s.progressTags) state.settings.progressTags = s.progressTags;
         if(s.staffList) state.settings.staffList = s.staffList;
         if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
+        if(s.staffWorksIds) state.settings.staffWorksIds = s.staffWorksIds;
         if(s.pin) state.settings.pin = s.pin;
       } else {
         await saveDoc("settings","main", state.settings);
@@ -1977,6 +1978,7 @@
         if(s.progressTags) state.settings.progressTags = s.progressTags;
         if(s.staffList) state.settings.staffList = s.staffList;
         if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
+        if(s.staffWorksIds) state.settings.staffWorksIds = s.staffWorksIds;
         if(s.pin) state.settings.pin = s.pin;
       }
       render();
@@ -6716,8 +6718,11 @@
     var wrap = document.getElementById("settingsStaffMail");
     if(!wrap) return;
     var em = state.settings.staffEmails || {};
+    var wk = state.settings.staffWorksIds || {};
     wrap.innerHTML = (state.settings.staffList||[]).map(function(n){
-      return '<label class="field" style="margin-block-end:6px;">'+escapeHtml(n)+'<input type="email" inputmode="email" autocomplete="off" data-staffmail="'+escapeHtml(n)+'" value="'+escapeHtml(em[n]||"")+'" placeholder="例：'+escapeHtml(n)+'@example.com"></label>';
+      return '<div class="row" style="gap:8px; margin-block-end:6px; align-items:flex-end;">'+
+        '<label class="field" style="flex:1; min-width:200px; margin:0;">'+escapeHtml(n)+'　メール<input type="email" inputmode="email" autocomplete="off" data-staffmail="'+escapeHtml(n)+'" value="'+escapeHtml(em[n]||"")+'" placeholder="例：'+escapeHtml(n)+'@example.com"></label>'+
+        '<label class="field" style="flex:1; min-width:200px; margin:0;">ワークスのユーザーID<input type="text" autocomplete="off" data-staffworks="'+escapeHtml(n)+'" value="'+escapeHtml(wk[n]||"")+'" placeholder="例：ID（LINE WORKSの管理画面で確認）"></label></div>';
     }).join("");
   }
   async function saveStaffMail(name, value){
@@ -6727,6 +6732,14 @@
     if(value) state.settings.staffEmails[name] = value; else delete state.settings.staffEmails[name];
     var ok = await saveDoc("settings","main", state.settings);
     toast(ok===false ? "保存できませんでした" : (value ? name+"さんのメールを保存しました" : name+"さんのメールを消しました"));
+  }
+  async function saveStaffWorks(name, value){
+    value = (value||"").trim();
+    if(/\s/.test(value)){ toast("ユーザーIDに空白は入れられません"); return; }
+    state.settings.staffWorksIds = Object.assign({}, state.settings.staffWorksIds||{});
+    if(value) state.settings.staffWorksIds[name] = value; else delete state.settings.staffWorksIds[name];
+    var ok = await saveDoc("settings","main", state.settings);
+    toast(ok===false ? "保存できませんでした" : (value ? name+"さんのワークスIDを保存しました" : name+"さんのワークスIDを消しました"));
   }
   function renderSettingsStaff(){
     var wrap = document.getElementById("settingsStaffList");
@@ -9696,6 +9709,8 @@
     document.getElementById("settingsStaffMail").addEventListener("change", function(e){
       var inp = e.target.closest("[data-staffmail]");
       if(inp) saveStaffMail(inp.dataset.staffmail, inp.value);
+      var iw = e.target.closest("[data-staffworks]");
+      if(iw) saveStaffWorks(iw.dataset.staffworks, iw.value);
     });
     document.getElementById("settingsStaffList").addEventListener("click", function(e){
       var x = e.target.closest("[data-delstaff]");
