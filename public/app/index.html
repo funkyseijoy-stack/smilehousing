@@ -128,6 +128,8 @@
   .muted{ color:var(--muted); }
   .empty{ color:var(--muted); font-size:.85rem; padding:18px 4px; text-align:center; }
   .cellname{ font-weight:700; }
+  .reqcontent{ font-weight:400; font-size:.85rem; margin-block-start:4px; padding:6px 8px; background:var(--orange-soft); border-radius:8px; }
+  .reqcontent-text{ white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
   .cellsub{ font-size:.85rem; color:var(--muted); }
 
   .toast{ position:fixed; left:50%; bottom: calc(18px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding:9px 16px; border-radius:999px; font-size:.85rem; font-weight:700; box-shadow: var(--shadow); opacity:0; pointer-events:none; transition: opacity .25s ease, transform .25s ease; z-index: 90; max-width:90vw; text-align:center; }
@@ -1382,6 +1384,7 @@
     <h3 style="margin:0 0 6px;">見積依頼を編集</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <div class="muted" id="reqEditInfo" style="font-size:.85rem;"></div>
+      <label class="field">依頼内容<textarea id="reqEditContent" rows="3"></textarea></label>
       <label class="field">依頼方法<select id="reqEditMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option></select></label>
       <label class="field">状況<select id="reqEditStatus"><option value="未依頼">未依頼</option><option value="依頼済み">依頼済み</option><option value="受領済み">受領済み</option></select></label>
       <label class="field">依頼日<input type="date" id="reqEditRequestedAt"></label>
@@ -2843,7 +2846,13 @@
         if(locked) return '<div class="lockbox" style="cursor:pointer; margin-block-start:4px;">🔒 見積書あり（タップして解除）</div>';
         return '<div style="margin-block-start:4px; font-size:.85rem;"><span data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;">📎 '+escapeHtml(a.name)+'</span> '+quotePill(a.quoteType)+quoteShareHtml(a)+'</div>';
       }).join("");
-      return '<tr><td>'+checkboxHtml+'</td><td class="cellname">'+escapeHtml(v.name)+attHtml+'</td><td>'+methodPill(r.method)+'</td><td>'+statusPill(r.status)+'</td>'+
+      var contentHtml = "";
+      if(r.content){
+        contentHtml = '<div class="reqcontent">'+(r.part&&r.part.label?'<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(r.part.label)+'</span> ':'')+
+          '<div class="reqcontent-text">'+escapeHtml(r.content)+'</div>'+
+          ((r.files&&r.files.length)?fileThumbRowHtml(r.files,52):"")+'</div>';
+      }
+      return '<tr><td>'+checkboxHtml+'</td><td class="cellname">'+escapeHtml(v.name)+contentHtml+attHtml+'</td><td>'+methodPill(r.method)+'</td><td>'+statusPill(r.status)+'</td>'+
         '<td class="muted">'+escapeHtml(r.requestedBy||"—")+'</td>'+
         '<td class="tabular">'+fmtDate(r.requestedAt)+'</td><td class="tabular">'+dueHtml+'</td>'+
         '<td class="muted">'+escapeHtml(r.receivedBy||"—")+'</td>'+
@@ -3036,6 +3045,7 @@
         '<div class="notemenu-divider"></div>'+
         noteSendButtonHtml(n, sent, "companytask")+
         noteSendButtonHtml(n, sent, "vendortask")+
+        noteSendButtonHtml(n, sent, "estreq")+
         noteSendButtonHtml(n, sent, "confirm")+
         noteSendButtonHtml(n, sent, "consider")+
         noteSendButtonHtml(n, sent, "estimate")+
@@ -3065,7 +3075,8 @@
   var NOTE_SEND_TYPES = [
     {type:"companytask", label:"→社内タスクへ", badge:"社内タスク済"},
     {type:"vendortask",  label:"→業者タスクへ", badge:"業者タスク済"},
-    {type:"confirm",     label:"→お客様への確認へ", badge:"お客様への確認済"},
+    {type:"estreq",      label:"→見積もり依頼へ", badge:"見積依頼済"},
+    {type:"confirm",    label:"→お客様への確認へ", badge:"お客様への確認済"},
     {type:"consider",    label:"→お客様の検討事項へ", badge:"検討事項済"},
     {type:"estimate",    label:"→追加見積もりへ", badge:"追加見積もり済"}
   ];
@@ -3076,6 +3087,11 @@
       var rec = s[t.type];
       if(!rec){ info[t.type] = false; return; }
       if(t.type === "estimate"){ info[t.type] = true; return; }
+      if(t.type === "estreq"){
+        var ids = (rec.refs && rec.refs.length) ? rec.refs : [rec.ref];
+        info[t.type] = state.requests.some(function(x){ return ids.indexOf(x.id)>=0 && !x.deletedAt; });
+        return;
+      }
       if(t.type === "companytask" || t.type === "vendortask"){
         info[t.type] = state.tasks.some(function(x){ return x.id===rec.ref && !x.deletedAt; });
       } else {
@@ -5469,6 +5485,35 @@
       return;
     }
 
+    if(taskType === "estreq"){
+      // 打合せ記録 → この案件の「見積」タブの見積依頼（未依頼）へ。依頼内容・部位・添付を行に持たせる。
+      askVendorForBadge(function(vendorIds){
+        if(vendorIds===null) return;
+        if(!vendorIds.length){ toast("依頼先の業者を1社以上選んでください"); return; }
+        var pid1 = proj.id;
+        var made = [], names = [];
+        vendorIds.forEach(function(vid){
+          var vendor = vendorById(vid);
+          if(!vendor) return;
+          var req = { id:uid("req"), projectId: pid1, vendorId: vendor.id, method: vendor.method||"gmail", status:"未依頼",
+            requestedAt:"", receivedAt:"", dueDate:"", requestedBy:"", receivedBy:"",
+            content: content, part: note.specPart||null, files: (note.files||[]).slice(),
+            sourceNoteId: note.id, note:"打合せ記録「"+content.slice(0,20)+"」より登録" };
+          state.requests.push(req);
+          saveDoc("requests", req.id, req);
+          made.push(req.id); names.push(vendor.name);
+        });
+        if(!made.length){ toast("業者が見つかりませんでした"); return; }
+        note.sent = note.sent || {};
+        note.sent.estreq = { at: nowIso(), by: state.currentUser||"", ref: made[0], refs: made };
+        saveDoc("meetingNotes", note.id, note);
+        logActivity("打合せ記録から見積依頼「"+content.slice(0,20)+"」を登録しました（"+names.join("、")+"）");
+        render();
+        toast("✅ 見積タブの見積依頼に「"+names.join("、")+"」を未依頼として追加しました");
+      });
+      return;
+    }
+
     if(taskType === "vendortask"){
       askVendorForBadge(function(vendorIds){
         if(vendorIds===null) return;
@@ -7071,6 +7116,7 @@
     var v = vendorById(r.vendorId) || {name:"（削除済み業者）"};
     var pr = projectById(r.projectId);
     document.getElementById("reqEditInfo").textContent = v.name + (pr ? "　／　" + (pr.customer || pr.name || "") : "");
+    document.getElementById("reqEditContent").value = r.content || "";
     document.getElementById("reqEditMethod").value = r.method==="fax" ? "fax" : "gmail";
     document.getElementById("reqEditStatus").value = r.status || "未依頼";
     document.getElementById("reqEditRequestedAt").value = r.requestedAt || "";
@@ -7090,6 +7136,7 @@
     if(status==="受領済み" && !receivedAt) receivedAt = todayStr();
     if(status!=="受領済み") receivedAt = "";
     if(status==="未依頼") requestedAt = "";
+    r.content = document.getElementById("reqEditContent").value.trim();
     r.method = document.getElementById("reqEditMethod").value;
     r.status = status;
     r.requestedAt = requestedAt; r.receivedAt = receivedAt;
