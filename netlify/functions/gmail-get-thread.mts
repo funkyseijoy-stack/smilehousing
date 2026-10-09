@@ -74,6 +74,7 @@ export default async (req: Request, context: Context) => {
     tUrl.searchParams.set("format", "metadata");
     tUrl.searchParams.append("metadataHeaders", "From");
     tUrl.searchParams.append("metadataHeaders", "Date");
+    tUrl.searchParams.append("metadataHeaders", "Subject");
     const tRes = await fetch(tUrl.toString(), { headers: { Authorization: "Bearer " + tokenResult.accessToken } });
     const tData: any = await tRes.json();
     if (!tRes.ok) {
@@ -84,6 +85,7 @@ export default async (req: Request, context: Context) => {
       return {
         sender: headerValue(headers, "From"),
         date: headerValue(headers, "Date"),
+        subject: headerValue(headers, "Subject"),
         snippet: m.snippet || "",
       };
     });

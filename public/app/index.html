@@ -2864,7 +2864,7 @@
     body.innerHTML = rows.map(function(row){
       var isLate = row.elapsed >= 5;
       var gmailCell = row.req.method !== "gmail" ? '<span class="muted">—</span>'
-        : row.req.replyDetected ? '<span class="pill status-受領済み" title="'+escapeHtml(row.req.replySnippet||"")+'">返信あり</span>'
+        : row.req.replyDetected ? '<button class="pill status-受領済み" data-act="replyinfo" data-id="'+row.req.id+'" title="'+escapeHtml(row.req.replySnippet||"")+'" style="border:0;cursor:pointer;">返信あり ▸</button>'
         : '<span class="muted" style="font-size:.85rem;">未確認</span>';
       var receiveBtnClass = row.req.replyDetected ? "btn small" : "btn small secondary";
       return '<tr><td class="cellname">'+escapeHtml(row.project.customer||row.project.name)+'</td><td>'+escapeHtml(row.vendor.name)+'</td><td>'+methodPill(row.req.method)+'</td>'+
@@ -6612,6 +6612,31 @@
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); return {ok:false, threadId:null}; }
   }
 
+  // 「返信なしに戻す（別件）」にしたメールは、同じメール（スレッド＋日時）なら次回から拾わない
+  function isReplyIgnored(r, threadId, date){
+    return (r.ignoredReplies||[]).indexOf(threadId+"|"+(date||""))!==-1;
+  }
+  function showReplyInfo(id){
+    var r = state.requests.find(function(x){ return x.id===id; });
+    if(!r || !r.replyDetected) return;
+    var tid = r.replyThreadId || r.gmailThreadId || "";
+    var title = r.replySubject ? r.replySubject : "（件名はこの返信には記録されていません）";
+    var msg = (r.replyDate ? r.replyDate+"　" : "") + (r.replySnippet || "（本文の抜粋なし）");
+    var choices = [];
+    if(tid) choices.push({label:"Gmailで開いて確認する", value:"open"});
+    choices.push({label:"返信なしに戻す（別件だった）", value:"dismiss"});
+    askChoice(title, msg, choices, async function(v){
+      if(v==="open"){ window.open("https://mail.google.com/mail/u/0/#all/"+tid, "_blank"); return; }
+      if(v!=="dismiss") return;
+      r.ignoredReplies = (r.ignoredReplies||[]).concat([tid+"|"+(r.replyDate||"")]);
+      if(!r.replyThreadId) r.gmailThreadId = ""; // 以前の版が別件のスレッドを固定していた分を外す
+      r.replyDetected=false; r.replySnippet=""; r.replyDate=""; r.replySubject=""; r.replyThreadId=""; r.replySubject=""; r.replyThreadId="";
+      render();
+      var ok = await saveDoc("requests", r.id, r);
+      toast(ok===false ? "保存に失敗しました。もう一度お試しください" : "返信なしに戻しました（このメールは次回から拾いません）");
+    });
+  }
+
   async function checkGmailReplies(){
     var all = liveRequests().filter(function(r){ return r.status==="依頼済み" && r.method==="gmail"; });
     if(all.length===0){ toast("確認対象の依頼がありません（Gmailで「依頼済み」の依頼がありません）"); return; }
@@ -6632,9 +6657,11 @@
             var res = await fetch("/api/gmail-get-thread?threadId="+encodeURIComponent(r.gmailThreadId), { headers:hdr });
             if(!res.ok) throw new Error("thread "+res.status);
             var data = await res.json();
-            threadCache[r.gmailThreadId] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date }; });
+            threadCache[r.gmailThreadId] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date, subject:m.subject }; });
           }
-          reply = threadCache[r.gmailThreadId].find(function(m){ return m.sender && m.sender.toLowerCase().indexOf(email)!==-1; }) || null;
+          var tidNow = r.gmailThreadId;
+          reply = threadCache[tidNow].find(function(m){ return m.sender && m.sender.toLowerCase().indexOf(email)!==-1 && !isReplyIgnored(r, tidNow, m.date); }) || null;
+          if(reply) reply.threadId = tidNow;
         } else {
           // スレッドIDが無い依頼（記録だけ依頼済み・Gmailから直接送った分）：業者から届いたメールを検索
           var d = new Date((r.requestedAt||"")+"T00:00:00+09:00");
@@ -6646,16 +6673,16 @@
           if(res2.status===409){ toast("Gmailが連携されていません。「業者・設定」でGmail連携をしてください"); return; }
           if(!res2.ok) throw new Error("search "+res2.status);
           var d2 = await res2.json();
-          var th = (d2.threads||[]);
+          var th = (d2.threads||[]).filter(function(t){ return !isReplyIgnored(r, t.id, t.date); });
           if(th.length){
             var mine = th.find(function(t){ return t.sender && t.sender.toLowerCase().indexOf(email)!==-1; }) || th[0];
-            reply = { snippet:mine.snippet, date:mine.date };
-            r.gmailThreadId = mine.id;
+            // 別件のメールを拾う可能性があるので、スレッドIDは依頼に固定せず、拾ったメールだけを記録する
+            reply = { snippet:mine.snippet, date:mine.date, subject:mine.subject, threadId:mine.id };
           }
         }
       }catch(e){ errCount++; continue; }
       checked++;
-      if(reply){ r.replyDetected=true; r.replySnippet=reply.snippet||""; r.replyDate=reply.date||""; foundCount++; touched.push(r); }
+      if(reply){ r.replyDetected=true; r.replySnippet=reply.snippet||""; r.replyDate=reply.date||""; r.replySubject=reply.subject||""; r.replyThreadId=reply.threadId||""; foundCount++; touched.push(r); }
     }
     render();
     var saveFail = 0;
@@ -6904,7 +6931,7 @@
     for(var i=0;i<allRows.length;i++){ await saveDoc("requests", allRows[i].id, allRows[i]); }
   }
   function markReceivedFinish(r, receivedBy){
-    r.status="受領済み"; r.receivedAt=todayStr(); r.receivedBy=receivedBy||""; r.replyDetected=false; r.replySnippet=""; r.replyDate="";
+    r.status="受領済み"; r.receivedAt=todayStr(); r.receivedBy=receivedBy||""; r.replyDetected=false; r.replySnippet=""; r.replyDate=""; r.replySubject=""; r.replyThreadId="";
     render();
     saveDoc("requests", r.id, r);
     logActivity("見積を受領登録しました");
@@ -7068,7 +7095,7 @@
     r.dueDate = document.getElementById("reqEditDueDate").value;
     r.requestedBy = document.getElementById("reqEditRequestedBy").value;
     r.receivedBy = status==="受領済み" ? document.getElementById("reqEditReceivedBy").value : "";
-    if(status!=="依頼済み"){ r.replyDetected = false; r.replySnippet = ""; r.replyDate = ""; }
+    if(status!=="依頼済み"){ r.replyDetected = false; r.replySnippet = ""; r.replyDate = ""; r.replySubject = ""; r.replyThreadId = ""; }
     document.getElementById("reqEditModal").hidden = true;
     render();
     var ok = await saveDoc("requests", r.id, r);
@@ -7114,7 +7141,7 @@
     try{
       var result = await gmailCreateDraft(input);
       var payload = (result && result.payload) || {};
-      r.status="依頼済み"; r.requestedAt=todayStr(); r.receivedAt=""; r.note=note; r.replyDetected=false; r.replySnippet=""; r.replyDate="";
+      r.status="依頼済み"; r.requestedAt=todayStr(); r.receivedAt=""; r.note=note; r.replyDetected=false; r.replySnippet=""; r.replyDate=""; r.replySubject=""; r.replyThreadId="";
       if(payload.threadId) r.gmailThreadId = payload.threadId;
       closeChangeRequestForm();
       render();
@@ -9367,6 +9394,7 @@
       var act = btn.dataset.act, id = btn.dataset.id;
       if(act==="request") markRequested(id);
       else if(act==="receive") markReceived(id);
+      else if(act==="replyinfo") showReplyInfo(id);
       else if(act==="reopen") reopenRequest(id);
       else if(act==="editrequest") openRequestEdit(id);
       else if(act==="attachreq"){ pendingReqAttachId = id; pendingReqAttachThenReceive = false; document.getElementById("reqAttachInput").click(); }
