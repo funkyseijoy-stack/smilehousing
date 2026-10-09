@@ -1850,7 +1850,7 @@
     try{
       state.meetingNotes.forEach(function(n){
         var sp0 = n && !n.deletedAt && n.specPart;
-        if(sp0 && !sp0.category && (sp0.scope==="exterior" || sp0.scope==="general" || (sp0.scope==="room" && sp0.roomId))) upsertNoteSpecEntry(n);
+        if(sp0 && !sp0.category && (sp0.scope==="exterior" || sp0.scope==="general" || sp0.scope==="room")) upsertNoteSpecEntry(n);
       });
     }catch(e){ console.warn("exterior note entries failed", e); }
   }
