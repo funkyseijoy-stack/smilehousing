@@ -5,7 +5,9 @@ import { CUSTOMER_CALENDAR_ID, HOLIDAY_CALENDAR_ID } from "./google.mts";
 // ここだけ直せば両方に反映される。
 // 空き状況は Google カレンダー「お客様予約」＋ 住まいるアプリの予約（reservations）から判定する。
 
-export const DURATION = 120; // 分（どの種類も2時間）
+export const DURATION = 120; // 分（ふつうの種類は2時間）
+// お客様が所要時間を選べる種類（現場は2時間か1時間。最初の値が初期値）
+export const DURATION_OPTIONS: Record<string, number[]> = { "現場": [120, 60] };
 export const OPEN_MIN = 9 * 60;
 export const CLOSE_MIN = 17 * 60;
 export const STEP = 30;
@@ -97,7 +99,7 @@ export async function holidays(accessToken: string, from: string, to: string): P
   return set;
 }
 
-export async function buildDays(accessToken: string, store: any, from: string, to: string) {
+export async function buildDays(accessToken: string, store: any, from: string, to: string, duration: number = DURATION) {
   const [calBusy, resvs, hol] = await Promise.all([
     calendarBusy(accessToken, from, to),
     listCollection(store, "reservations"),
@@ -118,8 +120,8 @@ export async function buildDays(accessToken: string, store: any, from: string, t
     if (hol.has(d)) { days.push({ ...base, status: "closed", reason: "祝日", slots: [] }); continue; }
     const dayBusy = busy.filter((b) => b.date === d);
     const slots: { start: string; available: boolean }[] = [];
-    for (let s = OPEN_MIN; s + DURATION <= CLOSE_MIN; s += STEP) {
-      let ok = !dayBusy.some((b) => s < b.end && b.start < s + DURATION);
+    for (let s = OPEN_MIN; s + duration <= CLOSE_MIN; s += STEP) {
+      let ok = !dayBusy.some((b) => s < b.end && b.start < s + duration);
       if (d === now.date && s < now.min + LEAD_MIN) ok = false;
       if (d < now.date) ok = false;
       slots.push({ start: toHM(s), available: ok });

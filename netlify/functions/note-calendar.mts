@@ -1,7 +1,7 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { getAccessToken, sendNotifyMail, CUSTOMER_CALENDAR_ID } from "../lib/google.mts";
-import { DURATION, OPEN_MIN, CLOSE_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays } from "../lib/booking.mts";
+import { DURATION, DURATION_OPTIONS, OPEN_MIN, CLOSE_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays } from "../lib/booking.mts";
 
 // おうちノート（お客様画面）の打合せ予約。
 // 空き状況は Google カレンダー「お客様予約」＋ 住まいるアプリの予約（reservations）から判定し、
@@ -20,7 +20,8 @@ function json(obj: any, status = 200) {
   });
 }
 
-const TYPES = ["来店", "オンライン", "銀行", "ショールーム"];
+const TYPES = ["来店", "オンライン", "銀行", "ショールーム", "現場"];
+const ALL_DURATIONS = Array.from(new Set([DURATION, ...Object.values(DURATION_OPTIONS).flat()]));
 
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -46,8 +47,10 @@ export default async (req: Request, context: Context) => {
   try {
     // ---------- 空き状況 ----------
     if (req.method === "GET") {
-      const days = await buildDays(tk.accessToken, store, today, horizon);
-      return json({ types: TYPES, durationMinutes: DURATION, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), days });
+      const dq = parseInt(url.searchParams.get("d") || "", 10);
+      const dur = ALL_DURATIONS.includes(dq) ? dq : DURATION;
+      const days = await buildDays(tk.accessToken, store, today, horizon, dur);
+      return json({ types: TYPES, durationOptions: DURATION_OPTIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), days });
     }
 
     // ---------- 予約する ----------
@@ -57,12 +60,15 @@ export default async (req: Request, context: Context) => {
     const start = String(body.start || "");
     if (!TYPES.includes(type)) return json({ error: "invalid_type" }, 400);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > horizon) return json({ error: "invalid_date" }, 400);
+    // 所要時間：選べる種類（現場）だけ選んだ値を使う。それ以外は2時間
+    const opts = DURATION_OPTIONS[type];
+    const dur = opts ? (opts.includes(Number(body.duration)) ? Number(body.duration) : opts[0]) : DURATION;
     // 直前に空きを取り直して、同じ枠が先に埋まっていないか確認する
-    const days = await buildDays(tk.accessToken, store, date, date);
+    const days = await buildDays(tk.accessToken, store, date, date, dur);
     const slot = days[0]?.slots.find((s: any) => s.start === start);
     if (!slot || !slot.available) return json({ error: "slot_taken" }, 409);
 
-    const end = toHM(hmToMin(start) + DURATION);
+    const end = toHM(hmToMin(start) + dur);
     const customer = project.customer || project.name || "お客様";
     const evRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}/events`,
@@ -86,7 +92,7 @@ export default async (req: Request, context: Context) => {
     const id = "rv_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const now = new Date().toISOString();
     const doc = {
-      id, projectId, type, staff: "", date, startTime: start, durationMinutes: DURATION, endTime: end,
+      id, projectId, type, staff: "", date, startTime: start, durationMinutes: dur, endTime: end,
       notes: "おうちノートから予約", googleEventId: ev.id || null, source: "note", createdAt: now, updatedAt: now,
     };
     await store.setJSON(`reservations/${id}`, doc);

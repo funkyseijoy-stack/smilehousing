@@ -692,6 +692,7 @@
                 <option value="オンライン">オンライン</option>
                 <option value="銀行">銀行</option>
                 <option value="ショールーム">ショールーム</option>
+                <option value="現場">現場</option>
               </select></label>
               <label class="field">担当者<select id="resStaff"></select></label>
             </div>
@@ -765,7 +766,7 @@
             <label class="field">日付<input type="date" id="okaiBookDate"></label>
             <label class="field">開始時刻<input type="time" id="okaiBookTime"></label>
             <label class="field">所要時間（分）<input type="number" id="okaiBookDuration" value="120" step="30" min="30" max="480"></label>
-            <label class="field">種別<input type="text" id="okaiBookService" placeholder="例：来店・オンライン・銀行・ショールーム"></label>
+            <label class="field">種別<input type="text" id="okaiBookService" placeholder="例：来店・オンライン・銀行・ショールーム・現場"></label>
             <button class="btn secondary" id="btnOkaiAddBooking">予約を手動で追加</button>
           </div>
         </div>
@@ -1320,7 +1321,7 @@
       <div class="row" id="reTypeRow">
         <label class="field">種別<select id="reType">
           <option value="来店">来店</option><option value="オンライン">オンライン</option>
-          <option value="銀行">銀行</option><option value="ショールーム">ショールーム</option>
+          <option value="銀行">銀行</option><option value="ショールーム">ショールーム</option><option value="現場">現場</option>
         </select></label>
         <label class="field">担当者<select id="reStaff"></select></label>
       </div>
@@ -6071,8 +6072,8 @@
   }
 
   // ================= 予約・Googleカレンダー連携 =================
-  var RESERVATION_TYPES = ["来店","オンライン","銀行","ショールーム"];
-  var RESERVATION_DEFAULT_DURATION = {"来店":120,"オンライン":120,"銀行":120,"ショールーム":120};
+  var RESERVATION_TYPES = ["来店","オンライン","銀行","ショールーム","現場"];
+  var RESERVATION_DEFAULT_DURATION = {"来店":120,"オンライン":120,"銀行":120,"ショールーム":120,"現場":120};
   function populateResStartTimeOptions(){
     var sel = document.getElementById("resStartTime");
     if(!sel || sel.options.length) return;

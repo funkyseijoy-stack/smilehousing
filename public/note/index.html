@@ -511,7 +511,9 @@
 
   var data = null;
   var view = { tab:"home", buildSeg:"spec", cat:null, imgFilter:"all", imgPlace:"LDK", imgBusy:false, specTab:{} };
-  var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false };
+  var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false, dur:120 };
+  // 現場だけ、所要時間（2時間／1時間）を選べる。ほかの種類は2時間
+  function rvNeedDur(){ var o = rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[rv.type]; return o ? (o.indexOf(rv.dur)!==-1 ? rv.dur : o[0]) : 120; }
   var main = document.getElementById("main");
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
@@ -955,7 +957,7 @@ function homeHtml(){
   async function loadAvail(){
     rv.loading = true; rv.error = ""; render();
     try{
-      var res = await fetch("/api/note-calendar?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T), {cache:"no-store"});
+      var res = await fetch("/api/note-calendar?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T)+"&d="+rvNeedDur(), {cache:"no-store"});
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
       rv.avail = j; rv.loaded = true;
@@ -976,8 +978,14 @@ function homeHtml(){
     if(up.length) out += '<div class="sechd"><h3>ご予約済み</h3></div><div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>';
 
     out += '<div class="rvstep">1. ご希望の内容</div><div class="rvtypes">';
-    var types = (rv.avail && rv.avail.types) || ["来店","オンライン","銀行","ショールーム"];
-    out += types.map(function(t){ return '<button class="rvtype'+(rv.type===t?" on":"")+'" data-rvtype="'+esc(t)+'"><b>'+esc(t)+'</b><span>2時間</span></button>'; }).join("")+'</div>';
+    var types = (rv.avail && rv.avail.types) || ["来店","オンライン","銀行","ショールーム","現場"];
+    out += types.map(function(t){ return '<button class="rvtype'+(rv.type===t?" on":"")+'" data-rvtype="'+esc(t)+'"><b>'+esc(t)+'</b><span>'+(rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[t] ? "1〜2時間" : "2時間")+'</span></button>'; }).join("")+'</div>';
+    var durOpts = rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[rv.type];
+    if(durOpts){
+      out += '<div class="rvstep">所要時間</div><div class="rvtypes">'+durOpts.map(function(m){
+        return '<button class="rvtype'+(rvNeedDur()===m?" on":"")+'" data-rvdur="'+m+'"><b>'+(m/60)+'時間</b></button>';
+      }).join("")+'</div>';
+    }
 
     out += '<div class="rvstep">2. 日付</div>';
     if(rv.loading || !rv.loaded){
@@ -1010,7 +1018,7 @@ function homeHtml(){
     if(!rv.date || !rv.start || rv.booking) return;
     rv.booking = true; render();
     try{
-      var res = await fetch("/api/note-calendar", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"book", type:rv.type, date:rv.date, start:rv.start }) });
+      var res = await fetch("/api/note-calendar", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"book", type:rv.type, date:rv.date, start:rv.start, duration:rvNeedDur() }) });
       var j = await res.json();
       if(res.status===409){ toast("その時間は先に埋まりました。別の時間をお選びください"); rv.start=""; rv.loaded=false; rv.booking=false; render(); return; }
       if(!res.ok){
@@ -1411,7 +1419,8 @@ function homeHtml(){
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     var cd = e.target.closest("[data-cdecide]"); if(cd){ decideCard(cd.dataset.cdecide, cd.dataset.ckey, cd.dataset.croom||"", cd.dataset.clabel||"", cd.dataset.ccat); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
-    var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; render(); return; }
+    var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== rvNeedDur()){ rv.loaded = false; } render(); return; }
+    var rdu = e.target.closest("[data-rvdur]"); if(rdu){ rv.dur = parseInt(rdu.dataset.rvdur,10); rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== rvNeedDur()){ rv.loaded = false; } render(); return; }
     var rd = e.target.closest("[data-rvdate]"); if(rd){ rv.date = rd.dataset.rvdate; rv.start = ""; render(); return; }
     var rs = e.target.closest("[data-rvstart]"); if(rs){ rv.start = rs.dataset.rvstart; render(); return; }
     if(e.target.closest("#rvBook")){ bookNow(); return; }

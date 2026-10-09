@@ -15,7 +15,7 @@ const CORS_HEADERS = {
 };
 // staff-auth.mts と同じ値にしてください。
 const STAFF_PASSPHRASE = "sumairu2026";
-const TYPES = ["来店", "オンライン", "銀行", "ショールーム"];
+const TYPES = ["来店", "オンライン", "銀行", "ショールーム", "現場"];
 
 function json(obj: any, status = 200) {
   return new Response(JSON.stringify(obj), {
