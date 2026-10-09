@@ -547,7 +547,9 @@ export default async (req: Request, context: Context) => {
 
   const categoriesRaw = catsOf(project).map((c) => {
     if (c.id === "rooms") return buildRoomsCategory(c);
-    const items = (timelineByCat[c.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    // 「インテリア：部屋別」（部屋を選ばない記録・写真）は、メインと同じ並びに入れる
+    const orphanRoomItems = c.id === "interior" ? (timelineByCat["rooms"] || []).filter((it: any) => !it.roomId) : [];
+    const items = (timelineByCat[c.id] || []).concat(orphanRoomItems).sort((a, b) => String(a.at).localeCompare(String(b.at)));
     const hasContent = c.id === "plan" ? plans.length > 0 : items.length > 0;
     const d = decisionByCat[c.id];
     return {
