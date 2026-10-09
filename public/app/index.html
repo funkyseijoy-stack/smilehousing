@@ -128,6 +128,25 @@
   .muted{ color:var(--muted); }
   .empty{ color:var(--muted); font-size:.85rem; padding:18px 4px; text-align:center; }
   .cellname{ font-weight:700; }
+  .attwrap{ display:grid; grid-template-columns:260px 1fr; gap:14px; align-items:start; }
+  .attleft{ border:1px solid var(--border); border-radius:12px; padding:8px; background:var(--surface); }
+  .attf{ display:flex; align-items:center; gap:4px; padding:7px 8px; border-radius:8px; cursor:pointer; font-size:.9rem; }
+  .attf:hover{ background:var(--orange-soft); }
+  .attf.sel{ background:var(--orange-soft); font-weight:700; }
+  .attf-tog{ display:inline-block; width:1.1em; text-align:center; flex:none; }
+  .attf-name{ flex:1; min-width:0; overflow-wrap:anywhere; }
+  .attf-n{ font-size:.85rem; color:var(--muted); margin-inline-start:6px; }
+  .dragover{ outline:2px dashed var(--orange); outline-offset:-2px; background:var(--orange-soft); }
+  .attcrumb{ font-weight:700; margin-block-end:6px; }
+  .attacts{ display:flex; flex-wrap:wrap; gap:6px; margin-block-end:8px; }
+  .atttiles{ display:flex; flex-wrap:wrap; gap:8px; margin-block-end:10px; }
+  .atttile{ padding:10px 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface); cursor:pointer; font-size:.9rem; }
+  .attselbar{ padding:8px 10px; border-radius:10px; background:var(--orange-soft); margin-block-end:8px; font-size:.9rem; }
+  .attwhere{ font-size:.85rem; color:var(--muted); }
+  .attwrap > *{ min-width:0; }
+  .attfiles .filechip{ flex-wrap:wrap; }
+  .attfiles .filechip .finame{ flex:1 1 160px; min-width:0; overflow-wrap:anywhere; }
+  @media (max-width:760px){ .attwrap{ grid-template-columns:1fr; } }
   .reqcontent{ font-weight:400; font-size:.85rem; margin-block-start:4px; padding:6px 8px; background:var(--orange-soft); border-radius:8px; }
   .reqcontent-text{ white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
   .cellsub{ font-size:.85rem; color:var(--muted); }
@@ -2841,7 +2860,9 @@
       var isOverdue = r.status!=="受領済み" && dueDays!==null && dueDays>=0;
       var dueHtml = r.dueDate ? '<span class="'+(isOverdue?"due-soon":"")+'">'+escapeHtml(r.dueDate)+(isOverdue?"（期限超過）":"")+'</span>' : '<span class="muted">—</span>';
       var reqAtts = liveAttachments().filter(function(a){ return a.requestId===r.id; });
-      var attHtml = reqAtts.map(function(a){
+      var attOpen = !!(state.reqAttOpen && state.reqAttOpen[r.id]);
+      var attHtml = !reqAtts.length ? "" : '<div style="margin-block-start:4px;"><button class="btn small ghost" data-reqatttoggle="'+r.id+'">📎 見積書 '+reqAtts.length+'件 '+(attOpen?"▾":"▸")+'</button></div>';
+      if(attOpen) attHtml += reqAtts.map(function(a){
         var locked = a.quoteType === "仕切り" && !state.quoteUnlocked;
         if(locked) return '<div class="lockbox" style="cursor:pointer; margin-block-start:4px;">🔒 見積書あり（タップして解除）</div>';
         return '<div style="margin-block-start:4px; font-size:.85rem;"><span data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;">📎 '+escapeHtml(a.name)+'</span> '+quotePill(a.quoteType)+quoteShareHtml(a)+'</div>';
@@ -2894,25 +2915,275 @@
     }).join("");
   }
 
+  // ---- 添付資料のフォルダー（2026年10月〜）----
+  // 案件ごとに自由に作れる階層フォルダー（最大4段）。フォルダー一覧は project.attFolders=[{id,name,parentId,deletedAt}]、
+  // ファイルの所属は attachments.folderId（無い／消えたフォルダー＝未分類）。
+  var ATT_FOLDER_MAX_DEPTH = 4;
+  var attFolderOpen = {};   // 開いているフォルダー
+  var attSelected = {};     // 選択中のファイル
+  var attDragging = null;   // ドラッグ中 {type:"file"|"folder", id}
+  function attFoldersOf(proj){ return ((proj&&proj.attFolders)||[]).filter(function(f){ return !f.deletedAt; }); }
+  function attFolderById(proj, id){ return id ? attFoldersOf(proj).find(function(f){ return f.id===id; }) : null; }
+  function attChildren(proj, pid){
+    var all = attFoldersOf(proj);
+    return all.filter(function(f){
+      var p = f.parentId || "";
+      if(p && !all.some(function(x){ return x.id===p; })) p = ""; // 親が無ければ最上位に出す
+      return p === (pid||"");
+    }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "ja"); });
+  }
+  function attDepth(proj, id){
+    var d = 0, cur = attFolderById(proj, id);
+    while(cur && d<10){ d++; cur = cur.parentId ? attFolderById(proj, cur.parentId) : null; }
+    return d;
+  }
+  function attHeight(proj, id){
+    var kids = attChildren(proj, id);
+    if(!kids.length) return 1;
+    return 1 + Math.max.apply(null, kids.map(function(k){ return attHeight(proj, k.id); }));
+  }
+  function attDescendantIds(proj, id){
+    var out = [id];
+    attChildren(proj, id).forEach(function(k){ out = out.concat(attDescendantIds(proj, k.id)); });
+    return out;
+  }
+  function attFileFolderId(proj, a){ return (a.folderId && attFolderById(proj, a.folderId)) ? a.folderId : ""; }
+  function attPathLabel(proj, id){
+    var names = [], cur = attFolderById(proj, id), n = 0;
+    while(cur && n<10){ names.unshift(cur.name); cur = cur.parentId ? attFolderById(proj, cur.parentId) : null; n++; }
+    return names.join(" › ");
+  }
+  function attTreeHtml(proj, rows, pid, depth, curSel){
+    return attChildren(proj, pid).map(function(f){
+      var kids = attChildren(proj, f.id), open = !!attFolderOpen[f.id];
+      var ids = attDescendantIds(proj, f.id);
+      var n = rows.filter(function(a){ return ids.indexOf(attFileFolderId(proj, a))>=0; }).length;
+      return '<div class="attf'+(curSel===f.id?" sel":"")+'" style="padding-inline-start:'+(8+depth*16)+'px;" data-attfolder="'+f.id+'" data-attdrop="'+f.id+'" draggable="true" data-attdragfolder="'+f.id+'">'+
+        '<span class="attf-tog" data-atttoggle="'+f.id+'">'+(kids.length?(open?"▾":"▸"):"")+'</span>📁 <span class="attf-name">'+escapeHtml(f.name)+'</span><span class="attf-n">'+n+'</span></div>'+
+        (open ? attTreeHtml(proj, rows, f.id, depth+1, curSel) : "");
+    }).join("");
+  }
   function renderAttachments(){
     var list = document.getElementById("attachmentList");
     var empty = document.getElementById("attachmentEmpty");
+    var proj = projectById(state.currentProjectId);
     var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId; });
-    empty.hidden = rows.length !== 0;
-    list.innerHTML = rows.map(function(a){
+    empty.hidden = true;
+    if(!proj){ list.innerHTML = ""; return; }
+    var cur = state.attFolder || "all";
+    if(cur!=="all" && cur!=="none" && !attFolderById(proj, cur)){ cur = state.attFolder = "all"; }
+    Object.keys(attSelected).forEach(function(id){ if(!rows.some(function(a){ return a.id===id; })) delete attSelected[id]; });
+    var unfiled = rows.filter(function(a){ return !attFileFolderId(proj, a); });
+    var shown = cur==="all" ? rows : (cur==="none" ? unfiled : rows.filter(function(a){ return attFileFolderId(proj, a)===cur; }));
+    var curFolder = attFolderById(proj, cur);
+    // 左：フォルダーの木
+    var left = '<div class="attf'+(cur==="all"?" sel":"")+'" data-attfolder="all"><span class="attf-tog"></span>🗂 すべて<span class="attf-n">'+rows.length+'</span></div>'+
+      '<div class="attf'+(cur==="none"?" sel":"")+'" data-attfolder="none" data-attdrop="">'+'<span class="attf-tog"></span>📄 未分類<span class="attf-n">'+unfiled.length+'</span></div>'+
+      attTreeHtml(proj, rows, "", 0, cur)+
+      '<div style="margin-block-start:8px;"><button class="btn small secondary" data-attact="newfolder" data-pid="">＋フォルダー</button></div>';
+    // 右：現在の場所・操作・サブフォルダー・ファイル
+    var crumb = cur==="all" ? "🗂 すべて" : (cur==="none" ? "📄 未分類" : "📁 "+escapeHtml(attPathLabel(proj, cur)));
+    var acts = "";
+    if(curFolder){
+      acts = (attDepth(proj, cur) < ATT_FOLDER_MAX_DEPTH ? '<button class="btn small secondary" data-attact="newfolder" data-pid="'+cur+'">＋サブフォルダー</button> ' : '')+
+        '<button class="btn small ghost" data-attact="renamefolder" data-pid="'+cur+'">名前変更</button> '+
+        '<button class="btn small ghost" data-attact="movefolder" data-pid="'+cur+'">📁 移動</button> '+
+        '<button class="btn small danger-ghost" data-attact="delfolder" data-pid="'+cur+'">フォルダー削除</button>';
+    }
+    var tiles = "";
+    if(curFolder){
+      tiles = attChildren(proj, cur).map(function(f){
+        return '<div class="atttile" data-attfolder="'+f.id+'" data-attdrop="'+f.id+'" draggable="true" data-attdragfolder="'+f.id+'">📁 '+escapeHtml(f.name)+'</div>';
+      }).join("");
+      if(tiles) tiles = '<div class="atttiles">'+tiles+'</div>';
+    }
+    var selIds = Object.keys(attSelected).filter(function(id){ return attSelected[id]; });
+    var selBar = selIds.length ? '<div class="attselbar">'+selIds.length+'件を選択中　<button class="btn small" data-attact="movesel">📁 まとめて移動</button> <button class="btn small ghost" data-attact="clearsel">選択を外す</button></div>' : "";
+    var filesHtml = shown.map(function(a){
       var locked = a.kind === "quote" && a.quoteType === "仕切り" && !state.quoteUnlocked;
-      // Locked quotes reveal nothing but the fact that something is locked
-      // here — no filename, no extension, no size — so a glance at this
-      // list can't leak which vendor or file it is before the PIN is entered.
+      var chk = '<input type="checkbox" data-attsel="'+a.id+'"'+(attSelected[a.id]?" checked":"")+' title="選んでまとめて移動">';
+      var mv = '<button class="btn small ghost" data-attact="move1" data-id="'+a.id+'" title="フォルダーへ移動">📁 移動</button>';
+      var where = "";
+      if(cur==="all"){ var fid = attFileFolderId(proj, a); where = fid ? '<span class="attwhere">📁 '+escapeHtml(attPathLabel(proj, fid))+'</span>' : ""; }
+      // 暗証番号が必要な見積書は、解除するまでファイル名・種類・大きさを一切出さない（誰の見積書か漏れないように）
       if(locked){
-        return '<div class="filechip"><div class="ficon">🔒</div><div class="finame lockbox" style="cursor:pointer;">ロック中の見積書（タップして解除）</div>'+
+        return '<div class="filechip" draggable="true" data-attfile="'+a.id+'">'+chk+'<div class="ficon">🔒</div><div class="finame lockbox" style="cursor:pointer;">ロック中の見積書（タップして解除）</div>'+where+mv+
           '<button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
       }
       var ext = (a.name.split(".").pop()||"").slice(0,4).toUpperCase();
       var kindLabel = a.kind === "quote" ? quotePill(a.quoteType) : (a.kind === "plan" ? '<span class="pill tag">図面</span>' : "");
-      return '<div class="filechip"><div class="ficon">'+escapeHtml(ext)+'</div><div class="finame" data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;" title="タップして開く">'+escapeHtml(a.name)+'</div>'+kindLabel+
-        '<div class="fisize tabular">'+fmtSize(a.sizeBytes)+'</div>'+quoteShareHtml(a)+'<button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
+      return '<div class="filechip" draggable="true" data-attfile="'+a.id+'">'+chk+'<div class="ficon">'+escapeHtml(ext)+'</div><div class="finame" data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;" title="タップして開く">'+escapeHtml(a.name)+'</div>'+kindLabel+where+
+        '<div class="fisize tabular">'+fmtSize(a.sizeBytes)+'</div>'+quoteShareHtml(a)+mv+'<button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
     }).join("");
+    if(!filesHtml) filesHtml = '<div class="muted" style="padding:10px 4px;">'+(rows.length ? "このフォルダーにファイルはありません。ファイルをここへドラッグするか、「📁 移動」で入れられます。" : "添付資料はまだ登録されていません。")+'</div>';
+    list.innerHTML = '<div class="attwrap"><div class="attleft">'+left+'</div><div class="attright"><div class="attcrumb">'+crumb+'</div>'+
+      (acts?'<div class="attacts">'+acts+'</div>':'')+tiles+selBar+'<div class="attfiles">'+filesHtml+'</div></div></div>';
+  }
+  // 移動先のフォルダーを選ぶ。cb(folderId)：""＝未分類（いちばん上）／キャンセルは null。
+  // excludeIds のフォルダーとその中は選べない。minRoom は、移動先の下に必要な段数（フォルダー移動用）。
+  function pickAttFolder(proj, title, excludeIds, minRoom, cb){
+    excludeIds = excludeIds || []; minRoom = minRoom || 0;
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:380px;width:100%;box-shadow:var(--shadow);max-height:85vh;overflow:auto;";
+    function walk(pid, depth){
+      return attChildren(proj, pid).map(function(f){
+        var blocked = excludeIds.indexOf(f.id)>=0 || (attDepth(proj, f.id) + minRoom > ATT_FOLDER_MAX_DEPTH);
+        var head = blocked ? '<div class="muted" style="padding:6px 8px; padding-inline-start:'+(8+depth*16)+'px;">📁 '+escapeHtml(f.name)+'</div>'
+          : '<button class="btn secondary" data-pickf="'+f.id+'" style="width:100%; justify-content:flex-start; margin-block-end:4px; margin-inline-start:'+(depth*16)+'px; width:calc(100% - '+(depth*16)+'px);">📁 '+escapeHtml(f.name)+'</button>';
+        return head + (excludeIds.indexOf(f.id)>=0 ? "" : walk(f.id, depth+1));
+      }).join("");
+    }
+    box.innerHTML = '<h3 style="margin:0 0 10px;">'+escapeHtml(title)+'</h3>'+
+      '<button class="btn secondary" data-pickf="" style="width:100%; justify-content:flex-start; margin-block-end:4px;">📄 未分類（フォルダーに入れない）</button>'+
+      walk("", 0)+
+      '<div style="margin-block-start:10px;"><button class="btn ghost" data-pickcancel style="width:100%;">キャンセル</button></div>';
+    overlay.appendChild(box); document.body.appendChild(overlay);
+    box.addEventListener("click", function(e){
+      if(e.target.closest("[data-pickcancel]")){ overlay.remove(); cb(null); return; }
+      var b = e.target.closest("[data-pickf]");
+      if(b){ overlay.remove(); cb(b.dataset.pickf); }
+    });
+  }
+  async function attSaveProject(proj, logMsg){
+    var ok = await saveDoc("projects", proj.id, proj);
+    if(ok===false){ toast("フォルダーの保存に失敗しました。もう一度お試しください"); return false; }
+    if(logMsg) logActivity(logMsg);
+    return true;
+  }
+  async function attNewFolder(parentId){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    if(parentId && attDepth(proj, parentId) >= ATT_FOLDER_MAX_DEPTH){ toast("フォルダーは"+ATT_FOLDER_MAX_DEPTH+"段までです"); return; }
+    var name = (prompt(parentId ? "サブフォルダーの名前（例：TOTO、キッチン）" : "フォルダーの名前（例：キッチン、中村電工）")||"").trim();
+    if(!name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    if(attChildren(proj, parentId||"").some(function(f){ return f.name===name; })){ toast("同じ場所に同じ名前のフォルダーがあります"); return; }
+    var f = { id: uid("af"), name: name, parentId: parentId||"", createdAt: nowIso() };
+    proj.attFolders = (proj.attFolders||[]).concat([f]);
+    if(parentId) attFolderOpen[parentId] = true;
+    state.attFolder = f.id;
+    render();
+    await attSaveProject(proj, "添付資料のフォルダー「"+name+"」を作りました");
+  }
+  async function attRenameFolder(id){
+    var proj = projectById(state.currentProjectId), f = attFolderById(proj, id);
+    if(!f) return;
+    var name = (prompt("新しい名前", f.name)||"").trim();
+    if(!name || name===f.name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    if(attChildren(proj, f.parentId||"").some(function(x){ return x.id!==id && x.name===name; })){ toast("同じ場所に同じ名前のフォルダーがあります"); return; }
+    f.name = name; render();
+    await attSaveProject(proj, "添付資料のフォルダー名を「"+name+"」に変更しました");
+  }
+  async function attDeleteFolder(id){
+    var proj = projectById(state.currentProjectId), f = attFolderById(proj, id);
+    if(!f) return;
+    if(!confirm("フォルダー「"+f.name+"」を削除しますか？\n中のファイルとフォルダーは消えず、1つ上（いちばん上なら「未分類」）に戻ります。")) return;
+    var up = f.parentId || "";
+    attFoldersOf(proj).forEach(function(k){ if((k.parentId||"")===id) k.parentId = up; });
+    f.deletedAt = nowIso();
+    var moved = liveAttachments().filter(function(a){ return a.projectId===proj.id && a.folderId===id; });
+    moved.forEach(function(a){ a.folderId = up; });
+    if(state.attFolder===id) state.attFolder = up || "all";
+    render();
+    await attSaveProject(proj, "添付資料のフォルダー「"+f.name+"」を削除しました");
+    for(var i=0;i<moved.length;i++){ await saveDoc("attachments", moved[i].id, moved[i]); }
+  }
+  async function attMoveFiles(ids, folderId){
+    var proj = projectById(state.currentProjectId);
+    if(folderId && !attFolderById(proj, folderId)){ toast("移動先のフォルダーが見つかりません"); return; }
+    var list = ids.map(function(id){ return state.attachments.find(function(x){ return x.id===id && x.projectId===state.currentProjectId; }); }).filter(Boolean)
+      .filter(function(a){ return (a.folderId||"") !== (folderId||""); });
+    if(!list.length) return;
+    list.forEach(function(a){ a.folderId = folderId||""; delete attSelected[a.id]; });
+    render();
+    var bad = 0;
+    for(var i=0;i<list.length;i++){ var ok = await saveDoc("attachments", list[i].id, list[i]); if(ok===false) bad++; }
+    if(bad) toast(bad+"件の保存に失敗しました。もう一度お試しください");
+    else toast(list.length+"件を「"+(folderId ? attFolderById(proj, folderId).name : "未分類")+"」へ移しました");
+  }
+  async function attMoveFolder(id, parentId){
+    var proj = projectById(state.currentProjectId), f = attFolderById(proj, id);
+    if(!f) return;
+    parentId = parentId||"";
+    if((f.parentId||"")===parentId) return;
+    if(parentId && attDescendantIds(proj, id).indexOf(parentId)>=0){ toast("フォルダーを自分の中へは移せません"); return; }
+    if(parentId && attDepth(proj, parentId) + attHeight(proj, id) > ATT_FOLDER_MAX_DEPTH){ toast("フォルダーは"+ATT_FOLDER_MAX_DEPTH+"段までです"); return; }
+    if(attChildren(proj, parentId).some(function(x){ return x.name===f.name; })){ toast("移動先に同じ名前のフォルダーがあります"); return; }
+    f.parentId = parentId;
+    if(parentId) attFolderOpen[parentId] = true;
+    render();
+    await attSaveProject(proj, "添付資料のフォルダー「"+f.name+"」を移動しました");
+  }
+  function attHandleClick(e){
+    var tog = e.target.closest("[data-atttoggle]");
+    if(tog){ var id0 = tog.dataset.atttoggle; attFolderOpen[id0] = !attFolderOpen[id0]; renderAttachments(); return true; }
+    var act = e.target.closest("[data-attact]");
+    if(act){
+      var proj = projectById(state.currentProjectId), a = act.dataset.attact, pid = act.dataset.pid || "";
+      if(a==="newfolder") attNewFolder(pid);
+      else if(a==="renamefolder") attRenameFolder(pid);
+      else if(a==="delfolder") attDeleteFolder(pid);
+      else if(a==="movefolder"){
+        var f = attFolderById(proj, pid); if(!f) return true;
+        pickAttFolder(proj, "「"+f.name+"」の移動先", attDescendantIds(proj, pid), attHeight(proj, pid), function(dest){ if(dest!==null) attMoveFolder(pid, dest); });
+      }
+      else if(a==="move1" || a==="movesel"){
+        var ids = a==="move1" ? [act.dataset.id] : Object.keys(attSelected).filter(function(k){ return attSelected[k]; });
+        if(!ids.length) return true;
+        pickAttFolder(proj, ids.length+"件の移動先", [], 0, function(dest){ if(dest!==null) attMoveFiles(ids, dest); });
+      }
+      else if(a==="clearsel"){ attSelected = {}; renderAttachments(); }
+      return true;
+    }
+    var fo = e.target.closest("[data-attfolder]");
+    if(fo && !e.target.closest("button")){
+      var fid = fo.dataset.attfolder;
+      state.attFolder = fid;
+      if(fid!=="all" && fid!=="none") attFolderOpen[fid] = true;
+      renderAttachments(); return true;
+    }
+    return false;
+  }
+  function attInitDnD(){
+    var list = document.getElementById("attachmentList");
+    list.addEventListener("change", function(e){
+      var c = e.target.closest("[data-attsel]");
+      if(!c) return;
+      if(c.checked) attSelected[c.dataset.attsel] = true; else delete attSelected[c.dataset.attsel];
+      renderAttachments();
+    });
+    list.addEventListener("dragstart", function(e){
+      var fi = e.target.closest("[data-attfile]"), fo = e.target.closest("[data-attdragfolder]");
+      if(fi){ attDragging = {type:"file", id: fi.dataset.attfile}; }
+      else if(fo){ attDragging = {type:"folder", id: fo.dataset.attdragfolder}; }
+      else return;
+      try{ e.dataTransfer.setData("text/plain", attDragging.type+":"+attDragging.id); e.dataTransfer.effectAllowed = "move"; }catch(err){}
+    });
+    list.addEventListener("dragend", function(){ attDragging = null; Array.prototype.forEach.call(list.querySelectorAll(".dragover"), function(n){ n.classList.remove("dragover"); }); });
+    list.addEventListener("dragover", function(e){
+      var t = e.target.closest("[data-attdrop]");
+      if(!t || !attDragging) return;
+      e.preventDefault();
+      Array.prototype.forEach.call(list.querySelectorAll(".dragover"), function(n){ if(n!==t) n.classList.remove("dragover"); });
+      t.classList.add("dragover");
+    });
+    list.addEventListener("dragleave", function(e){ var t = e.target.closest("[data-attdrop]"); if(t && !t.contains(e.relatedTarget)) t.classList.remove("dragover"); });
+    list.addEventListener("drop", function(e){
+      var t = e.target.closest("[data-attdrop]");
+      if(!t || !attDragging) return;
+      e.preventDefault(); t.classList.remove("dragover");
+      var d = attDragging; attDragging = null;
+      var dest = t.dataset.attdrop || "";
+      if(d.type==="file"){
+        var ids = attSelected[d.id] ? Object.keys(attSelected).filter(function(k){ return attSelected[k]; }) : [d.id];
+        attMoveFiles(ids, dest);
+      } else {
+        attMoveFolder(d.id, dest);
+      }
+    });
   }
   // 定価の見積書だけ、部位を指定してお客様のおうちノートに出せる（仕切りは出せない）
   function quoteShareHtml(a){
@@ -6517,6 +6788,7 @@
         var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:f.name, url: res.url,
           contentType: res.contentType || f.type, sizeBytes: res.sizeBytes || f.size, uploadedAt: todayStr(),
           kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"仕切り") : undefined };
+        if(!requestId && pid0===state.currentProjectId){ var pj0 = projectById(pid0); if(state.attFolder && attFolderById(pj0, state.attFolder)) att.folderId = state.attFolder; }
         if(requestId){ att.requestId = requestId; var rq0 = state.requests.find(function(x){ return x.id===requestId; }); if(rq0) att.vendorId = rq0.vendorId; }
         blobCache[res.id] = f;
         state.attachments.push(att);
@@ -8986,6 +9258,8 @@
       });
     });
     document.getElementById("projectTableBody").addEventListener("click", function(e){
+      var tg = e.target.closest("[data-reqatttoggle]");
+      if(tg){ state.reqAttOpen = state.reqAttOpen || {}; state.reqAttOpen[tg.dataset.reqatttoggle] = !state.reqAttOpen[tg.dataset.reqatttoggle]; renderProjectTable(); return; }
       var openEl = e.target.closest("[data-openatt]");
       if(openEl){ openAttachment(openEl.dataset.openatt); return; }
       var lockEl = e.target.closest(".lockbox");
@@ -9477,9 +9751,11 @@
       openNoteMenuId = null;
       renderMeetingNotes();
     });
+    attInitDnD();
     document.getElementById("attachmentList").addEventListener("click", function(e){
       var openEl = e.target.closest("[data-openatt]");
       if(openEl){ openAttachment(openEl.dataset.openatt); return; }
+      if(attHandleClick(e)) return;
       var btn = e.target.closest("button[data-act]");
       if(!btn) return;
       handleTableClick(e);
