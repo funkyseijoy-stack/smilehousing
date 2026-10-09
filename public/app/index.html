@@ -2869,7 +2869,7 @@
       var receiveBtnClass = row.req.replyDetected ? "btn small" : "btn small secondary";
       return '<tr><td class="cellname">'+escapeHtml(row.project.customer||row.project.name)+'</td><td>'+escapeHtml(row.vendor.name)+'</td><td>'+methodPill(row.req.method)+'</td>'+
         '<td class="tabular">'+fmtDate(row.req.requestedAt)+'</td><td class="tabular" style="'+(isLate?'color:var(--danger);font-weight:700;':'')+'">'+(row.elapsed>=0?row.elapsed+"日":"—")+'</td>'+
-        '<td>'+gmailCell+'</td><td><button class="'+receiveBtnClass+'" data-act="receive" data-id="'+row.req.id+'">受領登録</button></td></tr>';
+        '<td>'+gmailCell+'</td><td style="white-space:nowrap;"><button class="btn small ghost" data-act="attachreceive" data-id="'+row.req.id+'">📎 見積書</button> <button class="'+receiveBtnClass+'" data-act="receive" data-id="'+row.req.id+'">受領登録</button></td></tr>';
     }).join("");
   }
 
@@ -6458,9 +6458,11 @@
     throw lastErr;
   }
   async function uploadAttachments(files, kind, quoteType, requestId){
-    if(!assets){ toast("この画面では添付ファイルの登録が利用できません"); return; }
-    if(!state.currentProjectId){ toast("先に案件を選択してください"); return; }
-    var pid0 = state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する
+    if(!assets){ toast("この画面では添付ファイルの登録が利用できません"); return 0; }
+    var rqPid = requestId ? (function(){ var q = state.requests.find(function(x){ return x.id===requestId; }); return q ? q.projectId : null; })() : null;
+    if(!rqPid && !state.currentProjectId){ toast("先に案件を選択してください"); return 0; }
+    var pid0 = rqPid || state.currentProjectId; // 途中で別の案件を開いても、最初に選んだ案件に保存する（見積依頼の行からは、その依頼の案件）
+    var okCount = 0;
     var list = Array.prototype.slice.call(files);
     for(var i=0;i<list.length;i++){
       var f = list[i];
@@ -6474,12 +6476,14 @@
         state.attachments.push(att);
         await saveDoc("attachments", att.id, att);
         logActivity("添付「"+f.name+"」を追加しました");
+        okCount++;
       }catch(e){
         var detail = (e && (e.message||e.name)) ? "（"+(e.message||e.name)+"）" : "";
         toast(f.name+" のアップロードに失敗しました"+detail+"。電波の良い場所でもう一度お試しください");
       }
     }
     render();
+    return okCount;
   }
   async function deleteAttachment(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
@@ -6996,6 +7000,7 @@
 
   // ---- 業者の編集 ----
   var pendingReqAttachId = null;
+  var pendingReqAttachThenReceive = false; // 未受領一覧から：見積書を付けたら受領登録まで行う
   var editingVendorId = null;
   function openVendorEdit(id){
     var v = vendorById(id);
@@ -8896,10 +8901,13 @@
     document.getElementById("reqAttachInput").addEventListener("change", function(e){
       var input = e.target; var files = input.files ? Array.prototype.slice.call(input.files) : [];
       var rid = pendingReqAttachId; input.value = "";
+      var thenReceive = pendingReqAttachThenReceive; pendingReqAttachThenReceive = false;
       if(!files.length || !rid) return;
       askChoice("見積書の種類", "仕切りは暗証番号でロックされます。", [{label:"仕切り", value:"仕切り"},{label:"定価", value:"定価"}], function(qt){
         if(qt===null) return;
-        uploadAttachments(files, "quote", qt, rid);
+        uploadAttachments(files, "quote", qt, rid).then(function(n){
+          if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid); }
+        });
       });
     });
     document.getElementById("projectTableBody").addEventListener("click", function(e){
@@ -9361,7 +9369,8 @@
       else if(act==="receive") markReceived(id);
       else if(act==="reopen") reopenRequest(id);
       else if(act==="editrequest") openRequestEdit(id);
-      else if(act==="attachreq"){ pendingReqAttachId = id; document.getElementById("reqAttachInput").click(); }
+      else if(act==="attachreq"){ pendingReqAttachId = id; pendingReqAttachThenReceive = false; document.getElementById("reqAttachInput").click(); }
+      else if(act==="attachreceive"){ pendingReqAttachId = id; pendingReqAttachThenReceive = true; document.getElementById("reqAttachInput").click(); }
       else if(act==="editvendor") openVendorEdit(id);
       else if(act==="setquotepart") setQuotePart(id);
       else if(act==="togglequotereflect") toggleQuoteReflect(id);
