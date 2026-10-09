@@ -38,9 +38,9 @@ const NOTE_CATS = [
   { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
   { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
   { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
-  { id: "interior", name: "インテリアメイン", sub: "床・建具・クロス・配色", icon: "sofa" },
+  { id: "interior", name: "インテリア（メイン）", sub: "床・建具・クロス・配色", icon: "sofa" },
   // 部屋別インテリア。部屋ごとに分けて表示し、「仮決定／決定」も部屋単位で受け付ける
-  { id: "rooms", name: "各部屋", sub: "天井・壁・アクセント", icon: "room" },
+  { id: "rooms", name: "インテリア（部屋別）", sub: "天井・壁・アクセント", icon: "room" },
   // 外部散水栓・インターホン親機・給湯リモコン・床下点検口（打合せで確認する項目）
   { id: "other", name: "その他の確認", sub: "散水栓・インターホン・給湯リモコン・床下点検口", icon: "house" },
 ];
@@ -49,6 +49,17 @@ const NOTE_CATS = [
 const LEGACY_CAT_MAP: Record<string, string> = {
   toilet1: "toilet", toilet2: "toilet", heating: "climate", ventilation: "climate", wiring: "electric", lighting: "electric",
 };
+
+// 「インテリア」項目全体の状態（メイン＋各部屋）。内容のあるものだけを見て決める
+function mergeInteriorStatus(mainStatus: string, rooms: any[]): string {
+  const list: string[] = [];
+  if (mainStatus && mainStatus !== "準備中") list.push(mainStatus);
+  for (const r of rooms) list.push(r.status);
+  if (!list.length) return "準備中";
+  if (list.every((x) => x === "決定")) return "決定";
+  if (!list.includes("決定") && list.includes("仮決定")) return "仮決定";
+  return "検討中";
+}
 
 const ROOM_CAT_LABELS: Record<string, string> = { ceiling: "天井", wall: "壁", accent: "アクセント" };
 // 各部位の表示名。部屋別インテリアは「部屋名・天井/壁/アクセント」の形にする
@@ -534,7 +545,7 @@ export default async (req: Request, context: Context) => {
     };
   };
 
-  const categories = catsOf(project).map((c) => {
+  const categoriesRaw = catsOf(project).map((c) => {
     if (c.id === "rooms") return buildRoomsCategory(c);
     const items = (timelineByCat[c.id] || []).sort((a, b) => String(a.at).localeCompare(String(b.at)));
     const hasContent = c.id === "plan" ? plans.length > 0 : items.length > 0;
@@ -547,6 +558,29 @@ export default async (req: Request, context: Context) => {
       count: c.id === "plan" ? plans.length : items.length,
     };
   });
+
+  // お客様には「インテリアメイン」と「各部屋」を1つの項目「インテリア」にまとめて見せる。
+  // 保存している決定（noteDecisions）の category は従来どおり interior／rooms のまま
+  // （カード単位・部屋単位の決定もそのまま使える）。
+  const roomsRaw: any = categoriesRaw.find((c: any) => c.id === "rooms");
+  const categories: any[] = [];
+  for (const c of categoriesRaw as any[]) {
+    if (c.id === "rooms") continue;
+    if (c.id === "interior" && roomsRaw) {
+      categories.push({
+        ...c,
+        name: "インテリア",
+        sub: "床・建具・クロス、部屋ごとの配色",
+        mainStatus: c.status,
+        mainCount: c.count,
+        rooms: roomsRaw.rooms || [],
+        status: mergeInteriorStatus(c.status, roomsRaw.rooms || []),
+        count: c.count + (roomsRaw.count || 0),
+      });
+      continue;
+    }
+    categories.push(c);
+  }
 
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   // 住まいるアプリの「予約」タブ（reservationsコレクション）に加えて、おうちノート連携タブの

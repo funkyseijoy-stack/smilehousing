@@ -914,8 +914,7 @@
           <button class="meetingsub-btn" data-meetingsub="exterior">外部仕様</button>
           <button class="meetingsub-btn" data-meetingsub="facility">設備仕様</button>
           <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
-          <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア基本色</button>
-          <button class="meetingsub-btn" data-meetingsub="room">部屋別インテリア</button>
+          <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア</button>
           <button class="meetingsub-btn" data-meetingsub="sc_sansui">外部散水栓</button>
           <button class="meetingsub-btn" data-meetingsub="sc_intercom">インターホン親機</button>
           <button class="meetingsub-btn" data-meetingsub="sc_remocon">給湯リモコン</button>
@@ -985,29 +984,22 @@
         </div>
         <div class="meetingsubpane" id="meetingsubpane-interiorColor">
           <div class="card">
-            <h3>インテリア基本色</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">表・裏がある項目は両方登録できます（どちらか一方のみでも構いません）。カテゴリーを自由に追加できます。</p>
+            <h3>インテリア</h3>
+            <h4 style="margin:6px 0 4px;">メインインテリア（家全体の基本色）</h4>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">写真・PDFなどのファイルを、複数まとめて＋から追加できます。表・裏がある項目は両方登録できます。項目も自由に追加できます。</p>
             <div class="row" style="margin-block-end:10px; gap:6px;">
               <input type="text" id="interiorColorCatInput" placeholder="例：手すり">
-              <button class="btn secondary small" id="btnAddInteriorColorCat">＋ カテゴリー追加</button>
+              <button class="btn secondary small" id="btnAddInteriorColorCat">＋ 項目を追加</button>
             </div>
             <div id="specInteriorWrap"></div>
-          </div>
-        </div>
-        <div class="meetingsubpane" id="meetingsubpane-room">
-          <div class="card">
-            <h3>部屋別インテリア</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">項目（天井・壁など）は全部屋共通です。カテゴリーを自由に追加できます。</p>
-            <div class="row" style="margin-block-end:10px; gap:6px;">
-              <input type="text" id="roomCatInput" placeholder="例：造作収納">
-              <button class="btn secondary small" id="btnAddRoomCat">＋ 項目を追加</button>
-            </div>
+            <h4 style="margin:22px 0 4px; padding-block-start:14px; border-block-start:1px solid var(--line, #ddd);">部屋別インテリア</h4>
+            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">部屋の名前は自由に追加できます（例：リビング、主寝室、子ども部屋）。部屋ごとに、写真・PDFなどのファイルを複数追加できます。</p>
             <div class="row" style="margin-block-end:10px;">
               <input type="text" id="newRoomName" placeholder="例：リビング">
               <button class="btn secondary small" id="btnAddRoom">部屋を追加</button>
             </div>
             <div id="specRoomsWrap"></div>
-            <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。</div>
+            <div class="empty" id="specRoomsEmpty" hidden>まだ部屋が登録されていません。上の欄に名前を入れて追加してください。</div>
           </div>
         </div>
         <div id="siteCheckPanes"></div>
@@ -1535,8 +1527,8 @@
     {label:"設備仕様", value:"facility"},
     {label:"暖房・換気・電気設備", value:"equipment"},
     {label:"外部散水栓・インターホンなど", value:"siteCheck"},
-    {label:"インテリア基本色", value:"interiorColor"},
-    {label:"部屋別インテリア", value:"room"}
+    {label:"インテリア：メイン（家全体の基本色）", value:"interiorColor"},
+    {label:"インテリア：部屋別", value:"room"}
   ];
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
@@ -2185,7 +2177,7 @@
     return null;
   }
   var NOTE_CAT_NAMES = { general:"総合", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", dressing:"脱衣室", toilet:"トイレ",
-    climate:"暖房・換気", electric:"電気・あかり", interior:"インテリアメイン", rooms:"各部屋", other:"その他の確認", planboard:"プランボード" };
+    climate:"暖房・換気", electric:"電気・あかり", interior:"インテリア（メイン）", rooms:"インテリア（部屋別）", other:"その他の確認", planboard:"プランボード" };
   // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
   var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
   function noteDecisionFor(catId, roomId){
@@ -3225,7 +3217,7 @@
     wrap.innerHTML = rows.map(planChipHtml).join("");
   }
 
-  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"room" };
+  var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"interiorColor" };
   function switchMeetingSubTab(key){
     var bar = document.getElementById("meetingSubTabBar");
     if(!bar) return;
@@ -3712,10 +3704,10 @@
       return '<div class="specphoto-wrap">'+tileHtml+reflectBtnHtml+'</div>';
     }).join("");
     if(!opts.noAdd){
-      var inputId = "spu_"+scope+"_"+encodeURIComponent(category)+(roomId?"_"+roomId:"")+(side?"_"+encodeURIComponent(side):"")+(opts.kind?"_"+opts.kind:"");
+      var inputId = "spu_"+scope+"_"+encodeURIComponent(category==null?"all":category)+(roomId?"_"+roomId:"")+(side?"_"+encodeURIComponent(side):"")+(opts.kind?"_"+opts.kind:"");
       html += '<label class="specphoto specadd" for="'+inputId+'">＋</label>'+
         '<input type="file" id="'+inputId+'" accept="image/*,application/pdf,video/*" multiple hidden '+
-        'data-spec-scope="'+scope+'" data-spec-cat="'+escapeHtml(category)+'"'+
+        'data-spec-scope="'+scope+'" data-spec-cat="'+escapeHtml(category==null?"":category)+'"'+
         (roomId?' data-spec-room="'+roomId+'"':'')+(side?' data-spec-side="'+escapeHtml(side)+'"':'')+'>';
     }
     return '<div class="specphotos">'+html+'</div>';
@@ -4005,7 +3997,7 @@
     var rooms = (proj && proj.rooms) || [];
     var roomCats = roomCatsFor(proj);
     if(empty) empty.hidden = rooms.length !== 0;
-    if(!rooms.length){ wrap.innerHTML = '<div class="muted" style="font-size:.85rem;">部屋は、打合せ記録の部位で「部屋別インテリア」→「＋ 新しい部屋を追加」から作れます。</div>'; return; }
+    if(!rooms.length){ wrap.innerHTML = ""; return; }
     var roomFilter = (state.noteSpecFilter && state.noteSpecFilter.scope==="room") ? state.noteSpecFilter : null;
     if(roomFilter && roomFilter.roomId && rooms.some(function(r){ return r.id===roomFilter.roomId; })) state.specRoomSel = roomFilter.roomId;
     if(!state.specRoomSel || !rooms.some(function(r){ return r.id===state.specRoomSel; })) state.specRoomSel = rooms[0].id;
@@ -4015,23 +4007,21 @@
       return '<button type="button" class="roombtn'+(r.id===state.specRoomSel?" on":"")+'" data-roomsel="'+r.id+'">'+escapeHtml(r.name)+(n?'<span class="roombtn-n">'+n+'</span>':'')+'</button>';
     }).join("")+'</div>';
     var r = rooms.find(function(x){ return x.id===state.specRoomSel; });
-    var catsShow = (roomFilter && roomFilter.category) ? roomCats.filter(function(rc){ return rc.id===roomFilter.category; }) : roomCats;
-    var wt = (roomFilter && roomFilter.category) ? "" : renderSpecTimeline("room",null,r.id,null);
+    var onlyCat = !!(roomFilter && roomFilter.category);
+    var catsShow = onlyCat ? roomCats.filter(function(rc){ return rc.id===roomFilter.category; }) : roomCats;
+    var wholeCard = onlyCat ? "" :
+      '<div class="speccat"><h4>部屋全体</h4>'+buildSpecGallery("room",null,r.id,null)+decidedSummaryHtml("room",null,r.id,null)+renderSpecTimeline("room",null,r.id,null)+'</div>';
     var catCards = catsShow.map(function(rc){
-      var tl = renderSpecTimeline("room",rc.id,r.id,null);
       var note = (rc.id==="accent" && r.accentNote) ? '<div class="muted" style="font-size:.85rem;">📝 '+escapeHtml(r.accentNote)+'</div>' : "";
-      if(!tl && !note) return "";
-      return '<div class="speccat"><h4>'+escapeHtml(rc.label)+'</h4>'+note+tl+'</div>';
+      return '<div class="speccat"><h4>'+escapeHtml(rc.label)+
+        (rc.custom ? ' <button class="btn danger-ghost small" data-delroomcat="'+escapeHtml(rc.id)+'" style="margin-inline-start:6px;">削除</button>' : '')+
+        '</h4>'+note+buildSpecGallery("room",rc.id,r.id,null)+renderSpecTimeline("room",rc.id,r.id,null)+'</div>';
     }).join("");
-    var body = '<div class="roomcard">'+
+    wrap.innerHTML = btns + '<div class="roomcard">'+
       '<div class="row" style="justify-content:space-between; align-items:center; margin-block-end:8px;">'+
       '<span class="rname">'+escapeHtml(r.name)+noteDecisionPill("room",null,r.id)+'</span>'+
       '<button class="btn danger-ghost small" data-delroom="'+r.id+'">部屋を削除</button></div>'+
-      '<div class="muted" style="font-size:.85rem; margin-block-end:8px;">入力は「打合せ記録」から行います（部位で「部屋別インテリア」→この部屋を選びます）。ここは見る場所です。</div>'+
-      '<div class="speccatgrid">'+(wt ? '<div class="speccat"><h4>部屋全体</h4>'+decidedSummaryHtml("room",null,r.id,null)+wt+'</div>' : "")+catCards+'</div>'+
-      ((!wt && !catCards) ? '<div class="empty">この部屋の記録はまだありません。</div>' : "")+
-      '</div>';
-    wrap.innerHTML = btns + body;
+      '<div class="speccatgrid">'+wholeCard+catCards+'</div></div>';
   }
   // ---- 案件ごとに自由に増やせる「追加した部位」（scope:"custom"、category=部位ID） ----
   function customPartsOf(proj){ return ((proj && proj.customParts)||[]).filter(function(c){ return c && c.id && !c.deletedAt; }); }
@@ -4162,7 +4152,7 @@
       }catch(e){ uploadFailToast(f.name, e); }
     }
     render();
-    logActivity(category+"の写真を追加しました");
+    logActivity((category||"部屋全体")+"の写真を追加しました");
   }
   var PB_REQ_STATUS_ORDER = ["未依頼","依頼済み","受領済み"];
   async function uploadSpecPlanboardRaw(scope, category, file){
@@ -5525,7 +5515,9 @@
     if(!name){ toast("部屋名を入力してください"); return; }
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
-    proj.rooms = (proj.rooms||[]).concat([{id:uid("room"), name:name, accentNote:""}]);
+    var newRoom = {id:uid("room"), name:name, accentNote:""};
+    proj.rooms = (proj.rooms||[]).concat([newRoom]);
+    state.specRoomSel = newRoom.id; // 追加した部屋をすぐ開く
     input.value = "";
     render();
     await saveDoc("projects", proj.id, proj);
@@ -9398,7 +9390,7 @@
       wrap.addEventListener("change", function(e){
         var input = e.target.closest("input[type=file][data-spec-scope]");
         if(input){
-          uploadSpecPhotos(input.dataset.specScope, input.dataset.specCat, input.dataset.specRoom||null, input.dataset.specSide||null, input.files);
+          uploadSpecPhotos(input.dataset.specScope, input.dataset.specCat||null, input.dataset.specRoom||null, input.dataset.specSide||null, input.files);
           input.value = "";
           return;
         }
@@ -9505,8 +9497,6 @@
     document.getElementById("btnAddRoom").addEventListener("click", addRoom);
     document.getElementById("newRoomName").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addRoom(); } });
     document.getElementById("btnAddInteriorColorCat").addEventListener("click", addInteriorColorCategory);
-    document.getElementById("btnAddRoomCat").addEventListener("click", addRoomCategory);
-    document.getElementById("roomCatInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addRoomCategory(); } });
 
     document.getElementById("cfType").addEventListener("change", function(e){
       document.getElementById("cfOptionsWrap").hidden = e.target.value !== "選択式";

@@ -1084,7 +1084,7 @@ function homeHtml(){
   var LABEL_CATS = ["exterior","dressing","other","toilet","climate","electric","interior","rooms"];
   function partOf(c, x){
     if(!x.label || x.label===c.name || LABEL_CATS.indexOf(c.id)<0) return "";
-    if(c.id==="rooms"){ var i = x.label.indexOf("・"); return i>=0 ? x.label.slice(i+1) : ""; } // 部屋名は見出しに出すので部位名だけ
+    if(x.roomId){ var i = x.label.indexOf("・"); return i>=0 ? x.label.slice(i+1) : ""; } // 部屋名は見出しに出すので部位名だけ
     return x.label;
   }
   function capOf(c, x, base){ var l = partOf(c, x); return l ? (l+"・"+base) : base; }
@@ -1147,10 +1147,10 @@ function homeHtml(){
     Object.keys(pdfGroups).forEach(function(k){ feed.push({ at: pdfGroups[k].at, kind:"pdf", g:pdfGroups[k] }); });
     specCards.forEach(function(x){ feed.push({ at: x.at||"", kind:"spec", x:x }); });
     feed.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
-    var roomIdOfTab = (c.id==="rooms" && String(tabKey).indexOf(":")>0) ? String(tabKey).split(":")[1] : "";
+    var roomIdOfTab = (String(tabKey).indexOf("rooms:")===0) ? String(tabKey).split(":")[1] : "";
     function cardDecHtml(key, status, label, show){
       if(!key || !show) return "";
-      var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(label||"").slice(0,40))+'" data-ccat="'+esc(c.id)+'"';
+      var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(label||"").slice(0,40))+'" data-ccat="'+esc(roomIdOfTab ? "rooms" : c.id)+'"';
       return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span></div>'+
         '<div class="btns"><button class="btn ol" data-cdecide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
         '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>決定する</button></div>'+
@@ -1264,14 +1264,21 @@ function homeHtml(){
       }
     }
 
-    if(c.id==="rooms"){
+    if(c.id==="interior" && c.rooms){
+      // インテリア＝メイン（家全体）＋部屋別。それぞれ中身がある分だけ見出しつきで並べる
       var rms = c.rooms || [];
-      if(!rms.length) return out + '<div class="empty">お打合せが進むと、部屋ごとの内容がここに並びます。</div>';
-      return out + rms.map(function(r){
-        return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
-          (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
-          itemsSectionsHtml(c, r.items || [], c.id+":"+r.id);
-      }).join("");
+      var mainHtml = (c.items||[]).length ? itemsSectionsHtml(c, c.items, c.id) : "";
+      if(mainHtml) out += '<div class="roomhd" style="margin-top:14px;"><div class="rn">メインインテリア</div>'+(c.mainStatus && c.mainStatus!=="準備中" ? '<span class="status s-'+esc(c.mainStatus)+'">'+esc(c.mainStatus)+'</span>' : '')+'</div>'+mainHtml;
+      if(rms.length){
+        out += '<div class="sechd" style="margin-top:22px;"><h3>部屋別インテリア</h3><span class="countpill">'+rms.length+'部屋</span></div>';
+        out += rms.map(function(r){
+          return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
+            (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
+            itemsSectionsHtml(c, r.items || [], "rooms:"+r.id);
+        }).join("");
+      }
+      if(!mainHtml && !rms.length) out += '<div class="empty">お打合せが進むと、ここに並びます。</div>';
+      return out;
     }
 
     out += itemsSectionsHtml(c, c.items || [], c.id);
@@ -1342,6 +1349,16 @@ function homeHtml(){
       render(); toast(response==="未回答" ? "回答を取り消しました" : (response==="承認" ? "承認として住まいるハウジングにお伝えしました" : "見送りとして住まいるハウジングにお伝えしました"));
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
+  // 「インテリア」項目全体の状態（メイン＋各部屋。サーバーの mergeInteriorStatus と同じ）
+  function interiorStatus(c){
+    var list = [];
+    if(c.mainStatus && c.mainStatus!=="準備中") list.push(c.mainStatus);
+    (c.rooms||[]).forEach(function(r){ list.push(r.status); });
+    if(!list.length) return "準備中";
+    if(list.every(function(x){ return x==="決定"; })) return "決定";
+    if(list.indexOf("決定")<0 && list.indexOf("仮決定")>=0) return "仮決定";
+    return "検討中";
+  }
   async function decide(status, roomId){
     var c = data.categories.find(function(x){ return x.id===view.cat; });
     if(!c) return;
@@ -1352,23 +1369,21 @@ function homeHtml(){
       (status==="仮決定" ? "「"+nm+"」を仮決定にします。よろしいですか？" : "「"+nm+"」を検討中に戻します。よろしいですか？");
     if(!window.confirm(msg)) return;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:c.id, status:status, roomId:roomId||undefined }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decide", category:(roomId ? "rooms" : c.id), status:status, roomId:roomId||undefined }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
       if(room){
         room.status = status; room.decidedAt = j.decision.decidedAt;
         // 各部屋カード全体の状態と表示（○/○部屋 決定）も更新する
-        var rs = c.rooms, n = rs.filter(function(r){ return r.status==="決定"; }).length;
-        c.status = n===rs.length ? "決定" : (n===0 && rs.some(function(r){ return r.status==="仮決定"; }) ? "仮決定" : "検討中");
-        c.sub = n+"/"+rs.length+"部屋 決定";
-      } else { c.status = status; c.decidedAt = j.decision.decidedAt; }
+        c.status = interiorStatus(c);
+      } else { c.mainStatus = status; c.decidedAt = j.decision.decidedAt; c.status = c.rooms ? interiorStatus(c) : status; }
       render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
 
   // カード1枚ごとの仮決定／決定
   async function decideCard(status, key, roomId, label, catId){
-    var c = data.categories.find(function(x){ return x.id===catId; });
+    var c = data.categories.find(function(x){ return x.id===(catId==="rooms" ? "interior" : catId); }); // 各部屋の決定は保存上 rooms、画面では「インテリア」の中
     if(!c) return;
     var msg = status==="決定" ? "この内容で「決定」にします。よろしいですか？" :
       (status==="仮決定" ? "この内容を「仮決定」にします。よろしいですか？" : "この内容を「検討中」に戻します。よろしいですか？");
@@ -1383,10 +1398,8 @@ function homeHtml(){
       if(roomId){
         var room = (c.rooms||[]).find(function(r){ return r.id===roomId; });
         if(room){ room.status = status; room.decidedAt = j.decision.decidedAt; }
-        var rs = c.rooms||[], n = rs.filter(function(r){ return r.status==="決定"; }).length;
-        c.status = n===rs.length ? "決定" : (n===0 && rs.some(function(r){ return r.status==="仮決定"; }) ? "仮決定" : "検討中");
-        c.sub = n+"/"+rs.length+"部屋 決定";
-      } else { c.status = status; c.decidedAt = j.decision.decidedAt; }
+        c.status = interiorStatus(c);
+      } else { c.mainStatus = status; c.decidedAt = j.decision.decidedAt; c.status = c.rooms ? interiorStatus(c) : status; }
       render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
