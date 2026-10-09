@@ -1269,15 +1269,17 @@ function homeHtml(){
       var rms = c.rooms || [];
       var mainHtml = (c.items||[]).length ? itemsSectionsHtml(c, c.items, c.id) : "";
       if(mainHtml) out += '<div class="roomhd" style="margin-top:14px;"><div class="rn">メインインテリア</div>'+(c.mainStatus && c.mainStatus!=="準備中" ? '<span class="status s-'+esc(c.mainStatus)+'">'+esc(c.mainStatus)+'</span>' : '')+'</div>'+mainHtml;
-      if(rms.length){
-        out += '<div class="sechd" style="margin-top:22px;"><h3>部屋別インテリア</h3><span class="countpill">'+rms.length+'部屋</span></div>';
+      var misc = c.roomMisc || [];
+      if(rms.length || misc.length){
+        out += '<div class="sechd" style="margin-top:22px;"><h3>部屋別インテリア</h3>'+(rms.length ? '<span class="countpill">'+rms.length+'部屋</span>' : '')+'</div>';
+        if(misc.length) out += '<div class="roomhd"><div class="rn">部屋別（まとめ）</div></div>'+itemsSectionsHtml(c, misc, c.id);
         out += rms.map(function(r){
           return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+
             (r.accentNote?'<div class="roomnote">アクセント：'+esc(r.accentNote)+'</div>':'')+
             itemsSectionsHtml(c, r.items || [], "rooms:"+r.id);
         }).join("");
       }
-      if(!mainHtml && !rms.length) out += '<div class="empty">お打合せが進むと、ここに並びます。</div>';
+      if(!mainHtml && !rms.length && !(c.roomMisc||[]).length) out += '<div class="empty">お打合せが進むと、ここに並びます。</div>';
       return out;
     }
 
@@ -1392,14 +1394,16 @@ function homeHtml(){
       var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decideCard", category:catId, cardKey:key, status:status, label:label, roomId:roomId||undefined }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
-      var lists = roomId ? ((c.rooms||[]).find(function(r){ return r.id===roomId; })||{}).items||[] : (c.items||[]);
+      var inMisc = !roomId && (c.roomMisc||[]).some(function(it){ return it.key===key; });
+      var lists = roomId ? ((c.rooms||[]).find(function(r){ return r.id===roomId; })||{}).items||[] : (c.items||[]).concat(c.roomMisc||[]);
       lists.forEach(function(it){ if(it.key===key){ it.cardStatus = status; it.cardDecidedAt = j.decision.decidedAt; } });
       // 項目全体の状態は、いちばん新しい決定にそろえる
       if(roomId){
         var room = (c.rooms||[]).find(function(r){ return r.id===roomId; });
         if(room){ room.status = status; room.decidedAt = j.decision.decidedAt; }
         c.status = interiorStatus(c);
-      } else { c.mainStatus = status; c.decidedAt = j.decision.decidedAt; c.status = c.rooms ? interiorStatus(c) : status; }
+      } else if(inMisc){ /* 部屋別（まとめ）のカードは、メインの状態には混ぜない */ }
+      else { c.mainStatus = status; c.decidedAt = j.decision.decidedAt; c.status = c.rooms ? interiorStatus(c) : status; }
       render(); toast(status==="検討中" ? "検討中に戻しました" : status+"として住まいるハウジングにお伝えしました");
     }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
   }
