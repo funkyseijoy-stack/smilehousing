@@ -205,7 +205,9 @@
   /* インテリアタブ：項目のカードを画面の幅いっぱいに横並びで詰める（余白を減らす） */
   #specInteriorWrap .speccatgrid, #specRoomsWrap .speccatgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); overflow-x:visible; }
   #specInteriorWrap .speccatgrid .speccat, #specRoomsWrap .speccatgrid .speccat{ flex:none; min-width:0; }
-  #specInteriorWrap .specphotos, #specRoomsWrap .specphotos{ gap:6px; }
+  #specInteriorWrap .specphotos, #specRoomsWrap .specphotos, #specInteriorWrap .notefilerow, #specRoomsWrap .notefilerow{ gap:2px; }
+  #specInteriorWrap .speccatgrid, #specRoomsWrap .speccatgrid{ gap:6px; }
+  #specInteriorWrap .speccat, #specRoomsWrap .speccat{ padding:6px 8px; margin-block-end:6px; }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
@@ -3976,7 +3978,15 @@
     var photos = specPhotosFor(scope, category, roomId, side, "photo");
     var rows = specPhotosFor(scope, category, roomId, side);
     if(!photos.length && !rows.length) return "";
+    // 打合せ記録に添付したPDF・写真も、折りたたみの中ではなく写真の並びと一緒に出す
+    var noteFiles = [];
+    rows.forEach(function(r){
+      if(r.kind!=="note" || !r.source) return;
+      var nt = state.meetingNotes.find(function(n){ return n.id===r.source.noteId && !n.deletedAt; });
+      if(nt && nt.files) noteFiles = noteFiles.concat(nt.files);
+    });
     return (photos.length ? buildSpecGallery(scope, category, roomId, side, {noAdd:true}) : "")+
+      (noteFiles.length ? '<div class="intnotefiles">'+fileThumbRowHtml(noteFiles, 72)+'</div>' : "")+
       (rows.length ? '<details class="spdetails"><summary>変更履歴（'+rows.length+'件）</summary>'+renderSpecTimeline(scope, category, roomId, side)+'</details>' : "");
   }
   function renderSpecInterior(){
