@@ -202,6 +202,10 @@
   .speccatgrid{ display:flex; flex-wrap:wrap; gap:12px; overflow-x:auto; padding-block-end:6px; -webkit-overflow-scrolling:touch; }
   .speccatgrid .speccat{ flex:0 0 calc(50% - 6px); min-width:340px; margin-block-end:0; }
   @media (max-width:760px){ .speccatgrid{ overflow-x:visible; } .speccatgrid .speccat{ flex:0 0 100%; min-width:0; max-width:100%; } }
+  /* インテリアタブ：項目のカードを画面の幅いっぱいに横並びで詰める（余白を減らす） */
+  #specInteriorWrap .speccatgrid, #specRoomsWrap .speccatgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); overflow-x:visible; }
+  #specInteriorWrap .speccatgrid .speccat, #specRoomsWrap .speccatgrid .speccat{ flex:none; min-width:0; }
+  #specInteriorWrap .specphotos, #specRoomsWrap .specphotos{ gap:6px; }
   .subpanel{ display:none; }
   .subpanel.active{ display:block; }
 
@@ -1848,10 +1852,13 @@
   // 「外部仕様」だけを部位にした既存の打合せ記録にも、仕様タブの履歴を作る（何度動かしても同じ結果）。
   function migrateExteriorNoteEntries(){
     try{
+      var before = state.specPhotos.length;
       state.meetingNotes.forEach(function(n){
         var sp0 = n && !n.deletedAt && n.specPart;
         if(sp0 && !sp0.category && (sp0.scope==="exterior" || sp0.scope==="general" || sp0.scope==="room")) upsertNoteSpecEntry(n);
       });
+      // 履歴を新しく作ったときは、画面を描き直して反映する（起動時の最初の描画はこの処理より前のため）
+      if(state.specPhotos.length !== before) render();
     }catch(e){ console.warn("exterior note entries failed", e); }
   }
   function migratePlanboardPartRemoval(){
