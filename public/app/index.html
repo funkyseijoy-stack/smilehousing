@@ -1833,7 +1833,7 @@
   function doStaffLogout(){
     if(!confirm("ログアウトしますか？")) return;
     clearStaffToken(); adminPwMem = "";
-    try{ localStorage.removeItem(LOGIN_NAME_KEY); }catch(e){ /* ignore */ }
+    try{ localStorage.removeItem(LOGIN_NAME_KEY); localStorage.removeItem("sumairu_user"); }catch(e){ /* ignore */ }
     location.reload();
   }
 
@@ -7159,7 +7159,7 @@
     var ln = loginNameLocked();
     if(ln){ state.currentUser = ln; if(list.indexOf(ln)<0) sel.innerHTML += '<option value="'+escapeHtml(ln)+'">'+escapeHtml(ln)+'</option>'; sel.value = ln; sel.disabled = true; }
     else sel.disabled = false;
-    var lo = document.getElementById("btnLogout"); if(lo) lo.hidden = !ln;
+    var lo = document.getElementById("btnLogout"); if(lo) lo.hidden = !(ln || getStaffToken());
     renderSettingsLogin();
   }
 
