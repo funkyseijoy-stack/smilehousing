@@ -2229,9 +2229,18 @@
   function liveRequests(){ return state.requests.filter(function(r){ return !r.deletedAt; }); }
   function liveAttachments(){ return state.attachments.filter(function(a){ return !a.deletedAt; }); }
   function liveNotes(){ return state.meetingNotes.filter(function(n){ return !n.deletedAt; }); }
+  // タスクの見え方（2026年10月〜・表示だけの絞り込み）：朋子は全部、ほかの人は「自分が作った」「自分が担当」「自分が確認者」のタスクだけ。
+  // 作成者が入っていない古いタスクは、朋子と、担当・確認者になっている人にだけ見える。名前が未選択の端末は絞らない。
+  var TASK_ADMIN = "朋子";
+  function taskVisibleToMe(t){
+    var me = state.currentUser;
+    if(!me || me===TASK_ADMIN) return true;
+    return t.creator===me || t.assignee===me || t.checker===me;
+  }
   function liveTasks(){
     return state.tasks.filter(function(t){
       if(t.deletedAt) return false;
+      if(!taskVisibleToMe(t)) return false;
       if(t.archivedAt) return false; // アーカイブ済みは案件の「タスク履歴」で見る
       // 「自分だけのタスク」は作成した本人以外には見せない
       if(t.private && t.creator && t.creator!==state.currentUser) return false;
@@ -2921,6 +2930,7 @@
     var pid = state.currentProjectId;
     var rows = (state.tasks||[]).filter(function(t){
       if(t.deletedAt || !t.archivedAt || t.projectId!==pid) return false;
+      if(!taskVisibleToMe(t)) return false;
       if(t.private && t.creator && t.creator!==state.currentUser) return false;
       return true;
     }).sort(function(a,b){ return String(b.completedAt||b.archivedAt).localeCompare(String(a.completedAt||a.archivedAt)); });
