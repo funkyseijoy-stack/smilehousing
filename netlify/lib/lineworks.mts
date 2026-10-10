@@ -45,7 +45,7 @@ async function getWorksToken(): Promise<string> {
 // userId へ個人宛のテキストを送る（本文は2000文字まで）。送れたら true。
 export async function sendWorksDM(userId: string, text: string): Promise<boolean> {
   try {
-    if (!worksConfigured() || !userId) return false;
+    if (!worksConfigured() || !userId) { console.error("works_not_ready", { configured: worksConfigured(), hasUser: !!userId }); return false; }
     const token = await getWorksToken();
     const res = await fetch(
       "https://www.worksapis.com/v1.0/bots/" + encodeURIComponent(env("WORKS_BOT_ID")) + "/users/" + encodeURIComponent(userId) + "/messages",
@@ -56,8 +56,10 @@ export async function sendWorksDM(userId: string, text: string): Promise<boolean
       }
     );
     if (res.status === 401) cached = null; // 次回はトークンを取り直す
+    if (!res.ok) console.error("works_send_failed", res.status, (await res.text().catch(() => "")).slice(0, 300));
     return res.ok;
-  } catch {
+  } catch (e: any) {
+    console.error("works_send_error", String(e && e.message || e).slice(0, 300));
     return false;
   }
 }
