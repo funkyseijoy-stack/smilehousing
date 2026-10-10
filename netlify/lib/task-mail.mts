@@ -30,12 +30,14 @@ const MAIL_FOOTER = "（このメールは住まいるアプリから自動で�
 async function notifyStaff(store: any, name: string, subject: string, body: string): Promise<boolean> {
   if (worksConfigured()) {
     const wid = await staffWorksIdOf(store, name);
+    console.log("works_notify", { name, hasWorksId: !!wid });
     if (wid) {
       const text = subject + "\n\n" + body.replace(MAIL_FOOTER, "（住まいるアプリからの自動通知です）");
       if (await sendWorksDM(wid, text)) return true;
     }
   }
   const to = await staffEmailOf(store, name);
+  console.log("works_fallback_mail", { name, hasEmail: !!to, worksConfigured: worksConfigured() });
   if (!to) return false;
   return (await sendMailTo({ to, subject, body, fromName: FROM_NAME })).ok;
 }

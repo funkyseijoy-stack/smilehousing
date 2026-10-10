@@ -67,6 +67,7 @@ export async function sendWorksDM(userId: string, text: string): Promise<boolean
     );
     if (res.status === 401) cached = null; // 次回はトークンを取り直す
     if (!res.ok) console.error("works_send_failed", res.status, (await res.text().catch(() => "")).slice(0, 300));
+    console.log("works_sent", res.status);
     return res.ok;
   } catch (e: any) {
     console.error("works_send_error", String(e && e.message || e).slice(0, 300));
