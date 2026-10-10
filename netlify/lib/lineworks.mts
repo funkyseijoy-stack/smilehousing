@@ -15,6 +15,16 @@ export function worksConfigured(): boolean {
 
 const b64url = (b: Buffer | string) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
+// 秘密鍵（PEM）を読める形に直す。Netlifyの入力欄に貼ると改行が空白になったり、\n の文字になったりするため、
+// 先頭・末尾の行を除いた本文だけを取り出して64文字ごとに改行し直す。
+export function normalizePem(raw: string): string {
+  const t = String(raw || "").replace(/\\n/g, "\n").replace(/\r/g, "").trim().replace(/^["']|["']$/g, "");
+  const m = t.match(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/);
+  const label = m ? m[1] : "PRIVATE KEY";
+  const body = (m ? m[2] : t).replace(/\s+/g, "");
+  return "-----BEGIN " + label + "-----\n" + (body.match(/.{1,64}/g) || []).join("\n") + "\n-----END " + label + "-----\n";
+}
+
 let cached: { token: string; exp: number } | null = null;
 
 async function getWorksToken(): Promise<string> {
@@ -24,7 +34,7 @@ async function getWorksToken(): Promise<string> {
   const claim = b64url(JSON.stringify({ iss: env("WORKS_CLIENT_ID"), sub: env("WORKS_SERVICE_ACCOUNT"), iat: now, exp: now + 3600 }));
   const signer = createSign("RSA-SHA256");
   signer.update(head + "." + claim);
-  const sig = b64url(signer.sign(env("WORKS_PRIVATE_KEY").replace(/\\n/g, "\n")));
+  const sig = b64url(signer.sign(normalizePem(env("WORKS_PRIVATE_KEY"))));
   const res = await fetch("https://auth.worksmobile.com/oauth2/v2.0/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
