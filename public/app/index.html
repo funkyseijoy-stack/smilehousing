@@ -532,12 +532,21 @@
           <label class="field">案件名<input type="text" id="newProjectName" placeholder="例：田中様邸"></label>
           <label class="field">お客様名（任意）<input type="text" id="newProjectCustomer" placeholder="例：田中様"></label>
           <label class="field">種別<select id="newProjectType"></select></label>
+          <label class="field">フォルダー<select id="newProjectFolder"></select></label>
           <button class="btn" id="btnAddProject">作成</button>
         </div>
-        <div class="tagbar" id="projectTypeFilterBar"></div>
-        <div class="tagbar" id="progressFilterBar"></div>
-        <div class="projlist" id="fullProjList"></div>
-        <div class="empty" id="fullProjEmpty" hidden>案件がありません。</div>
+        <div class="attwrap" id="projFolderWrap">
+          <div class="attleft" id="projFolderTree"></div>
+          <div class="attright">
+            <div class="attcrumb" id="projFolderCrumb"></div>
+            <div class="attacts" id="projFolderActs"></div>
+            <div class="atttiles" id="projFolderTiles"></div>
+            <div class="tagbar" id="projectTypeFilterBar"></div>
+            <div class="tagbar" id="progressFilterBar"></div>
+            <div class="projlist" id="fullProjList"></div>
+            <div class="empty" id="fullProjEmpty" hidden>このフォルダーに案件はありません。</div>
+          </div>
+        </div>
       </div>
       <div class="card" id="finishedProjCard" hidden>
         <h2 style="margin:0 0 4px;">🏁 完工・保存</h2>
@@ -568,6 +577,7 @@
           <label class="field">案件名<input type="text" id="editProjectName"></label>
           <label class="field">お客様名（任意）<input type="text" id="editProjectCustomer"></label>
           <label class="field">種別<select id="editProjectType"></select></label>
+          <label class="field">フォルダー<select id="editProjectFolder"></select></label>
           <label class="field">進捗（契約前・着工など）<select id="editProjectTag"></select></label>
           <div class="row" style="gap:8px; margin-block-start:6px;">
             <button class="btn" id="btnSaveEditProject">保存</button>
@@ -1543,6 +1553,7 @@
     quoteUnlocked: false,
     progressFilter: null,
     projectTypeFilter: null,
+    projFolderSel: null,
     taskKindFilter: null,
     taskAssigneeFilter: null,
     taskProjectFilter: null,
@@ -1827,6 +1838,7 @@
         if(s.staffList) state.settings.staffList = s.staffList;
         if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
         if(s.staffWorksIds) state.settings.staffWorksIds = s.staffWorksIds;
+        if(Array.isArray(s.projectFolders)) state.settings.projectFolders = s.projectFolders;
         if(s.pin) state.settings.pin = s.pin;
       } else {
         await saveDoc("settings","main", state.settings);
@@ -1979,6 +1991,7 @@
         if(s.staffList) state.settings.staffList = s.staffList;
         if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
         if(s.staffWorksIds) state.settings.staffWorksIds = s.staffWorksIds;
+        if(Array.isArray(s.projectFolders)) state.settings.projectFolders = s.projectFolders;
         if(s.pin) state.settings.pin = s.pin;
       }
       render();
@@ -2140,6 +2153,7 @@
     renderHomeProjList();
     renderProgressFilterBar();
     renderProjectTypeFilterBar();
+    renderProjFolders();
     renderFullProjList();
     renderFinishedProjList();
     renderProjectDetail();
@@ -2541,14 +2555,225 @@
   function renderFullProjList(){
     var wrap = document.getElementById("fullProjList");
     var empty = document.getElementById("fullProjEmpty");
+    var sel = state.projFolderSel || "all";
+    var inIds = sel==="all" ? null : pfDescIds(sel);
     var rows = liveProjects().filter(function(p){
-      return (!state.progressFilter || p.progressTag === state.progressFilter) &&
+      return (!inIds || inIds.indexOf(pfOf(p))>=0) &&
+        (!state.progressFilter || p.progressTag === state.progressFilter) &&
         (!state.projectTypeFilter || p.type === state.projectTypeFilter);
     });
     empty.hidden = rows.length !== 0;
+    empty.textContent = sel==="all" ? "案件がありません。" : "このフォルダーに案件はありません。";
     wrap.innerHTML = rows.map(function(p){
-      return '<div class="projrow" data-open-project="'+p.id+'"><div class="pname">'+escapeHtml(p.name)+(p.customer?'<span class="psub"> '+escapeHtml(p.customer)+'</span>':'')+'</div>'+projectTypePill(p.type)+progressPill(p.progressTag)+'</div>';
+      var fid = pfOf(p);
+      var where = (fid && (sel==="all" || fid!==sel)) ? '<span class="pill tag">📁 '+escapeHtml(pfPath(fid))+'</span>' : "";
+      return '<div class="projrow" data-open-project="'+p.id+'"><div class="pname">'+escapeHtml(p.name)+(p.customer?'<span class="psub"> '+escapeHtml(p.customer)+'</span>':'')+'</div>'+where+projectTypePill(p.type)+progressPill(p.progressTag)+'</div>';
     }).join("");
+  }
+
+  // ================= 案件のフォルダー（新築・不動産・賃貸・除雪・会社＋自由な入れ子） =================
+  // フォルダーの一覧は settings/main の projectFolders に保存する。案件は folderId で所属（無い案件は「新築」）。
+  var PF_DEFAULTS = [
+    { id:"pf_shinchiku", name:"新築", parentId:"" },
+    { id:"pf_fudosan", name:"不動産", parentId:"" },
+    { id:"pf_chintai", name:"賃貸", parentId:"" },
+    { id:"pf_josetsu", name:"除雪", parentId:"" },
+    { id:"pf_kaisha", name:"会社", parentId:"" }
+  ];
+  var PF_DEFAULT_ID = "pf_shinchiku";
+  var PF_MAX_DEPTH = 8;
+  var pfOpenMap = {};
+  function pfAll(){
+    var f = state.settings.projectFolders;
+    return (Array.isArray(f) ? f : PF_DEFAULTS).filter(function(x){ return x && !x.deletedAt; });
+  }
+  function pfEnsure(){
+    if(!Array.isArray(state.settings.projectFolders)){
+      state.settings.projectFolders = PF_DEFAULTS.map(function(d){ return { id:d.id, name:d.name, parentId:"", createdAt: nowIso() }; });
+    }
+  }
+  function pfById(id){ return id ? pfAll().find(function(f){ return f.id===id; }) : null; }
+  function pfChildren(pid){
+    var all = pfAll();
+    return all.filter(function(f){
+      var p = f.parentId || "";
+      if(p && !all.some(function(x){ return x.id===p; })) p = "";
+      return p === (pid||"");
+    });
+  }
+  function pfDepth(id){
+    var d = 0, cur = pfById(id);
+    while(cur && d<20){ d++; cur = cur.parentId ? pfById(cur.parentId) : null; }
+    return d;
+  }
+  function pfHeight(id){
+    var kids = pfChildren(id);
+    if(!kids.length) return 1;
+    return 1 + Math.max.apply(null, kids.map(function(k){ return pfHeight(k.id); }));
+  }
+  function pfDescIds(id){
+    var out = [id];
+    pfChildren(id).forEach(function(k){ out = out.concat(pfDescIds(k.id)); });
+    return out;
+  }
+  function pfPath(id){
+    var names = [], cur = pfById(id), n = 0;
+    while(cur && n<20){ names.unshift(cur.name); cur = cur.parentId ? pfById(cur.parentId) : null; n++; }
+    return names.join(" › ");
+  }
+  function pfOf(p){
+    if(p && p.folderId && pfById(p.folderId)) return p.folderId;
+    return pfById(PF_DEFAULT_ID) ? PF_DEFAULT_ID : "";
+  }
+  function pfOptionsHtml(selected){
+    function walk(pid, depth){
+      return pfChildren(pid).map(function(f){
+        return '<option value="'+f.id+'"'+(f.id===selected?" selected":"")+'>'+escapeHtml("　".repeat(depth)+f.name)+'</option>'+walk(f.id, depth+1);
+      }).join("");
+    }
+    return walk("", 0);
+  }
+  function pfTreeHtml(pid, depth, sel, cnt){
+    return pfChildren(pid).map(function(f){
+      var kids = pfChildren(f.id), open = !!pfOpenMap[f.id];
+      return '<div class="attf'+(sel===f.id?" sel":"")+'" style="padding-inline-start:'+(8+depth*16)+'px;" data-pfopen="'+f.id+'">'+
+        '<span class="attf-tog" data-pftoggle="'+f.id+'">'+(kids.length?(open?"▾":"▸"):"")+'</span>📁 <span class="attf-name">'+escapeHtml(f.name)+'</span><span class="attf-n">'+cnt(f.id)+'</span></div>'+
+        (open ? pfTreeHtml(f.id, depth+1, sel, cnt) : "");
+    }).join("");
+  }
+  function renderProjFolders(){
+    var tree = document.getElementById("projFolderTree");
+    if(!tree) return;
+    var sel = state.projFolderSel || "all";
+    if(sel!=="all" && !pfById(sel)) sel = state.projFolderSel = "all";
+    // 選んでいるフォルダーまでの道すじは開いておく
+    if(sel!=="all"){ var c = pfById(sel); var n = 0; while(c && c.parentId && n<20){ pfOpenMap[c.parentId] = true; c = pfById(c.parentId); n++; } }
+    var projs = liveProjects();
+    var cnt = function(fid){ var ids = pfDescIds(fid); return projs.filter(function(p){ return ids.indexOf(pfOf(p))>=0; }).length; };
+    tree.innerHTML = '<div class="attf'+(sel==="all"?" sel":"")+'" data-pfopen="all"><span class="attf-tog"></span>🗂 すべての案件<span class="attf-n">'+projs.length+'</span></div>'+
+      pfTreeHtml("", 0, sel, cnt)+
+      '<div style="margin-block-start:8px;"><button class="btn small secondary" data-pfact="new" data-pid="">＋フォルダー</button></div>';
+    document.getElementById("projFolderCrumb").textContent = sel==="all" ? "🗂 すべての案件" : "📁 "+pfPath(sel);
+    var acts = "";
+    if(sel!=="all"){
+      acts = (pfDepth(sel) < PF_MAX_DEPTH ? '<button class="btn small secondary" data-pfact="new" data-pid="'+sel+'">＋サブフォルダー</button> ' : '')+
+        '<button class="btn small ghost" data-pfact="rename" data-pid="'+sel+'">名前変更</button> '+
+        '<button class="btn small ghost" data-pfact="move" data-pid="'+sel+'">📁 移動</button> '+
+        '<button class="btn small danger-ghost" data-pfact="del" data-pid="'+sel+'">フォルダー削除</button>';
+    }
+    document.getElementById("projFolderActs").innerHTML = acts;
+    var tileParent = sel==="all" ? "" : sel;
+    document.getElementById("projFolderTiles").innerHTML = pfChildren(tileParent).map(function(f){
+      return '<div class="atttile" data-pfopen="'+f.id+'">📁 '+escapeHtml(f.name)+' <span class="muted">'+cnt(f.id)+'</span></div>';
+    }).join("");
+    // 新規案件・編集フォームのフォルダー選択肢（いま選んでいる値は保つ）
+    var ns = document.getElementById("newProjectFolder");
+    if(ns){ var keep = ns.value || (sel!=="all" ? sel : PF_DEFAULT_ID); ns.innerHTML = pfOptionsHtml(keep); }
+  }
+  async function pfSave(msg){
+    var ok = await saveDoc("settings","main", state.settings);
+    if(ok===false){ toast("フォルダーの保存に失敗しました。もう一度お試しください"); return false; }
+    if(msg) logActivity(msg);
+    return true;
+  }
+  async function pfNew(parentId){
+    if(parentId && pfDepth(parentId) >= PF_MAX_DEPTH){ toast("フォルダーは"+PF_MAX_DEPTH+"段までです"); return; }
+    var name = (prompt(parentId ? "サブフォルダーの名前（例：2026年、山田様）" : "フォルダーの名前（例：リフォーム）")||"").trim();
+    if(!name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    if(pfChildren(parentId||"").some(function(f){ return f.name===name; })){ toast("同じ場所に同じ名前のフォルダーがあります"); return; }
+    pfEnsure();
+    var f = { id: uid("pf"), name: name, parentId: parentId||"", createdAt: nowIso() };
+    state.settings.projectFolders.push(f);
+    if(parentId) pfOpenMap[parentId] = true;
+    state.projFolderSel = f.id;
+    render();
+    await pfSave("案件のフォルダー「"+name+"」を作りました");
+  }
+  async function pfRename(id){
+    var f = pfById(id); if(!f) return;
+    var name = (prompt("新しい名前", f.name)||"").trim();
+    if(!name || name===f.name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    if(pfChildren(f.parentId||"").some(function(x){ return x.id!==id && x.name===name; })){ toast("同じ場所に同じ名前のフォルダーがあります"); return; }
+    pfEnsure();
+    var real = state.settings.projectFolders.find(function(x){ return x.id===id; });
+    real.name = name; render();
+    await pfSave("案件のフォルダー名を「"+name+"」に変更しました");
+  }
+  async function pfDelete(id){
+    var f = pfById(id); if(!f) return;
+    if(pfChildren(id).length){ toast("中にフォルダーがあります。先に移すか削除してください"); return; }
+    if(liveProjects().some(function(p){ return pfOf(p)===id; })){ toast("中に案件があります。先に別のフォルダーへ移してください（案件の「編集」でフォルダーを変えられます）"); return; }
+    if(!confirm("フォルダー「"+f.name+"」を削除しますか？（中は空です）")) return;
+    pfEnsure();
+    var real = state.settings.projectFolders.find(function(x){ return x.id===id; });
+    real.deletedAt = nowIso();
+    state.projFolderSel = f.parentId || "all";
+    render();
+    await pfSave("案件のフォルダー「"+f.name+"」を削除しました");
+  }
+  async function pfMove(id, parentId){
+    var f = pfById(id); if(!f) return;
+    parentId = parentId||"";
+    if((f.parentId||"")===parentId) return;
+    if(parentId && pfDescIds(id).indexOf(parentId)>=0){ toast("フォルダーを自分の中へは移せません"); return; }
+    if(parentId && pfDepth(parentId) + pfHeight(id) > PF_MAX_DEPTH){ toast("フォルダーは"+PF_MAX_DEPTH+"段までです"); return; }
+    if(pfChildren(parentId).some(function(x){ return x.name===f.name; })){ toast("移動先に同じ名前のフォルダーがあります"); return; }
+    pfEnsure();
+    var real = state.settings.projectFolders.find(function(x){ return x.id===id; });
+    real.parentId = parentId;
+    if(parentId) pfOpenMap[parentId] = true;
+    render();
+    await pfSave("案件のフォルダー「"+f.name+"」を移動しました");
+  }
+  // 移動先のフォルダーを選ぶ。cb(folderId)：""＝いちばん上／キャンセルは null
+  function pickProjFolder(title, excludeIds, minRoom, cb){
+    excludeIds = excludeIds || []; minRoom = minRoom || 0;
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:380px;width:100%;box-shadow:var(--shadow);max-height:85vh;overflow:auto;";
+    function walk(pid, depth){
+      return pfChildren(pid).map(function(f){
+        var blocked = excludeIds.indexOf(f.id)>=0 || (pfDepth(f.id) + minRoom > PF_MAX_DEPTH);
+        var head = blocked ? '<div class="muted" style="padding:6px 8px; padding-inline-start:'+(8+depth*16)+'px;">📁 '+escapeHtml(f.name)+'</div>'
+          : '<button class="btn secondary" data-pickf="'+f.id+'" style="justify-content:flex-start; margin-block-end:4px; margin-inline-start:'+(depth*16)+'px; width:calc(100% - '+(depth*16)+'px);">📁 '+escapeHtml(f.name)+'</button>';
+        return head + (excludeIds.indexOf(f.id)>=0 ? "" : walk(f.id, depth+1));
+      }).join("");
+    }
+    box.innerHTML = '<h3 style="margin:0 0 10px;">'+escapeHtml(title)+'</h3>'+
+      '<button class="btn secondary" data-pickf="" style="width:100%; justify-content:flex-start; margin-block-end:4px;">🗂 いちばん上（どのフォルダーにも入れない）</button>'+
+      walk("", 0)+
+      '<div style="margin-block-start:10px;"><button class="btn ghost" data-pickcancel style="width:100%;">キャンセル</button></div>';
+    overlay.appendChild(box); document.body.appendChild(overlay);
+    box.addEventListener("click", function(e){
+      if(e.target.closest("[data-pickcancel]")){ overlay.remove(); cb(null); return; }
+      var b = e.target.closest("[data-pickf]");
+      if(b){ overlay.remove(); cb(b.dataset.pickf); }
+    });
+  }
+  function pfHandleClick(e){
+    var tog = e.target.closest("[data-pftoggle]");
+    if(tog){ var i0 = tog.dataset.pftoggle; pfOpenMap[i0] = !pfOpenMap[i0]; renderProjFolders(); e.stopPropagation(); return; }
+    var act = e.target.closest("[data-pfact]");
+    if(act){
+      var a = act.dataset.pfact, pid = act.dataset.pid || "";
+      if(a==="new") pfNew(pid);
+      else if(a==="rename") pfRename(pid);
+      else if(a==="del") pfDelete(pid);
+      else if(a==="move"){
+        var f = pfById(pid); if(!f) return;
+        pickProjFolder("「"+f.name+"」の移動先", pfDescIds(pid), pfHeight(pid), function(dest){ if(dest!==null) pfMove(pid, dest); });
+      }
+      return;
+    }
+    var op = e.target.closest("[data-pfopen]");
+    if(op){
+      state.projFolderSel = op.dataset.pfopen==="all" ? null : op.dataset.pfopen;
+      var nf = document.getElementById("newProjectFolder"); if(nf) nf.value = "";
+      render();
+    }
   }
 
   function renderFinishedProjList(){
@@ -7130,7 +7355,9 @@
     if(!name){ toast("案件名を入力してください"); return; }
     var customer = custEl.value.trim();
     var type = typeEl ? typeEl.value : PROJECT_TYPES[0];
-    var p = { id:uid("proj"), name:name, customer:customer, type:type, progressTag: (state.settings.progressTags||[])[0]||"", createdAt: todayStr() };
+    var folderEl = document.getElementById("newProjectFolder");
+    var folderId = (folderEl && folderEl.value) || (pfById(PF_DEFAULT_ID) ? PF_DEFAULT_ID : "");
+    var p = { id:uid("proj"), name:name, customer:customer, type:type, folderId:folderId, progressTag: (state.settings.progressTags||[])[0]||"", createdAt: todayStr() };
     state.projects.push(p);
     state.currentProjectId = p.id;
     nameEl.value=""; custEl.value="";
@@ -7153,6 +7380,7 @@
     document.getElementById("editProjectCustomer").value = p.customer||"";
     var typeSel = document.getElementById("editProjectType");
     typeSel.innerHTML = projectTypeOptionsHtml(p.type);
+    document.getElementById("editProjectFolder").innerHTML = pfOptionsHtml(pfOf(p));
     var tagSel = document.getElementById("editProjectTag");
     var tagList = (state.settings.progressTags || []).slice();
     if(p.progressTag && tagList.indexOf(p.progressTag)<0) tagList.push(p.progressTag);
@@ -7174,6 +7402,8 @@
     p.name = name;
     p.customer = document.getElementById("editProjectCustomer").value.trim();
     p.type = document.getElementById("editProjectType").value;
+    var newFolder = document.getElementById("editProjectFolder").value;
+    if(newFolder && newFolder!==pfOf(p)) p.folderId = newFolder;
     var newTag = document.getElementById("editProjectTag").value;
     var tagChanged = newTag !== (p.progressTag || "");
     p.progressTag = newTag;
@@ -9170,6 +9400,9 @@
       render();
     });
 
+    ["projFolderTree","projFolderTiles","projFolderActs"].forEach(function(id){
+      document.getElementById(id).addEventListener("click", pfHandleClick);
+    });
     document.getElementById("progressFilterBar").addEventListener("click", function(e){
       var chip = e.target.closest("[data-filtertag]");
       if(!chip) return;
