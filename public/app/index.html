@@ -446,13 +446,15 @@
   <div style="max-width:320px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px 22px;box-shadow:var(--shadow);text-align:center;">
     <div id="loginIconSlot" style="width:64px;height:64px;margin:0 auto 14px;border-radius:16px;background:linear-gradient(155deg, var(--accent) 0%, var(--accent-ink) 100%); display:flex;align-items:center;justify-content:center;"></div>
     <h2 style="margin:0 0 4px;">住まいるアプリ</h2>
-    <p class="muted" style="margin:0 0 16px;font-size:.85rem;">社内用アプリです。合い言葉を入力してください。</p>
+    <p class="muted" style="margin:0 0 16px;font-size:.85rem;">社内用アプリです。お名前を選んで、ご自分の合い言葉を入力してください。</p>
+    <select id="staffLoginName" style="width:100%;margin-bottom:10px;"><option value="">お名前を選んでください</option></select>
     <div style="position:relative;margin-bottom:10px;">
       <input type="text" id="staffLoginInput" placeholder="合い言葉" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-form-type="other" style="width:100%;text-align:center;-webkit-text-security:disc;text-security:disc;">
       <button type="button" id="staffLoginToggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;padding:4px 6px;">表示</button>
     </div>
     <button class="btn" style="width:100%;" id="staffLoginBtn">ログイン</button>
     <p id="staffLoginError" hidden style="color:var(--danger);font-size:.85rem;margin:10px 0 0;">合い言葉が違います</p>
+    <p class="muted" style="font-size:.85rem;margin:12px 0 0;">合い言葉は朋子さんが決めてお伝えします。わからないときは朋子さんに聞いてください。</p>
   </div>
 </div>
 
@@ -468,6 +470,7 @@
     <div class="userpicker">
       <span class="muted" style="font-size:.85rem;" title="記録や変更履歴に名前が残ります">いま使っている人</span>
       <select id="userSelect" title="ここで選んだ名前が、記録・タスク・変更履歴に残ります"></select>
+      <button class="btn secondary small" id="btnLogout" title="この端末からログアウトします" hidden>ログアウト</button>
       <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 最新の内容に更新</button>
       <span class="muted" id="syncStamp" style="font-size:.85rem;"></span>
       <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span></button>
@@ -1096,6 +1099,11 @@
       <h3>担当者一覧</h3>
       <div class="row"><input type="text" id="newStaffInput" placeholder="例：朋子"><button class="btn secondary small" id="btnAddStaff">追加</button></div>
       <div class="tagbar" id="settingsStaffList" style="margin-block-start:10px;"></div>
+      <div id="settingsLoginCard" hidden>
+        <h4 style="margin:16px 0 4px;">ログインの合い言葉（朋子さんだけ）</h4>
+        <p class="muted" style="margin:0 0 8px; font-size:.85rem;">スタッフごとの合い言葉を、ここで決めてお伝えください（6文字以上）。合い言葉を決めた人だけが、ログイン画面の名前に出ます。変更・解除もここでできます。</p>
+        <div id="settingsLoginList"></div>
+      </div>
       <h4 style="margin:16px 0 4px;">担当者への通知（ワークス／メール）</h4>
       <p class="muted" style="margin:0 0 8px; font-size:.85rem;">タスクの担当者・確認者になったとき、期限の前日と当日の朝（9時）、完了のときに、その人へお知らせします。「ワークスのユーザーID」を入れた人にはワークス（LINE WORKS）の個人宛メッセージだけ、入れていない人（またはワークスに送れなかったとき）にはメールで届きます。どちらも空の人には届きません（入力欄を出たときに保存されます）。</p>
       <div id="settingsStaffMail"></div>
@@ -1742,6 +1750,7 @@
     // インラインスタイルの方が優先されてしまい、実際には非表示にならない。
     // style.displayを明示的に切り替えることで確実に表示/非表示を制御する。
     if(overlay){ overlay.hidden = false; overlay.style.display = "flex"; }
+    loadLoginNames();
     var errEl = document.getElementById("staffLoginError");
     if(errEl && reason){
       errEl.textContent = reason;
@@ -1754,13 +1763,44 @@
   }
 
   var staffLoginInFlight = false;
+  var LOGIN_NAME_KEY = "sumairu_login_name";
+  function loginNameLocked(){ try{ return localStorage.getItem(LOGIN_NAME_KEY) || ""; }catch(e){ return ""; } }
+  var adminPwMem = ""; // この画面を開いている間だけ、朋子さんの合い言葉を覚えておく（保存はしない）
+  var AUTH_ERR = {wrong_password:"名前か合い言葉が違います", locked:"続けて間違えたため、10分ほど止めています。しばらくしてからお試しください", name_required:"お名前を選んでください", admin_wrong:"朋子さんの合い言葉が違います", too_short:"合い言葉は6文字以上にしてください", same_as_old:"これまでの共通の合い言葉は使えません", cannot_clear_admin:"朋子さんの合い言葉は解除できません"};
+  async function authPost(body){
+    var res = await fetch('/api/staff-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    var j = null; try{ j = await res.json(); }catch(e){ /* not JSON */ }
+    return j || {ok:false, error:"http_"+res.status};
+  }
+  async function loadLoginNames(){
+    var sel = document.getElementById("staffLoginName");
+    if(!sel) return;
+    try{
+      var res = await fetch('/api/staff-auth');
+      var j = await res.json();
+      var order = (state.settings && state.settings.staffList) || ["社長","朋子","山本","渡邊"];
+      var names = (j.names||[]).slice().sort(function(a,b){
+        var ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia<0?99:ia)-(ib<0?99:ib);
+      });
+      var cur = sel.value;
+      sel.innerHTML = '<option value="">お名前を選んでください</option>' + names.map(function(n){ return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>'; }).join("");
+      if(cur && names.indexOf(cur)>=0) sel.value = cur;
+    }catch(e){ /* 名前が出ないときは通信を確認してもらう */ }
+  }
   async function doStaffLogin(){
     if(staffLoginInFlight) return;
     var input = document.getElementById("staffLoginInput");
     var pw = input ? input.value.trim() : "";
+    var nameSel = document.getElementById("staffLoginName");
+    var name = nameSel ? nameSel.value : "";
     var errEl = document.getElementById("staffLoginError");
     var btn = document.getElementById("staffLoginBtn");
     if(errEl) errEl.hidden = true;
+    if(!name){
+      if(errEl){ errEl.textContent = "お名前を選んでください"; errEl.hidden = false; }
+      return;
+    }
     if(!pw){
       if(errEl){ errEl.textContent = "合い言葉を入力してください"; errEl.hidden = false; }
       return;
@@ -1769,17 +1809,19 @@
     var origBtnText = btn ? btn.textContent : "";
     if(btn){ btn.disabled = true; btn.textContent = "確認中…"; }
     try{
-      var res = await fetch('/api/staff-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) });
-      var raw = await res.text();
-      var j = null;
-      try{ j = JSON.parse(raw); }catch(e2){ /* not JSON */ }
+      var j = await authPost({action:"login", name:name, password:pw});
       if(j && j.ok){
         setStaffToken(j.token);
+        saveLocalUser(j.name || name);
+        try{ localStorage.setItem(LOGIN_NAME_KEY, j.name || name); }catch(e){ /* ignore */ }
         if(input) input.value = "";
+        var needSet = !!j.mustSet;
+        adminPwMem = (j.name||name)==="朋子" ? pw : "";
         hideLoginScreen();
         boot();
+        if(needSet) setTimeout(function(){ adminSetOwnPassword(pw); }, 600);
       } else if(errEl){
-        errEl.textContent = "合い言葉が違います（詳細: HTTP " + res.status + " " + String(raw||"").slice(0,100) + "）";
+        errEl.textContent = AUTH_ERR[j && j.error] || ("ログインできませんでした（" + String(j && j.error || "") + "）");
         errEl.hidden = false;
       }
     }catch(e){ if(errEl){ errEl.textContent = "通信に失敗しました（詳細: " + String(e && e.message || e) + "）"; errEl.hidden = false; } }
@@ -1787,6 +1829,67 @@
       staffLoginInFlight = false;
       if(btn){ btn.disabled = false; btn.textContent = origBtnText || "ログイン"; }
     }
+  }
+  function doStaffLogout(){
+    if(!confirm("ログアウトしますか？")) return;
+    clearStaffToken(); adminPwMem = "";
+    try{ localStorage.removeItem(LOGIN_NAME_KEY); }catch(e){ /* ignore */ }
+    location.reload();
+  }
+
+  // 朋子さんの初回（または忘れたとき）：その場でご自分の合い言葉を決めてもらう
+  async function adminSetOwnPassword(adminPw){
+    var np = "";
+    for(var i=0;i<3;i++){
+      np = prompt("朋子さん専用の新しい合い言葉を決めてください（6文字以上）。\nこれ以降、この合い言葉でログインします。", "");
+      if(np===null) { toast("あとで設定タブから決められます（それまでは共通の合い言葉でも入れます）"); return; }
+      np = np.trim();
+      if(np.length>=6) break;
+      toast("6文字以上にしてください");
+    }
+    if(np.length<6) return;
+    var j = await authPost({action:"setPassword", adminPassword:adminPw, name:"朋子", password:np});
+    if(j.ok){ adminPwMem = np; toast("朋子さんの合い言葉を決めました。次からこの合い言葉でログインします"); renderSettingsLogin(); }
+    else toast(AUTH_ERR[j.error] || "保存できませんでした");
+  }
+  async function renderSettingsLogin(){
+    var card = document.getElementById("settingsLoginCard");
+    var list = document.getElementById("settingsLoginList");
+    if(!card || !list) return;
+    var isAdmin = state.currentUser==="朋子" && !!loginNameLocked();
+    card.hidden = !isAdmin;
+    if(!isAdmin) return;
+    var names = [];
+    try{ var r = await fetch('/api/staff-auth'); var j = await r.json(); names = j.names||[]; }catch(e){ /* ignore */ }
+    list.innerHTML = (state.settings.staffList||[]).map(function(n){
+      var has = names.indexOf(n)>=0;
+      return '<div class="row" style="gap:8px;margin-block-end:6px;align-items:center;"><span style="min-width:5em;">'+escapeHtml(n)+'</span>'+
+        '<span class="muted" style="font-size:.85rem;min-width:6em;">'+(has?"設定済み":"未設定（ログイン不可）")+'</span>'+
+        '<button class="btn secondary small" data-loginpw="'+escapeHtml(n)+'">'+(has?"変更":"設定")+'</button>'+
+        (has && n!=="朋子" ? '<button class="btn secondary small" data-loginclear="'+escapeHtml(n)+'">解除</button>' : '')+'</div>';
+    }).join("");
+  }
+  async function adminPwFor(){
+    if(adminPwMem) return adminPwMem;
+    var v = prompt("朋子さんご自身の合い言葉を入力してください（確認のため）", "");
+    return v ? v.trim() : "";
+  }
+  async function settingsLoginSet(name){
+    var ap = await adminPwFor(); if(!ap) return;
+    var np = prompt(name+"さんの新しい合い言葉を決めてください（6文字以上）。決めたらご本人にお伝えください。", "");
+    if(np===null) return; np = np.trim();
+    var j = await authPost({action:"setPassword", adminPassword:ap, name:name, password:np});
+    if(j.error==="admin_wrong") adminPwMem = "";
+    if(j.ok){ if(name==="朋子") adminPwMem = np; else adminPwMem = ap; toast(name+"さんの合い言葉を決めました"); renderSettingsLogin(); }
+    else toast(AUTH_ERR[j.error] || "保存できませんでした");
+  }
+  async function settingsLoginClear(name){
+    if(!confirm(name+"さんの合い言葉を解除しますか？（解除すると、その人はログインできなくなります）")) return;
+    var ap = await adminPwFor(); if(!ap) return;
+    var j = await authPost({action:"clearPassword", adminPassword:ap, name:name});
+    if(j.error==="admin_wrong") adminPwMem = "";
+    if(j.ok){ adminPwMem = ap; toast(name+"さんの合い言葉を解除しました"); renderSettingsLogin(); }
+    else toast(AUTH_ERR[j.error] || "解除できませんでした");
   }
 
   // 進捗「対応済み」を廃止して「業者連絡済み」に統合した（2026年10月）。
@@ -7042,6 +7145,12 @@
     var list = state.settings.staffList || [];
     sel.innerHTML = '<option value="">選択してください</option>' + list.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     if(state.currentUser && list.indexOf(state.currentUser) !== -1) sel.value = state.currentUser;
+    // 個人ログインした端末は、ログインした人に固定する（別の人の名前で記録しない）
+    var ln = loginNameLocked();
+    if(ln){ state.currentUser = ln; if(list.indexOf(ln)<0) sel.innerHTML += '<option value="'+escapeHtml(ln)+'">'+escapeHtml(ln)+'</option>'; sel.value = ln; sel.disabled = true; }
+    else sel.disabled = false;
+    var lo = document.getElementById("btnLogout"); if(lo) lo.hidden = !ln;
+    renderSettingsLogin();
   }
 
   // ================= attachments (assets) =================
@@ -9353,6 +9462,11 @@
     });
 
     document.getElementById("staffLoginBtn").addEventListener("click", doStaffLogin);
+    document.getElementById("btnLogout").addEventListener("click", doStaffLogout);
+    document.getElementById("settingsLoginList").addEventListener("click", function(e){
+      var b = e.target.closest("[data-loginpw],[data-loginclear]"); if(!b) return;
+      if(b.dataset.loginpw) settingsLoginSet(b.dataset.loginpw); else settingsLoginClear(b.dataset.loginclear);
+    });
     document.getElementById("staffLoginInput").addEventListener("keydown", function(e){
       if(e.key === "Enter") doStaffLogin();
     });
