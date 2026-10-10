@@ -47,6 +47,17 @@ async function getWorksToken(): Promise<string> {
     }),
   });
   const j: any = await res.json().catch(() => ({}));
+  if (!res.ok || !j.access_token) {
+    // 値そのものは出さず、形だけ（文字数・@の有無・先頭/末尾の少しだけ）を残す
+    const cid = env("WORKS_CLIENT_ID"), sa = env("WORKS_SERVICE_ACCOUNT"), sec = env("WORKS_CLIENT_SECRET");
+    const raw = (n: string) => { try { return Netlify.env.get(n) || ""; } catch { return ""; } };
+    console.error("works_diag", JSON.stringify({
+      clientId: { len: cid.length, head: cid.slice(0, 1), tail: cid.slice(-4), hasSpace: /\s/.test(cid), hasQuote: /["']/.test(cid), rawLenDiff: raw("WORKS_CLIENT_ID").length - cid.length },
+      serviceAccount: { len: sa.length, hasAt: sa.includes("@"), hasServiceaccount: sa.includes(".serviceaccount"), tail: sa.slice(-4), hasSpace: /\s/.test(sa), hasQuote: /["']/.test(sa), rawLenDiff: raw("WORKS_SERVICE_ACCOUNT").length - sa.length },
+      clientSecretLen: sec.length,
+      botIdIsDigits: /^\d+$/.test(env("WORKS_BOT_ID")),
+    }));
+  }
   if (!res.ok || !j.access_token) throw new Error("works_token_failed:" + res.status + ":" + String(j.error || "") + ":" + String(j.error_description || "").slice(0, 200));
   cached = { token: j.access_token, exp: Date.now() + (Number(j.expires_in) || 3600) * 1000 };
   return cached.token;
