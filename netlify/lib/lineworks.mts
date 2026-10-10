@@ -47,7 +47,7 @@ async function getWorksToken(): Promise<string> {
     }),
   });
   const j: any = await res.json().catch(() => ({}));
-  if (!res.ok || !j.access_token) throw new Error("works_token_failed:" + res.status);
+  if (!res.ok || !j.access_token) throw new Error("works_token_failed:" + res.status + ":" + String(j.error || "") + ":" + String(j.error_description || "").slice(0, 200));
   cached = { token: j.access_token, exp: Date.now() + (Number(j.expires_in) || 3600) * 1000 };
   return cached.token;
 }
