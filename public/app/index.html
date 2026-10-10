@@ -2379,6 +2379,29 @@
     }).join("");
   }
   // タスクを依頼したら、ホームのタスク画面へ移動して、できたカードを見せる。
+  // タスクの複製：内容・案件・部位・担当・確認者・メモ・添付・依頼先・進捗などをそのままコピーして、新しいカードにする。
+  // 例外：「反映済み」「決定ボタン」は戻す（同じ内容がお客様画面に二重に出ないように）。完了なら完了日は今日にする。
+  async function duplicateTask(id){
+    var src = state.tasks.find(function(x){ return x.id===id; });
+    if(!src) return;
+    var t = JSON.parse(JSON.stringify(src));
+    var now = nowIso();
+    t.id = uid("task");
+    t.createdAt = now; t.updatedAt = now;
+    t.creator = state.currentUser || "";
+    t.deletedAt = null; t.archivedAt = null;
+    t.completedAt = (t.status==="完了") ? now : null;
+    t.reflected = false; t.reflectedAt = null;
+    delete t.askDecision;
+    delete t.sent;
+    state.tasks.push(t);
+    state.taskMenuId = null;
+    goToTaskBoard(t.id);
+    var ok = await saveDoc("tasks", t.id, t);
+    if(ok===false){ toast("複製の保存に失敗しました。もう一度お試しください"); return; }
+    logActivity("タスク「"+String(t.content||"").slice(0,20)+"」を複製しました");
+    toast("📋 タスクを複製しました（反映は「反映する」を押すとお客様画面に出ます）");
+  }
   function goToTaskBoard(taskId){
     state.taskKindFilter = null;
     state.taskAssigneeFilter = null;
@@ -2492,6 +2515,7 @@
           '<div class="kc-actions">'+
             '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
             '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
+            '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
             (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
@@ -9872,6 +9896,7 @@
       else if(act==="setstatus") setTaskStatus(id, btn.dataset.status);
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
       else if(act==="edit") openTaskForm(id);
+      else if(act==="duplicate") duplicateTask(id);
       else if(act==="setpart") setTaskSpecPart(id);
       else if(act==="gmaildraft") taskGmailDraft(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
