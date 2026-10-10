@@ -4701,6 +4701,16 @@
     var proj = projectById(ctx.projectId);
     if(!proj) return;
     var content = (ctx.content||"").trim();
+    if(!content){
+      [ctx.title, ctx.talk, ctx.decided, ctx.message].forEach(function(s){
+        if(!content && typeof s==="string" && s.trim()) content = s.trim();
+      });
+    }
+    if(!content){
+      var fn2 = (ctx.files||[]).map(function(f){ return f && (f.name||f.filename||f.fileName); }).filter(Boolean);
+      if(fn2.length) content = "添付：" + fn2.slice(0,3).join("、") + (fn2.length>3 ? " ほか" : "");
+      else if((ctx.files||[]).length) content = "添付資料（記録より）";
+    }
     if(!content) return;
     var part = ctx.part || null;
     var files = ctx.files || [];
@@ -6063,8 +6073,20 @@
     if(!proj) return;
     var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
     if(!note){ toast("打合せ記録が見つかりません"); return; }
+    // 「内容」欄が空でも、タイトル・打合せ内容・決定事項・お客様へのメッセージ・添付ファイル名のどれかがあれば作れる
     var content = (note.content||"").trim();
-    if(!content){ toast("内容が空です"); return; }
+    if(!content){
+      var alt = [note.title, note.talk, note.decided, note.message];
+      for(var ai=0; ai<alt.length && !content; ai++){
+        if(typeof alt[ai]==="string" && alt[ai].trim()) content = alt[ai].trim();
+      }
+    }
+    if(!content){
+      var fnames = (note.files||[]).map(function(f){ return f && (f.name||f.filename||f.fileName); }).filter(Boolean);
+      if(fnames.length) content = "添付：" + fnames.slice(0,3).join("、") + (fnames.length>3 ? " ほか" : "");
+      else if((note.files||[]).length) content = "添付資料（打合せ記録より）";
+    }
+    if(!content){ toast("記録に何も入っていないため作成できません（タイトル・内容・添付のどれかを入れてください）"); return; }
     if(noteSentInfo(note)[taskType]){ toast("すでに登録済みです"); return; }
 
     if(taskType === "estimate"){
