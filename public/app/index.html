@@ -1110,6 +1110,13 @@
     </div>
 
     <div class="card">
+      <h3>アプリの重さの診断</h3>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">データの件数と、読み込み・画面の描き直しにかかる時間を測ります（何も変更・削除しません）。重いと感じるときに押して、結果をお知らせください。</p>
+      <button class="btn secondary small" id="btnPerfCheck">診断する</button>
+      <pre id="perfResult" style="white-space:pre-wrap; font-size:.85rem; margin:10px 0 0;"></pre>
+    </div>
+
+    <div class="card">
       <h3>担当者一覧</h3>
       <div class="row"><input type="text" id="newStaffInput" placeholder="例：朋子"><button class="btn secondary small" id="btnAddStaff">追加</button></div>
       <div class="tagbar" id="settingsStaffList" style="margin-block-start:10px;"></div>
@@ -1171,7 +1178,8 @@
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
     <div class="card">
       <h2 style="margin:0 0 10px;">ゴミ箱（削除した項目）</h2>
-      <p class="muted" style="font-size:.85rem; margin:0 0 10px;">削除してもすぐには消えず、ここから復元できます。</p>
+      <p class="muted" style="font-size:.85rem; margin:0 0 10px;">削除してもすぐには消えず、ここから復元できます。「完全に削除」したものは元に戻せません。</p>
+      <div class="row" style="margin-block-end:10px;"><button class="btn small danger-ghost" id="btnEmptyTrash" hidden>🗑 ゴミ箱を空にする</button></div>
       <div id="trashList"></div>
       <div class="empty" id="trashEmpty" hidden>ゴミ箱は空です。</div>
     </div>
@@ -1677,6 +1685,7 @@
         showLoginScreen("認証エラー（削除: " + collection + "）。もう一度ログインしてください");
         return false;
       }
+      if(!res.ok){ toast("削除に失敗しました（" + collection + "・状態 " + res.status + "）"); return false; }
       return true;
     }catch(e){ toast("削除に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
@@ -2081,6 +2090,33 @@
     }catch(e){}
   }
 
+  // 重さの診断：各データの件数・サイズ・取得時間と、画面の描き直しの時間を測る（読み取りだけ。何も書き換えない）
+  async function runPerfCheck(){
+    var out = document.getElementById("perfResult"), btn = document.getElementById("btnPerfCheck");
+    if(!out) return;
+    btn.disabled = true; out.textContent = "測っています…";
+    var lines = [], total = 0, totalBytes = 0;
+    try{
+      var t0 = performance.now();
+      var res = await Promise.all(DATA_COLLECTIONS.map(async function(c){
+        var a = performance.now();
+        var r = await fetch('/api/staff-data?collection='+encodeURIComponent(c), { headers:{'X-Staff-Token': getStaffToken()} });
+        var txt = await r.text();
+        var n = 0; try{ n = (JSON.parse(txt).items||[]).length; }catch(e){}
+        return { c:c, n:n, kb: Math.round(txt.length/1024), ms: Math.round(performance.now()-a) };
+      }));
+      var wall = Math.round(performance.now()-t0);
+      res.sort(function(x,y){ return y.ms-x.ms; });
+      res.forEach(function(x){ total += x.n; totalBytes += x.kb; lines.push(x.c+"：" + x.n + "件／" + x.kb + "KB／" + x.ms + "ミリ秒"); });
+      var delN = 0;
+      DATA_COLLECTIONS.forEach(function(c){ (state[c]||[]).forEach(function(x){ if(x && x.deletedAt) delN++; }); });
+      var r0 = performance.now(); render(); var rms = Math.round(performance.now()-r0);
+      lines.unshift("全部で " + total + "件／" + totalBytes + "KB　（うちゴミ箱 " + delN + "件）\n全データの読み込み（同時）：" + wall + "ミリ秒\n画面の描き直し1回：" + rms + "ミリ秒\n\n―― 内訳（遅い順）――");
+      out.textContent = lines.join("\n");
+    }catch(e){ out.textContent = "測れませんでした：" + String(e && e.message || e); }
+    btn.disabled = false;
+  }
+
   var syncRunning = false;
   async function syncFromServer(opts){
     var silent = !!(opts && opts.silent);
@@ -2234,11 +2270,13 @@
     await saveDoc(collectionName, id, item);
     logActivity(label + "を復元しました");
   }
+  var purgeQuiet = false; // ゴミ箱を空にする最中は、1件ごとの再描画・履歴を省く
   async function purgeItem(collectionName, arrName, id, label){
     state[arrName] = state[arrName].filter(function(x){ return x.id!==id; });
-    render();
-    await hardDeleteDoc(collectionName, id);
-    logActivity(label + "を完全に削除しました");
+    if(!purgeQuiet) render();
+    var ok = await hardDeleteDoc(collectionName, id);
+    if(!purgeQuiet) logActivity(label + "を完全に削除しました");
+    return ok;
   }
 
   function liveProjects(){ return state.projects.filter(function(p){ return !p.deletedAt && !p.finishedAt; }); }
@@ -7191,24 +7229,52 @@
     }).join("");    renderSettingsStaffMail();
   }
 
+  // ゴミ箱を空にする：確認してから、全件を完全に削除（同時に5件ずつ）
+  var emptyingTrash = false;
+  async function emptyTrash(items){
+    if(emptyingTrash || !items || !items.length) return;
+    if(!confirm("ゴミ箱の "+items.length+" 件を、すべて完全に削除します。\n元に戻せません。よろしいですか？")) return;
+    emptyingTrash = true;
+    var btn = document.getElementById("btnEmptyTrash");
+    if(btn){ btn.disabled = true; btn.textContent = "削除しています…"; }
+    var list = items.slice(), done = 0, failed = 0;
+    async function worker(){
+      while(list.length){
+        var it = list.shift();
+        try{ var ok = await it.purge(); if(ok===false) failed++; else done++; }catch(e){ failed++; }
+      }
+    }
+    purgeQuiet = true;
+    try{ await Promise.all([worker(),worker(),worker(),worker(),worker()]); }
+    finally{
+      purgeQuiet = false;
+      emptyingTrash = false;
+      if(btn) btn.disabled = false;
+      logActivity("ゴミ箱を空にしました（"+done+"件を完全に削除）");
+      render();
+      toast(failed ? ("ゴミ箱を空にしました（"+done+"件削除・"+failed+"件は失敗。もう一度お試しください）") : ("ゴミ箱を空にしました（"+done+"件）"));
+    }
+  }
   function renderTrash(){
     var wrap = document.getElementById("trashList");
     var empty = document.getElementById("trashEmpty");
     var items = [];
-    state.projects.filter(function(p){return p.deletedAt;}).forEach(function(p){ items.push({kind:"案件", label:p.name, ts:p.deletedAt, restore:function(){restoreItem("projects","projects",p.id,"案件「"+p.name+"」");}, purge:function(){purgeItem("projects","projects",p.id,"案件「"+p.name+"」");}}); });
-    state.vendors.filter(function(v){return v.deletedAt;}).forEach(function(v){ items.push({kind:"業者", label:v.name, ts:v.deletedAt, restore:function(){restoreItem("vendors","vendors",v.id,"業者「"+v.name+"」");}, purge:function(){purgeItem("vendors","vendors",v.id,"業者「"+v.name+"」");}}); });
-    state.requests.filter(function(r){return r.deletedAt;}).forEach(function(r){ var v=vendorById(r.vendorId); items.push({kind:"見積依頼", label:(v?v.name:"?")+"への依頼", ts:r.deletedAt, restore:function(){restoreItem("requests","requests",r.id,"見積依頼");}, purge:function(){purgeItem("requests","requests",r.id,"見積依頼");}}); });
-    state.attachments.filter(function(a){return a.deletedAt;}).forEach(function(a){ items.push({kind:"添付", label:a.name, ts:a.deletedAt, restore:function(){restoreItem("attachments","attachments",a.id,"添付「"+a.name+"」");}, purge:function(){purgeItem("attachments","attachments",a.id,"添付「"+a.name+"」");}}); });
-    state.meetingNotes.filter(function(n){return n.deletedAt;}).forEach(function(n){ items.push({kind:"打合せ記録", label:(n.content||"").slice(0,20), ts:n.deletedAt, restore:function(){restoreItem("meetingNotes","meetingNotes",n.id,"打合せ記録");}, purge:function(){purgeItem("meetingNotes","meetingNotes",n.id,"打合せ記録");}}); });
-    state.tasks.filter(function(t){return t.deletedAt;}).forEach(function(t){ items.push({kind:"タスク", label:(t.content||"").slice(0,20), ts:t.deletedAt, restore:function(){restoreItem("tasks","tasks",t.id,"タスク");}, purge:function(){purgeItem("tasks","tasks",t.id,"タスク");}}); });
-    state.specPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ items.push({kind:"仕様写真", label:(p.category||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("specPhotos","specPhotos",p.id,"仕様写真");}, purge:function(){purgeItem("specPhotos","specPhotos",p.id,"仕様写真");}}); });
-    state.confirmItems.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="confirm"?"確認事項":"お客様の検討事項")+"「"+(p.content||"").slice(0,20)+"」"; items.push({kind:(p.kind==="confirm"?"確認事項":"お客様の検討事項"), label:(p.content||"").slice(0,20), ts:p.deletedAt, restore:function(){restoreItem("confirmItems","confirmItems",p.id,label);}, purge:function(){purgeItem("confirmItems","confirmItems",p.id,label);}}); });
-    state.albumPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="reference"?"参考写真":"アルバム写真"); items.push({kind:label, label:(p.fileName||""), ts:p.deletedAt, restore:function(){restoreItem("albumPhotos","albumPhotos",p.id,label);}, purge:function(){purgeItem("albumPhotos","albumPhotos",p.id,label);}}); });
-    state.imageBoard.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="イメージ写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("imageBoard","imageBoard",p.id,label);}, purge:function(){purgeItem("imageBoard","imageBoard",p.id,label);}}); });
-    state.sitePhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="現場写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("sitePhotos","sitePhotos",p.id,label);}, purge:function(){purgeItem("sitePhotos","sitePhotos",p.id,label);}}); });
-    state.reservations.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="予約「"+(p.type||"")+" "+(p.date||"")+"」"; items.push({kind:"予約", label:(p.type||"")+" "+(p.date||""), ts:p.deletedAt, restore:function(){restoreItem("reservations","reservations",p.id,label);}, purge:function(){purgeItem("reservations","reservations",p.id,label);}}); });
+    state.projects.filter(function(p){return p.deletedAt;}).forEach(function(p){ items.push({kind:"案件", label:p.name, ts:p.deletedAt, restore:function(){restoreItem("projects","projects",p.id,"案件「"+p.name+"」");}, purge:function(){return purgeItem("projects","projects",p.id,"案件「"+p.name+"」");}}); });
+    state.vendors.filter(function(v){return v.deletedAt;}).forEach(function(v){ items.push({kind:"業者", label:v.name, ts:v.deletedAt, restore:function(){restoreItem("vendors","vendors",v.id,"業者「"+v.name+"」");}, purge:function(){return purgeItem("vendors","vendors",v.id,"業者「"+v.name+"」");}}); });
+    state.requests.filter(function(r){return r.deletedAt;}).forEach(function(r){ var v=vendorById(r.vendorId); items.push({kind:"見積依頼", label:(v?v.name:"?")+"への依頼", ts:r.deletedAt, restore:function(){restoreItem("requests","requests",r.id,"見積依頼");}, purge:function(){return purgeItem("requests","requests",r.id,"見積依頼");}}); });
+    state.attachments.filter(function(a){return a.deletedAt;}).forEach(function(a){ items.push({kind:"添付", label:a.name, ts:a.deletedAt, restore:function(){restoreItem("attachments","attachments",a.id,"添付「"+a.name+"」");}, purge:function(){return purgeItem("attachments","attachments",a.id,"添付「"+a.name+"」");}}); });
+    state.meetingNotes.filter(function(n){return n.deletedAt;}).forEach(function(n){ items.push({kind:"打合せ記録", label:(n.content||"").slice(0,20), ts:n.deletedAt, restore:function(){restoreItem("meetingNotes","meetingNotes",n.id,"打合せ記録");}, purge:function(){return purgeItem("meetingNotes","meetingNotes",n.id,"打合せ記録");}}); });
+    state.tasks.filter(function(t){return t.deletedAt;}).forEach(function(t){ items.push({kind:"タスク", label:(t.content||"").slice(0,20), ts:t.deletedAt, restore:function(){restoreItem("tasks","tasks",t.id,"タスク");}, purge:function(){return purgeItem("tasks","tasks",t.id,"タスク");}}); });
+    state.specPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ items.push({kind:"仕様写真", label:(p.category||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("specPhotos","specPhotos",p.id,"仕様写真");}, purge:function(){return purgeItem("specPhotos","specPhotos",p.id,"仕様写真");}}); });
+    state.confirmItems.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="confirm"?"確認事項":"お客様の検討事項")+"「"+(p.content||"").slice(0,20)+"」"; items.push({kind:(p.kind==="confirm"?"確認事項":"お客様の検討事項"), label:(p.content||"").slice(0,20), ts:p.deletedAt, restore:function(){restoreItem("confirmItems","confirmItems",p.id,label);}, purge:function(){return purgeItem("confirmItems","confirmItems",p.id,label);}}); });
+    state.albumPhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label=(p.kind==="reference"?"参考写真":"アルバム写真"); items.push({kind:label, label:(p.fileName||""), ts:p.deletedAt, restore:function(){restoreItem("albumPhotos","albumPhotos",p.id,label);}, purge:function(){return purgeItem("albumPhotos","albumPhotos",p.id,label);}}); });
+    state.imageBoard.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="イメージ写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("imageBoard","imageBoard",p.id,label);}, purge:function(){return purgeItem("imageBoard","imageBoard",p.id,label);}}); });
+    state.sitePhotos.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="現場写真"; items.push({kind:label, label:(p.place||"")+(p.fileName?"："+p.fileName:""), ts:p.deletedAt, restore:function(){restoreItem("sitePhotos","sitePhotos",p.id,label);}, purge:function(){return purgeItem("sitePhotos","sitePhotos",p.id,label);}}); });
+    state.reservations.filter(function(p){return p.deletedAt;}).forEach(function(p){ var label="予約「"+(p.type||"")+" "+(p.date||"")+"」"; items.push({kind:"予約", label:(p.type||"")+" "+(p.date||""), ts:p.deletedAt, restore:function(){restoreItem("reservations","reservations",p.id,label);}, purge:function(){return purgeItem("reservations","reservations",p.id,label);}}); });
     items.sort(function(a,b){ return (b.ts||"").localeCompare(a.ts||""); });
     empty.hidden = items.length !== 0;
+    var etb = document.getElementById("btnEmptyTrash");
+    if(etb){ etb.hidden = items.length === 0; etb.textContent = "🗑 ゴミ箱を空にする（"+items.length+"件）"; etb.onclick = function(){ emptyTrash(items); }; }
     wrap.innerHTML = "";
     items.forEach(function(it, idx){
       var div = document.createElement("div");
@@ -7217,7 +7283,10 @@
         '<button class="btn small secondary" data-trashidx="'+idx+'" data-trashact="restore">復元</button> <button class="btn small danger-ghost" data-trashidx="'+idx+'" data-trashact="purge">完全に削除</button>';
       wrap.appendChild(div);
       div.querySelector('[data-trashact="restore"]').addEventListener("click", it.restore);
-      div.querySelector('[data-trashact="purge"]').addEventListener("click", it.purge);
+      div.querySelector('[data-trashact="purge"]').addEventListener("click", function(){
+        if(!confirm("「"+it.kind+"：" + (it.label||"") + "」を完全に削除します。元に戻せません。よろしいですか？")) return;
+        it.purge();
+      });
     });
   }
 
@@ -9582,6 +9651,7 @@
       toast(state.currentUser ? "いま使っている人を「"+state.currentUser+"」にしました" : "名前が選ばれていません（記録に名前が残りません）");
     });
     document.getElementById("btnSyncNow").addEventListener("click", function(){ syncFromServer({}); });
+    document.getElementById("btnPerfCheck").addEventListener("click", runPerfCheck);
     startAutoRefresh();
     var fsBtn = document.getElementById("btnFullscreen");
     if(fsBtn){
