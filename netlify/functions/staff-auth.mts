@@ -30,6 +30,8 @@ function sameHex(a: string, b: string) {
 function resetCode(): string {
   try { return (Netlify.env.get("STAFF_ADMIN_RESET") || "").trim(); } catch { return ""; }
 }
+// 全角→半角などの形をそろえ、前後の空白を除く（保存時・照合時に使う）
+const normPw = (pw: string) => String(pw || "").normalize("NFKC").trim();
 const cleanName = (v: any) => String(v || "").trim().slice(0, 30);
 
 async function getCred(store: any, name: string): Promise<any> {
@@ -41,7 +43,8 @@ async function verifyCred(store: any, name: string, password: string): Promise<"
   const rec = await getCred(store, name);
   if (!rec || !rec.hash) return "none";
   if (rec.lockedUntil && Date.now() < rec.lockedUntil) return "locked";
-  const ok = sameHex(hashOf(password, rec.salt), rec.hash);
+  // 入力そのまま／形をそろえた入力のどちらかが合えばOK（以前に保存した合言葉も通る）
+  const ok = sameHex(hashOf(password, rec.salt), rec.hash) || sameHex(hashOf(normPw(password), rec.salt), rec.hash);
   if (ok) {
     if (rec.fails || rec.lockedUntil) { rec.fails = 0; rec.lockedUntil = 0; await store.setJSON(keyOf(name), rec); }
     return "ok";
@@ -49,8 +52,10 @@ async function verifyCred(store: any, name: string, password: string): Promise<"
   rec.fails = (rec.fails || 0) + 1;
   if (rec.fails >= MAX_FAILS) { rec.lockedUntil = Date.now() + LOCK_MS; rec.fails = 0; }
   await store.setJSON(keyOf(name), rec);
+  lastFailsLeft = Math.max(0, MAX_FAILS - (rec.fails || 0));
   return rec.lockedUntil && Date.now() < rec.lockedUntil ? "locked" : "bad";
 }
+let lastFailsLeft = MAX_FAILS;
 
 // 管理者として認められるか。管理者の合言葉が未設定の間（初期設定）は、これまでの共通の合言葉で入れる。
 // 管理者が合言葉を忘れたときは、Netlifyの環境変数 STAFF_ADMIN_RESET に入れた値で入れる。
@@ -65,7 +70,7 @@ async function adminOk(store: any, password: string): Promise<{ ok: boolean; loc
 
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
-  const store = getStore("staffLogins");
+  const store = getStore({ name: "staffLogins", consistency: "strong" });
 
   // ログイン画面用：合言葉が決まっている人の名前（と、管理者の初期設定がまだかどうか）
   if (req.method === "GET") {
@@ -101,7 +106,8 @@ export default async (req: Request, context: Context) => {
     const r = await verifyCred(store, name, password);
     if (r === "ok") return json({ ok: true, token: STAFF_PASSPHRASE, name });
     if (r === "locked") return json({ ok: false, error: "locked" }, 429);
-    return json({ ok: false, error: "wrong_password" }, 401);
+    if (r === "none") return json({ ok: false, error: "not_set" }, 401);
+    return json({ ok: false, error: "wrong_password", left: lastFailsLeft }, 401);
   }
 
   if (action === "setPassword" || action === "clearPassword") {
@@ -115,11 +121,11 @@ export default async (req: Request, context: Context) => {
       await store.delete(keyOf(name));
       return json({ ok: true });
     }
-    const pw = String(body.password || "");
+    const pw = normPw(String(body.password || ""));
     if (pw.length < MIN_LEN) return json({ ok: false, error: "too_short", min: MIN_LEN }, 400);
     if (pw === STAFF_PASSPHRASE) return json({ ok: false, error: "same_as_old" }, 400);
     const salt = randomBytes(16).toString("hex");
-    await store.setJSON(keyOf(name), { salt, hash: hashOf(pw, salt), updatedAt: new Date().toISOString(), fails: 0, lockedUntil: 0 });
+    await store.setJSON(keyOf(name), { salt, hash: hashOf(normPw(pw), salt), updatedAt: new Date().toISOString(), fails: 0, lockedUntil: 0 });
     return json({ ok: true });
   }
 

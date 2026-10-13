@@ -1781,7 +1781,7 @@
   var LOGIN_NAME_KEY = "sumairu_login_name";
   function loginNameLocked(){ try{ return localStorage.getItem(LOGIN_NAME_KEY) || ""; }catch(e){ return ""; } }
   var adminPwMem = ""; // この画面を開いている間だけ、朋子さんの合い言葉を覚えておく（保存はしない）
-  var AUTH_ERR = {wrong_password:"名前か合い言葉が違います", locked:"続けて間違えたため、10分ほど止めています。しばらくしてからお試しください", name_required:"お名前を選んでください", admin_wrong:"朋子さんの合い言葉が違います", too_short:"合い言葉は6文字以上にしてください", same_as_old:"これまでの共通の合い言葉は使えません", cannot_clear_admin:"朋子さんの合い言葉は解除できません"};
+  var AUTH_ERR = {wrong_password:"名前か合い言葉が違います", not_set:"この名前の合い言葉はまだ決まっていません。朋子さんに決めてもらってください", locked:"続けて間違えたため、10分ほど止めています。しばらくしてからお試しください", name_required:"お名前を選んでください", admin_wrong:"朋子さんの合い言葉が違います", too_short:"合い言葉は6文字以上にしてください", same_as_old:"これまでの共通の合い言葉は使えません", cannot_clear_admin:"朋子さんの合い言葉は解除できません"};
   async function authPost(body){
     var res = await fetch('/api/staff-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     var j = null; try{ j = await res.json(); }catch(e){ /* not JSON */ }
@@ -1836,7 +1836,8 @@
         boot();
         if(needSet) setTimeout(function(){ adminSetOwnPassword(pw); }, 600);
       } else if(errEl){
-        errEl.textContent = AUTH_ERR[j && j.error] || ("ログインできませんでした（" + String(j && j.error || "") + "）");
+        errEl.textContent = (AUTH_ERR[j && j.error] || ("ログインできませんでした（" + String(j && j.error || "") + "）")) +
+          ((j && j.error==="wrong_password" && typeof j.left==="number") ? "（あと"+j.left+"回間違えると10分止まります）" : "");
         errEl.hidden = false;
       }
     }catch(e){ if(errEl){ errEl.textContent = "通信に失敗しました（詳細: " + String(e && e.message || e) + "）"; errEl.hidden = false; } }
@@ -1893,6 +1894,9 @@
     var ap = await adminPwFor(); if(!ap) return;
     var np = prompt(name+"さんの新しい合い言葉を決めてください（6文字以上）。決めたらご本人にお伝えください。", "");
     if(np===null) return; np = np.trim();
+    var np2 = prompt("確認のため、もう一度同じ合い言葉を入力してください", "");
+    if(np2===null) return;
+    if(np2.trim()!==np){ toast("2回の入力が合いません。もう一度やり直してください"); return; }
     var j = await authPost({action:"setPassword", adminPassword:ap, name:name, password:np});
     if(j.error==="admin_wrong") adminPwMem = "";
     if(j.ok){ if(name==="朋子") adminPwMem = np; else adminPwMem = ap; toast(name+"さんの合い言葉を決めました"); renderSettingsLogin(); }
