@@ -494,7 +494,7 @@
         <h2 style="margin:0;">社内タスク【最重要】</h2>
         <button class="btn small" id="btnNewTask">＋ タスク追加</button>
       </div>
-      <div class="row" id="taskProjectFilterRow" style="gap:8px; margin-block-end:8px; flex-wrap:wrap;"><label for="taskProjectFilter" style="font-weight:700;">案件</label><select id="taskProjectFilter" style="max-width:100%;"></select></div>
+      <div class="row" id="taskProjectFilterRow" style="gap:8px; margin-block-end:8px; flex-wrap:wrap;"><label for="taskFolderFilter" style="font-weight:700;">フォルダー</label><select id="taskFolderFilter" style="max-width:100%;"></select><label for="taskProjectFilter" style="font-weight:700;">案件</label><select id="taskProjectFilter" style="max-width:100%;"></select></div>
       <div class="row" id="taskStatusFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
       <div class="row" id="taskAssigneeFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
@@ -606,8 +606,22 @@
         <button class="sub-btn" data-sub="plan">図面</button>
         <button class="sub-btn" data-sub="reservation">予約</button>
         <button class="sub-btn" data-sub="message">メッセージ</button>
+        <button class="sub-btn" data-sub="tasks">タスク</button>
         <button class="sub-btn" data-sub="taskhistory">タスク履歴</button>
         <button class="sub-btn" data-sub="okainote">おうちノート連携</button>
+      </div>
+
+      <!-- タスク（この案件の進行中タスク） subpanel -->
+      <div class="subpanel" id="sub-tasks">
+        <div class="card">
+          <div class="row" style="justify-content:space-between; margin-block-end:8px;">
+            <h3 style="margin:0;">この案件のタスク</h3>
+            <button class="btn small" id="btnProjNewTask">＋ この案件のタスクを追加</button>
+          </div>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">進行中のタスクです。進捗の変更や複製などは、ホームのタスク画面で行えます。</p>
+          <div id="projTaskList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="empty" id="projTaskEmpty" hidden>この案件のタスクはまだありません。</div>
+        </div>
       </div>
 
       <!-- タスク履歴（アーカイブ済みタスク） subpanel -->
@@ -1565,6 +1579,7 @@
     taskKindFilter: null,
     taskAssigneeFilter: null,
     taskProjectFilter: null,
+    taskFolderFilter: null,
     taskStatusFilter: null,
     noteSpecFilter: null,
     meetingSubTab: "record",
@@ -2270,6 +2285,7 @@
     renderFinishedProjList();
     renderProjectDetail();
     renderTaskHistory();
+    renderProjectTasks();
     renderVendorCheckboxList();
     renderProjectTable();
     renderPendingTable();
@@ -2518,6 +2534,7 @@
     state.taskKindFilter = null;
     state.taskAssigneeFilter = null;
     state.taskProjectFilter = null;
+    state.taskFolderFilter = null;
     state.taskStatusFilter = null;
     var gt = state.tasks.find(function(x){ return x.id===taskId; });
     if(gt){ state.taskOpen = state.taskOpen || {}; state.taskOpen[gt.status||"未着手"] = true; }
@@ -2546,16 +2563,28 @@
     }).join("");
   }
   // 案件（プルダウン）と進捗（チップ）での絞り込み
+  // フォルダー絞り込み用：選んだフォルダー（と下のフォルダー）に入っている案件か
+  function projInTaskFolder(p){
+    if(!state.taskFolderFilter) return true;
+    if(!p) return false;
+    return pfDescIds(state.taskFolderFilter).indexOf(pfOf(p)) >= 0;
+  }
   function renderTaskProjectStatusBars(){
+    var fsel = document.getElementById("taskFolderFilter");
+    if(fsel){
+      if(state.taskFolderFilter && !pfById(state.taskFolderFilter)) state.taskFolderFilter = null;
+      fsel.innerHTML = '<option value="">すべて</option>' + pfOptionsHtml(state.taskFolderFilter);
+      fsel.value = state.taskFolderFilter || "";
+    }
     var sel = document.getElementById("taskProjectFilter");
     if(sel){
       var counts = {};
-      liveTasks().forEach(function(t){ var k = t.projectId||"__none"; counts[k] = (counts[k]||0)+1; });
+      liveTasks().forEach(function(t){ if(state.taskFolderFilter && !projInTaskFolder(projectById(t.projectId))) return; var k = t.projectId||"__none"; counts[k] = (counts[k]||0)+1; });
       var h = '<option value="">すべての案件</option>';
-      liveProjects().forEach(function(p){
+      liveProjects().filter(projInTaskFolder).forEach(function(p){
         h += '<option value="'+escapeHtml(p.id)+'"'+(state.taskProjectFilter===p.id?" selected":"")+'>'+escapeHtml(p.name)+(counts[p.id]?'（'+counts[p.id]+'）':'')+'</option>';
       });
-      if(counts["__none"]) h += '<option value="__none"'+(state.taskProjectFilter==="__none"?" selected":"")+'>案件未設定（'+counts["__none"]+'）</option>';
+      if(counts["__none"] && !state.taskFolderFilter) h += '<option value="__none"'+(state.taskProjectFilter==="__none"?" selected":"")+'>案件未設定（'+counts["__none"]+'）</option>';
       sel.innerHTML = h;
       if(state.taskProjectFilter && sel.value!==state.taskProjectFilter){ state.taskProjectFilter = null; sel.value = ""; }
     }
@@ -2573,6 +2602,7 @@
     renderTaskAssigneeFilterBar();
     renderTaskProjectStatusBars();
     var tasks = liveTasks().filter(function(t){
+      if(state.taskFolderFilter && !projInTaskFolder(projectById(t.projectId))) return false;
       if(state.taskProjectFilter==="__none" && t.projectId) return false;
       if(state.taskProjectFilter && state.taskProjectFilter!=="__none" && t.projectId!==state.taskProjectFilter) return false;
       if(state.taskAssigneeFilter==="__none" && t.assignee) return false;
@@ -2605,7 +2635,7 @@
         var proj = projectById(t.projectId);
         var isVendor = !!t.requestTo;
         return '<div class="kancard'+(t.reflected?" reflected":"")+'" data-taskid="'+t.id+'">'+
-          '<div class="kc-proj">'+(proj?escapeHtml(proj.name):"（案件未設定）")+
+          '<div class="kc-proj">'+(proj?escapeHtml(proj.name)+' <span class="muted" style="font-size:.85rem; font-weight:400;">'+escapeHtml(pfPath(pfOf(proj)))+'</span>':"（案件未設定）")+
             (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
             (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
@@ -2948,6 +2978,31 @@
           (t.checker?'<span>確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
         '</div>'+
         '<div class="kc-actions"><button class="btn small secondary" data-taskunarchive="'+t.id+'">元に戻す</button></div>'+
+      '</div>';
+    }).join("");
+  }
+  // 案件の「タスク」サブタブ：この案件の進行中タスク
+  function renderProjectTasks(){
+    var wrap = document.getElementById("projTaskList");
+    if(!wrap) return;
+    var empty = document.getElementById("projTaskEmpty");
+    var pid = state.currentProjectId;
+    var rows = liveTasks().filter(function(t){ return t.projectId===pid; })
+      .sort(function(a,b){ return STATUS_ORDER.indexOf(a.status||"未着手") - STATUS_ORDER.indexOf(b.status||"未着手") || String(a.createdAt||"").localeCompare(String(b.createdAt||"")); });
+    empty.hidden = rows.length!==0;
+    wrap.innerHTML = rows.map(function(t){
+      return '<div class="kancard" style="margin:0;">'+
+        '<div class="kc-proj"><span class="pill">'+escapeHtml(t.status||"未着手")+'</span>'+(t.requestTo?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+'</div>'+
+        '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+        (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
+        (t.vendorSpec ? '<div class="kc-part">📍 部位：<b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '')+
+        '<div class="kc-meta">'+
+          (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
+          (t.requestTo?'<span>依頼先 '+escapeHtml(t.requestTo)+'</span>':'')+
+          (t.checker?'<span>確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
+          fmtDeadline(t)+
+        '</div>'+
+        '<div class="kc-actions"><button class="btn small secondary" data-projtaskedit="'+t.id+'">編集</button></div>'+
       '</div>';
     }).join("");
   }
@@ -10059,6 +10114,21 @@
       if(!chip) return;
       state.taskKindFilter = chip.dataset.taskkindfilter || null;
       renderKanban();
+    });
+    document.getElementById("taskFolderFilter").addEventListener("change", function(){
+      state.taskFolderFilter = this.value || null;
+      if(state.taskProjectFilter && state.taskProjectFilter!=="__none" && !projInTaskFolder(projectById(state.taskProjectFilter))) state.taskProjectFilter = null;
+      renderKanban();
+    });
+    document.getElementById("btnProjNewTask").addEventListener("click", function(){
+      var pid = state.currentProjectId;
+      openTaskForm();
+      var ps = document.getElementById("tfProject");
+      if(pid && ps && Array.prototype.some.call(ps.options, function(o){ return o.value===pid; })) ps.value = pid;
+    });
+    document.getElementById("projTaskList").addEventListener("click", function(e){
+      var b = e.target.closest("[data-projtaskedit]");
+      if(b) openTaskForm(b.dataset.projtaskedit);
     });
     document.getElementById("taskProjectFilter").addEventListener("change", function(){
       state.taskProjectFilter = this.value || null;
