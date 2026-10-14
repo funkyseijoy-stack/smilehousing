@@ -2690,6 +2690,7 @@
             (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
             fmtDeadline(t)+
           '</div>'+
+          (t.review && t.review.result ? '<div class="kc-memo" style="border-left-color:'+(t.review.result==="承認"?'var(--accent)':'var(--orange)')+';">'+(t.review.result==="承認"?'✅ 承認':'↩ 差し戻し')+'（'+escapeHtml(t.review.by||"")+'）'+(t.review.note?' '+escapeHtml(t.review.note):'')+'</div>' : '')+
           (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
             var st = v.status||"未連絡";
             var done = VENDOR_STATUS.indexOf(st) >= 1;
@@ -2704,6 +2705,7 @@
             '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
             (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
             (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
+            (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
             '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
             '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
           '</div>'+
@@ -8583,6 +8585,34 @@
     if(checkStatusFor(checker)) goToTaskBoard(t.id);
   }
 
+  // 確認者の承認／差し戻し。確認者本人（と朋子）だけがボタンを見られる。
+  // 承認→進捗「対応中」、差し戻し→進捗「未着手」。担当者へ通知（サーバー側が review.at の変化を見て送る）。
+  function canReviewTask(t){
+    if(!t || !t.checker || t.status==="完了" || t.private) return false;
+    var me = state.currentUser || "";
+    if(me && me!==t.checker && me!==TASK_ADMIN) return false;
+    var col = checkStatusFor(t.checker);
+    return col ? t.status===col : !t.review;
+  }
+  async function reviewTask(id, result){
+    var t = state.tasks.find(function(x){ return x.id===id; });
+    if(!t || !canReviewTask(t)) return;
+    var note = "";
+    if(result==="差し戻し"){
+      var v = prompt("差し戻しの理由・コメント（担当者に届きます。空でも構いません）", "");
+      if(v===null) return;
+      note = v.trim().slice(0,300);
+    }
+    t.review = { result: result, by: state.currentUser || t.checker, note: note, at: nowIso() };
+    t.status = result==="承認" ? "対応中" : "未着手";
+    t.updatedAt = nowIso(); t.completedAt = null; t.archivedAt = null;
+    state.taskOpen = state.taskOpen || {};
+    state.taskOpen[t.status] = true;
+    render();
+    toast(result==="承認" ? "承認しました（「対応中」へ移しました）" : "差し戻しました（「未着手」へ移しました）");
+    await saveDoc("tasks", t.id, t);
+    logActivity("タスクを"+result+"しました（"+(t.content||"").slice(0,20)+"）");
+  }
   // 進捗を好きな段階へ直接変更する（飛ばしてもよい）。変更先の見出しは自動で開く。
   // 完了報告の宛先を選ぶ。選んだ名前の配列／キャンセルは null。選んだ人にだけ届く。
   function askReportTo(t){
@@ -10207,6 +10237,8 @@
       var act = btn.dataset.taskact, id = btn.dataset.id;
       if(act==="statusmenu"){ state.taskMenuId = (state.taskMenuId===id ? null : id); renderKanban(); }
       else if(act==="setstatus") setTaskStatus(id, btn.dataset.status);
+      else if(act==="approve") reviewTask(id, "承認");
+      else if(act==="reject") reviewTask(id, "差し戻し");
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
       else if(act==="edit") openTaskForm(id);
       else if(act==="duplicate") duplicateTask(id);

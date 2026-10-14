@@ -163,3 +163,19 @@ export async function sendTaskDoneMails(store: any, task: any, by: string) {
     await notifyStaff(store, name, subject, body);
   }
 }
+
+// ---- 確認者の承認／差し戻し：担当者（いなければ作成者・指示者）へ知らせる ----
+export async function sendTaskReviewMail(store: any, task: any, by: string) {
+  const r = task.review || {};
+  const name = task.assignee || task.creator || task.instructor || "";
+  if (!name || name === by) return false;
+  let projectName = "";
+  if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
+  const approved = r.result === "承認";
+  const subject = "【住まいる】" + (approved ? "承認されました" : "差し戻されました") + "：" + String(task.content || "").replace(/\s+/g, " ").slice(0, 30);
+  const body = [name + "さん", "",
+    (r.by || by ? (r.by || by) + "さんが、" : "") + (approved ? "次のタスクを承認しました。進めてください。" : "次のタスクを差し戻しました。内容を確認してください。"), "",
+    ...(r.note ? ["コメント：" + String(r.note).slice(0, 300), ""] : []),
+    ...taskLines(task, projectName), "", "▼ 住まいるアプリを開く", APP_URL, "", MAIL_FOOTER].join("\n");
+  return await notifyStaff(store, name, subject, body);
+}

@@ -1,6 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { sendTaskAssignedMail, sendTaskDoneMails, queueTaskNotice, isQuietHourJst } from "../lib/task-mail.mts";
+import { sendTaskAssignedMail, sendTaskDoneMails, sendTaskReviewMail, queueTaskNotice, isQuietHourJst } from "../lib/task-mail.mts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -145,7 +145,11 @@ export default async (req: Request, context: Context) => {
       if (m && doc.status !== (prevTask && prevTask.status) && !sameCheck && m[1] !== by && m[1] !== checkerNotified) {
         jobs.push(notify("checker", m[1]));
       }
-      // 「完了」になったら、社長・朋子・依頼者へ報告する
+      // 確認者が承認／差し戻しをしたら、担当者へ知らせる（review.at が変わったときだけ）
+      if (doc.review && doc.review.at && doc.review.at !== (prevTask && prevTask.review && prevTask.review.at)) {
+        jobs.push(sendTaskReviewMail(store, doc, by).catch(() => false));
+      }
+      // 「完了」になったら、選ばれた人へ報告する
       if (doc.status === "完了" && prevTask && prevTask.status !== "完了") {
         jobs.push(sendTaskDoneMails(store, doc, by).catch(() => false));
       }
