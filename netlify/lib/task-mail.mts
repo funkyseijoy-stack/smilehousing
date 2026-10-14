@@ -143,14 +143,13 @@ export async function flushTaskQueue(store: any) {
   for (const k of dead) await store.delete(k);
 }
 
-// ---- 完了の報告：社長・朋子・依頼者（指示者。いなければ作成者）へ ----
-export const DONE_REPORT_TO = ["社長", "朋子"];
+// ---- 完了の報告：完了にするとき画面で選んだ人だけ（社長・朋子にも自動では送らない） ----
 export async function sendTaskDoneMails(store: any, task: any, by: string) {
-  const names = new Set<string>(DONE_REPORT_TO);
+  const names = new Set<string>();
   if (Array.isArray(task.reportTo)) {
-    // 完了にするとき画面で選んだ報告先（空なら社長・朋子だけ）
     for (const n of task.reportTo) { const s = String(n || "").trim(); if (s) names.add(s.slice(0, 30)); }
   } else {
+    // 画面を通さずに完了になった場合（古い画面など）は、依頼者だけに知らせる
     const requester = task.instructor || task.creator || "";
     if (requester) names.add(requester);
   }

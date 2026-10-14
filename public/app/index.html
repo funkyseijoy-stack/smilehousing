@@ -8584,20 +8584,19 @@
   }
 
   // 進捗を好きな段階へ直接変更する（飛ばしてもよい）。変更先の見出しは自動で開く。
-  // 完了報告の宛先を選ぶ。選んだ名前の配列／キャンセルは null。社長・朋子には常に届く（サーバー側）。
+  // 完了報告の宛先を選ぶ。選んだ名前の配列／キャンセルは null。選んだ人にだけ届く。
   function askReportTo(t){
     return new Promise(function(resolve){
       var me = state.currentUser || "";
-      var auto = ["社長","朋子"];
       var def = t.instructor || t.creator || "";
-      var staff = (state.settings.staffList||[]).filter(function(n){ return auto.indexOf(n)<0 && n!==me; });
+      var staff = (state.settings.staffList||[]).filter(function(n){ return n!==me; });
       if(Array.isArray(t.reportTo)) def = null;
       var overlay = document.createElement("div");
       overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
       var box = document.createElement("div");
       box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:360px;width:100%;box-shadow:var(--shadow);max-height:85vh;overflow:auto;";
       box.innerHTML = '<h3 style="margin:0 0 6px;">完了を報告する人</h3>'+
-        '<p class="muted" style="margin:0 0 10px; font-size:.85rem;">社長・朋子さんには、自動で届きます。ほかに知らせたい人（頼んだ人など）をチェックしてください。</p>'+
+        '<p class="muted" style="margin:0 0 10px; font-size:.85rem;">知らせたい人をチェックしてください（チェックした人にだけ届きます。誰も選ばなければ、誰にも届きません）。</p>'+
         '<div style="display:flex; flex-direction:column; gap:8px; margin-block-end:12px;">'+
         (staff.length ? staff.map(function(n){
           var on = Array.isArray(t.reportTo) ? t.reportTo.indexOf(n)>=0 : (n===def);
