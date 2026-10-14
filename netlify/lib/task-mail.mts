@@ -147,8 +147,13 @@ export async function flushTaskQueue(store: any) {
 export const DONE_REPORT_TO = ["社長", "朋子"];
 export async function sendTaskDoneMails(store: any, task: any, by: string) {
   const names = new Set<string>(DONE_REPORT_TO);
-  const requester = task.instructor || task.creator || "";
-  if (requester) names.add(requester);
+  if (Array.isArray(task.reportTo)) {
+    // 完了にするとき画面で選んだ報告先（空なら社長・朋子だけ）
+    for (const n of task.reportTo) { const s = String(n || "").trim(); if (s) names.add(s.slice(0, 30)); }
+  } else {
+    const requester = task.instructor || task.creator || "";
+    if (requester) names.add(requester);
+  }
   if (by) names.delete(by);
   let projectName = "";
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
