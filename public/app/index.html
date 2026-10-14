@@ -8589,6 +8589,7 @@
     return new Promise(function(resolve){
       var me = state.currentUser || "";
       var def = t.instructor || t.creator || "";
+      var chk = t.checker || "";
       var staff = (state.settings.staffList||[]).filter(function(n){ return n!==me; });
       if(Array.isArray(t.reportTo)) def = null;
       var overlay = document.createElement("div");
@@ -8599,8 +8600,8 @@
         '<p class="muted" style="margin:0 0 10px; font-size:.85rem;">知らせたい人をチェックしてください（チェックした人にだけ届きます。誰も選ばなければ、誰にも届きません）。</p>'+
         '<div style="display:flex; flex-direction:column; gap:8px; margin-block-end:12px;">'+
         (staff.length ? staff.map(function(n){
-          var on = Array.isArray(t.reportTo) ? t.reportTo.indexOf(n)>=0 : (n===def);
-          return '<label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" data-rpick="'+escapeHtml(n)+'"'+(on?' checked':'')+'> '+escapeHtml(n)+(n===def?' <span class="muted" style="font-size:.85rem;">（頼んだ人）</span>':'')+'</label>';
+          var on = Array.isArray(t.reportTo) ? t.reportTo.indexOf(n)>=0 : (n===def || n===chk);
+          return '<label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" data-rpick="'+escapeHtml(n)+'"'+(on?' checked':'')+'> '+escapeHtml(n)+(n===def?' <span class="muted" style="font-size:.85rem;">（頼んだ人）</span>':'')+(n===chk?' <span class="muted" style="font-size:.85rem;">（確認者）</span>':'')+'</label>';
         }).join("") : '<div class="muted">ほかのスタッフはいません</div>')+
         '</div>'+
         '<div style="display:flex; gap:8px;"><button class="btn" data-rok style="flex:1;">完了にする</button><button class="btn secondary" data-rcancel style="flex:1;">やめる</button></div>';
