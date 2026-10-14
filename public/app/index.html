@@ -3778,6 +3778,7 @@
         noteSendButtonHtml(n, sent, "companytask")+
         noteSendButtonHtml(n, sent, "vendortask")+
         noteSendButtonHtml(n, sent, "estreq")+
+        '<button class="'+((sent.vendortask&&sent.estreq)?"on":"")+'" data-act="notebundle" data-id="'+n.id+'" title="業者タスク・見積依頼・Gmail下書きを一度に作る（送信はしません）">→業者タスク＋見積依頼＋Gmail下書き</button>'+
         noteSendButtonHtml(n, sent, "confirm")+
         noteSendButtonHtml(n, sent, "consider")+
         noteSendButtonHtml(n, sent, "estimate")+
@@ -6166,6 +6167,109 @@
     render();
     await saveDoc("confirmItems", doc.id, doc);
     logActivity("お客様の検討事項「"+content.slice(0,20)+"」を追加しました");
+  }
+  // 打合せ記録 → 業者タスク＋見積依頼（会社ごと）＋Gmail下書き（会社ごと）を一度に作る。メールは送らない（下書きだけ）。
+  async function createBundleFromNote(noteId){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var pid1 = proj.id;
+    var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
+    if(!note){ toast("打合せ記録が見つかりません"); return; }
+    var info = noteSentInfo(note);
+    if(info.vendortask && info.estreq){ toast("すでに業者タスクと見積依頼が登録済みです"); return; }
+    var content = (note.content||"").trim();
+    if(!content){
+      var alt = [note.title, note.talk, note.decided, note.message];
+      for(var ai=0; ai<alt.length && !content; ai++){ if(typeof alt[ai]==="string" && alt[ai].trim()) content = alt[ai].trim(); }
+    }
+    if(!content){
+      var fnames = (note.files||[]).map(function(f){ return f && (f.name||f.filename||f.fileName); }).filter(Boolean);
+      if(fnames.length) content = "添付：" + fnames.slice(0,3).join("、") + (fnames.length>3 ? " ほか" : "");
+    }
+    if(!content){ toast("記録に何も入っていないため作成できません（タイトル・内容・添付のどれかを入れてください）"); return; }
+    var vendorIds = await new Promise(function(res){ askVendorForBadge(res); });
+    if(vendorIds===null) return;
+    if(!vendorIds.length){ toast("依頼先の業者を1社以上選んでください"); return; }
+    var assignee = await new Promise(function(res){ askAssignee(res); });
+    if(assignee===null) return;
+    var part = await new Promise(function(res){ askSpecPart(res); });
+    if(!part){ toast("部位が選択されなかったため、作成を中止しました"); return; }
+    var vendors = vendorIds.map(function(id){ return vendorById(id); }).filter(Boolean);
+    if(!vendors.length){ toast("業者が見つかりませんでした"); return; }
+    var names = vendors.map(function(v){ return v.name; });
+    var files = (note.files||[]).slice();
+
+    // 1) 業者タスク（メールはまだ送っていないので、進捗は「未着手」・各社「未連絡」のまま）
+    if(!info.vendortask){
+      var t = { id: uid("task"), projectId: pid1, content: content,
+        assignee: assignee, instructor: "", creator: state.currentUser||"",
+        hasDeadline: false, deadline: "", requestMethod: "", attachmentAssetIds: [],
+        attachments: files.slice(), vendorSpec: part, private: false,
+        reflected: false, reflectedAt: null, status: "未着手", createdAt: nowIso(), updatedAt: nowIso() };
+      Object.assign(t, newTaskVendorFields(names));
+      state.tasks.push(t);
+      if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
+      note.sent = note.sent || {};
+      note.sent.vendortask = { at: nowIso(), by: state.currentUser||"", ref: t.id };
+      saveDoc("tasks", t.id, t);
+    }
+    // 2) 見積依頼（会社ごと）。下書きを作れた会社は「依頼済み」にする（Gmail方法）
+    var made = [], reqs = [];
+    if(!info.estreq){
+      vendors.forEach(function(vendor){
+        var req = { id:uid("req"), projectId: pid1, vendorId: vendor.id, method:"gmail", status:"未依頼",
+          requestedAt:"", receivedAt:"", dueDate:"", requestedBy:"", receivedBy:"",
+          content: content, part: note.specPart||part, files: files.slice(),
+          sourceNoteId: note.id, note:"打合せ記録「"+content.slice(0,20)+"」より登録" };
+        state.requests.push(req); reqs.push({req:req, vendor:vendor}); made.push(req.id);
+      });
+      note.sent = note.sent || {};
+      note.sent.estreq = { at: nowIso(), by: state.currentUser||"", ref: made[0], refs: made };
+    }
+    render();
+    toast("業者タスクと見積依頼を作りました。Gmail下書きを作っています…");
+
+    // 3) Gmail下書き（会社ごと）。添付は記録のファイル（1つ3.5MB超・合計3.8MB超は付けない）
+    var atts = [], skipped = 0, total = 0;
+    for(var i=0;i<files.length;i++){
+      var a = files[i];
+      try{
+        var r0 = await fetch(a.url);
+        if(!r0.ok) throw new Error("fetch");
+        var blob = await r0.blob();
+        if(blob.size > 3500000 || total + blob.size > 3800000){ skipped++; continue; }
+        total += blob.size;
+        atts.push({ filename:a.name||"添付", mimeType:a.contentType||blob.type||"application/octet-stream", content: await blobToBase64(blob) });
+      }catch(e){ skipped++; }
+    }
+    var subject = "【見積依頼】"+proj.name+(part&&part.label?"　"+part.label:"");
+    var okNames = [], failNames = [], noMail = [];
+    for(var k=0;k<reqs.length;k++){
+      var v = reqs[k].vendor;
+      var lines = ["お世話になっております。住まいるハウジングです。","",
+        "下記の件につきまして、お見積りをお願いしたくご連絡いたしました。","",
+        "案件："+proj.name, "部位："+(part&&part.label?part.label:""), "内容："+content, "",
+        "添付の資料等をご確認のうえ、ご対応のほどよろしくお願いいたします。","",
+        "株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798"];
+      if(!v.email) noMail.push(v.name);
+      try{
+        var res = await gmailCreateDraft({ to: v.email?[v.email]:[], subject: subject, body: lines.join("\n"), attachments: atts });
+        var payload = (res && res.payload) || {};
+        if(payload.threadId) reqs[k].req.gmailThreadId = payload.threadId;
+        reqs[k].req.status = "依頼済み"; reqs[k].req.requestedAt = todayStr();
+        okNames.push(v.name);
+      }catch(e){ failNames.push(v.name); }
+    }
+    reqs.forEach(function(x){ saveDoc("requests", x.req.id, x.req); });
+    saveDoc("meetingNotes", note.id, note);
+    render();
+    logActivity("打合せ記録から業者タスク＋見積依頼＋Gmail下書きを作成しました（"+names.join("、")+"）");
+    goToTaskBoard(note.sent && note.sent.vendortask && !info.vendortask ? note.sent.vendortask.ref : undefined);
+    var msg = "✅ 業者タスクと見積依頼を作り、Gmail下書きを"+okNames.length+"件作りました（送信はしていません。Gmailで確認して送ってください）";
+    if(noMail.length) msg += "。メール未登録："+noMail.join("、")+"（下書きで宛先を入れてください）";
+    if(failNames.length) msg += "。下書きに失敗："+failNames.join("、")+"（見積タブの「依頼する」からやり直せます）";
+    if(skipped) msg += "。大きい／読めない添付"+skipped+"件は付けていません";
+    toast(msg);
   }
   async function createTaskFromNote(noteId, taskType){
     var proj = projectById(state.currentProjectId);
@@ -10361,6 +10465,7 @@
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
       else if(act==="togglenoteask"){ toggleMeetingAskDecision(id); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
+      else if(act==="notebundle"){ createBundleFromNote(id); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
       else if(act==="togglenotemenu"){ e.stopPropagation(); toggleNoteMenu(id); }
       else if(act==="copynote"){ copyMeetingNote(id); }
