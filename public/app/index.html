@@ -4180,7 +4180,7 @@
         var reqStatus = p.reqStatus || "未依頼";
         return '<div class="pbentry">'+
           '<div class="pbentry-thumb" data-openspec="'+p.id+'" title="クリックして編集（Gmail添付もできます）">'+
-          '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">'+
+          '<img loading="lazy" decoding="async" src="'+p.url+'" alt="'+escapeHtml(category)+'">'+
           (i===0 ? '<span class="pbentry-latest">最新</span>' : '')+
           '</div>'+
           '<div class="pbentry-meta">'+
@@ -4205,7 +4205,7 @@
         pdfThumbInnerHtml(p.url) :
         (isVideoPhoto ?
           '<video src="'+p.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
-          '<img src="'+p.url+'" alt="'+escapeHtml(category)+'">');
+          '<img loading="lazy" decoding="async" src="'+p.url+'" alt="'+escapeHtml(category)+'">');
       var tileHtml = '<div class="specphoto" data-openspec="'+p.id+'" title="'+thumbTitle+'">'+
         thumbInner+
         '<button class="spdel" data-delspec="'+p.id+'">×</button></div>';
@@ -6216,14 +6216,36 @@
     }
     if(!cached){
       pdfThumbCache[url] = {status:"pending"};
-      loadPdfThumb(url);
+      pdfThumbQueue.push(url);
+      pdfThumbPump();
     }
     return '<div class="specphoto-file">📄<span class="specphoto-filelabel">PDF</span></div>';
   }
+  // スマホ（iPhone Safari）で、全PDFを同時に開いて1枚ごとに画面全体を描き直すと
+  // メモリ不足で落ちるため、同時に作るのは2件までにし、描き直しもまとめて1回にする。
+  var pdfThumbQueue = [], pdfThumbRunning = 0, pdfThumbRenderTimer = null;
+  function pdfThumbPump(){
+    while(pdfThumbRunning<2 && pdfThumbQueue.length){
+      pdfThumbRunning++;
+      loadPdfThumb(pdfThumbQueue.shift()).then(function(){
+        pdfThumbRunning--;
+        pdfThumbPump();
+      });
+    }
+  }
+  function pdfThumbScheduleRender(){
+    if(pdfThumbRenderTimer) return;
+    pdfThumbRenderTimer = setTimeout(function(){
+      pdfThumbRenderTimer = null;
+      if(pdfThumbRunning>0 || pdfThumbQueue.length) { pdfThumbScheduleRender(); return; }
+      render();
+    }, 1500);
+  }
   async function loadPdfThumb(url){
+    var doc = null;
     try{
       if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
-      var doc = await pdfjsLib.getDocument(url).promise;
+      doc = await pdfjsLib.getDocument(url).promise;
       var page = await doc.getPage(1);
       var baseViewport = page.getViewport({scale:1});
       var scale = 200 / Math.max(baseViewport.width, baseViewport.height);
@@ -6234,11 +6256,13 @@
       canvas.height = viewport.height;
       var ctx = canvas.getContext("2d");
       await page.render({canvasContext:ctx, viewport:viewport}).promise;
-      pdfThumbCache[url] = {status:"done", dataUrl:canvas.toDataURL("image/png")};
+      pdfThumbCache[url] = {status:"done", dataUrl:canvas.toDataURL("image/jpeg", 0.8)};
+      canvas.width = canvas.height = 0;
     }catch(e){
       pdfThumbCache[url] = {status:"error"};
     }
-    render();
+    try{ if(doc) await doc.destroy(); }catch(e){}
+    pdfThumbScheduleRender();
   }
   // 打ち合わせ記録に添付された写真・PDF・動画を、横一列の大きめサムネイルで表示する
   // （件数が多い時は横スクロール）。1つの打ち合わせ記録＝複数の候補写真、という
@@ -6253,7 +6277,7 @@
       var isVideo = ct.indexOf("video")>=0;
       var inner = isPdf ? pdfThumbInnerHtml(f.url) :
         (isVideo ? '<video src="'+f.url+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>' :
-        '<img src="'+f.url+'" alt="">');
+        '<img loading="lazy" decoding="async" src="'+f.url+'" alt="">');
       return '<a href="'+f.url+'" target="_blank" rel="noopener" class="notefiletile" style="width:'+px+'px; height:'+px+'px;" title="'+escapeHtml(f.name||"")+'">'+inner+'</a>';
     }).join("")+'</div>';
   }
@@ -6897,7 +6921,7 @@
     return (proj && proj.photoCategories && proj.photoCategories[kind]) || [];
   }
   function photoTileHtml(p){
-    return '<div class="specphoto"><img src="'+p.url+'" alt="">'+
+    return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+p.url+'" alt="">'+
       '<a href="'+p.url+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
       '<button class="spdel" data-delalbum="'+p.id+'">×</button>'+
       '<button class="spdate" data-albdate="'+p.id+'" title="日付を変更（お客様画面に出る日付）">'+albumDateShort(p.createdAt)+' ✎</button></div>';
@@ -7031,7 +7055,7 @@
       html += '<div style="margin-block-end:12px;"><strong>'+pl+'</strong>（'+list.length+'）<div class="specphotos" style="margin-block-start:6px;">'+
         list.map(function(p){
           var cust = p.by==="customer";
-          return '<div class="specphoto"><img src="'+p.url+'" alt="">'+
+          return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+p.url+'" alt="">'+
             '<a href="'+p.url+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
             '<span class="spby'+(cust?' cust':'')+'">'+(cust?'お客様':'スタッフ')+'</span>'+
             '<button class="spdel" data-delimageboard="'+p.id+'">×</button></div>';
@@ -7097,7 +7121,7 @@
       html += '<div style="margin-block-end:12px;"><strong>'+escapeHtml(pl)+'</strong>（'+list.length+'）<div class="specphotos" style="margin-block-start:6px;">'+
         list.map(function(p){
           var cap = siteDateLabel(p.takenDate) + (p.memo ? " "+p.memo : "");
-          return '<div class="specphoto-wrap" style="width:72px;"><div class="specphoto"><img src="'+escapeHtml(p.url)+'" alt="">'+
+          return '<div class="specphoto-wrap" style="width:72px;"><div class="specphoto"><img loading="lazy" decoding="async" src="'+escapeHtml(p.url)+'" alt="">'+
             '<a href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
             '<button class="spdel" data-delsitephoto="'+p.id+'">×</button></div>'+
             (cap ? '<div class="muted" title="'+escapeHtml(cap)+'" style="font-size:.85rem; width:72px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+escapeHtml(cap)+'</div>' : '')+
@@ -8602,7 +8626,7 @@
     box.innerHTML = '<div class="muted" style="font-size:.85rem; font-weight:700; margin-block-end:4px;">いまの添付（削除・差し替えは「更新」を押すと保存されます）</div>'+
       editNoteFiles.map(function(e, i){
         var f = e.f, ct = f.contentType||"";
-        var inner = ct.indexOf("pdf")>=0 ? pdfThumbInnerHtml(f.url) : (ct.indexOf("video")>=0 ? '▶' : '<img src="'+f.url+'" alt="">');
+        var inner = ct.indexOf("pdf")>=0 ? pdfThumbInnerHtml(f.url) : (ct.indexOf("video")>=0 ? '▶' : '<img loading="lazy" decoding="async" src="'+f.url+'" alt="">');
         var state2 = e.removed ? '<span class="pill small status-未依頼">削除します</span>' : (e.repl ? '<span class="pill small status-受領済み">→ '+escapeHtml(e.repl.name)+' に差し替え</span>' : '');
         return '<div class="row" style="gap:8px; align-items:center; margin-block-end:6px; flex-wrap:wrap;'+(e.removed?' opacity:.5;':'')+'">'+
           '<a href="'+f.url+'" target="_blank" rel="noopener" class="notefiletile" style="width:56px; height:56px;">'+inner+'</a>'+
