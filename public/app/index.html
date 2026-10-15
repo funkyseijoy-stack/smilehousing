@@ -1953,17 +1953,22 @@
     return n;
   }
 
+  // ホームを早く出すため、起動時の読み込みを2段階にする（2026年10月〜）。
+  //  1段目：ホームに必要な小さいデータ（案件・タスク・業者・見積依頼・予約・設定）だけ先に読んで、すぐ描く。
+  //  2段目：写真・記録・添付など大きいデータは、ホームを出したあとで読んで、読めたらもう一度描く。
+  var BOOT_FAST_COLLECTIONS = ["projects","tasks","vendors","requests","reservations"];
   async function boot(){
     state.currentUser = loadLocalUser();
+    var slowCols = DATA_COLLECTIONS.filter(function(c){ return BOOT_FAST_COLLECTIONS.indexOf(c)<0; });
     try{
-      var results = await Promise.all(DATA_COLLECTIONS.map(function(c){ return apiGet(c); }));
-      DATA_COLLECTIONS.forEach(function(c, i){ state[c] = results[i]; });
+      var fastAndSettings = await Promise.all(BOOT_FAST_COLLECTIONS.map(function(c){ return apiGet(c); }).concat([apiGet("settings")]));
+      BOOT_FAST_COLLECTIONS.forEach(function(c, i){ state[c] = fastAndSettings[i]; });
+      var settingsItems = fastAndSettings[BOOT_FAST_COLLECTIONS.length];
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
       migrateLegacyTaskStatus();
       autoArchiveTasks();
       state.currentProjectId = state.projects.find(function(p){return !p.deletedAt;}) ? state.projects.find(function(p){return !p.deletedAt;}).id : null;
-      var settingsItems = await apiGet("settings");
       var s = settingsItems.find(function(x){ return x.id==="main"; });
       if(s){
         if(s.progressTags) state.settings.progressTags = s.progressTags;
@@ -1981,6 +1986,15 @@
     }
     render();
     populateUserSelect();
+    // 2段目：大きいデータを読む
+    try{
+      var slowResults = await Promise.all(slowCols.map(function(c){ return apiGet(c); }));
+      slowCols.forEach(function(c, i){ state[c] = slowResults[i]; });
+    }catch(e){
+      if(String(e && e.message)!=="unauthorized") toast("写真・記録などの読み込みに失敗しました。「🔄 最新の内容に更新」を押してください");
+      return;
+    }
+    render();
     migrateSiteCheckMoves();
     migrateToiletMerge();
     migratePlanboardPartRemoval();
