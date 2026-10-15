@@ -834,6 +834,7 @@
         <div class="card">
           <h3>追加見積り</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.85rem;">追加見積りを登録して金額を入れると、お客様が新しいおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面の「状態」に反映され、通知メールも届きます。状態は、ここで手動でも変えられます。</p>
+          <p style="margin:0 0 8px; font-size:.85rem; font-weight:700; padding:6px 10px; border-radius:8px; background:var(--surface-2);">💡 金額は、各カードの「金額を入力」欄から入れます。空欄のままだと、お客様には「金額確認中」と表示されます。</p>
           <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.85rem; font-weight:700;" hidden></p>
           <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
@@ -2703,7 +2704,7 @@
             '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
-            (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は「おうちノート」タブで入力）">'+(t.estimateRef?'✓追加見積り済み':'💴 追加見積りへ')+'</button>':'')+
+            (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'💴 追加見積りへ')+'</button>':'')+
             (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
             (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
             (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
@@ -7953,7 +7954,7 @@
     if(!content){ toast("内容が空のため載せられません"); return; }
     var firstLine = content.split("\n")[0].trim();
     var estTitle = firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine;
-    askChoice("追加見積りに載せる", "「"+proj.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が「金額確認中」で表示されます。金額は「おうちノート」タブで入力できます。", [{label:"載せる", value:"go"}], async function(v){
+    askChoice("追加見積りに載せる", "「"+proj.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が載ります。\n\n金額を入れる場所：この案件の「おうちノート連携」タブ →「追加見積り」→ 各カードの「金額を入力」欄。\n空欄のままだと、お客様には「金額確認中」と表示されます。", [{label:"載せる", value:"go"}], async function(v){
       if(v!=="go") return;
       var pid = t.projectId;
       var estId = uid("est");
@@ -7971,7 +7972,7 @@
       saveDoc("tasks", t.id, t);
       if(state.currentProjectId===pid) renderOkaiEstimates(cust);
       logActivity("タスクから追加見積り「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
-      toast("✅ 追加見積りに載せました（お客様には「金額確認中」と表示されます。金額は「おうちノート」タブで入力）", 8000);
+      toast("✅ 追加見積りに載せました。\n金額は、この案件の「おうちノート連携」タブ →「追加見積り」の「金額を入力」欄から入れます。\n空欄のままだと、お客様には「金額確認中」と表示されます。", 12000);
     });
   }
   async function taskGmailDraft(id){
@@ -9048,7 +9049,7 @@
     var box = document.createElement("div");
     box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:320px;width:100%;box-shadow:var(--shadow);";
     box.innerHTML = '<h3 style="margin:0 0 8px;">'+escapeHtml(title)+'</h3>'+
-      (message ? '<p class="muted" style="margin:0 0 14px; font-size:.85rem;">'+escapeHtml(message)+'</p>' : '')+
+      (message ? '<p class="muted" style="margin:0 0 14px; font-size:.85rem; white-space:pre-line;">'+escapeHtml(message)+'</p>' : '')+
       '<div style="display:flex; flex-direction:column; gap:8px;">'+
       choices.map(function(c,i){ return '<button class="btn'+(i===0?"":" secondary")+'" data-choiceval="'+i+'" style="width:100%;">'+escapeHtml(c.label)+'</button>'; }).join("")+
       '<button class="btn secondary" data-choiceval="cancel" style="width:100%;">キャンセル</button>'+
