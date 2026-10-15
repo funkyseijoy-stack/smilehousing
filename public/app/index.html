@@ -5096,8 +5096,24 @@
       var reqBtnHtml = (p.kind==="planboard") ? '<button class="pill status-'+(p.reqStatus||"未依頼")+'" style="cursor:pointer; border:none; font-family:inherit;" data-cyclereq="'+p.id+'">'+(p.reqStatus||"未依頼")+'</button>' : '';
       var reflectBtnHtml = (p.kind!=="note") ? '<button class="pill reflect small'+(p.reflected?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>' : '';
       // お客様の画面に「仮決定／決定」ボタンを出すか（タスクから作ったコピーはタスク側のボタンで決める）
-      var askBtnHtml = (p.kind!=="note" && !(p.source && p.source.taskId))
-        ? '<button class="pill reflect small'+(p.askDecision?" on":"")+'" style="cursor:pointer; border:none; font-family:inherit;" data-spec-toggleask="'+p.id+'" title="お客様のおうちノートで、このカードに「仮決定／決定」ボタンを出す">'+(p.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>' : '';
+      var askTitle = 'title="お客様のおうちノートで、このカードに「仮決定／決定」ボタンを出す（反映済みのカードだけ表示されます）"';
+      var askBtnStyle = 'style="cursor:pointer; border:none; font-family:inherit;"';
+      var askBtnHtml = "";
+      if(p.kind==="note"){
+        // 打合せ記録のカード：記録そのものの「出す／出さない」と「反映」をここからも操作できる
+        if(relatedNote){
+          askBtnHtml = '<button class="pill reflect small'+(relatedNote.reflected?" on":"")+'" '+askBtnStyle+' data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>'+
+            '<button class="pill reflect small'+(relatedNote.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-togglenoteask="'+relatedNote.id+'" '+askTitle+'>'+(relatedNote.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>';
+        }
+      } else if(p.source && p.source.taskId){
+        // 業者タスクから作ったコピー：決定ボタンはタスク側の設定と共通
+        var srcTask = state.tasks.find(function(x){ return x.id===p.source.taskId; });
+        if(srcTask){
+          askBtnHtml = '<button class="pill reflect small'+(srcTask.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-toggletaskask="'+srcTask.id+'" '+askTitle+'>'+(srcTask.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>';
+        }
+      } else {
+        askBtnHtml = '<button class="pill reflect small'+(p.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-toggleask="'+p.id+'" '+askTitle+'>'+(p.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>';
+      }
       // バッジ（打合せ記録は6種類すべて、写真・プランボードは分類用の2種類のみ、トグル可能）。
       var badgeRowHtml = (p.kind==="note")
         ? (relatedNote ? '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("note:"+relatedNote.id, relatedNote.badges)+'</div>' : "")
@@ -10143,6 +10159,12 @@
         if(spedit){ openSpecEdit(spedit.dataset.specEdit); return; }
         var sptask = e.target.closest("[data-spec-taskmenu]");
         if(sptask){ openSpecTaskMenu(sptask.dataset.specTaskmenu, sptask.dataset.sc, sptask.dataset.cat||null, sptask.dataset.room||null, sptask.dataset.side||null); return; }
+        var spnoteask = e.target.closest("[data-spec-togglenoteask]");
+        if(spnoteask){ toggleMeetingAskDecision(spnoteask.dataset.specTogglenoteask); return; }
+        var spnoterefl = e.target.closest("[data-spec-togglenotereflect]");
+        if(spnoterefl){ toggleMeetingReflected(spnoterefl.dataset.specTogglenotereflect); return; }
+        var sptaskask = e.target.closest("[data-spec-toggletaskask]");
+        if(sptaskask){ toggleTaskAskDecision(sptaskask.dataset.specToggletaskask); return; }
         var specask = e.target.closest("[data-spec-toggleask]");
         if(specask){ toggleSpecAskDecision(specask.dataset.specToggleask); return; }
         var specdecide = e.target.closest("[data-spec-decide]");
