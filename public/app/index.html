@@ -1698,6 +1698,46 @@
     }catch(e){ toast("削除に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
 
+  // 大きすぎるPDF（サーバーの受け取り上限を超えるもの）を、各ページを画像にして軽くしたPDFに作り直す。
+  // 文字は選べなくなるが、見た目はそのまま。収まるまで段階的に画質・解像度を下げる。収まらなければ null。
+  async function shrinkPdfForUpload(file, limitBytes){
+    if(typeof pdfjsLib === "undefined" || typeof PDFLib === "undefined") return null;
+    var buf = await file.arrayBuffer();
+    var src = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise;
+    var n = src.numPages;
+    if(n>40){ try{ await src.destroy(); }catch(e){} return null; }
+    var steps = [ {long:2400,q:0.8}, {long:1800,q:0.7}, {long:1400,q:0.6}, {long:1100,q:0.5} ];
+    try{
+      for(var si=0; si<steps.length; si++){
+        var st = steps[si];
+        var out = await PDFLib.PDFDocument.create();
+        var total = 0;
+        for(var pn=1; pn<=n; pn++){
+          var page = await src.getPage(pn);
+          var vp1 = page.getViewport({scale:1});
+          var sc = st.long / Math.max(vp1.width, vp1.height);
+          var vp = page.getViewport({scale:sc});
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+          var ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+          await page.render({canvasContext:ctx, viewport:vp}).promise;
+          var jpgBlob = await new Promise(function(res){ canvas.toBlob(res, "image/jpeg", st.q); });
+          canvas.width = canvas.height = 0;
+          if(!jpgBlob) return null;
+          total += jpgBlob.size;
+          if(total > limitBytes) break; // この画質では収まらない。次の段階へ
+          var img = await out.embedJpg(new Uint8Array(await jpgBlob.arrayBuffer()));
+          var pg = out.addPage([vp1.width, vp1.height]);
+          pg.drawImage(img, {x:0, y:0, width:vp1.width, height:vp1.height});
+        }
+        if(total > limitBytes) continue;
+        var bytes = await out.save();
+        if(bytes.length <= limitBytes) return new Blob([bytes], {type:"application/pdf"});
+      }
+      return null;
+    }finally{ try{ await src.destroy(); }catch(e){} }
+  }
   assets = {
     // 保存前に、HEIC/HEIF（iPhoneのカメラ・写真ライブラリの既定形式）を
     // 自動でJPEGに変換しておく。多くのブラウザは<img>でHEICを表示できず、
@@ -1717,6 +1757,18 @@
         if(cl){ uploadFile = cl; shadowCleaned = true; }
       }
       function fail(msg, code){ var er = new Error(code||"upload_failed"); er.userMessage = msg; er.code = code||"upload_failed"; return er; }
+      // 大きいPDFは、ページを画像にして軽くしてから送る（上限を超えるときだけ）
+      var isPdfFile = (uploadFile.type==="application/pdf") || /\.pdf$/i.test(uploadFile.name||"");
+      if(isPdfFile && uploadFile.size*1.37 > 5.8*1048576){
+        var origMb = (uploadFile.size/1048576).toFixed(1);
+        toast("📄 大きいPDF（"+origMb+"MB）を軽くしています…少しお待ちください");
+        var small = null;
+        try{ small = await shrinkPdfForUpload(uploadFile, 4.2*1048576); }catch(e){ small = null; }
+        if(!small) throw fail("PDFが大きすぎて（"+origMb+"MB）自動で軽くできませんでした。ページ数を減らすか、小さくしてから追加してください", "too_large");
+        small.name = uploadFile.name; // 表示用（Blobにはnameを付けられないが、無害）
+        uploadFile = small;
+        toast("✅ PDFを軽くしました（"+origMb+"MB → "+(small.size/1048576).toFixed(1)+"MB）");
+      }
       // サーバー（Netlify）は1回に約6MBまでしか受け取れない。写真は送るとき約1.37倍に膨らむので、先に確かめて、理由を伝える
       var mb = (uploadFile.size/1048576);
       if(uploadFile.size*1.37 > 5.8*1048576){
