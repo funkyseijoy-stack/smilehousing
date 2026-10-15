@@ -30,7 +30,14 @@ async function fetchOldCustomer(projectId: string): Promise<any | null> {
 
 export async function getExtras(store: Store, projectId: string): Promise<any | null> {
   const key = `noteExtras/${projectId}`;
-  const existing = await store.get(key, { type: "json" });
+  // 最新の内容を確実に読む（読み損ねて「無い」と判断し、既存データを初期状態で上書きするのを防ぐ）。
+  // 読み込み自体に失敗したときは null（＝使えない）を返し、決して新規作成・上書きしない。
+  let existing: any;
+  try {
+    existing = await store.get(key, { type: "json", consistency: "strong" });
+  } catch {
+    return null;
+  }
   if (existing) return existing;
   const old = await fetchOldCustomer(projectId);
   if (old === null) return null; // 旧側と通信できなかった。保存せず、次に開いたときにやり直す
@@ -40,8 +47,17 @@ export async function getExtras(store: Store, projectId: string): Promise<any | 
   doc.customerEstimates = Array.isArray(doc.customerEstimates) ? doc.customerEstimates : [];
   doc.considerations = Array.isArray(doc.considerations) ? doc.considerations : [];
   doc.nextBookings = Array.isArray(doc.nextBookings) ? doc.nextBookings : [];
-  // 一度写したら、以後は旧側を見ない
-  await store.setJSON(key, doc);
+  // 一度写したら、以後は旧側を見ない。onlyIfNew＝すでに保存されたデータがあれば絶対に上書きしない
+  try {
+    const r: any = await store.setJSON(key, doc, { onlyIfNew: true } as any);
+    if (r && r.modified === false) {
+      const again = await store.get(key, { type: "json", consistency: "strong" });
+      if (again) return again;
+      return null;
+    }
+  } catch {
+    return null;
+  }
   return doc;
 }
 
