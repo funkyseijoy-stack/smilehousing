@@ -681,7 +681,8 @@ export default async (req: Request, context: Context) => {
       const nm = okaiCustomer && okaiCustomer.nextMeeting;
       if (!nm || nm.on === false) return null;
       const text = String(nm.text || "").trim().slice(0, 2000);
-      return text ? { text } : null;
+      const done = Array.isArray(nm.done) ? nm.done.slice(0, 50).map((x: any) => String(x || "").trim().slice(0, 500)).filter(Boolean) : [];
+      return text ? { text, done } : null;
     })(),
     ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });

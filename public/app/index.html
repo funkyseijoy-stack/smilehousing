@@ -815,6 +815,7 @@
           <p class="muted" style="margin:0 0 10px; font-size:.85rem;">次回の打合せで決める内容などを自由に書けます。書き換えて保存すると、お客様の画面も書き換わります。</p>
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiNextMeetOn"> お客様の画面に表示する</label>
           <textarea id="okaiNextMeetText" rows="4" style="width:100%;" placeholder="例：外壁・屋根の色を決めます。サンプルをご覧いただきます。"></textarea>
+          <div id="okaiNextMeetChecks" style="margin-block-start:10px;"></div>
           <div class="row" style="gap:6px; margin-block-start:10px;"><button class="btn small" id="btnOkaiNextMeetSave">保存</button></div>
         </div>
         <div class="card">
@@ -5676,11 +5677,40 @@
     if(!on || !tx) return;
     on.checked = !!(nm && nm.on!==false && String(nm.text||"").trim());
     tx.value = (nm && nm.text) || "";
+    okaiNextMeetDone = (nm && Array.isArray(nm.done)) ? nm.done.map(String) : [];
+    okaiNextMeetRenderChecks();
+  }
+  // 「打ち合わせ済み」にした行（行の文字そのものを覚える。お客様画面でその行に「打ち合わせ済み」の印が付く）
+  var okaiNextMeetDone = [];
+  function okaiNextMeetLines(){
+    var tx = document.getElementById("okaiNextMeetText");
+    return String((tx && tx.value) || "").split(/\r?\n/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+  }
+  function okaiNextMeetRenderChecks(){
+    var box = document.getElementById("okaiNextMeetChecks");
+    if(!box) return;
+    var lines = okaiNextMeetLines();
+    if(!lines.length){ box.innerHTML = ""; return; }
+    box.innerHTML = '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">打ち合わせが終わった項目にチェック（お客様の画面に「打ち合わせ済み」と出ます）</div>' +
+      lines.map(function(line, i){
+        var on = okaiNextMeetDone.indexOf(line) >= 0;
+        return '<label class="row" style="gap:8px; align-items:center; padding:4px 0;"><input type="checkbox" data-nmline="'+i+'"'+(on?' checked':'')+'> <span>'+escapeHtml(line)+'</span></label>';
+      }).join("");
+    box.querySelectorAll("input[data-nmline]").forEach(function(cb){
+      cb.addEventListener("change", function(){
+        var line = lines[Number(cb.getAttribute("data-nmline"))];
+        var at = okaiNextMeetDone.indexOf(line);
+        if(cb.checked && at < 0) okaiNextMeetDone.push(line);
+        if(!cb.checked && at >= 0) okaiNextMeetDone.splice(at, 1);
+      });
+    });
   }
   function okaiNextMeetSave(){
     var proj = projectById(state.currentProjectId);
     if(!proj) return;
-    var nm = { on: document.getElementById("okaiNextMeetOn").checked, text: document.getElementById("okaiNextMeetText").value.trim() };
+    var curLines = okaiNextMeetLines();
+    var nm = { on: document.getElementById("okaiNextMeetOn").checked, text: document.getElementById("okaiNextMeetText").value.trim(),
+      done: okaiNextMeetDone.filter(function(l){ return curLines.indexOf(l) >= 0; }) };
     okaiBridgeFetch('', {
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
@@ -9988,6 +10018,7 @@
     document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
     document.getElementById("btnOkaiProgSave").addEventListener("click", okaiProgSave);
     document.getElementById("btnOkaiNextMeetSave").addEventListener("click", okaiNextMeetSave);
+    document.getElementById("okaiNextMeetText").addEventListener("input", okaiNextMeetRenderChecks);
     document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); });
     document.getElementById("okaiProgRows").addEventListener("click", function(e){
       var d = e.target.closest("[data-progdel]"); if(!d) return;

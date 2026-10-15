@@ -721,8 +721,15 @@ function homeHtml(){
 
     // 次回の打合せの予定（スタッフが入力した文章）
     if(data.nextMeeting && data.nextMeeting.text){
+      var nmDone = Array.isArray(data.nextMeeting.done) ? data.nextMeeting.done : [];
+      var nmLines = String(data.nextMeeting.text).split(/\r?\n/).map(function(l){
+        var t = l.trim();
+        if(!t) return '<div style="height:.6em;"></div>';
+        if(nmDone.indexOf(t) >= 0) return '<div style="display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;"><span>'+esc(t)+'</span><span style="font-size:.8em; font-weight:700; color:#2f6b3f; background:#e4f1e6; border-radius:999px; padding:1px 10px;">✓ 打ち合わせ済み</span></div>';
+        return '<div>'+esc(t)+'</div>';
+      }).join("");
       out += '<div class="sechd"><h3>📝 打合せの予定</h3></div>'+
-        '<div class="rv" style="display:block;"><div class="tm" style="white-space:pre-wrap; line-height:1.7; color:var(--ink,inherit);">'+esc(data.nextMeeting.text)+'</div></div>';
+        '<div class="rv" style="display:block;"><div class="tm" style="line-height:1.7; color:var(--ink,inherit);">'+nmLines+'</div></div>';
     }
 
     // 最近のお打合せ記録（2件）。決定事項・確認事項が見える具体的な内容なので、
