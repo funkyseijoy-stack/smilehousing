@@ -36,6 +36,30 @@ function base64ToBase64Url(b64: string) {
 }
 
 type Attachment = { filename: string; mimeType: string; content: string };
+// 画面から「中身（base64）」ではなく「ファイルの場所（url）」だけが送られてくる添付
+type AttachmentIn = { filename?: string; mimeType?: string; content?: string; url?: string };
+
+// 1通に付けるファイルの合計上限（Gmailは約25MB。base64で約1.37倍になるので余裕を見て元の大きさで17MB）
+const MAX_TOTAL_RAW = 17 * 1024 * 1024;
+// これを超えるメールは、Gmailの大きいメール用の取り込み口（最大35MB）で作る
+const BIG_MESSAGE_BYTES = 4 * 1024 * 1024;
+
+// /api/get-photo?slug=…&key=… のURLから、保存済みのファイルを直接読む
+async function loadStoredFile(url: string): Promise<{ data: Buffer; contentType: string } | null> {
+  try {
+    const u = new URL(url, "https://example.invalid");
+    if (!u.pathname.endsWith("/api/get-photo")) return null;
+    const slug = u.searchParams.get("slug");
+    const key = u.searchParams.get("key");
+    if (!slug || !key) return null;
+    const store = getStore("customerPhotos");
+    const r: any = await store.getWithMetadata(`${slug}/${key}`, { type: "arrayBuffer" });
+    if (!r || !r.data) return null;
+    return { data: Buffer.from(r.data), contentType: (r.metadata && r.metadata.contentType) || "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
 
 function buildMimeMessage(opts: {
   to: string[];
@@ -123,7 +147,7 @@ export default async (req: Request, context: Context) => {
   const to: string[] = Array.isArray(body.to) ? body.to : body.to ? [String(body.to)] : [];
   const subject = String(body.subject || "");
   const mailBody = String(body.body || "");
-  const attachments: Attachment[] = Array.isArray(body.attachments) ? body.attachments : [];
+  const incoming: AttachmentIn[] = Array.isArray(body.attachments) ? body.attachments : [];
 
   const tokenResult = await getAccessToken();
   if (!tokenResult.ok) {
@@ -131,22 +155,65 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
-    const raw = buildMimeMessage({ to, subject, body: mailBody, attachments });
-    const rawBase64Url = base64ToBase64Url(Buffer.from(raw, "utf-8").toString("base64"));
+    // 添付を集める（中身が来ていればそのまま、urlだけならここで読む）。合計が上限を超えるものは付けず、本文にリンクを入れる。
+    const attachments: Attachment[] = [];
+    const linked: { name: string; url: string; why: string }[] = [];
+    const origin = new URL(req.url).origin;
+    let totalRaw = 0;
+    for (const a of incoming) {
+      const name = String(a.filename || "添付");
+      if (a.content) {
+        const size = Math.floor(a.content.length * 0.75);
+        if (totalRaw + size > MAX_TOTAL_RAW) { linked.push({ name, url: "", why: "大きすぎる" }); continue; }
+        totalRaw += size;
+        attachments.push({ filename: name, mimeType: a.mimeType || "application/octet-stream", content: a.content });
+      } else if (a.url) {
+        const absUrl = new URL(a.url, origin).href;
+        const f = await loadStoredFile(a.url);
+        if (!f) { linked.push({ name, url: absUrl, why: "読み込めない" }); continue; }
+        if (totalRaw + f.data.length > MAX_TOTAL_RAW) { linked.push({ name, url: absUrl, why: "大きすぎる（" + (f.data.length / 1048576).toFixed(1) + "MB）" }); continue; }
+        totalRaw += f.data.length;
+        attachments.push({ filename: name, mimeType: a.mimeType || f.contentType, content: f.data.toString("base64") });
+      }
+    }
+    let finalBody = mailBody;
+    const withLinks = linked.filter((x) => x.url);
+    if (withLinks.length) {
+      finalBody += "\n\n※メールに付けられなかった資料は、下のリンクから開いてください。\n" + withLinks.map((x) => "・" + x.name + "：" + x.url).join("\n");
+    }
 
-    const draftRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + tokenResult.accessToken,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ message: { raw: rawBase64Url } }),
-    });
+    const raw = buildMimeMessage({ to, subject, body: finalBody, attachments });
+    const rawBytes = Buffer.from(raw, "utf-8");
+
+    let draftRes: Response;
+    if (rawBytes.length > BIG_MESSAGE_BYTES) {
+      // 大きいメール：Gmailの取り込み口（message/rfc822をそのまま送る）で作る
+      draftRes = await fetch("https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + tokenResult.accessToken,
+          "Content-Type": "message/rfc822",
+        },
+        body: rawBytes,
+      });
+    } else {
+      draftRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + tokenResult.accessToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: { raw: base64ToBase64Url(rawBytes.toString("base64")) } }),
+      });
+    }
     const draftData: any = await draftRes.json();
     if (!draftRes.ok) {
       return jsonResponse({ error: "gmail_api_error", detail: draftData }, 502);
     }
-    return jsonResponse({ ok: true, id: draftData.id, threadId: draftData.message?.threadId || null, attachmentCount: attachments.length });
+    return jsonResponse({
+      ok: true, id: draftData.id, threadId: draftData.message?.threadId || null,
+      attachmentCount: attachments.length, attachedBytes: totalRaw, linked,
+    });
   } catch (e: any) {
     return jsonResponse({ error: "unexpected_error", detail: e?.message || String(e) }, 500);
   }

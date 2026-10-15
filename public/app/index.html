@@ -6245,20 +6245,12 @@
     render();
     toast("業者タスクと見積依頼を作りました。Gmail下書きを作っています…");
 
-    // 3) Gmail下書き（会社ごと）。添付は記録のファイル（1つ3.5MB超・合計3.8MB超は付けない）
-    var atts = [], skipped = 0, total = 0, notAttached = [];
-    function absUrl(u){ try{ return new URL(u, location.origin).href; }catch(e){ return u||""; } }
-    for(var i=0;i<files.length;i++){
-      var a = files[i];
-      try{
-        var r0 = await fetch(a.url);
-        if(!r0.ok) throw new Error("fetch");
-        var blob = await r0.blob();
-        if(blob.size > 3500000 || total + blob.size > 3800000){ skipped++; notAttached.push({name:a.name||"添付", url:absUrl(a.url), why:"大きすぎる（"+(blob.size/1048576).toFixed(1)+"MB）"}); continue; }
-        total += blob.size;
-        atts.push({ filename:a.name||"添付", mimeType:a.contentType||blob.type||"application/octet-stream", content: await blobToBase64(blob) });
-      }catch(e){ skipped++; notAttached.push({name:a.name||"添付", url:absUrl(a.url), why:"読み込めない"}); }
-    }
+    // 3) Gmail下書き（会社ごと）。添付は記録のファイル
+    // 添付は「ファイルの場所」だけ渡す（サーバーが直接読むので、大きいファイルも付けられる。合計17MBまで）
+    var atts = files.filter(function(f){ return f && f.url; }).map(function(f){
+      return { filename:f.name||"添付", mimeType:f.contentType||"application/octet-stream", url:f.url };
+    });
+    var attachedN = 0, linkedAll = [];
     var subject = "【見積依頼】"+proj.name+(part&&part.label?"　"+part.label:"");
     var okNames = [], failNames = [], noMail = [];
     for(var k=0;k<reqs.length;k++){
@@ -6267,15 +6259,12 @@
         "下記の件につきまして、お見積りをお願いしたくご連絡いたしました。","",
         "案件："+proj.name, "部位："+(part&&part.label?part.label:""), "内容："+content, "",
         "添付の資料等をご確認のうえ、ご対応のほどよろしくお願いいたします。"];
-      if(notAttached.length){
-        lines.push("","※メールに付けられなかった資料は、下のリンクから開いてください。");
-        notAttached.forEach(function(x){ lines.push("・"+x.name+"："+x.url); });
-      }
       lines.push("","株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798");
       if(!v.email) noMail.push(v.name);
       try{
         var res = await gmailCreateDraft({ to: v.email?[v.email]:[], subject: subject, body: lines.join("\n"), attachments: atts });
         var payload = (res && res.payload) || {};
+        if(k===0){ attachedN = payload.attachmentCount||0; linkedAll = payload.linked||[]; }
         if(payload.threadId) reqs[k].req.gmailThreadId = payload.threadId;
         reqs[k].req.status = "依頼済み"; reqs[k].req.requestedAt = todayStr();
         okNames.push(v.name);
@@ -6289,8 +6278,8 @@
     var msg = "✅ 業者タスクと見積依頼を作り、Gmail下書きを"+okNames.length+"件作りました（送信はしていません。Gmailで確認して送ってください）";
     if(noMail.length) msg += "。メール未登録："+noMail.join("、")+"（下書きで宛先を入れてください）";
     if(failNames.length) msg += "。下書きに失敗："+failNames.join("、")+"（見積タブの「依頼する」からやり直せます）";
-    if(atts.length) msg += "。添付"+atts.length+"件";
-    if(skipped) msg += "。メールに付けられなかった資料"+skipped+"件（"+notAttached.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は、本文にリンクを入れました";
+    if(atts.length) msg += "。添付"+attachedN+"件";
+    if(linkedAll.length) msg += "。メールに付けられなかった資料"+linkedAll.length+"件（"+linkedAll.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は、本文にリンクを入れました";
     toast(msg, 12000);
   }
   async function createTaskFromNote(noteId, taskType){
@@ -7523,6 +7512,8 @@
     var out = []; var assetListCache = {value:null};
     for(var i=0;i<atts.length;i++){
       var a = atts[i];
+      // 画面からサーバーで下書きを作るときは、ファイルの場所だけ渡す（サーバーが直接読むので大きいファイルも付けられる）
+      if(!mcp && !fileArgsSupported && a.url){ out.push({ filename:a.name, mimeType:a.contentType||"application/octet-stream", url:a.url }); continue; }
       var blob = await getAttachmentBlob(a, assetListCache);
       if(!blob){ toast(a.name+" の読み込みに失敗しました（添付なしで依頼します）"); continue; }
       if(fileArgsSupported){
@@ -7574,6 +7565,7 @@
   async function gmailCreateDraft(input){
     if(mcp) return await mcp.callTool("Gmail","create_draft", input);
     var atts = input.attachments || [];
+    // 中身（content）を送る添付だけを数える。url だけの添付はサーバーが直接読むので大きさの制限は受けない（サーバー側で合計17MBまで）
     var total = atts.reduce(function(n,a){ return n + (typeof a.content==="string" ? a.content.length*0.75 : 0); }, 0);
     if(total > 4*1024*1024) throw new Error("添付が大きすぎます（約"+Math.round(total/1048576)+"MB）。合計4MB以内にしてください");
     var res = await fetch("/api/gmail-create-draft", {
@@ -7585,7 +7577,7 @@
     if(res.status===401) throw new Error("ログインの有効期限が切れました。ログインし直してください");
     if(!res.ok) throw new Error("サーバーエラー（"+res.status+"）");
     var j = await res.json();
-    return { payload: { threadId: j.threadId || null, id: j.id || null } };
+    return { payload: { threadId: j.threadId || null, id: j.id || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[] } };
   }
   async function sendGmailRequest(project, vendors){
     var subject = "【見積依頼】"+(project?project.name:"")+" 案件について";
@@ -7967,26 +7959,18 @@
     lines.push("内容："+String(t.content||""));
     if(t.hasDeadline && t.deadline) lines.push("期限："+t.deadline);
     lines.push("","よろしくお願いいたします。","","株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798");
-    var atts = []; var skipped = 0;
-    var list = (t.attachments||[]);
-    for(var i=0;i<list.length;i++){
-      var a = list[i];
-      try{
-        var res = await fetch(a.url);
-        if(!res.ok) throw new Error("fetch");
-        var blob = await res.blob();
-        if(blob.size > 3500000){ skipped++; continue; }
-        atts.push({ filename:a.name||"添付", mimeType:a.contentType||blob.type||"application/octet-stream", content: await blobToBase64(blob) });
-      }catch(e){ skipped++; }
-    }
+    var atts = (t.attachments||[]).filter(function(a){ return a && a.url; }).map(function(a){
+      return { filename:a.name||"添付", mimeType:a.contentType||"application/octet-stream", url:a.url };
+    });
     try{
-      await gmailCreateDraft({ to:to, subject:subject, body:lines.join("\n"), attachments:atts });
+      var dres = await gmailCreateDraft({ to:to, subject:subject, body:lines.join("\n"), attachments:atts });
+      var dp = (dres && dres.payload) || {};
       var msg = "✅ Gmail下書きを作成しました";
       if(to.length) msg += "（宛先"+to.length+"件）"; else msg += "（宛先なし。下書きで宛先を入れてください）";
-      if(atts.length) msg += "・添付"+atts.length+"件";
+      if(atts.length) msg += "・添付"+(dp.attachmentCount!=null ? dp.attachmentCount : atts.length)+"件";
       if(noEmail.length) msg += "。メール未登録："+noEmail.join("、");
-      if(skipped) msg += "。大きすぎる／読めない添付"+skipped+"件は付けていません";
-      toast(msg);
+      if(dp.linked && dp.linked.length) msg += "。付けられなかった資料"+dp.linked.length+"件（"+dp.linked.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は本文にリンクを入れました";
+      toast(msg, 9000);
       logActivity("タスクのGmail下書きを作成しました");
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
