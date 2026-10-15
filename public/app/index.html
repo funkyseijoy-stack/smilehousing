@@ -2563,7 +2563,7 @@
     t.completedAt = (t.status==="完了") ? now : null;
     t.reflected = false; t.reflectedAt = null;
     delete t.askDecision;
-    delete t.sent;
+    delete t.sent; delete t.estimateRef;
     state.tasks.push(t);
     state.taskMenuId = null;
     goToTaskBoard(t.id);
@@ -2703,6 +2703,7 @@
             '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
             '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
             '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
+            (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は「おうちノート」タブで入力）">'+(t.estimateRef?'✓追加見積り済み':'💴 追加見積りへ')+'</button>':'')+
             (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
             (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
             (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
@@ -7941,6 +7942,38 @@
     });
   }
   // ---- タスクからGmail下書き ----
+  // タスク → お客様のおうちノートの「追加見積り」へ（金額なし＝お客様には「金額確認中」と表示。金額は「おうちノート」タブで入力）
+  function taskToEstimate(id){
+    var t = state.tasks.find(function(x){ return x.id===id; });
+    if(!t) return;
+    var proj = projectById(t.projectId);
+    if(!proj){ toast("案件が見つかりません"); return; }
+    if(t.estimateRef){ toast("すでに追加見積りに載せています（「おうちノート」タブで金額を入力できます）"); return; }
+    var content = String(t.content||"").trim();
+    if(!content){ toast("内容が空のため載せられません"); return; }
+    var firstLine = content.split("\n")[0].trim();
+    var estTitle = firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine;
+    askChoice("追加見積りに載せる", "「"+proj.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が「金額確認中」で表示されます。金額は「おうちノート」タブで入力できます。", [{label:"載せる", value:"go"}], async function(v){
+      if(v!=="go") return;
+      var pid = t.projectId;
+      var estId = uid("est");
+      var cust;
+      try{
+        cust = await okaiUpdateList(pid, "customerEstimates", function(list){
+          return list.concat([{ id: estId, title: estTitle, amount: "", note: content, status: "確認中", updated: nowIso(), createdAt: nowIso() }]);
+        });
+      }catch(e){ toast("追加見積りへの追加に失敗しました。「おうちノート」タブでリンクを発行済みか確認してください"); return; }
+      var saved = ((cust && cust.customerEstimates) || []).some(function(x){ return x.id===estId; });
+      if(!saved){ toast("追加見積りに入りませんでした（おうちノート側で保存されませんでした）。もう一度お試しください"); return; }
+      t.estimateRef = { id: estId, at: nowIso(), by: state.currentUser||"" };
+      t.updatedAt = nowIso();
+      render();
+      saveDoc("tasks", t.id, t);
+      if(state.currentProjectId===pid) renderOkaiEstimates(cust);
+      logActivity("タスクから追加見積り「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
+      toast("✅ 追加見積りに載せました（お客様には「金額確認中」と表示されます。金額は「おうちノート」タブで入力）", 8000);
+    });
+  }
   async function taskGmailDraft(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t) return;
@@ -10360,6 +10393,7 @@
       else if(act==="duplicate") duplicateTask(id);
       else if(act==="setpart") setTaskSpecPart(id);
       else if(act==="gmaildraft") taskGmailDraft(id);
+      else if(act==="toestimate") taskToEstimate(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
       else if(act==="toggleask") toggleTaskAskDecision(id);
     });
