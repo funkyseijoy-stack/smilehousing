@@ -681,8 +681,18 @@ export default async (req: Request, context: Context) => {
       const nm = okaiCustomer && okaiCustomer.nextMeeting;
       if (!nm || nm.on === false) return null;
       const text = String(nm.text || "").trim().slice(0, 2000);
-      const done = Array.isArray(nm.done) ? nm.done.slice(0, 50).map((x: any) => String(x || "").trim().slice(0, 500)).filter(Boolean) : [];
-      return text ? { text, done } : null;
+      return text ? { text } : null;
+    })(),
+    // 決めることの一覧（スタッフが「おうちノート連携」タブで入力。on:false や空なら出さない。項目名と「決まった」かどうかだけ渡す）
+    meetingChecklist: (() => {
+      const mc = okaiCustomer && okaiCustomer.meetingChecklist;
+      if (!mc || mc.on === false || !Array.isArray(mc.items)) return null;
+      const items = mc.items.slice(0, 100).map((x: any) => ({
+        group: String((x && x.group) || "").slice(0, 20),
+        name: String((x && x.name) || "").trim().slice(0, 40),
+        decided: !!(x && x.decided),
+      })).filter((x: any) => x.name && x.group);
+      return items.length ? { items } : null;
     })(),
     ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });

@@ -815,8 +815,14 @@
           <p class="muted" style="margin:0 0 10px; font-size:.85rem;">次回の打合せで決める内容などを自由に書けます。書き換えて保存すると、お客様の画面も書き換わります。</p>
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiNextMeetOn"> お客様の画面に表示する</label>
           <textarea id="okaiNextMeetText" rows="4" style="width:100%;" placeholder="例：外壁・屋根の色を決めます。サンプルをご覧いただきます。"></textarea>
-          <div id="okaiNextMeetChecks" style="margin-block-start:10px;"></div>
           <div class="row" style="gap:6px; margin-block-start:10px;"><button class="btn small" id="btnOkaiNextMeetSave">保存</button></div>
+        </div>
+        <div class="card">
+          <h3>決めることの一覧（決まったらチェック）</h3>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">決まった項目にチェックを入れて保存すると、お客様の画面にも「決まった」と表示されます。項目は、お客様ごとに追加できます。</p>
+          <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiChkOn"> お客様の画面に表示する</label>
+          <div id="okaiChkList"></div>
+          <div class="row" style="gap:6px; margin-block-start:10px;"><button class="btn small" id="btnOkaiChkSave">保存</button></div>
         </div>
         <div class="card">
           <h3>予約状況（お客様がおうちノートで確認・予約）</h3>
@@ -5489,6 +5495,7 @@
       renderOkaiConsider(dataRes.body.customer);
       okaiProgFromCustomer(dataRes.body.customer);
       okaiNextMeetFromCustomer(dataRes.body.customer);
+      okaiChkFromCustomer(dataRes.body.customer);
       document.getElementById("okaiAce3dUrl").value = (dataRes.body.customer && dataRes.body.customer.customerLinks && dataRes.body.customer.customerLinks.ace3dUrl) || "";
     }).catch(function(){ unavailable.hidden = false; });
   }
@@ -5677,40 +5684,11 @@
     if(!on || !tx) return;
     on.checked = !!(nm && nm.on!==false && String(nm.text||"").trim());
     tx.value = (nm && nm.text) || "";
-    okaiNextMeetDone = (nm && Array.isArray(nm.done)) ? nm.done.map(String) : [];
-    okaiNextMeetRenderChecks();
-  }
-  // 「打ち合わせ済み」にした行（行の文字そのものを覚える。お客様画面でその行に「打ち合わせ済み」の印が付く）
-  var okaiNextMeetDone = [];
-  function okaiNextMeetLines(){
-    var tx = document.getElementById("okaiNextMeetText");
-    return String((tx && tx.value) || "").split(/\r?\n/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
-  }
-  function okaiNextMeetRenderChecks(){
-    var box = document.getElementById("okaiNextMeetChecks");
-    if(!box) return;
-    var lines = okaiNextMeetLines();
-    if(!lines.length){ box.innerHTML = ""; return; }
-    box.innerHTML = '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">打ち合わせが終わった項目にチェック（お客様の画面に「打ち合わせ済み」と出ます）</div>' +
-      lines.map(function(line, i){
-        var on = okaiNextMeetDone.indexOf(line) >= 0;
-        return '<label class="row" style="gap:8px; align-items:center; padding:4px 0;"><input type="checkbox" data-nmline="'+i+'"'+(on?' checked':'')+'> <span>'+escapeHtml(line)+'</span></label>';
-      }).join("");
-    box.querySelectorAll("input[data-nmline]").forEach(function(cb){
-      cb.addEventListener("change", function(){
-        var line = lines[Number(cb.getAttribute("data-nmline"))];
-        var at = okaiNextMeetDone.indexOf(line);
-        if(cb.checked && at < 0) okaiNextMeetDone.push(line);
-        if(!cb.checked && at >= 0) okaiNextMeetDone.splice(at, 1);
-      });
-    });
   }
   function okaiNextMeetSave(){
     var proj = projectById(state.currentProjectId);
     if(!proj) return;
-    var curLines = okaiNextMeetLines();
-    var nm = { on: document.getElementById("okaiNextMeetOn").checked, text: document.getElementById("okaiNextMeetText").value.trim(),
-      done: okaiNextMeetDone.filter(function(l){ return curLines.indexOf(l) >= 0; }) };
+    var nm = { on: document.getElementById("okaiNextMeetOn").checked, text: document.getElementById("okaiNextMeetText").value.trim() };
     okaiBridgeFetch('', {
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
@@ -5719,6 +5697,88 @@
       if(!res.ok || !res.body.customer || !res.body.customer.nextMeeting){ toast("保存に失敗しました"); return; }
       okaiNextMeetFromCustomer(res.body.customer);
       toast("✅ 保存しました" + (nm.on && nm.text ? "（お客様の画面に表示されます）" : "（お客様の画面には表示しません）"));
+    }).catch(function(){ toast("保存に失敗しました"); });
+  }
+
+  // ---- 決めることの一覧（noteExtras.meetingChecklist = {on, items:[{id,group,name,decided}]}）----
+  // 項目の初期セットはここだけ（保存するとお客様ごとの一覧として items ごと保存。お客様ごとに項目を追加できる）。
+  var OKAI_CHK_GROUPS = ["外部","設備","暖房・電気","インテリア"];
+  var OKAI_CHK_DEFAULTS = {
+    "外部": ["外壁","屋根","玄関ドア","外部電源と水道の位置"],
+    "設備": ["お風呂","キッチン","洗面","トイレ","脱衣室"],
+    "暖房・電気": ["暖房設備","あかりプラン","配線計画"],
+    "インテリア": ["クロス","カーテン等","ニッチ"]
+  };
+  var okaiChk = { on:false, items:[] };
+  function okaiChkDefaultItems(){
+    var out = [];
+    OKAI_CHK_GROUPS.forEach(function(g, gi){
+      OKAI_CHK_DEFAULTS[g].forEach(function(n, i){ out.push({ id:"d"+gi+"_"+i, group:g, name:n, decided:false }); });
+    });
+    return out;
+  }
+  function okaiChkFromCustomer(customer){
+    var mc = customer && customer.meetingChecklist;
+    if(mc && Array.isArray(mc.items) && mc.items.length){
+      okaiChk = { on: mc.on!==false, items: mc.items.map(function(x){ return { id:String(x.id), group:String(x.group||""), name:String(x.name||""), decided:!!x.decided }; }) };
+    } else {
+      okaiChk = { on:false, items: okaiChkDefaultItems() };
+    }
+    var cb = document.getElementById("okaiChkOn");
+    if(cb) cb.checked = okaiChk.on;
+    okaiChkRender();
+  }
+  function okaiChkRender(){
+    var box = document.getElementById("okaiChkList");
+    if(!box) return;
+    var groups = OKAI_CHK_GROUPS.slice();
+    okaiChk.items.forEach(function(it){ if(groups.indexOf(it.group) < 0) groups.push(it.group); });
+    box.innerHTML = groups.map(function(g){
+      var rows = okaiChk.items.filter(function(it){ return it.group===g; }).map(function(it){
+        var custom = String(it.id).indexOf("c")===0;
+        return '<label class="row" style="gap:8px; align-items:center; padding:4px 0;"><input type="checkbox" data-chk-id="'+escapeHtml(it.id)+'"'+(it.decided?' checked':'')+'> <span>'+escapeHtml(it.name)+'</span>'
+          + (custom ? ' <button type="button" class="btn small" data-chk-del="'+escapeHtml(it.id)+'">削除</button>' : '')
+          + '</label>';
+      }).join("");
+      return '<div style="margin-block-end:10px;"><div style="font-weight:700; margin-block-end:2px;">'+escapeHtml(g)+'</div>'+rows
+        + '<button type="button" class="btn small" data-chk-add="'+escapeHtml(g)+'">＋ 項目を追加</button></div>';
+    }).join("");
+  }
+  function okaiChkClick(e){
+    var t = e.target;
+    if(!t || !t.getAttribute) return;
+    var id = t.getAttribute("data-chk-id");
+    if(id){
+      okaiChk.items.forEach(function(it){ if(it.id===id) it.decided = !!t.checked; });
+      return;
+    }
+    var addG = t.getAttribute("data-chk-add");
+    if(addG){
+      var name = prompt("「"+addG+"」に追加する項目の名前");
+      name = (name||"").trim();
+      if(!name) return;
+      okaiChk.items.push({ id:"c"+Date.now().toString(36)+Math.floor(Math.random()*1000), group:addG, name:name.slice(0,40), decided:false });
+      okaiChkRender();
+      return;
+    }
+    var delId = t.getAttribute("data-chk-del");
+    if(delId){
+      okaiChk.items = okaiChk.items.filter(function(it){ return it.id!==delId; });
+      okaiChkRender();
+    }
+  }
+  function okaiChkSave(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj) return;
+    var payload = { on: document.getElementById("okaiChkOn").checked, items: okaiChk.items };
+    okaiBridgeFetch('', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId: proj.id, patch: { meetingChecklist: payload } })
+    }).then(function(res){
+      if(!res.ok || !res.body.customer || !res.body.customer.meetingChecklist){ toast("保存に失敗しました"); return; }
+      okaiChkFromCustomer(res.body.customer);
+      toast("✅ 保存しました" + (payload.on ? "（お客様の画面に表示されます）" : "（お客様の画面には表示しません）"));
     }).catch(function(){ toast("保存に失敗しました"); });
   }
 
@@ -10018,7 +10078,8 @@
     document.getElementById("btnOkaiSaveAce3d").addEventListener("click", okaiSaveAce3d);
     document.getElementById("btnOkaiProgSave").addEventListener("click", okaiProgSave);
     document.getElementById("btnOkaiNextMeetSave").addEventListener("click", okaiNextMeetSave);
-    document.getElementById("okaiNextMeetText").addEventListener("input", okaiNextMeetRenderChecks);
+    document.getElementById("btnOkaiChkSave").addEventListener("click", okaiChkSave);
+    document.getElementById("okaiChkList").addEventListener("click", okaiChkClick);
     document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); });
     document.getElementById("okaiProgRows").addEventListener("click", function(e){
       var d = e.target.closest("[data-progdel]"); if(!d) return;
