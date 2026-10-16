@@ -319,6 +319,15 @@
   .kancol .kangrid{ display:none; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; padding:4px 12px 12px; align-items:start; }
   .kancol.open .kangrid{ display:grid; }
   @media (max-width:900px){ .kancol .kangrid{ grid-template-columns:minmax(0,1fr); } }
+  /* 完了：月ごとのアコーディオン */
+  .kancol .kangrid .donemonth{ grid-column:1 / -1; border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden; }
+  .donemonthhead{ width:100%; display:flex; align-items:center; gap:10px; padding:10px 14px; background:none; border:0; cursor:pointer; text-align:start; font-family:inherit; color:var(--text); font-size:.95rem; font-weight:700; }
+  .donemonthhead .kancount{ background:var(--accent); color:#fff; border-radius:999px; padding:1px 11px; font-size:.85rem; }
+  .donemonthhead .kanarrow{ margin-inline-start:auto; color:var(--muted); transition:transform .15s; }
+  .donemonth.open .donemonthhead .kanarrow{ transform:rotate(180deg); }
+  .donemonthgrid{ display:none; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; padding:4px 12px 12px; align-items:start; }
+  .donemonth.open .donemonthgrid{ display:grid; }
+  @media (max-width:900px){ .donemonthgrid{ grid-template-columns:minmax(0,1fr); } }
   .kancard .kc-statusmenu{ display:flex; flex-wrap:wrap; gap:6px; padding:8px; margin-block-start:6px; background:var(--surface-2); border-radius:10px; }
   .kancard .kc-statusmenu button{ border:2px solid var(--border); background:var(--surface); color:var(--text); border-radius:999px; padding:5px 12px; font-family:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
   .kancard .kc-statusmenu button.cur{ background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -2666,6 +2675,14 @@
     logActivity("タスク「"+String(t.content||"").slice(0,20)+"」を複製しました");
     toast("📋 タスクを複製しました（反映は「反映する」を押すとお客様画面に出ます）");
   }
+  // 完了のカードが入っている「月」を開く（移した・探したカードが隠れないように）
+  function openDoneMonthOf(t){
+    var at = Date.parse(t.completedAt || t.updatedAt || t.createdAt || "");
+    var key = "日付なし";
+    if(at>0){ var d = new Date(at + 9*3600*1000); key = d.getUTCFullYear()+"年"+(d.getUTCMonth()+1)+"月"; }
+    state.doneMonthOpen = state.doneMonthOpen || {};
+    state.doneMonthOpen[key] = true;
+  }
   function goToTaskBoard(taskId){
     state.taskKindFilter = null;
     state.taskAssigneeFilter = null;
@@ -2673,7 +2690,7 @@
     state.taskFolderFilter = null;
     state.taskStatusFilter = null;
     var gt = state.tasks.find(function(x){ return x.id===taskId; });
-    if(gt){ state.taskOpen = state.taskOpen || {}; state.taskOpen[gt.status||"未着手"] = true; }
+    if(gt){ state.taskOpen = state.taskOpen || {}; state.taskOpen[gt.status||"未着手"] = true; if(gt.status==="完了") openDoneMonthOf(gt); }
     switchTab("home");
     renderKanban();
     setTimeout(function(){
@@ -2767,7 +2784,7 @@
         if(la !== lb) return la.localeCompare(lb, "ja");
         return (a.createdAt||"").localeCompare(b.createdAt||"");
       });
-      var cards = rows.map(function(t){
+      var cardArr = rows.map(function(t){
         var proj = projectById(t.projectId);
         var isVendor = !!t.requestTo;
         return '<div class="kancard'+(t.reflected?" reflected":"")+'" data-taskid="'+t.id+'">'+
@@ -2808,7 +2825,29 @@
             return '<button data-taskact="setstatus" data-id="'+t.id+'" data-status="'+st+'"'+(st===status?' class="cur"':'')+'>'+st+'</button>';
           }).join("")+'</div>' : '')+
           '</div>';
-      }).join("") || '<div class="empty" style="padding:10px 4px;">なし</div>';
+      });
+      var cards;
+      if(status==="完了" && rows.length){
+        // 完了は「月ごと」にまとめて開け閉めする（完了日の月・日本時間。新しい月が上、月の中も新しい順）
+        state.doneMonthOpen = state.doneMonthOpen || {};
+        var monthOf = function(t){
+          var at = Date.parse(t.completedAt || t.updatedAt || t.createdAt || "");
+          if(!(at>0)) return "日付なし";
+          var d = new Date(at + 9*3600*1000);
+          return d.getUTCFullYear()+"年"+(d.getUTCMonth()+1)+"月";
+        };
+        var order = rows.map(function(t, i){ return {t:t, i:i, key:monthOf(t), at:Date.parse(t.completedAt || t.updatedAt || t.createdAt || "")||0}; });
+        order.sort(function(x,y){ return y.at - x.at; });
+        var groups = [], gmap = {};
+        order.forEach(function(o){ if(!gmap[o.key]){ gmap[o.key] = {key:o.key, html:[], n:0}; groups.push(gmap[o.key]); } gmap[o.key].html.push(cardArr[o.i]); gmap[o.key].n++; });
+        cards = groups.map(function(g){
+          var mo = !!state.doneMonthOpen[g.key];
+          return '<div class="donemonth'+(mo?" open":"")+'"><button class="donemonthhead" data-donemonthtoggle="'+escapeHtml(g.key)+'" aria-expanded="'+mo+'"><span>'+escapeHtml(g.key)+'</span><span class="kancount tabular">'+g.n+'</span><span class="kanarrow">▾</span></button>'+
+            '<div class="donemonthgrid">'+g.html.join("")+'</div></div>';
+        }).join("");
+      } else {
+        cards = cardArr.join("") || '<div class="empty" style="padding:10px 4px;">なし</div>';
+      }
       var isOpen = !!state.taskStatusFilter || !!state.taskOpen[status];
       return '<div class="kancol'+(isOpen?" open":"")+'"><button class="kanhead" data-taskstatustoggle="'+status+'" aria-expanded="'+isOpen+'">'+
         '<span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span><span>'+status+'</span><span class="kancount tabular">'+rows.length+'</span><span class="kanarrow">▾</span></button>'+
@@ -9007,6 +9046,7 @@
     else { t.completedAt = null; t.archivedAt = null; }
     state.taskOpen = state.taskOpen || {};
     state.taskOpen[newStatus] = true;
+    if(newStatus==="完了") openDoneMonthOf(t);
     render();
     toast("「"+newStatus+"」へ移しました");
     await saveDoc("tasks", t.id, t);
@@ -10576,6 +10616,14 @@
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
       var vcyc = e.target.closest("[data-vendorcycle]");
       if(vcyc){ cycleVendorStatus(vcyc.dataset.vendorcycle, parseInt(vcyc.dataset.vidx,10)); return; }
+      var mhead = e.target.closest("[data-donemonthtoggle]");
+      if(mhead){
+        var mk = mhead.dataset.donemonthtoggle;
+        state.doneMonthOpen = state.doneMonthOpen || {};
+        state.doneMonthOpen[mk] = !state.doneMonthOpen[mk];
+        renderKanban();
+        return;
+      }
       var head = e.target.closest("[data-taskstatustoggle]");
       if(head){
         var st0 = head.dataset.taskstatustoggle;
