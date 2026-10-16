@@ -16,6 +16,14 @@
 <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
 </head>
 <body>
+<script>
+  // 文字の大きさ（この端末の設定）。描画前に反映してチラつきを防ぐ
+  (function(){
+    var v = ""; try{ v = localStorage.getItem("sumairu_fs") || ""; }catch(e){}
+    if(v!=="s" && v!=="m" && v!=="l") v = (window.innerWidth<=760) ? "m" : "l";
+    document.documentElement.setAttribute("data-fs", v);
+  })();
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
@@ -52,6 +60,14 @@
   *{ box-sizing:border-box; }
   /* 60代の方でも読みやすいよう、全デバイスで大きめの文字にする（rem基準なので全体が連動）。画面が広いほど少し大きくなる。 */
   html{ font-size:clamp(18px, 0.35vw + 15.5px, 21px); }
+  /* 文字の大きさ（端末ごとに「小／中／大」を選べる。選ばないときは、スマホ幅は「中」、それ以外は「大」） */
+  html[data-fs="s"]{ font-size:clamp(14.5px, 0.3vw + 12.5px, 17px); }
+  html[data-fs="m"]{ font-size:clamp(16px, 0.33vw + 13.8px, 18.5px); }
+  html[data-fs="l"]{ font-size:clamp(18px, 0.35vw + 15.5px, 21px); }
+  .fspick{ display:inline-flex; align-items:center; gap:2px; }
+  .fspick button{ border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:inherit; font-weight:700; padding:4px 10px; cursor:pointer; font-size:.85rem; }
+  .fspick button:first-of-type{ border-radius:8px 0 0 8px; } .fspick button:last-of-type{ border-radius:0 8px 8px 0; }
+  .fspick button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
   body{ background:var(--bg); color:var(--ink); font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; padding-inline:clamp(12px,1.6vw,32px); padding-block:0; }
   h1,h2,h3,.display{ font-family:"Zen Maru Gothic","Noto Sans JP",sans-serif; text-wrap:balance; }
   .tabular{ font-variant-numeric: tabular-nums; }
@@ -483,6 +499,7 @@
       <button class="btn secondary small" id="btnLogout" title="この端末からログアウトします" hidden>ログアウト</button>
       <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 最新の内容に更新</button>
       <span class="muted" id="syncStamp" style="font-size:.85rem;"></span>
+      <span class="fspick" id="fsPick" title="この端末の文字の大きさ"><span class="muted" style="font-size:.85rem; margin-inline-end:4px;">文字</span><button type="button" data-fs="s">小</button><button type="button" data-fs="m">中</button><button type="button" data-fs="l">大</button></span>
       <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span></button>
     </div>
   </header>
@@ -10082,6 +10099,17 @@
 
     document.getElementById("staffLoginBtn").addEventListener("click", doStaffLogin);
     document.getElementById("btnLogout").addEventListener("click", doStaffLogout);
+    (function(){
+      var box = document.getElementById("fsPick"); if(!box) return;
+      function mark(){ var cur = document.documentElement.getAttribute("data-fs"); Array.prototype.forEach.call(box.querySelectorAll("button"), function(b){ b.classList.toggle("on", b.dataset.fs===cur); }); }
+      box.addEventListener("click", function(e){
+        var b = e.target.closest("button[data-fs]"); if(!b) return;
+        document.documentElement.setAttribute("data-fs", b.dataset.fs);
+        try{ localStorage.setItem("sumairu_fs", b.dataset.fs); }catch(err){}
+        mark();
+      });
+      mark();
+    })();
     document.getElementById("settingsLoginList").addEventListener("click", function(e){
       var b = e.target.closest("[data-loginpw],[data-loginclear]"); if(!b) return;
       if(b.dataset.loginpw) settingsLoginSet(b.dataset.loginpw); else settingsLoginClear(b.dataset.loginclear);
