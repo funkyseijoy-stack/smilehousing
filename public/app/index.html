@@ -919,16 +919,11 @@
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
               <option value="plan">図面</option>
-              <option value="quote">見積書</option>
+              <option value="プランボード">プランボード</option>
+              <option value="見積もり">見積もり</option>
+              <option value="NET">NET</option>
               <option value="other">その他</option>
             </select>
-            <span id="quoteTypePickWrap" hidden>
-              <select id="attachmentQuoteType">
-                <option value="プランボード">プランボード</option>
-                <option value="見積もり">見積もり</option>
-                <option value="NET">NET</option>
-              </select>
-            </span>
             <button class="btn secondary small" id="btnUploadAttachment">追加</button>
           </div>
           <div class="filelist" id="attachmentList"></div>
@@ -1173,8 +1168,8 @@
     </div>
 
     <div class="card">
-      <h3>見積もり・NETのロック用の暗証番号</h3>
-      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「見積もり」「NET」の書類を見るときに求める番号です（「プランボード」はロックされません）。業者向けメールには見積の種類は表示されません。</p>
+      <h3>NETのロック用の暗証番号</h3>
+      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「NET」の書類を見るときに求める番号です（「プランボード」「見積もり」はロックされません。お客様に出せるのは「プランボード」だけです）。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
 
@@ -3469,7 +3464,7 @@
   // 以前の「定価」はプランボード、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
   var QUOTE_TYPES = ["プランボード","見積もり","NET"];
   function quoteTypeNorm(t){ return t==="定価" ? "プランボード" : (t==="仕切り" ? "NET" : (t||"")); }
-  function quoteLocked(t){ return quoteTypeNorm(t) !== "プランボード"; }
+  function quoteLocked(t){ return quoteTypeNorm(t) === "NET"; }
   function quotePill(qt){ var n = quoteTypeNorm(qt); return n ? '<span class="pill quote-'+n+'">'+n+'</span>' : ""; }
 
   function renderProjectTable(){
@@ -10296,7 +10291,7 @@
       var rid = pendingReqAttachId; input.value = "";
       var thenReceive = pendingReqAttachThenReceive; pendingReqAttachThenReceive = false;
       if(!files.length || !rid) return;
-      askChoice("書類の種類", "見積もり・NETは暗証番号でロックされ、お客様には出ません。プランボードだけ、お客様に出せます。", [{label:"プランボード", value:"プランボード"},{label:"見積もり", value:"見積もり"},{label:"NET", value:"NET"}], function(qt){
+      askChoice("書類の種類", "NETだけ暗証番号でロックされます。お客様に出せるのはプランボードだけです（見積もり・NETは出ません）。", [{label:"プランボード", value:"プランボード"},{label:"見積もり", value:"見積もり"},{label:"NET", value:"NET"}], function(qt){
         if(qt===null) return;
         uploadAttachments(files, "quote", qt, rid).then(function(n){
           if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid); }
@@ -10327,13 +10322,11 @@
     document.getElementById("btnAddVendor").addEventListener("click", addVendor);
     document.getElementById("btnAddRequest").addEventListener("click", addRequest);
 
-    document.getElementById("attachmentKind").addEventListener("change", function(e){
-      document.getElementById("quoteTypePickWrap").hidden = e.target.value !== "quote";
-    });
     document.getElementById("btnUploadAttachment").addEventListener("click", function(){
       var input = document.getElementById("attachmentInput");
       var kind = document.getElementById("attachmentKind").value;
-      var qt = document.getElementById("attachmentQuoteType").value;
+      var qt = "";
+      if(QUOTE_TYPES.indexOf(kind)>=0){ qt = kind; kind = "quote"; } // プランボード／見積もり／NET は「見積書」の種類として保存
       if(input.files && input.files.length){ uploadAttachments(input.files, kind, qt); input.value=""; }
       else { toast("ファイルを選択してください"); }
     });
