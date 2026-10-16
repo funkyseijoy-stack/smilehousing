@@ -169,7 +169,12 @@
   .attwrap > *{ min-width:0; }
   .attfiles .filechip{ flex-wrap:wrap; }
   .attfiles .filechip .finame{ flex:1 1 160px; min-width:0; overflow-wrap:anywhere; }
-  @media (max-width:760px){ .attwrap{ grid-template-columns:1fr; } }
+  .pfmobtn{ display:none; }
+  @media (max-width:760px){ .attwrap{ grid-template-columns:1fr; }
+    #projFolderWrap > .attleft{ display:none; }
+    #projFolderWrap.pfshow > .attleft{ display:block; }
+    .pfmobtn{ display:inline-block; margin-block-end:8px; }
+  }
   .reqcontent{ font-weight:400; font-size:.85rem; margin-block-start:4px; padding:6px 8px; background:var(--orange-soft); border-radius:8px; }
   .reqcontent-text{ white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
   .cellsub{ font-size:.85rem; color:var(--muted); }
@@ -568,6 +573,7 @@
         <div class="attwrap" id="projFolderWrap">
           <div class="attleft" id="projFolderTree"></div>
           <div class="attright">
+            <button class="btn small secondary pfmobtn" id="pfMobToggle" type="button">📁 フォルダーを選ぶ ▾</button>
             <div class="attcrumb" id="projFolderCrumb"></div>
             <div class="attacts" id="projFolderActs"></div>
             <div class="atttiles" id="projFolderTiles"></div>
@@ -3131,8 +3137,16 @@
       }
       return;
     }
+    var mt = e.target.closest("#pfMobToggle");
+    if(mt){
+      var w = document.getElementById("projFolderWrap");
+      if(w){ var on = w.classList.toggle("pfshow"); mt.textContent = on ? "📁 フォルダーを閉じる ▴" : "📁 フォルダーを選ぶ ▾"; }
+      return;
+    }
     var op = e.target.closest("[data-pfopen]");
     if(op){
+      var w2 = document.getElementById("projFolderWrap"); if(w2) w2.classList.remove("pfshow");
+      var mb = document.getElementById("pfMobToggle"); if(mb) mb.textContent = "📁 フォルダーを選ぶ ▾";
       state.projFolderSel = op.dataset.pfopen==="all" ? null : op.dataset.pfopen;
       var nf = document.getElementById("newProjectFolder"); if(nf) nf.value = "";
       render();
@@ -10186,7 +10200,7 @@
       render();
     });
 
-    ["projFolderTree","projFolderTiles","projFolderActs"].forEach(function(id){
+    ["projFolderTree","projFolderTiles","projFolderActs","pfMobToggle"].forEach(function(id){
       document.getElementById(id).addEventListener("click", pfHandleClick);
     });
     document.getElementById("progressFilterBar").addEventListener("click", function(e){
