@@ -122,8 +122,9 @@
   .pill.status-受領済み{ background:var(--orange-soft); color:var(--orange); }
   .pill.method{ background:var(--surface-2); color:var(--muted); font-weight:500; }
   .pill.tag{ background:var(--accent-soft); color:var(--accent-ink); }
-  .pill.quote-定価{ background:var(--gold-soft); color:var(--gold); }
-  .pill.quote-仕切り{ background:var(--blue-soft); color:var(--blue); }
+  .pill.quote-プランボード{ background:var(--accent-soft); color:var(--accent-ink); }
+  .pill.quote-見積もり{ background:var(--gold-soft); color:var(--gold); }
+  .pill.quote-NET{ background:var(--blue-soft); color:var(--blue); }
 
   .muted{ color:var(--muted); }
   .empty{ color:var(--muted); font-size:.85rem; padding:18px 4px; text-align:center; }
@@ -890,7 +891,7 @@
       <div class="subpanel" id="sub-quote">
         <div class="card">
           <h3>添付資料（平面図・見積書など）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（定価／仕切り）を指定して登録できます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／見積もり／NET）を指定して登録できます。</p>
           <div class="uploadrow">
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
@@ -900,8 +901,9 @@
             </select>
             <span id="quoteTypePickWrap" hidden>
               <select id="attachmentQuoteType">
-                <option value="仕切り">仕切り</option>
-                <option value="定価">定価</option>
+                <option value="プランボード">プランボード</option>
+                <option value="見積もり">見積もり</option>
+                <option value="NET">NET</option>
               </select>
             </span>
             <button class="btn secondary small" id="btnUploadAttachment">追加</button>
@@ -1148,8 +1150,8 @@
     </div>
 
     <div class="card">
-      <h3>見積書「仕切り」ロック用の暗証番号</h3>
-      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「仕切り」扱いの見積書を見るときに求める番号です。業者向けメールには見積の種類は表示されません。</p>
+      <h3>見積もり・NETのロック用の暗証番号</h3>
+      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「見積もり」「NET」の書類を見るときに求める番号です（「プランボード」はロックされません）。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
 
@@ -3432,7 +3434,12 @@
 
   function statusPill(status){ return '<span class="pill status-'+status+'">'+status+'</span>'; }
   function methodPill(method){ return '<span class="pill method">'+(method==="gmail"?"Gmail":"FAX")+'</span>'; }
-  function quotePill(qt){ return qt ? '<span class="pill quote-'+qt+'">'+qt+'</span>' : ""; }
+  // 書類の種類：プランボード（お客様に出せる）／見積もり／NET（お客様には絶対に出さない・暗証番号でロック）。
+  // 以前の「定価」はプランボード、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
+  var QUOTE_TYPES = ["プランボード","見積もり","NET"];
+  function quoteTypeNorm(t){ return t==="定価" ? "プランボード" : (t==="仕切り" ? "NET" : (t||"")); }
+  function quoteLocked(t){ return quoteTypeNorm(t) !== "プランボード"; }
+  function quotePill(qt){ var n = quoteTypeNorm(qt); return n ? '<span class="pill quote-'+n+'">'+n+'</span>' : ""; }
 
   function renderProjectTable(){
     var body = document.getElementById("projectTableBody");
@@ -3458,7 +3465,7 @@
       var attOpen = !!(state.reqAttOpen && state.reqAttOpen[r.id]);
       var attHtml = !reqAtts.length ? "" : '<div style="margin-block-start:4px;"><button class="btn small ghost" data-reqatttoggle="'+r.id+'">📎 見積書 '+reqAtts.length+'件 '+(attOpen?"▾":"▸")+'</button></div>';
       if(attOpen) attHtml += reqAtts.map(function(a){
-        var locked = a.quoteType === "仕切り" && !state.quoteUnlocked;
+        var locked = quoteLocked(a.quoteType) && !state.quoteUnlocked;
         if(locked) return '<div class="lockbox" style="cursor:pointer; margin-block-start:4px;">🔒 見積書あり（タップして解除）</div>';
         return '<div style="margin-block-start:4px; font-size:.85rem;"><span data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;">📎 '+escapeHtml(a.name)+'</span> '+quotePill(a.quoteType)+quoteShareHtml(a)+'</div>';
       }).join("");
@@ -3595,7 +3602,7 @@
     var selIds = Object.keys(attSelected).filter(function(id){ return attSelected[id]; });
     var selBar = selIds.length ? '<div class="attselbar">'+selIds.length+'件を選択中　<button class="btn small" data-attact="movesel">📁 まとめて移動</button> <button class="btn small ghost" data-attact="clearsel">選択を外す</button></div>' : "";
     var filesHtml = shown.map(function(a){
-      var locked = a.kind === "quote" && a.quoteType === "仕切り" && !state.quoteUnlocked;
+      var locked = a.kind === "quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked;
       var chk = '<input type="checkbox" data-attsel="'+a.id+'"'+(attSelected[a.id]?" checked":"")+' title="選んでまとめて移動">';
       var mv = '<button class="btn small ghost" data-attact="move1" data-id="'+a.id+'" title="フォルダーへ移動">📁 移動</button>';
       var where = "";
@@ -3780,12 +3787,12 @@
       }
     });
   }
-  // 定価の見積書だけ、部位を指定してお客様のおうちノートに出せる（仕切りは出せない）
+  // 「プランボード」の書類だけ、部位を指定してお客様のおうちノートに出せる（見積もり・NETは出せない）
   function quoteShareHtml(a){
-    if(!(a && a.kind==="quote" && a.quoteType==="定価")) return "";
+    if(!(a && a.kind==="quote" && quoteTypeNorm(a.quoteType)==="プランボード")) return "";
     var partOk = taskPartReflectable(a.specPart);
     return '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="お客様に出す部位を選ぶ">📍 '+(partOk ? escapeHtml(a.specPart.label||"部位") : "部位")+'</button>'+
-      '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="定価の見積書をお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
+      '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="プランボードをお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
   }
 
   // 図面/プランボードの一覧チップ。タップで編集（表示）、⬇でダウンロード
@@ -7694,7 +7701,7 @@
         var res = await uploadAssetWithRetry(f, 2);
         var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:f.name, url: res.url,
           contentType: res.contentType || f.type, sizeBytes: res.sizeBytes || f.size, uploadedAt: todayStr(),
-          kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"仕切り") : undefined };
+          kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"見積もり") : undefined };
         if(!requestId && pid0===state.currentProjectId){ var pj0 = projectById(pid0); if(state.attFolder && attFolderById(pj0, state.attFolder)) att.folderId = state.attFolder; }
         if(requestId){ att.requestId = requestId; var rq0 = state.requests.find(function(x){ return x.id===requestId; }); if(rq0) att.vendorId = rq0.vendorId; }
         blobCache[res.id] = f;
@@ -8248,10 +8255,10 @@
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
 
-  // ---- 定価の見積書をお客様に出す（部位を指定して反映）----
+  // ---- プランボードの書類をお客様に出す（部位を指定して反映）----
   async function setQuotePart(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
-    if(!a || a.quoteType!=="定価") return;
+    if(!a || quoteTypeNorm(a.quoteType)!=="プランボード") return;
     askSpecPart(async function(part){
       if(!part) return;
       a.specPart = part; render();
@@ -8262,7 +8269,7 @@
   async function toggleQuoteReflect(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
     if(!a) return;
-    if(a.quoteType!=="定価"){ toast("お客様に出せるのは定価の見積書だけです"); return; }
+    if(quoteTypeNorm(a.quoteType)!=="プランボード"){ toast("お客様に出せるのは「プランボード」の書類だけです"); return; }
     if(!a.reflected && !taskPartReflectable(a.specPart)){
       askSpecPart(function(part){
         if(!part) return;
@@ -8278,8 +8285,8 @@
     render();
     var ok = await saveDoc("attachments", a.id, a);
     if(ok===false){ toast("保存に失敗しました。もう一度お試しください"); return; }
-    logActivity("定価の見積書「"+a.name+"」を"+(a.reflected?"おうちノートに反映しました":"反映解除しました"));
-    toast(a.reflected ? "✅ 「"+((a.specPart&&a.specPart.label)||"")+"」のおうちノートに、定価の見積書を出しました" : "反映を解除しました");
+    logActivity("プランボード「"+a.name+"」を"+(a.reflected?"おうちノートに反映しました":"反映解除しました"));
+    toast(a.reflected ? "✅ 「"+((a.specPart&&a.specPart.label)||"")+"」のおうちノートに、プランボードを出しました" : "反映を解除しました");
   }
 
   // ---- 業者の編集 ----
@@ -10247,7 +10254,7 @@
       var rid = pendingReqAttachId; input.value = "";
       var thenReceive = pendingReqAttachThenReceive; pendingReqAttachThenReceive = false;
       if(!files.length || !rid) return;
-      askChoice("見積書の種類", "仕切りは暗証番号でロックされます。", [{label:"仕切り", value:"仕切り"},{label:"定価", value:"定価"}], function(qt){
+      askChoice("書類の種類", "見積もり・NETは暗証番号でロックされ、お客様には出ません。プランボードだけ、お客様に出せます。", [{label:"プランボード", value:"プランボード"},{label:"見積もり", value:"見積もり"},{label:"NET", value:"NET"}], function(qt){
         if(qt===null) return;
         uploadAttachments(files, "quote", qt, rid).then(function(n){
           if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid); }

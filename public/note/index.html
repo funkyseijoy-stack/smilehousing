@@ -1280,10 +1280,10 @@ function homeHtml(){
         '</div></div></div>';
     }
 
-    // 見積書（定価）。スタッフが部位を指定して出したものだけ
+    // プランボードの書類（見積書の種類「プランボード」）。スタッフが部位を指定して出したものだけ
     if(quotes.length){
       out += '<div class="section decided">'+
-        '<div class="section-header"><span class="section-icon">💴</span><span>見積書（定価）</span></div>'+
+        '<div class="section-header"><span class="section-icon">📐</span><span>プランボード（資料）</span></div>'+
         '<div class="section-content"><div class="section-thumbs">'+
         quotes.slice().reverse().map(function(x){
           return thumbHtml(x.file, capOf(c, x, fmtD(x.at)));
