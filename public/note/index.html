@@ -320,6 +320,13 @@
   /* ヘルプモーダル */
   .help{ position:fixed; inset:0; background:rgba(20,16,14,.6); z-index:70; display:flex; align-items:flex-end; justify-content:center; }
   .help[hidden]{ display:none; }
+  .hpgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .hpgrid button{ position:relative; padding:0; border:3px solid transparent; border-radius:12px; overflow:hidden; background:none; aspect-ratio:1/1; cursor:pointer; }
+  .hpgrid button img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .hpgrid button.on{ border-color:var(--brown,#8a5a3c); }
+  .hpgrid button .ck{ position:absolute; top:4px; right:4px; width:26px; height:26px; border-radius:50%; background:var(--brown,#8a5a3c); color:#fff; font-weight:700; display:none; align-items:center; justify-content:center; }
+  .hpgrid button.on .ck{ display:flex; }
+  .hpedit{ border:1px solid var(--line,#ddd); background:var(--card,#fff); border-radius:999px; padding:6px 12px; font:inherit; font-size:.8rem; cursor:pointer; }
   .help-card{ background:var(--card); width:100%; max-width:520px; max-height:86vh; overflow-y:auto; border-radius:22px 22px 0 0; padding:22px 20px calc(26px + env(safe-area-inset-bottom)); position:relative; }
   @media (min-width:560px){ .help-card{ border-radius:22px; max-height:80vh; margin-bottom:24px; } }
   .help-card h2{ font-size:1.05rem; margin:0 0 4px; color:var(--ink); }
@@ -458,6 +465,18 @@
     <p class="help-lead">間取りや収納、コンセントの計画に役立てます。わかる範囲でご入力ください（住まいるハウジングのスタッフに共有されます）。</p>
     <div id="famBody"></div>
     <button class="btn dk full" id="famSave">保存する</button>
+  </div>
+</div>
+
+<div class="help" id="hpModal" hidden>
+  <div class="help-card">
+    <button class="x" id="hpX" aria-label="閉じる">×</button>
+    <h2>ホームに出す写真を選ぶ</h2>
+    <p class="help-lead">アルバムの写真から、ホームに表示したい写真を最大3枚まで選べます。選ばないときは、最新の3枚が出ます。</p>
+    <div id="hpBody"></div>
+    <div id="hpCount" class="help-lead" style="margin:10px 0 12px;"></div>
+    <button class="btn dk full" id="hpSave">この写真を表示する</button>
+    <button class="btn full" id="hpReset" style="margin-top:8px;">選ばない（最新の3枚に戻す）</button>
   </div>
 </div>
 
@@ -664,6 +683,49 @@ function estTotalHtml(list){
     '<div class="tm">※金額確認中・見送りの項目は含みません'+(bad?'（金額を数字で読み取れない'+bad+'件も含みません）':'')+'</div></div>';
 }
 
+// ---------- ホームに出す写真（お客様が選ぶ） ----------
+  // 候補：アルバムの写真（参考写真を除く）と、お家のイメージの写真
+  function hpCandidates(){
+    var out = [], seen = {};
+    (data.album||[]).filter(function(a){ return isImg(a) && a.kind!=="reference"; }).concat((data.images||[]).filter(function(a){ return !!a.url; })).forEach(function(a){
+      if(a.url && !seen[a.url]){ seen[a.url] = 1; out.push(a); }
+    });
+    return out;
+  }
+  // 選んだ写真が（いまも残っていて）あればそれ、なければ最新の3枚
+  function homeChosen(album){
+    var cand = hpCandidates();
+    var chosen = (data.homePhotos||[]).map(function(u){ return cand.filter(function(a){ return a.url===u; })[0]; }).filter(Boolean).slice(0,3);
+    if(chosen.length) return { chosen:true, list:chosen };
+    return { chosen:false, list:album.slice(0,3) };
+  }
+  var hpSel = [];
+  function hpOpen(){
+    var cur = homeChosen((data.album||[]).filter(function(a){ return isImg(a) && a.kind!=="reference"; }));
+    hpSel = cur.chosen ? cur.list.map(function(a){ return a.url; }) : [];
+    hpRender();
+    document.getElementById("hpModal").hidden = false;
+  }
+  function hpRender(){
+    document.getElementById("hpBody").innerHTML = '<div class="hpgrid">'+hpCandidates().map(function(a){
+      var on = hpSel.indexOf(a.url)>=0;
+      return '<button type="button" class="'+(on?"on":"")+'" data-hppick="'+esc(a.url)+'"><img loading="lazy" src="'+esc(a.url)+'" alt=""><span class="ck">'+(on?(hpSel.indexOf(a.url)+1):"")+'</span></button>';
+    }).join("")+'</div>';
+    document.getElementById("hpCount").textContent = hpSel.length ? ('選んだ写真：'+hpSel.length+' / 3 枚') : '写真をタップして選びます（最大3枚）';
+  }
+  async function hpSave(urls){
+    var b1 = document.getElementById("hpSave"), b2 = document.getElementById("hpReset"); b1.disabled = b2.disabled = true;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"homePhotosSave", urls:urls }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.homePhotos = j.homePhotos || [];
+      document.getElementById("hpModal").hidden = true;
+      render(); toast(data.homePhotos.length ? "ホームに表示する写真を変更しました" : "最新の3枚を表示します");
+    }catch(e){ toast("保存できませんでした。もう一度お試しください"); }
+    b1.disabled = b2.disabled = false;
+  }
+
 function homeHtml(){
     var h = new Date().getHours();
     var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
@@ -712,8 +774,10 @@ function homeHtml(){
 
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
+    var homeShown = homeChosen(album);
+    if(hpCandidates().length) out += '<div style="margin:0 0 8px;"><button class="hpedit" data-hpopen="1">📷 ホームに出す写真を選ぶ'+(homeShown.chosen ? '（選択中）' : '')+'</button></div>';
     if(album.length){
-      out += '<div class="polas">'+album.slice(0,3).map(function(a){
+      out += '<div class="polas">'+homeShown.list.map(function(a){
         // キャプションはファイル名・部位名ではなく、日付と「アルバムの写真」だけにする
         return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt)+'<br>'+(a.kind==="reference"?"参考写真":"アルバムの写真")+'</div></button>';
       }).join("")+'</div>';
@@ -1339,6 +1403,16 @@ function homeHtml(){
     btn.disabled = false;
   }
   document.getElementById("famX").addEventListener("click", function(){ document.getElementById("famModal").hidden = true; });
+  document.getElementById("hpX").addEventListener("click", function(){ document.getElementById("hpModal").hidden = true; });
+  document.getElementById("hpSave").addEventListener("click", function(){ if(!hpSel.length){ toast("写真を選んでください"); return; } hpSave(hpSel); });
+  document.getElementById("hpReset").addEventListener("click", function(){ hpSave([]); });
+  document.getElementById("hpBody").addEventListener("click", function(e){
+    var b = e.target.closest("[data-hppick]"); if(!b) return;
+    var u = b.dataset.hppick, i = hpSel.indexOf(u);
+    if(i>=0) hpSel.splice(i,1);
+    else { if(hpSel.length>=3){ toast("選べるのは3枚までです"); return; } hpSel.push(u); }
+    hpRender();
+  });
   document.getElementById("famSave").addEventListener("click", famSave);
   document.getElementById("famBody").addEventListener("input", function(e){
     var el = e.target.closest("[data-fam]"); if(!el || !fam) return;
@@ -1446,6 +1520,7 @@ function homeHtml(){
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
     if(e.target.closest("[data-famopen]")){ famOpen(); return; }
+    if(e.target.closest("[data-hpopen]")){ hpOpen(); return; }
     var er = e.target.closest("[data-estresp]"); if(er){ respondEstimate(er.dataset.estid, er.dataset.estresp); return; }
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
     var cd = e.target.closest("[data-cdecide]"); if(cd){ decideCard(cd.dataset.cdecide, cd.dataset.ckey, cd.dataset.croom||"", cd.dataset.clabel||"", cd.dataset.ccat); return; }

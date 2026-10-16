@@ -277,6 +277,18 @@ export default async (req: Request, context: Context) => {
       );
       return json({ ok: true, email });
     }
+    // ホームに出す写真（お客様がアルバムの写真から最大3枚を選ぶ。空にすると「最新の3枚」に戻る）
+    if (body.action === "homePhotosSave") {
+      const urls = (Array.isArray(body.urls) ? body.urls : [])
+        .map((u: any) => String(u == null ? "" : u))
+        .filter((u: string) => u.startsWith("/api/get-photo?") && u.length <= 400)
+        .slice(0, 3);
+      const extras: any = await getExtras(store, projectId);
+      if (!extras) return json({ error: "unavailable" }, 502);
+      extras.homePhotos = urls;
+      await saveExtras(store, extras);
+      return json({ ok: true, homePhotos: urls });
+    }
     // ご家族・家電・持ち込み品（お客様が入力する）
     if (body.action === "profileSave") {
       const src = body.profile && typeof body.profile === "object" ? body.profile : {};
@@ -694,6 +706,7 @@ export default async (req: Request, context: Context) => {
       })).filter((x: any) => x.name && x.group);
       return items.length ? { items } : null;
     })(),
+    homePhotos: Array.isArray(okaiCustomer && okaiCustomer.homePhotos) ? okaiCustomer.homePhotos.filter((u: any) => typeof u === "string").slice(0, 3) : [],
     ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });
 };
