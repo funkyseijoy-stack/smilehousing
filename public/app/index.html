@@ -591,6 +591,17 @@
   .specmergebar .btn{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   .specscopemergebar{ margin-block-end:12px; }
   .specscopemergebar .btn{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); width:100%; white-space:normal; line-height:1.4; padding:10px 12px; }
+  /* 打合せ記録：ふだんは一覧だけ。入力は「＋ 記録する」で画面いっぱいに開く */
+  .mnopenbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-block-end:12px; }
+  .mnopenbar #btnOpenMnSheet{ font-size:1rem; padding:10px 22px; }
+  .mnsheet{ display:none; }
+  .mnsheet.open{ display:block; position:fixed; inset:0; z-index:60; margin:0; border-radius:0; border:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding: calc(10px + env(safe-area-inset-top,0px)) clamp(14px,4vw,40px) calc(28px + env(safe-area-inset-bottom,0px)); background:var(--surface); }
+  .mnsheet.open > *{ max-width:860px; margin-inline:auto; }
+  .mnsheethead{ position:sticky; top:calc(-10px - env(safe-area-inset-top,0px)); z-index:2; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--surface); padding-block:calc(10px + env(safe-area-inset-top,0px)) 10px; margin-block:calc(-10px - env(safe-area-inset-top,0px)) 10px; border-bottom:1px solid var(--border); }
+  .mnsheethead h3{ margin:0; }
+  body.mnlock{ overflow:hidden; }
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
   /* ファイルのサムネイル（タイル）表示：見積の添付資料・図面タブ */
   .ftgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px; }
@@ -1255,13 +1266,20 @@
         </div>
 
         <div class="meetingsubpane active" id="meetingsubpane-record">
+          <div class="mnopenbar">
+            <button type="button" class="btn" id="btnOpenMnSheet">＋ 記録する</button>
+            <button type="button" class="btn secondary small" id="btnOpenNoteImport">📥 まとめて取り込む</button>
+          </div>
           <div class="card" id="decidedSummaryCard" hidden>
             <h3>✅ 決定事項のまとめ</h3>
             <p class="muted" style="margin:0 0 8px; font-size:.85rem;">この案件で決まったことを、新しい順にまとめています。</p>
             <div class="decsum" id="decidedSummaryList"></div>
           </div>
-          <div class="card">
-            <h3>打合せ内容を記録</h3>
+          <div class="card mnsheet" id="mnFormCard" role="dialog" aria-modal="true" aria-labelledby="mnSheetTitle">
+            <div class="mnsheethead">
+              <h3 id="mnSheetTitle">打合せ内容を記録</h3>
+              <button type="button" class="btn secondary small" id="btnCloseMnSheet">✕ 閉じる</button>
+            </div>
             <div class="mnrow">
               <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
               <label class="field">連絡方法<select id="meetingNoteChannel"><option value="打合せ">打合せ</option><option value="LINE">LINE</option><option value="電話">電話</option><option value="メール">メール</option></select></label>
@@ -1290,7 +1308,6 @@
             </details>
             <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.85rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは、上の「いまの添付」で削除・差し替え、下の欄で追加ができます）。</p>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
-            <div class="row" style="margin-block-start:10px;"><button type="button" class="btn secondary small" id="btnOpenNoteImport">📥 まとめて取り込む（貼り付け）</button></div>
           </div>
           <div class="card">
             <h3>これまでの記録</h3>
@@ -3911,6 +3928,7 @@
     b.setAttribute("aria-expanded", open ? "true" : "false");
   }
   function openProjectDetail(id){
+    if(typeof closeMnSheet==="function") closeMnSheet();
     state.currentProjectId = id;
     state.editingProject = false;
     state.noteSpecFilter = null;
@@ -3925,6 +3943,7 @@
     var mb = document.querySelector('.sub-btn[data-sub="meeting"]'); if(mb) mb.click();
   }
   function closeProjectDetail(){
+    if(typeof closeMnSheet==="function") closeMnSheet();
     document.getElementById("projectDetailView").hidden = true;
     document.getElementById("projectListView").hidden = false;
   }
@@ -4580,7 +4599,7 @@
       });
     card.hidden = rows.length===0;
     box.innerHTML = rows.map(function(n){
-      return '<div class="dsi"><div class="dsd">'+escapeHtml(n.date || fmtTs(n.createdAt))+(n.title?'　'+escapeHtml(n.title):'')+(n.specPart?'　['+escapeHtml(n.specPart.label)+']':'')+'</div>'+escapeHtml(n.decided)+'</div>';
+      return '<div class="dsi"><div class="dsd">'+escapeHtml(n.date || fmtTs(n.createdAt))+(n.title?'　'+escapeHtml(n.title):'')+(n.specPart?'　'+escapeHtml(partText(n.specPart)):'')+'</div>'+escapeHtml(n.decided)+'</div>';
     }).join("");
   }
   function renderMeetingNotes(){
@@ -9535,6 +9554,16 @@
       }
     };
   }
+  function openMnSheet(){
+    var c = document.getElementById("mnFormCard"); if(!c) return;
+    var t = document.getElementById("mnSheetTitle"); if(t) t.textContent = editingMeetingNoteId ? "記録を編集" : "打合せ内容を記録";
+    var d = document.getElementById("meetingNoteDate"); if(d && !d.value) d.value = todayStr();
+    c.classList.add("open"); document.body.classList.add("mnlock"); c.scrollTop = 0;
+  }
+  function closeMnSheet(){
+    var c = document.getElementById("mnFormCard"); if(!c) return;
+    c.classList.remove("open"); document.body.classList.remove("mnlock");
+  }
   function editMeetingNote(id){
     var n = state.meetingNotes.find(function(x){ return x.id===id; });
     if(!n){ toast("記録が見つかりませんでした"); return; }
@@ -9570,9 +9599,10 @@
     if(cancelBtn) cancelBtn.hidden = false;
     var hint = document.getElementById("meetingNoteEditHint");
     if(hint) hint.hidden = false;
-    if(titleInput) titleInput.scrollIntoView({behavior:"smooth", block:"center"});
+    openMnSheet();
   }
   function cancelEditMeetingNote(){
+    closeMnSheet();
     editingMeetingNoteId = null;
     editNoteFiles = []; renderEditNoteFiles();
     var titleInput = document.getElementById("meetingNoteTitle");
@@ -11227,6 +11257,11 @@
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
     document.getElementById("btnOpenNoteImport").addEventListener("click", openNoteImport);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
+    document.getElementById("btnOpenMnSheet").addEventListener("click", openMnSheet);
+    // ✕ 閉じる：新しく書いている途中なら書きかけは残す（次に開くと続きから）。編集中なら編集をやめる。
+    document.getElementById("btnCloseMnSheet").addEventListener("click", function(){
+      if(editingMeetingNoteId) cancelEditMeetingNote(); else closeMnSheet();
+    });
     document.getElementById("btnSetMeetingNoteSpecPart").addEventListener("click", function(){
       askSpecPart(function(part){
         if(!part) return;
