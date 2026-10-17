@@ -44,6 +44,11 @@
   h2.big{ font-size:1.45rem; margin:6px 0 6px; letter-spacing:.02em; }
   .sub{ color:var(--muted); font-size:.82rem; letter-spacing:.04em; margin:0 0 16px; }
   .sechd{ display:flex; align-items:center; justify-content:space-between; margin:26px 0 10px; }
+  .conslist{ display:flex; flex-direction:column; gap:6px; }
+  .cons{ background:#fbf3df; border:1px solid #ecd9a6; border-left:5px solid #c9a54a; border-radius:12px; padding:10px 12px; }
+  .cons .ct{ font-weight:700; line-height:1.5; }
+  .cons .cm{ font-size:.8rem; color:var(--muted); margin-top:2px; }
+  .consmore{ background:none; border:none; color:var(--muted); font-size:.85rem; cursor:pointer; padding:6px 2px; text-align:left; font-family:inherit; }
   .sechd h3{ margin:0; font-size:1.02rem; }
   .sechd .more{ font-size:.8rem; color:var(--muted); background:none; border:none; cursor:pointer; letter-spacing:.06em; }
   .countpill{ background:var(--green); color:var(--green-ink); font-size:.72rem; border-radius:999px; padding:4px 10px; }
@@ -726,6 +731,18 @@ function estTotalHtml(list){
     b1.disabled = b2.disabled = false;
   }
 
+// 反映済みの打合せ記録から「ご検討いただきたいこと」を1行ずつ取り出す（同じ文は新しいほうだけ）
+function consItems(){
+  var out = [], seen = {};
+  var notes = (data.notes||[]).slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); });
+  notes.forEach(function(n){
+    String(n.open||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean).forEach(function(t){
+      if(seen[t]) return; seen[t] = 1;
+      out.push({ t:t, date:n.date, part:n.part||"", title:n.title||"" });
+    });
+  });
+  return out;
+}
 function homeHtml(){
     var h = new Date().getHours();
     var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
@@ -801,6 +818,19 @@ function homeHtml(){
                 (it.decided ? '<span style="font-size:.8em; font-weight:700; color:#2f6b3f; background:#e4f1e6; border-radius:999px; padding:1px 10px;">✓ 決まった</span>' : '')+'</div>';
             }).join("")+'</div>';
         }).join("")+'</div>';
+    }
+
+    // 💭 ご検討いただきたいこと：反映済みの打合せ記録の「ご検討いただきたいこと」（open）を1行ずつ集めて、新しい順に一覧にする。
+    // スタッフが記録を編集して💭の印を外す（✅にする・印なしにする）と、ここから消える。
+    var cons = consItems();
+    if(cons.length){
+      var CONS_LIMIT = 5, consShow = view.consAll ? cons : cons.slice(0, CONS_LIMIT);
+      out += '<div class="sechd"><h3>💭 ご検討いただきたいこと</h3><span style="font-size:.85rem;">'+cons.length+'件</span></div>'+
+        '<div class="conslist">'+consShow.map(function(c){
+          return '<div class="cons"><div class="ct">'+esc(c.t)+'</div><div class="cm">'+fmtD(c.date)+(c.part?'・'+esc(c.part):(c.title?'・'+esc(c.title):''))+'</div></div>';
+        }).join("")+
+        (cons.length>CONS_LIMIT ? '<button class="consmore" data-consall="1">'+(view.consAll?'閉じる ▴':'ほか '+(cons.length-CONS_LIMIT)+'件を見る ▾')+'</button>' : '')+
+        '</div>';
     }
 
     // 最近のお打合せ記録（2件）。決定事項・確認事項が見える具体的な内容なので、
@@ -1514,6 +1544,7 @@ function homeHtml(){
     if(e.target.closest("#nmClear")){ nmSave(true); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
     var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
+    var consall = e.target.closest("[data-consall]"); if(consall){ view.consAll = !view.consAll; render(); return; }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var imf = e.target.closest("[data-imgfilter]"); if(imf){ view.imgFilter = imf.dataset.imgfilter; render(); return; }
     var imd = e.target.closest("[data-imgdel]"); if(imd){ deleteImage(imd.dataset.imgdel); return; }
