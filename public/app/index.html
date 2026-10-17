@@ -644,6 +644,13 @@
   .spectl-card.spectl-type-manual-border{ border-inline-start-color:var(--border); }
   .spectl-meta{ flex-grow:1; min-width:120px; }
   .spectl-actions{ display:flex; flex-wrap:wrap; gap:6px; max-width:100%; margin-inline-start:auto; }
+  /* 変更履歴のカード：ボタン類は「⋯」の中（ふだんは閉じる） */
+  .spectl-ops{ flex-basis:100%; }
+  .spectl-ops > summary{ list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:.85rem; font-weight:700; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:2px 12px; background:var(--surface-2); }
+  .spectl-ops > summary::-webkit-details-marker{ display:none; }
+  .spectl-ops[open] > summary{ color:var(--accent-ink); border-color:var(--accent); }
+  .spectl-ops > .spectl-actions{ margin:8px 0 2px; justify-content:flex-start; }
+  .spectl-st{ display:inline-flex; gap:4px; flex-wrap:wrap; }
   .spectl-thumb{ position:relative; width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
   .spectl-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .spectl-thumbgroup{ display:flex; flex-wrap:wrap; gap:4px; width:92px; flex-shrink:0; }
@@ -5225,7 +5232,7 @@
     var catsGridHtml = '<div class="speccatgrid">'+equipmentCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("equipment",cat)+'</h4>'+
         decidedSummaryHtml("equipment",cat,null,null)+
-        '<div style="font-size:.85rem; color:var(--muted); margin-block-end:6px;">写真の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</div>'+
+        '<div class="help" style="font-size:.85rem; color:var(--muted); margin-block-end:6px;">写真の追加は、下の「変更履歴」から打ち合わせ記録・タスクを通じて行います</div>'+
         '<textarea class="equipmentNote" data-equipmentnote="'+escapeHtml(cat)+'" rows="2" placeholder="メモ（自由記述）">'+escapeHtml(notes[cat]||"")+'</textarea>'+
         renderSpecTimeline("equipment",cat,null,null)+
         '</div>';
@@ -5935,6 +5942,10 @@
     if(tasks.length) links.push('<button type="button" class="rellink" data-gosub="tasks">タスク '+tasks.length+'件 ›</button>');
     return '<div class="relpart"><div class="relhd">📎 見積の書類・依頼'+(links.length?' <span class="rellinks">'+links.join("")+'</span>':'')+'</div>'+(chips?'<div class="relchips">'+chips+'</div>':'')+'</div>';
   }
+  var specOpsOpen = {};
+  function specOpsHtml(id, inner){
+    return '<details class="spectl-ops"'+(specOpsOpen[id]?' open':'')+'><summary data-specops="'+id+'">⋯ 操作</summary>'+inner+'</details>';
+  }
   function renderSpecTimeline(scope, category, roomId, side){
     var rel = relatedPartHtml(scope, category, roomId);
     var rows = specPhotosFor(scope, category, roomId, side).slice();
@@ -5975,9 +5986,11 @@
       } else {
         thumbHtml = '<div class="spectl-thumb">—</div>';
       }
+      var reflectedNow = (p.kind==="note") ? !!(state.meetingNotes.find(function(n){ return n.id===(p.source&&p.source.noteId); })||{}).reflected : !!p.reflected;
       var metaHtml = '<div class="row" style="gap:5px;">'+
         '<span class="pill small '+typeClass+'">'+typeLabel+'</span>'+
         (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
+        (reflectedNow?'<span class="pill reflect small on">✓反映済み</span>':'')+
         '</div>'+
         (snippet?'<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
       var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
@@ -6030,20 +6043,18 @@
         return '<div class="'+cardClass+' spectl-card-row">'+
           '<div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">'+
           '<div class="spectl-meta">'+metaHtml+'</div>'+
-          '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
           memoHtml+
-          badgeRowHtml+
+          specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
           '</div>';
       }
       return '<div class="'+cardClass+'">'+
         thumbHtml+
         '<div class="spectl-meta">'+metaHtml+'</div>'+
-        '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+
         sentBadgesHtml+
         memoHtml+
-        badgeRowHtml+
+        specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
         '</div>';
     });
     // 日付ごとにグループ化し、見出しを立てる（並びは新しい順のまま）。
@@ -6065,7 +6076,7 @@
         g.cards.join("")+
         '</div>';
     }).join("");
-    return rel + '<div style="margin-block-start:10px;"><div style="font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
+    return rel + '<div style="margin-block-start:10px;"><div style="font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴</div><div class="spectl">'+html+'</div></div>';
   }
   // お客様画面のカードに「仮決定／決定」ボタンを出すかどうか（記録・業者タスクごと。初めは出さない）
   function toggleMeetingAskDecision(id){
@@ -11261,6 +11272,12 @@
     document.getElementById("btnOpenNoteImport").addEventListener("click", openNoteImport);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
     document.getElementById("btnOpenMnSheet").addEventListener("click", openMnSheet);
+    document.addEventListener("click", function(e){
+      var sm = e.target.closest("summary[data-specops]");
+      if(!sm) return;
+      var id = sm.dataset.specops; var d = sm.parentElement;
+      specOpsOpen[id] = !d.open; // クリック直後はまだ切り替わる前
+    });
     (function(){
       var hb = document.getElementById("btnHelpToggle");
       function apply(on){ document.body.classList.toggle("showhelp", on); if(hb) hb.textContent = on ? "❔ 説明を隠す" : "❔ 説明を表示"; }
