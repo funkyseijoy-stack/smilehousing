@@ -573,6 +573,25 @@
   .specscopemergebar{ margin-block-end:12px; }
   .specscopemergebar .btn{ background:var(--blue-soft); color:var(--blue); border-color:var(--blue); width:100%; white-space:normal; line-height:1.4; padding:10px 12px; }
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
+  /* ファイルのサムネイル（タイル）表示：見積の添付資料・図面タブ */
+  .ftgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px; }
+  .fttile{ position:relative; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; min-width:0; }
+  .ftthumb{ position:relative; aspect-ratio:4/3; background:var(--surface-2); display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; border-bottom:1px solid var(--border); }
+  .ftthumb img, .ftthumb video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .ftthumb .specphoto-file{ font-size:2rem; }
+  .ftext{ display:flex; flex-direction:column; align-items:center; gap:2px; font-size:2rem; color:var(--muted); }
+  .ftext b{ font-size:.85rem; letter-spacing:.05em; }
+  .ftchk{ position:absolute; top:6px; left:6px; z-index:2; background:rgba(255,255,255,.9); border-radius:6px; padding:2px 4px; display:flex; }
+  .ftchk input{ width:18px; height:18px; margin:0; }
+  .ftbody{ padding:8px 9px 9px; display:flex; flex-direction:column; gap:5px; min-width:0; flex:1; }
+  .ftname{ font-weight:700; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer; }
+  .ftmeta{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; font-size:.85rem; color:var(--muted); }
+  .ftacts{ display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; align-items:center; }
+  .ftacts .btn{ padding:3px 8px; }
+  .ftacts a.btn{ text-decoration:none; color:var(--ink); display:inline-flex; align-items:center; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); padding:3px 10px; }
+  .fttile.locked .ftthumb{ font-size:2.2rem; border-radius:0; justify-content:center; padding:0; }
+  .fttile.locked .ftname{ padding:6px 8px; -webkit-line-clamp:unset; display:block; }
+  @media (max-width:760px){ .ftgrid{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; } }
   .notefiletile{ position:relative; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--surface-2); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; text-decoration:none; color:inherit; }
   .notefiletile img, .notefiletile video{ width:100%; height:100%; object-fit:cover; display:block; }
   .pill.small{ padding:2px 7px; font-size:.85rem; }
@@ -4168,15 +4187,21 @@
       var where = "";
       if(cur==="all"){ var fid = attFileFolderId(proj, a); where = fid ? '<span class="attwhere">📁 '+escapeHtml(attPathLabel(proj, fid))+'</span>' : ""; }
       // 暗証番号が必要な見積書は、解除するまでファイル名・種類・大きさを一切出さない（誰の見積書か漏れないように）
+      var chkT = '<label class="ftchk">'+chk+'</label>';
+      var del = '<button class="btn small danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button>';
       if(locked){
-        return '<div class="filechip" draggable="true" data-attfile="'+a.id+'">'+chk+'<div class="ficon">🔒</div><div class="finame lockbox" style="cursor:pointer;">ロック中の見積書（タップして解除）</div>'+where+mv+
-          '<button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
+        return '<div class="fttile locked" draggable="true" data-attfile="'+a.id+'">'+chkT+'<div class="ftthumb lockbox">🔒</div>'+
+          '<div class="ftbody"><div class="ftname lockbox">ロック中（タップで解除）</div>'+(where?'<div class="ftmeta">'+where+'</div>':'')+
+          '<div class="ftacts">'+mv+del+'</div></div></div>';
       }
-      var ext = (a.name.split(".").pop()||"").slice(0,4).toUpperCase();
       var kindLabel = a.kind === "quote" ? quotePill(a.quoteType) : (a.kind === "plan" ? '<span class="pill tag">図面</span>' : "");
-      return '<div class="filechip" draggable="true" data-attfile="'+a.id+'">'+chk+'<div class="ficon">'+escapeHtml(ext)+'</div><div class="finame" data-openatt="'+a.id+'" style="cursor:pointer; text-decoration:underline;" title="タップして開く">'+escapeHtml(a.name)+'</div>'+kindLabel+where+
-        '<div class="fisize tabular">'+fmtSize(a.sizeBytes)+'</div>'+quoteShareHtml(a)+mv+'<button class="btn danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div>';
+      return '<div class="fttile" draggable="true" data-attfile="'+a.id+'">'+chkT+
+        '<div class="ftthumb" data-openatt="'+a.id+'" title="タップして開く">'+fileThumbInner(a.url, a.contentType, a.name)+'</div>'+
+        '<div class="ftbody"><div class="ftname" data-openatt="'+a.id+'" title="'+escapeHtml(a.name)+'">'+escapeHtml(a.name)+'</div>'+
+        '<div class="ftmeta">'+kindLabel+'<span class="tabular">'+fmtSize(a.sizeBytes)+'</span>'+where+'</div>'+
+        quoteShareHtml(a)+'<div class="ftacts">'+mv+del+'</div></div></div>';
     }).join("");
+    if(filesHtml) filesHtml = '<div class="ftgrid">'+filesHtml+'</div>';
     if(!filesHtml) filesHtml = '<div class="muted" style="padding:10px 4px;">'+(rows.length ? "このフォルダーにファイルはありません。ファイルをここへドラッグするか、「📁 移動」で入れられます。" : "添付資料はまだ登録されていません。")+'</div>';
     list.innerHTML = '<div class="attwrap"><div class="attleft">'+left+'</div><div class="attright"><div class="attcrumb">'+crumb+'</div>'+
       (acts?'<div class="attacts">'+acts+'</div>':'')+tiles+selBar+'<div class="attfiles">'+filesHtml+'</div></div></div>';
@@ -4362,6 +4387,13 @@
 
   // 図面/プランボードの一覧チップ。タップで編集（表示）、⬇でダウンロード
   // （GoodNotesなど他アプリへ取り込む用）、×でゴミ箱に削除できる。
+  function planTileHtml(a){
+    var dl = a.url ? '<a class="btn secondary small" target="_blank" rel="noopener" href="'+escapeHtml(a.url)+'" download="'+escapeHtml(a.name)+'" title="ダウンロード（GoodNotesなど他アプリで開けます）">⬇</a>' : '';
+    return '<div class="fttile">'+
+      '<div class="ftthumb" data-openplan="'+a.id+'" title="タップして開く（表示・書き込み）">'+fileThumbInner(a.url, a.contentType, a.name)+'</div>'+
+      '<div class="ftbody"><div class="ftname" data-openplan="'+a.id+'" title="'+escapeHtml(a.name)+'">'+escapeHtml(a.name)+'</div>'+
+      '<div class="ftacts">'+dl+'<button class="btn small danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button></div></div></div>';
+  }
   function planChipHtml(a){
     var dlAttr = a.url ? ' href="'+escapeHtml(a.url)+'" download="'+escapeHtml(a.name)+'"' : '';
     var dlDisabled = a.url ? "" : ' style="opacity:.4; pointer-events:none;" title="この図面はダウンロードできません"';
@@ -4374,18 +4406,22 @@
   function renderPlanSourceList(){
     var wrap = document.getElementById("planSourceList");
     var empty = document.getElementById("planSourceEmpty");
-    var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
+    var rows = liveAttachments().filter(function(a){ if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return false;
+      return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
     empty.hidden = rows.length !== 0;
-    wrap.innerHTML = rows.map(planChipHtml).join("");
+    wrap.className = "ftgrid";
+    wrap.innerHTML = rows.map(planTileHtml).join("");
   }
 
   function renderDrawingsList(){
     var wrap = document.getElementById("drawingsList");
     var empty = document.getElementById("drawingsEmpty");
     if(!wrap) return;
-    var rows = liveAttachments().filter(function(a){ return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
+    var rows = liveAttachments().filter(function(a){ if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return false;
+      return a.projectId === state.currentProjectId && (a.kind==="plan" || (a.contentType||"").indexOf("image")===0 || (a.contentType||"").indexOf("pdf")>=0); });
     empty.hidden = rows.length !== 0;
-    wrap.innerHTML = rows.map(planChipHtml).join("");
+    wrap.className = "ftgrid";
+    wrap.innerHTML = rows.map(planTileHtml).join("");
   }
 
   var MEETING_SUBTAB_BY_SCOPE = { exterior:"exterior", facility:"facility", equipment:"equipment", interiorColor:"interiorColor", room:"interiorColor" };
@@ -4458,7 +4494,7 @@
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(n){
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
-      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files)+'</div>' : "";
+      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files, 120)+'</div>' : "";
       var chHtml = (n.channel && n.channel!=="打合せ") ? '<span class="pill" style="background:#06c755; color:#fff; font-weight:700;">'+escapeHtml(n.channel)+'</span> ' : "";
       var specHtml = n.specPart ?
         '<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
@@ -6956,6 +6992,22 @@
   // 打ち合わせ記録に添付された写真・PDF・動画を、横一列の大きめサムネイルで表示する
   // （件数が多い時は横スクロール）。1つの打ち合わせ記録＝複数の候補写真、という
   // まとめ方を分かりやすく見せるための共通パーツ。
+  // ファイル1つ分のサムネイルの中身（写真＝そのまま／PDF＝1ページ目／動画／その他＝拡張子）
+  function fileKindOf(url, ct, name){
+    ct = ct || ""; var ext = String(name||url||"").split("?")[0].split(".").pop().toLowerCase();
+    if(ct.indexOf("pdf")>=0 || ext==="pdf") return "pdf";
+    if(ct.indexOf("image")===0 || /^(jpe?g|png|gif|webp|heic|bmp)$/.test(ext)) return "image";
+    if(ct.indexOf("video")===0 || /^(mp4|mov|m4v|webm)$/.test(ext)) return "video";
+    return "other";
+  }
+  function fileThumbInner(url, ct, name){
+    var k = fileKindOf(url, ct, name);
+    if(k==="pdf") return pdfThumbInnerHtml(url);
+    if(k==="image" && url) return '<img loading="lazy" decoding="async" src="'+escapeHtml(url)+'" alt="">';
+    if(k==="video" && url) return '<video src="'+escapeHtml(url)+'" muted preload="metadata"></video><span class="specphoto-playbadge">▶</span>';
+    var ext = String(name||"").split(".").pop().slice(0,4).toUpperCase();
+    return '<div class="ftext">📄<b>'+escapeHtml(ext||"FILE")+'</b></div>';
+  }
   function fileThumbRowHtml(files, size){
     files = files || [];
     if(!files.length) return "";
