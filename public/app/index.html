@@ -388,6 +388,14 @@
   .kancol .kangrid{ grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
   @media (max-width:900px){ .kancol .kangrid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   @media (max-width:760px){ .kancol .kangrid{ grid-template-columns:1fr; } }
+  /* 記録の部位カードに出す「見積の書類・依頼」 */
+  .relpart{ margin-block-start:10px; padding:8px 10px; border-radius:10px; background:var(--surface-2); }
+  .relhd{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:.85rem; font-weight:700; color:var(--muted); }
+  .rellinks{ display:inline-flex; gap:6px; margin-inline-start:auto; }
+  .rellink{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:2px 10px; font-family:inherit; font-size:.85rem; font-weight:700; color:var(--accent-ink); cursor:pointer; }
+  .relchips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .relchip{ display:inline-flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:3px 8px; font-size:.85rem; color:var(--ink); text-decoration:none; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .relchip .relon{ color:var(--accent-ink); }
   /* ===== タスクのボード（Trello風） ===== */
   .tfrow{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-block-end:10px; }
   .tfsel{ display:inline-flex; align-items:center; gap:4px; border:1px solid var(--border); background:var(--surface); border-radius:9px; padding:2px 4px 2px 9px; max-width:100%; }
@@ -1022,7 +1030,7 @@
       <div class="subpanel" id="sub-quote">
         <div class="card">
           <h3>添付資料（平面図・見積書など）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／見積もり／NET）を指定して登録できます。</p>
+          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
           <div class="uploadrow">
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
@@ -1699,7 +1707,9 @@
   var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口"];
   // 上の4項目は、打合せ記録のサブタブにそれぞれ別のタブとして出す（タブのキー）
   var SITECHECK_TABS = { "外部散水栓（水道）":{key:"sc_sansui", label:"外部散水栓"}, "インターホン親機":{key:"sc_intercom", label:"インターホン親機"}, "給湯リモコン":{key:"sc_remocon", label:"給湯リモコン"}, "床下点検口":{key:"sc_yukashita", label:"床下点検口"} };
-  var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
+  var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠","窓まわり"];
+  // 社内だけの部位（見積・タスク・見積依頼で使う。記録の仕様タブ・お客様のおうちノートには出さない）
+  var INTERNAL_CATS = ["基礎","足場"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
   var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪","会社","その他"];
   // 部門＝案件の種別。保存する値はそのままで、表示名だけ変える
@@ -1727,7 +1737,8 @@
     {label:"暖房・換気・電気設備", value:"equipment"},
     {label:"外部散水栓・インターホンなど", value:"siteCheck"},
     {label:"インテリア：メイン（家全体の基本色）", value:"interiorColor"},
-    {label:"インテリア：部屋別", value:"room"}
+    {label:"インテリア：部屋別", value:"room"},
+    {label:"社内だけ（基礎・足場など。お客様に出さない）", value:"internal"}
   ];
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
@@ -2271,6 +2282,7 @@
     migrateToiletMerge();
     migratePlanboardPartRemoval();
     migrateExteriorNoteEntries();
+    migrateAttachmentFolderParts();
     repairReflectedTaskCopies();
     loadActivityBackground();
   }
@@ -2337,6 +2349,17 @@
         saveDoc("projects", pr.id, pr);
       });
     }catch(e){ console.warn("toilet merge failed", e); }
+  }
+  // 見積の書類に、入っているフォルダーの部位を付ける（部位が無い書類だけ。何度動かしても同じ結果）
+  async function migrateAttachmentFolderParts(){
+    var changed = [];
+    liveAttachments().forEach(function(a){
+      if(a.specPart || !a.folderId) return;
+      var proj = projectById(a.projectId);
+      if(proj && attApplyFolderPart(a, proj)) changed.push(a);
+    });
+    for(var i=0;i<changed.length;i++){ await saveDoc("attachments", changed[i].id, changed[i]); }
+    if(changed.length) render();
   }
   function migrateSiteCheckMoves(){
     try{
@@ -3863,6 +3886,35 @@
   // 水まわり（fx_10）の中の固定サブフォルダー。IDは必ず末尾に足す（fx_13〜）
   ["キッチン","お風呂","洗面","トイレ","脱衣"].forEach(function(n, i){ ATT_FIXED_FOLDERS.push({id:"fx_"+(13+i), name:n, parentId:"fx_10", order:100+i}); });
   // 初期フォルダーは「最初に自動で入るだけ」。案件で最初にフォルダーを変えたとき(attEnsureSeeded)に実データとして保存され、以後は自由に名前変更・削除・移動できる
+  // 見積のフォルダー（業者さんの種類）ごとに「最初に付く部位」。フォルダーIDで決めるので、名前を変えても同じ。
+  // 自分で作ったサブフォルダー（業者名など）は、いちばん近い親フォルダーの部位を使う。
+  var ATT_FOLDER_PARTS = {
+    fx_1:{scope:"internal", category:"基礎"}, fx_2:{scope:"internal", category:"足場"},
+    fx_3:{scope:"exterior", category:"屋根"}, fx_8:{scope:"exterior", category:"外壁"},
+    fx_4:{scope:"equipment", category:"暖房設備"}, fx_5:{scope:"equipment", category:"換気設備"},
+    fx_6:{scope:"equipment", category:"電気配線"}, fx_7:{scope:"equipment", category:"あかりプラン"},
+    fx_9:{scope:"interiorColor", category:"ドア"}, fx_11:{scope:"interiorColor", category:"メインクロス"},
+    fx_10:{scope:"facility", category:null},
+    fx_13:{scope:"facility", category:"キッチン"}, fx_14:{scope:"facility", category:"お風呂"}, fx_15:{scope:"facility", category:"洗面"},
+    fx_16:{scope:"facility", category:"トイレ"}, fx_17:{scope:"facility", category:"脱衣室"}
+  };
+  function attFolderPart(proj, folderId){
+    var cur = folderId ? attFolderById(proj, folderId) : null, n = 0;
+    while(cur && n<10){
+      var m = ATT_FOLDER_PARTS[cur.id];
+      if(m) return {scope:m.scope, category:m.category, roomId:null, side:null, label: m.category ? specPartGroupLabel(m.scope)+"・"+m.category : specPartGroupLabel(m.scope)};
+      cur = cur.parentId ? attFolderById(proj, cur.parentId) : null; n++;
+    }
+    return null;
+  }
+  // フォルダーから自動で付いた部位（specPartAuto）は、フォルダーを移すと付け直す。自分で選んだ部位は変えない。
+  function attApplyFolderPart(a, proj){
+    if(a.specPart && !a.specPartAuto) return false;
+    var fp = attFolderPart(proj, a.folderId);
+    if(fp){ if(a.specPart && a.specPart.scope===fp.scope && a.specPart.category===fp.category) return false; a.specPart = fp; a.specPartAuto = true; return true; }
+    if(a.specPartAuto && a.specPart && !a.reflected){ a.specPart = null; delete a.specPartAuto; return true; }
+    return false;
+  }
   function attDefaultCopies(){ return ATT_FIXED_FOLDERS.map(function(f){ return {id:f.id, name:f.name, parentId:f.parentId, order:f.order}; }); }
   function attFoldersOf(proj){
     var stored = ((proj&&proj.attFolders)||[]).filter(function(f){ return !f.deletedAt; });
@@ -4053,7 +4105,7 @@
     var list = ids.map(function(id){ return state.attachments.find(function(x){ return x.id===id && x.projectId===state.currentProjectId; }); }).filter(Boolean)
       .filter(function(a){ return (a.folderId||"") !== (folderId||""); });
     if(!list.length) return;
-    list.forEach(function(a){ a.folderId = folderId||""; delete attSelected[a.id]; });
+    list.forEach(function(a){ a.folderId = folderId||""; delete attSelected[a.id]; attApplyFolderPart(a, proj); });
     render();
     var bad = 0;
     for(var i=0;i<list.length;i++){ var ok = await saveDoc("attachments", list[i].id, list[i]); if(ok===false) bad++; }
@@ -4142,11 +4194,15 @@
     });
   }
   // 「プランボード」の書類だけ、部位を指定してお客様のおうちノートに出せる（定価・NETは出せない）
+  // お客様に出せる書類：プランボード・定価（NETは絶対に出さない）
+  function quoteSharable(a){ var n = a && a.kind==="quote" ? quoteTypeNorm(a.quoteType) : ""; return n==="プランボード" || n==="定価"; }
   function quoteShareHtml(a){
-    if(!(a && a.kind==="quote" && quoteTypeNorm(a.quoteType)==="プランボード")) return "";
-    var partOk = taskPartReflectable(a.specPart);
-    return '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="お客様に出す部位を選ぶ">📍 '+(partOk ? escapeHtml(a.specPart.label||"部位") : "部位")+'</button>'+
-      '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="プランボードをお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
+    if(!a) return "";
+    if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return "";
+    var hasPart = !!(a.specPart && a.specPart.scope);
+    var partBtn = '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="この書類の部位を選ぶ（記録の同じ部位にも並びます）">📍 '+(hasPart ? escapeHtml(a.specPart.label||"部位") : "部位")+'</button>';
+    if(!quoteSharable(a)) return partBtn;
+    return partBtn + '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="この書類をお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
   }
 
   // 図面/プランボードの一覧チップ。タップで編集（表示）、⬇でダウンロード
@@ -5527,9 +5583,35 @@
       } else run(null, "");
     });
   }
+  function samePartLoose(sp, scope, category, roomId){
+    if(!sp || sp.scope!==scope) return false;
+    if((sp.category||null)!==(category||null)) return false;
+    if(scope==="room" && (sp.roomId||null)!==(roomId||null)) return false;
+    return true;
+  }
+  // この部位に付いている見積の書類・見積依頼・タスク（記録の各部位のカードに出す）
+  function relatedPartHtml(scope, category, roomId){
+    var pid = state.currentProjectId;
+    if(!pid || scope==="siteCheck") return "";
+    var docs = liveAttachments().filter(function(a){ return a.projectId===pid && samePartLoose(a.specPart, scope, category, roomId); });
+    var reqs = (state.requests||[]).filter(function(r){ return !r.deletedAt && r.projectId===pid && samePartLoose(r.part, scope, category, roomId); });
+    var tasks = liveTasks().filter(function(t){ return t.projectId===pid && samePartLoose(t.vendorSpec, scope, category, roomId); });
+    if(!docs.length && !reqs.length && !tasks.length) return "";
+    var chips = docs.map(function(a){
+      var locked = a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked;
+      var kind = a.kind==="quote" ? quotePill(a.quoteType) : (a.kind==="plan" ? '<span class="pill tag">図面</span>' : "");
+      if(locked) return '<span class="relchip">'+kind+' 🔒</span>';
+      return '<a class="relchip" href="'+escapeHtml(a.url||"#")+'" target="_blank" rel="noopener">'+kind+' '+escapeHtml(a.name||"")+(a.reflected?' <b class="relon">✓反映</b>':'')+'</a>';
+    }).join("");
+    var links = [];
+    if(reqs.length) links.push('<button type="button" class="rellink" data-gosub="quote">見積依頼 '+reqs.length+'件 ›</button>');
+    if(tasks.length) links.push('<button type="button" class="rellink" data-gosub="tasks">タスク '+tasks.length+'件 ›</button>');
+    return '<div class="relpart"><div class="relhd">📎 見積の書類・依頼'+(links.length?' <span class="rellinks">'+links.join("")+'</span>':'')+'</div>'+(chips?'<div class="relchips">'+chips+'</div>':'')+'</div>';
+  }
   function renderSpecTimeline(scope, category, roomId, side){
+    var rel = relatedPartHtml(scope, category, roomId);
     var rows = specPhotosFor(scope, category, roomId, side).slice();
-    if(!rows.length) return "";
+    if(!rows.length) return rel;
     // 新しい順（降順）。経緯を追うには時系列のつながりが大事なので、並び替えは
     // するが「日付でグループ化して見やすくする」だけに留め、時系列自体は崩さない。
     rows.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
@@ -5656,7 +5738,7 @@
         g.cards.join("")+
         '</div>';
     }).join("");
-    return '<div style="margin-block-start:10px;"><div style="font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
+    return rel + '<div style="margin-block-start:10px;"><div style="font-size:.85rem; color:var(--muted); font-weight:700; margin-block-end:4px;">変更履歴（打ち合わせ→依頼→受領→決定）</div><div class="spectl">'+html+'</div></div>';
   }
   // お客様画面のカードに「仮決定／決定」ボタンを出すかどうか（記録・業者タスクごと。初めは出さない）
   function toggleMeetingAskDecision(id){
@@ -8047,7 +8129,7 @@
         var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:f.name, url: res.url,
           contentType: res.contentType || f.type, sizeBytes: res.sizeBytes || f.size, uploadedAt: todayStr(),
           kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"定価") : undefined };
-        if(!requestId && pid0===state.currentProjectId){ var pj0 = projectById(pid0); if(state.attFolder && attFolderById(pj0, state.attFolder)) att.folderId = state.attFolder; }
+        if(!requestId && pid0===state.currentProjectId){ var pj0 = projectById(pid0); if(state.attFolder && attFolderById(pj0, state.attFolder)){ att.folderId = state.attFolder; attApplyFolderPart(att, pj0); } }
         if(requestId){ att.requestId = requestId; var rq0 = state.requests.find(function(x){ return x.id===requestId; }); if(rq0) att.vendorId = rq0.vendorId; }
         blobCache[res.id] = f;
         state.attachments.push(att);
@@ -8603,10 +8685,10 @@
   // ---- プランボードの書類をお客様に出す（部位を指定して反映）----
   async function setQuotePart(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
-    if(!a || quoteTypeNorm(a.quoteType)!=="プランボード") return;
+    if(!a) return;
     askSpecPart(async function(part){
       if(!part) return;
-      a.specPart = part; render();
+      a.specPart = part; delete a.specPartAuto; render();
       var ok = await saveDoc("attachments", a.id, a);
       if(ok===false) toast("保存に失敗しました。もう一度お試しください");
     }, a.projectId);
@@ -8614,7 +8696,7 @@
   async function toggleQuoteReflect(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
     if(!a) return;
-    if(quoteTypeNorm(a.quoteType)!=="プランボード"){ toast("お客様に出せるのは「プランボード」の書類だけです"); return; }
+    if(!quoteSharable(a)){ toast("お客様に出せるのは「プランボード」と「定価」の書類だけです"); return; }
     if(!a.reflected && !taskPartReflectable(a.specPart)){
       askSpecPart(function(part){
         if(!part) return;
@@ -8630,8 +8712,9 @@
     render();
     var ok = await saveDoc("attachments", a.id, a);
     if(ok===false){ toast("保存に失敗しました。もう一度お試しください"); return; }
-    logActivity("プランボード「"+a.name+"」を"+(a.reflected?"おうちノートに反映しました":"反映解除しました"));
-    toast(a.reflected ? "✅ 「"+((a.specPart&&a.specPart.label)||"")+"」のおうちノートに、プランボードを出しました" : "反映を解除しました");
+    var qn = quoteTypeNorm(a.quoteType);
+    logActivity(qn+"「"+a.name+"」を"+(a.reflected?"おうちノートに反映しました":"反映解除しました"));
+    toast(a.reflected ? "✅ 「"+((a.specPart&&a.specPart.label)||"")+"」のおうちノートに、"+qn+"を出しました" : "反映を解除しました");
   }
 
   // ---- 業者の編集 ----
@@ -9438,6 +9521,7 @@
   // 外部仕様（項目を選ばず「外部仕様」だけ）と、部屋そのもの（項目を限定しない）は category が空でも出せる。
   function taskPartReflectable(vs){
     if(!vs || !vs.scope) return false;
+    if(vs.scope==="internal") return false; // 社内だけの部位はお客様に出さない
     if(vs.category) return true;
     if(vs.scope==="general" || vs.scope==="exterior") return true;
     if(vs.scope==="room" && vs.roomId) return true;
@@ -9678,6 +9762,7 @@
     if(scope==="facility") return FACILITY_CATS;
     if(scope==="equipment") return EQUIPMENT_CATS;
     if(scope==="siteCheck") return SITECHECK_CATS;
+    if(scope==="internal") return INTERNAL_CATS;
     if(scope==="interiorColor") return interiorColorCatsFor(proj).map(function(c){ return c.name; });
     return [];
   }
@@ -10472,6 +10557,11 @@
       toast(state.currentUser ? "いま使っている人を「"+state.currentUser+"」にしました" : "名前が選ばれていません（記録に名前が残りません）");
     });
     document.getElementById("btnSyncNow").addEventListener("click", function(){ syncFromServer({}); });
+    // 記録の部位カードの「見積依頼 n件 ›」「タスク n件 ›」：その案件のタブへ移る
+    document.addEventListener("click", function(e){
+      var g = e.target.closest("[data-gosub]"); if(!g) return;
+      var b = document.querySelector('.sub-btn[data-sub="'+g.dataset.gosub+'"]'); if(b){ b.click(); window.scrollTo({top:0, behavior:"smooth"}); }
+    });
     (function(){
       var mb = document.getElementById("btnHdrMore"), mm = document.getElementById("hdrMore");
       if(!mb || !mm) return;

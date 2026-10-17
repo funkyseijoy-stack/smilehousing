@@ -454,15 +454,18 @@ export default async (req: Request, context: Context) => {
       });
     }
   }
-  // プランボードの書類（スタッフが部位を指定して「反映」したものだけ。定価・NETは出さない）。見積もり・NET（以前の「仕切り」）は、反映の有無にかかわらず出さない。
+  // プランボード・定価の書類（スタッフが部位を指定して「反映」したものだけ）。NET（以前の「仕切り」）は、反映の有無にかかわらず絶対に出さない。
+  // 「見積もり」は「定価」の旧名なので定価として扱う。社内だけの部位（internal）は noteCatFor が null を返すので出ない。
   for (const a of attachments) {
-    if (a.kind !== "quote" || a.quoteType !== "プランボード" || !a.reflected || !a.url) continue;
+    const qt = a.quoteType === "見積もり" ? "定価" : a.quoteType;
+    if (a.kind !== "quote" || (qt !== "プランボード" && qt !== "定価") || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;
     if (!sp.category && sp.scope !== "general" && sp.scope !== "exterior" && !(sp.scope === "room" && sp.roomId)) continue;
     push(noteCatFor(sp.scope, sp.category), {
       type: "photo",
       isQuote: true,
+      quoteType: qt,
       at: a.reflectedAt || a.uploadedAt || "",
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,
