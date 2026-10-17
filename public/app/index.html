@@ -139,7 +139,7 @@
   .pill.method{ background:var(--surface-2); color:var(--muted); font-weight:500; }
   .pill.tag{ background:var(--accent-soft); color:var(--accent-ink); }
   .pill.quote-プランボード{ background:var(--accent-soft); color:var(--accent-ink); }
-  .pill.quote-見積もり{ background:var(--gold-soft); color:var(--gold); }
+  .pill.quote-定価{ background:var(--gold-soft); color:var(--gold); }
   .pill.quote-NET{ background:var(--blue-soft); color:var(--blue); }
 
   .muted{ color:var(--muted); }
@@ -920,7 +920,7 @@
             <select id="attachmentKind">
               <option value="plan">図面</option>
               <option value="プランボード">プランボード</option>
-              <option value="見積もり">見積もり</option>
+              <option value="定価">定価</option>
               <option value="NET">NET</option>
               <option value="other">その他</option>
             </select>
@@ -1169,7 +1169,7 @@
 
     <div class="card">
       <h3>NETのロック用の暗証番号</h3>
-      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「NET」の書類を見るときに求める番号です（「プランボード」「見積もり」はロックされません。お客様に出せるのは「プランボード」だけです）。業者向けメールには見積の種類は表示されません。</p>
+      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「NET」の書類を見るときに求める番号です（「プランボード」「定価」はロックされません。お客様に出せるのは「プランボード」だけです）。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
 
@@ -3460,10 +3460,10 @@
 
   function statusPill(status){ return '<span class="pill status-'+status+'">'+status+'</span>'; }
   function methodPill(method){ return '<span class="pill method">'+(method==="gmail"?"Gmail":"FAX")+'</span>'; }
-  // 書類の種類：プランボード（お客様に出せる）／見積もり／NET（お客様には絶対に出さない・暗証番号でロック）。
-  // 以前の「定価」はプランボード、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
-  var QUOTE_TYPES = ["プランボード","見積もり","NET"];
-  function quoteTypeNorm(t){ return t==="定価" ? "プランボード" : (t==="仕切り" ? "NET" : (t||"")); }
+  // 書類の種類：プランボード（お客様に出せる）／定価／NET（NETは暗証番号でロック。お客様に出せるのはプランボードだけ）。
+  // 以前の「見積もり」は定価、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
+  var QUOTE_TYPES = ["プランボード","定価","NET"];
+  function quoteTypeNorm(t){ return t==="見積もり" ? "定価" : (t==="仕切り" ? "NET" : (t||"")); }
   function quoteLocked(t){ return quoteTypeNorm(t) === "NET"; }
   function quotePill(qt){ var n = quoteTypeNorm(qt); return n ? '<span class="pill quote-'+n+'">'+n+'</span>' : ""; }
 
@@ -3550,7 +3550,10 @@
   var attFolderOpen = {};   // 開いているフォルダー
   var attSelected = {};     // 選択中のファイル
   var attDragging = null;   // ドラッグ中 {type:"file"|"folder", id}
-  function attFoldersOf(proj){ return ((proj&&proj.attFolders)||[]).filter(function(f){ return !f.deletedAt; }); }
+  // 全案件に最初から入っている固定フォルダー（部門）。保存はせず、画面で毎回作る（削除・名前変更・移動はできない。中に自由にサブフォルダー［業者など］を足せる）
+  var ATT_FIXED_NAMES = ["基礎","足場","板金","暖房設備","換気設備","電気配線","あかりプラン","建材","建具・階段","水まわり（キッチン・お風呂・洗面・トイレ・脱衣）","クロス・窓まわり","その他"];
+  var ATT_FIXED_FOLDERS = ATT_FIXED_NAMES.map(function(n, i){ return {id:"fx_"+(i+1), name:n, parentId:"", fixed:true, order:i}; });
+  function attFoldersOf(proj){ return ATT_FIXED_FOLDERS.concat(((proj&&proj.attFolders)||[]).filter(function(f){ return !f.deletedAt; })); }
   function attFolderById(proj, id){ return id ? attFoldersOf(proj).find(function(f){ return f.id===id; }) : null; }
   function attChildren(proj, pid){
     var all = attFoldersOf(proj);
@@ -3558,7 +3561,11 @@
       var p = f.parentId || "";
       if(p && !all.some(function(x){ return x.id===p; })) p = ""; // 親が無ければ最上位に出す
       return p === (pid||"");
-    }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "ja"); });
+    }).sort(function(a,b){
+      if(a.fixed && b.fixed) return a.order-b.order;
+      if(a.fixed) return -1; if(b.fixed) return 1;
+      return (a.name||"").localeCompare(b.name||"", "ja");
+    });
   }
   function attDepth(proj, id){
     var d = 0, cur = attFolderById(proj, id);
@@ -3586,7 +3593,7 @@
       var kids = attChildren(proj, f.id), open = !!attFolderOpen[f.id];
       var ids = attDescendantIds(proj, f.id);
       var n = rows.filter(function(a){ return ids.indexOf(attFileFolderId(proj, a))>=0; }).length;
-      return '<div class="attf'+(curSel===f.id?" sel":"")+'" style="padding-inline-start:'+(8+depth*16)+'px;" data-attfolder="'+f.id+'" data-attdrop="'+f.id+'" draggable="true" data-attdragfolder="'+f.id+'">'+
+      return '<div class="attf'+(curSel===f.id?" sel":"")+'" style="padding-inline-start:'+(8+depth*16)+'px;" data-attfolder="'+f.id+'" data-attdrop="'+f.id+'"'+(f.fixed?'':' draggable="true" data-attdragfolder="'+f.id+'"')+'>'+
         '<span class="attf-tog" data-atttoggle="'+f.id+'">'+(kids.length?(open?"▾":"▸"):"")+'</span>📁 <span class="attf-name">'+escapeHtml(f.name)+'</span><span class="attf-n">'+n+'</span></div>'+
         (open ? attTreeHtml(proj, rows, f.id, depth+1, curSel) : "");
     }).join("");
@@ -3614,14 +3621,15 @@
     var acts = "";
     if(curFolder){
       acts = (attDepth(proj, cur) < ATT_FOLDER_MAX_DEPTH ? '<button class="btn small secondary" data-attact="newfolder" data-pid="'+cur+'">＋サブフォルダー</button> ' : '')+
+        (curFolder.fixed ? '<span class="muted" style="font-size:.85rem;">（固定のフォルダー）</span>' :
         '<button class="btn small ghost" data-attact="renamefolder" data-pid="'+cur+'">名前変更</button> '+
         '<button class="btn small ghost" data-attact="movefolder" data-pid="'+cur+'">📁 移動</button> '+
-        '<button class="btn small danger-ghost" data-attact="delfolder" data-pid="'+cur+'">フォルダー削除</button>';
+        '<button class="btn small danger-ghost" data-attact="delfolder" data-pid="'+cur+'">フォルダー削除</button>');
     }
     var tiles = "";
     if(curFolder){
       tiles = attChildren(proj, cur).map(function(f){
-        return '<div class="atttile" data-attfolder="'+f.id+'" data-attdrop="'+f.id+'" draggable="true" data-attdragfolder="'+f.id+'">📁 '+escapeHtml(f.name)+'</div>';
+        return '<div class="atttile" data-attfolder="'+f.id+'" data-attdrop="'+f.id+'"'+(f.fixed?'':' draggable="true" data-attdragfolder="'+f.id+'"')+'>📁 '+escapeHtml(f.name)+'</div>';
       }).join("");
       if(tiles) tiles = '<div class="atttiles">'+tiles+'</div>';
     }
@@ -3698,6 +3706,7 @@
   async function attRenameFolder(id){
     var proj = projectById(state.currentProjectId), f = attFolderById(proj, id);
     if(!f) return;
+    if(f.fixed){ toast("固定のフォルダーは名前を変えられません"); return; }
     var name = (prompt("新しい名前", f.name)||"").trim();
     if(!name || name===f.name) return;
     if(name.length>30){ toast("名前は30文字までです"); return; }
@@ -3708,6 +3717,7 @@
   async function attDeleteFolder(id){
     var proj = projectById(state.currentProjectId), f = attFolderById(proj, id);
     if(!f) return;
+    if(f.fixed){ toast("固定のフォルダーは削除できません"); return; }
     if(!confirm("フォルダー「"+f.name+"」を削除しますか？\n中のファイルとフォルダーは消えず、1つ上（いちばん上なら「未分類」）に戻ります。")) return;
     var up = f.parentId || "";
     attFoldersOf(proj).forEach(function(k){ if((k.parentId||"")===id) k.parentId = up; });
@@ -3735,6 +3745,7 @@
   async function attMoveFolder(id, parentId){
     var proj = projectById(state.currentProjectId), f = attFolderById(proj, id);
     if(!f) return;
+    if(f.fixed){ toast("固定のフォルダーは移せません"); return; }
     parentId = parentId||"";
     if((f.parentId||"")===parentId) return;
     if(parentId && attDescendantIds(proj, id).indexOf(parentId)>=0){ toast("フォルダーを自分の中へは移せません"); return; }
@@ -3813,7 +3824,7 @@
       }
     });
   }
-  // 「プランボード」の書類だけ、部位を指定してお客様のおうちノートに出せる（見積もり・NETは出せない）
+  // 「プランボード」の書類だけ、部位を指定してお客様のおうちノートに出せる（定価・NETは出せない）
   function quoteShareHtml(a){
     if(!(a && a.kind==="quote" && quoteTypeNorm(a.quoteType)==="プランボード")) return "";
     var partOk = taskPartReflectable(a.specPart);
@@ -7727,7 +7738,7 @@
         var res = await uploadAssetWithRetry(f, 2);
         var att = { id:uid("att"), projectId: pid0, assetId: res.id, name:f.name, url: res.url,
           contentType: res.contentType || f.type, sizeBytes: res.sizeBytes || f.size, uploadedAt: todayStr(),
-          kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"見積もり") : undefined };
+          kind: kind || "other", quoteType: kind==="quote" ? (quoteType||"定価") : undefined };
         if(!requestId && pid0===state.currentProjectId){ var pj0 = projectById(pid0); if(state.attFolder && attFolderById(pj0, state.attFolder)) att.folderId = state.attFolder; }
         if(requestId){ att.requestId = requestId; var rq0 = state.requests.find(function(x){ return x.id===requestId; }); if(rq0) att.vendorId = rq0.vendorId; }
         blobCache[res.id] = f;
@@ -10291,7 +10302,7 @@
       var rid = pendingReqAttachId; input.value = "";
       var thenReceive = pendingReqAttachThenReceive; pendingReqAttachThenReceive = false;
       if(!files.length || !rid) return;
-      askChoice("書類の種類", "NETだけ暗証番号でロックされます。お客様に出せるのはプランボードだけです（見積もり・NETは出ません）。", [{label:"プランボード", value:"プランボード"},{label:"見積もり", value:"見積もり"},{label:"NET", value:"NET"}], function(qt){
+      askChoice("書類の種類", "NETだけ暗証番号でロックされます。お客様に出せるのはプランボードだけです（定価・NETは出ません）。", [{label:"プランボード", value:"プランボード"},{label:"定価", value:"定価"},{label:"NET", value:"NET"}], function(qt){
         if(qt===null) return;
         uploadAttachments(files, "quote", qt, rid).then(function(n){
           if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid); }
@@ -10326,7 +10337,7 @@
       var input = document.getElementById("attachmentInput");
       var kind = document.getElementById("attachmentKind").value;
       var qt = "";
-      if(QUOTE_TYPES.indexOf(kind)>=0){ qt = kind; kind = "quote"; } // プランボード／見積もり／NET は「見積書」の種類として保存
+      if(QUOTE_TYPES.indexOf(kind)>=0){ qt = kind; kind = "quote"; } // プランボード／定価／NET は「見積書」の種類として保存
       if(input.files && input.files.length){ uploadAttachments(input.files, kind, qt); input.value=""; }
       else { toast("ファイルを選択してください"); }
     });

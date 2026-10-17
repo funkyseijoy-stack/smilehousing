@@ -454,9 +454,9 @@ export default async (req: Request, context: Context) => {
       });
     }
   }
-  // プランボードの書類（スタッフが部位を指定して「反映」したものだけ。以前の「定価」も同じ扱い）。見積もり・NET（以前の「仕切り」）は、反映の有無にかかわらず出さない。
+  // プランボードの書類（スタッフが部位を指定して「反映」したものだけ。定価・NETは出さない）。見積もり・NET（以前の「仕切り」）は、反映の有無にかかわらず出さない。
   for (const a of attachments) {
-    if (a.kind !== "quote" || (a.quoteType !== "プランボード" && a.quoteType !== "定価") || !a.reflected || !a.url) continue;
+    if (a.kind !== "quote" || a.quoteType !== "プランボード" || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;
     if (!sp.category && sp.scope !== "general" && sp.scope !== "exterior" && !(sp.scope === "room" && sp.roomId)) continue;
