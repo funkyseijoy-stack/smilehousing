@@ -388,11 +388,49 @@
   .kancol .kangrid{ grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
   @media (max-width:900px){ .kancol .kangrid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   @media (max-width:760px){ .kancol .kangrid{ grid-template-columns:1fr; } }
-  /* タスクの絞り込み（ボタンで開閉） */
-  .tfbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
-  .tfbar .tf-sum{ font-size:.85rem; color:var(--muted); font-weight:400; }
-  #taskFilterBody{ border:1px solid var(--border); border-radius:12px; padding:10px; margin-block-end:10px; background:var(--surface-2); }
-  #taskFilterBody[hidden]{ display:none; }
+  /* ===== タスクのボード（Trello風） ===== */
+  .tfrow{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-block-end:10px; }
+  .tfsel{ display:inline-flex; align-items:center; gap:4px; border:1px solid var(--border); background:var(--surface); border-radius:9px; padding:2px 4px 2px 9px; max-width:100%; }
+  .tfsel[hidden]{ display:none; }
+  .tfsel > span{ font-size:.85rem; color:var(--muted); white-space:nowrap; }
+  .tfsel select{ border:0; background:transparent; padding:5px 2px; max-width:11em; font-weight:700; }
+  @media (max-width:760px){
+    .tfrow{ display:grid; grid-template-columns:1fr 1fr; }
+    .tfsel{ min-width:0; }
+    .tfsel select{ flex:1; min-width:0; max-width:none; width:100%; }
+    #taskFilterReset{ grid-column:1 / -1; justify-self:start; }
+    /* ボードはカードの余白をはみ出して画面いっぱいに使う */
+    #panel-home .kboard{ margin-inline:-16px; padding-inline:16px; scroll-padding-inline:16px; }
+  }
+  .kboard{ display:flex; gap:12px; overflow-x:auto; align-items:flex-start; padding-block-end:10px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+  .kcol{ flex:0 0 310px; min-width:0; background:var(--surface-2); border-radius:14px; border-top:5px solid var(--sc); padding:10px 8px 8px; scroll-snap-align:start; }
+  @media (max-width:760px){ .kcol{ flex-basis:86%; } }
+  .khead{ display:flex; align-items:center; gap:8px; margin:0 4px 8px; font-weight:700; font-family:"Zen Maru Gothic",sans-serif; }
+  .khead .kandot{ width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+  .khead .kn{ margin-inline-start:auto; color:var(--muted); font-weight:400; }
+  .kgrp{ display:flex; align-items:center; gap:6px; font-size:.85rem; font-weight:700; color:var(--muted); margin:12px 4px 4px; }
+  .kbody > .kgrp:first-child{ margin-top:2px; }
+  .kgrp i{ flex:1; height:1px; background:var(--border); }
+  .kprj{ font-size:.85rem; font-weight:700; color:var(--accent-ink); margin:6px 4px 4px; }
+  .kempty{ color:var(--muted); font-size:.85rem; text-align:center; padding:14px 0 8px; }
+  .kmore{ display:block; width:100%; border:0; background:none; color:var(--muted); font-family:inherit; font-size:.85rem; font-weight:700; padding:8px 4px 2px; text-align:start; cursor:pointer; }
+  .kboard .kancard{ border:0; border-radius:10px; padding:8px 10px; margin-block-end:6px; box-shadow:0 1px 2px rgba(43,36,32,.10); }
+  .kboard .kancard.reflected{ border-inline-start:5px solid var(--accent); }
+  .kboard .kancard.exp{ box-shadow:0 0 0 2px var(--accent); }
+  .kc-row{ display:flex; align-items:center; gap:8px; }
+  .kc-main{ flex:1; min-width:0; }
+  .kboard .kancard .kc-content{ font-size:.92rem; line-height:1.4; -webkit-line-clamp:2; margin:0; white-space:normal; }
+  .kboard .kancard.exp .kc-content{ white-space:pre-wrap; }
+  .kc-meta2{ display:flex; flex-wrap:wrap; gap:4px 8px; font-size:.85rem; color:var(--muted); margin-top:3px; }
+  .kc-meta2 .due{ color:var(--danger); font-weight:700; }
+  .kc-meta2 .vend{ color:var(--orange); font-weight:700; }
+  .kc-meta2 .chk{ color:var(--orange); }
+  .kc-meta2 .refl{ color:var(--accent-ink); font-weight:700; }
+  .kc-av{ flex:0 0 28px; height:28px; border-radius:50%; color:#fff; font-size:.85rem; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .kc-av.none{ background:var(--surface-2); color:var(--muted); border:1px dashed var(--border); }
+  .kboard .kancard.exp .kc-full{ margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+  .kboard .donemonth{ border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden; margin-block-end:6px; }
+  .kboard .donemonth .klist{ padding:4px 6px 6px; }
   .kancard{ cursor:pointer; padding:7px 8px; }
   .kancard .kc-proj{ font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .kancard .kc-content{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-block-end:4px; }
@@ -578,14 +616,16 @@
         <h2 style="margin:0;">社内タスク【最重要】</h2>
         <button class="btn small" id="btnNewTask">＋ タスク追加</button>
       </div>
-      <div class="tfbar"><button type="button" class="btn secondary small" id="taskFilterToggle" aria-expanded="false">🔍 絞り込み <span id="taskFilterArrow">▾</span></button><span class="tf-sum" id="taskFilterSummary"></span><button type="button" class="btn secondary small" id="taskFilterReset" hidden>解除</button></div>
-      <div id="taskFilterBody" hidden>
-      <div class="row" id="taskProjectFilterRow" style="gap:8px; margin-block-end:8px; flex-wrap:wrap;"><label for="taskFolderFilter" style="font-weight:700;">フォルダー</label><select id="taskFolderFilter" style="max-width:100%;"></select><label for="taskProjectFilter" style="font-weight:700;">案件</label><select id="taskProjectFilter" style="max-width:100%;"></select></div>
-      <div class="row" id="taskStatusFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
-      <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
-      <div class="row" id="taskAssigneeFilterBar" style="gap:6px; flex-wrap:wrap;"></div>
+      <div class="tfrow">
+        <label class="tfsel"><span>部門</span><select id="taskDeptFilter"></select></label>
+        <label class="tfsel"><span>案件</span><select id="taskProjectFilter"></select></label>
+        <label class="tfsel"><span>種類</span><select id="taskKindFilter"></select></label>
+        <label class="tfsel" id="taskAssigneeWrap"><span>担当</span><select id="taskAssigneeFilter"></select></label>
+        <button type="button" class="btn secondary small" id="taskFilterReset" hidden>解除</button>
       </div>
-      <div class="kanbanwrap" id="kanbanWrap"></div>
+      <!-- 以前の絞り込み（使っていない。古い処理が参照するので空のまま残す） -->
+      <div hidden><select id="taskFolderFilter"></select><div id="taskStatusFilterBar"></div><div id="taskKindFilterBar"></div><div id="taskAssigneeFilterBar"></div></div>
+      <div class="kboard" id="kanbanWrap"></div>
     </div>
     <div class="statrow">
       <div class="stat"><div class="label">案件数</div><div class="value tabular" id="statProjects">–</div></div>
@@ -1661,7 +1701,22 @@
   var SITECHECK_TABS = { "外部散水栓（水道）":{key:"sc_sansui", label:"外部散水栓"}, "インターホン親機":{key:"sc_intercom", label:"インターホン親機"}, "給湯リモコン":{key:"sc_remocon", label:"給湯リモコン"}, "床下点検口":{key:"sc_yukashita", label:"床下点検口"} };
   var INTERIOR_COLOR_CATS = ["メインクロス","ドア","床","巾木","笠木","玄関枠","浴室枠"];
   var ROOM_CATS = [["ceiling","天井"],["wall","壁"],["accent","アクセント"]];
-  var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪"];
+  var PROJECT_TYPES = ["新築","リフォーム","不動産","賃貸","除雪","会社","その他"];
+  // 部門＝案件の種別。保存する値はそのままで、表示名だけ変える
+  var DEPT_LABELS = {"リフォーム":"改修・リフォーム","賃貸":"賃貸・管理物件"};
+  function deptLabel(t){ return DEPT_LABELS[t] || t || "その他"; }
+  // 案件の部門：種別で決める。種別が既定の「新築」のままで、最上位フォルダーが別の部門名（会社・不動産など）ならそちらを使う
+  function deptOfProject(p){
+    if(!p) return "その他";
+    var t = p.type || "";
+    if(PROJECT_TYPES.indexOf(t)<0) t = "その他";
+    if(t==="新築"){
+      var top = String(pfPath(pfOf(p))||"").split(" › ")[0];
+      if(top && top!=="新築" && PROJECT_TYPES.indexOf(top)>=0) t = top;
+    }
+    return t;
+  }
+  function deptOfTask(t){ return t.projectId ? deptOfProject(projectById(t.projectId)) : "その他"; }
   // 業者タスクに紐付ける「部位」のグループ一覧。仕様タブの各カテゴリーをそのまま使う。
   // ラベルは仕様タブの各カードの見出しと完全に一致させること（部位選択→仕様タブの
   // 変更履歴が同じ名前で連動していると分かるようにするため）。
@@ -2817,6 +2872,7 @@
     state.doneMonthOpen[key] = true;
   }
   function goToTaskBoard(taskId){
+    state.taskDeptFilter = null;
     state.taskKindFilter = null;
     state.taskAssigneeFilter = null;
     state.taskProjectFilter = null;
@@ -2885,30 +2941,138 @@
       }).join("");
     }
   }
-  // 絞り込み欄の開閉と、いま効いている条件の表示
-  function renderTaskFilterToggle(){
-    if(state.taskFilterOpen===undefined) state.taskFilterOpen = !(window.matchMedia && window.matchMedia("(max-width:760px)").matches);
-    var body = document.getElementById("taskFilterBody"), btn = document.getElementById("taskFilterToggle");
-    if(body) body.hidden = !state.taskFilterOpen;
-    if(btn) btn.setAttribute("aria-expanded", state.taskFilterOpen?"true":"false");
-    var ar = document.getElementById("taskFilterArrow"); if(ar) ar.textContent = state.taskFilterOpen ? "▴" : "▾";
-    var parts = [];
-    if(state.taskFolderFilter){ var f = pfById(state.taskFolderFilter); parts.push("📁"+(f && f.name ? f.name : "フォルダー")); }
-    if(state.taskProjectFilter){ var pj = state.taskProjectFilter==="__none" ? null : projectById(state.taskProjectFilter); parts.push(pj ? pj.name : "案件未設定"); }
-    if(state.taskStatusFilter) parts.push(state.taskStatusFilter);
-    if(state.taskKindFilter) parts.push({internal:"社内",vendor:"業者",check:"確認依頼"}[state.taskKindFilter] || state.taskKindFilter);
-    if(state.taskAssigneeFilter) parts.push(state.taskAssigneeFilter==="__none" ? "担当未設定" : state.taskAssigneeFilter);
-    var sum = document.getElementById("taskFilterSummary"); if(sum) sum.textContent = parts.length ? parts.join("・") : "すべて表示中";
-    var rs = document.getElementById("taskFilterReset"); if(rs) rs.hidden = !parts.length;
+  // ===== タスクのボード（Trello風：進捗ごとの列を横に並べ、列の中は 部門 → 案件 で区切る） =====
+  var KAN_COL_LIMIT = 10; // 1列に最初に出す枚数（残りは「ほか n件」で開く）
+  var AV_COLORS = ["#4b9bb5","#3f7d5c","#c96a1f","#7a5aa8","#b23b3b","#a9822c","#2e6fb0"];
+  function avatarColor(name){
+    var i = (state.settings.staffList || []).indexOf(name);
+    if(i>=0) return AV_COLORS[i % AV_COLORS.length];
+    var h = 0; String(name||"").split("").forEach(function(c){ h = (h*31 + c.charCodeAt(0)) >>> 0; }); return AV_COLORS[h % AV_COLORS.length]; }
+  function renderTaskFilters(){
+    var isAdmin = !state.currentUser || state.currentUser===TASK_ADMIN;
+    var all = liveTasks();
+    // 部門
+    var dsel = document.getElementById("taskDeptFilter");
+    if(dsel){
+      var dc = {}; all.forEach(function(t){ var d = deptOfTask(t); dc[d] = (dc[d]||0)+1; });
+      dsel.innerHTML = '<option value="">すべて</option>' + PROJECT_TYPES.map(function(d){ return '<option value="'+escapeHtml(d)+'">'+escapeHtml(deptLabel(d))+(dc[d]?'（'+dc[d]+'）':'')+'</option>'; }).join("");
+      dsel.value = state.taskDeptFilter || "";
+    }
+    // 案件（部門ごとにまとめる）
+    var psel = document.getElementById("taskProjectFilter");
+    if(psel){
+      var pc = {}; all.forEach(function(t){ var k = t.projectId||"__none"; pc[k] = (pc[k]||0)+1; });
+      var h = '<option value="">すべて</option>';
+      PROJECT_TYPES.forEach(function(d){
+        if(state.taskDeptFilter && state.taskDeptFilter!==d) return;
+        var ps = liveProjects().filter(function(p){ return deptOfProject(p)===d; });
+        if(!ps.length) return;
+        h += '<optgroup label="'+escapeHtml(deptLabel(d))+'">' + ps.map(function(p){ return '<option value="'+escapeHtml(p.id)+'">'+escapeHtml(p.name)+(pc[p.id]?'（'+pc[p.id]+'）':'')+'</option>'; }).join("") + '</optgroup>';
+      });
+      if(pc["__none"] && (!state.taskDeptFilter || state.taskDeptFilter==="その他")) h += '<option value="__none">案件なし（'+pc["__none"]+'）</option>';
+      psel.innerHTML = h;
+      psel.value = state.taskProjectFilter || "";
+      if(state.taskProjectFilter && psel.value!==state.taskProjectFilter){ state.taskProjectFilter = null; psel.value = ""; }
+    }
+    // 種類
+    var ksel = document.getElementById("taskKindFilter");
+    if(ksel){
+      ksel.innerHTML = '<option value="">すべて</option><option value="internal">社内</option><option value="vendor">業者</option><option value="check">確認依頼</option>';
+      ksel.value = state.taskKindFilter || "";
+    }
+    // 担当（朋子だけ。ほかの人は自分のタスクしか見えないので出さない）
+    var awrap = document.getElementById("taskAssigneeWrap"), asel = document.getElementById("taskAssigneeFilter");
+    if(awrap) awrap.hidden = !isAdmin;
+    if(!isAdmin) state.taskAssigneeFilter = null;
+    if(asel && isAdmin){
+      var names = (state.settings.staffList || []).slice();
+      all.forEach(function(t){ if(t.assignee && names.indexOf(t.assignee)<0) names.push(t.assignee); });
+      asel.innerHTML = '<option value="">すべて</option>' + names.map(function(n){ return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>'; }).join("") + '<option value="__none">担当未設定</option>';
+      asel.value = state.taskAssigneeFilter || "";
+    }
+    var rs = document.getElementById("taskFilterReset");
+    if(rs) rs.hidden = !(state.taskDeptFilter || state.taskProjectFilter || state.taskKindFilter || state.taskAssigneeFilter);
+  }
+  function kanCardHtml(t, status){
+    var proj = projectById(t.projectId);
+    var isVendor = !!t.requestTo;
+    var exp = !!(state.taskExpanded && state.taskExpanded[t.id]) || state.taskMenuId===t.id;
+    var nAtt = (t.attachments||[]).length;
+    var who = t.assignee || "";
+    var meta = [];
+    if(t.vendorSpec) meta.push('<span>📍'+escapeHtml(t.vendorSpec.label||"")+'</span>');
+    if(t.hasDeadline && t.deadline){ var dd = daysSince(t.deadline); meta.push('<span class="'+(dd!==null && dd>=-2?"due":"")+'">⏰ '+escapeHtml(String(t.deadline).slice(5).replace("-","/"))+'</span>'); }
+    if(isVendor) meta.push('<span class="vend">業者</span>');
+    if(t.checker) meta.push('<span class="chk">確認：'+escapeHtml(t.checker)+'</span>');
+    if(t.reflected) meta.push('<span class="refl">✓反映</span>');
+    if(t.private) meta.push('<span>🔒</span>');
+    if(t.memo) meta.push('<span>📝</span>');
+    if(nAtt) meta.push('<span>📎'+nAtt+'</span>');
+    return '<div class="kancard'+(t.reflected?" reflected":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
+      '<div class="kc-row"><div class="kc-main">'+
+        '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+        (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
+      '</div>'+
+      (who ? '<div class="kc-av" style="background:'+avatarColor(who)+'" title="担当 '+escapeHtml(who)+'">'+escapeHtml(who.slice(0,1))+'</div>' : '<div class="kc-av none" title="担当未設定">？</div>')+
+      '</div>'+
+      '<div class="kc-full">'+
+      '<div class="kc-state"><span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span>いまの状態：<b>'+status+'</b></div>'+
+      '<div class="kc-proj">'+(proj?escapeHtml(proj.name)+' <span class="muted" style="font-size:.85rem; font-weight:400;">'+escapeHtml(deptLabel(deptOfProject(proj)))+'</span>':"（案件なし）")+'</div>'+
+      (t.vendorSpec ? '<div class="kc-part">📍 <b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
+      '<div class="kc-meta">'+
+        (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
+        (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
+        (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
+        fmtDeadline(t)+
+      '</div>'+
+      (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
+      (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
+      (t.review && t.review.result ? '<div class="kc-memo" style="border-left-color:'+(t.review.result==="承認"?'var(--accent)':'var(--orange)')+';">'+(t.review.result==="承認"?'✅ 承認':'↩ 差し戻し')+'（'+escapeHtml(t.review.by||"")+'）'+(t.review.note?' '+escapeHtml(t.review.note):'')+'</div>' : '')+
+      (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
+        var st = v.status||"未連絡";
+        var done = VENDOR_STATUS.indexOf(st) >= 1;
+        return '<div style="display:flex; align-items:center; gap:6px; font-size:.85rem;"><span>依頼先 '+escapeHtml(v.name)+'</span>'+
+          '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(done?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
+      }).join("")+'</div>' : '')+
+      '<div class="kc-actions">'+
+        '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
+        '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
+        '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
+        '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
+        '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
+        '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
+        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'💴 追加見積りへ')+'</button>':'')+
+        (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
+        (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
+        (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
+        '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
+      '</div>'+
+      (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
+        return '<button data-taskact="setstatus" data-id="'+t.id+'" data-status="'+st+'"'+(st===status?' class="cur"':'')+'>'+st+'</button>';
+      }).join("")+'</div>' : '')+
+      '</div></div>';
+  }
+  // 部門 → 案件 の見出しを付けて並べる（rows は並べ替え済み）
+  function kanGroupedHtml(rows, status){
+    var html = "", curD = null, curP = null;
+    rows.forEach(function(t){
+      var d = deptOfTask(t), proj = projectById(t.projectId);
+      var pk = t.projectId || "__none";
+      if(d!==curD){ html += '<div class="kgrp"><span>'+escapeHtml(deptLabel(d))+'</span><i></i></div>'; curD = d; curP = null; }
+      if(pk!==curP){
+        var pname = proj ? proj.name : "案件なし";
+        if(pname!==deptLabel(d)) html += '<div class="kprj">'+escapeHtml(pname)+'</div>';
+        curP = pk;
+      }
+      html += kanCardHtml(t, status);
+    });
+    return html;
   }
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
-    renderTaskKindFilterBar();
-    renderTaskAssigneeFilterBar();
-    renderTaskProjectStatusBars();
-    renderTaskFilterToggle();
+    renderTaskFilters();
     var tasks = liveTasks().filter(function(t){
-      if(state.taskFolderFilter && !projInTaskFolder(projectById(t.projectId))) return false;
+      if(state.taskDeptFilter && deptOfTask(t)!==state.taskDeptFilter) return false;
       if(state.taskProjectFilter==="__none" && t.projectId) return false;
       if(state.taskProjectFilter && state.taskProjectFilter!=="__none" && t.projectId!==state.taskProjectFilter) return false;
       if(state.taskAssigneeFilter==="__none" && t.assignee) return false;
@@ -2918,73 +3082,13 @@
       if(state.taskKindFilter==="check") return !!t.checker;
       return true;
     });
-    if(!state.taskOpen) state.taskOpen = {"未着手":true,"対応中":true,"社長確認依頼中":true,"朋子確認依頼中":true};
-    wrap.innerHTML = STATUS_ORDER.filter(function(st){ return !state.taskStatusFilter || st===state.taskStatusFilter; }).map(function(status){
+    state.kanShowAll = state.kanShowAll || {};
+    var scrollL = wrap.scrollLeft;
+    wrap.innerHTML = STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status; });
-      // 部位ごとにまとまり、各部位の中では古い→新しい（時系列）に並ぶようにする。
-      // 部位未設定のものは最後にまとめる。
-      // 期限つきのタスクは一番上に、期限が近い順に並べる。
-      rows.sort(function(a,b){
-        var da = (a.hasDeadline && a.deadline) ? a.deadline : "";
-        var db = (b.hasDeadline && b.deadline) ? b.deadline : "";
-        if(da && !db) return -1;
-        if(!da && db) return 1;
-        if(da && db && da!==db) return da.localeCompare(db);
-        var la = (a.vendorSpec && a.vendorSpec.label) || "";
-        var lb = (b.vendorSpec && b.vendorSpec.label) || "";
-        if(!la && lb) return 1;
-        if(la && !lb) return -1;
-        if(la !== lb) return la.localeCompare(lb, "ja");
-        return (a.createdAt||"").localeCompare(b.createdAt||"");
-      });
-      var cardArr = rows.map(function(t){
-        var proj = projectById(t.projectId);
-        var isVendor = !!t.requestTo;
-        var exp = !!(state.taskExpanded && state.taskExpanded[t.id]) || state.taskMenuId===t.id;
-        return '<div class="kancard'+(t.reflected?" reflected":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'" style="border-top:5px solid '+(STATUS_COLORS[status]||"var(--border)")+';">'+
-          '<div class="kc-proj">'+(proj?escapeHtml(proj.name)+' <span class="muted" style="font-size:.85rem; font-weight:400;">'+escapeHtml(pfPath(pfOf(proj)))+'</span>':"（案件未設定）")+
-            (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
-            (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
-          '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
-          (t.vendorSpec ? '<div class="kc-part">📍 <b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
-          '<div class="kc-meta">'+
-            (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
-            (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
-            (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
-            fmtDeadline(t)+
-          '</div>'+
-          '<div class="kc-full">'+
-          '<div class="kc-state"><span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span>いまの状態：<b>'+status+'</b></div>'+
-          (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
-          (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
-          (t.review && t.review.result ? '<div class="kc-memo" style="border-left-color:'+(t.review.result==="承認"?'var(--accent)':'var(--orange)')+';">'+(t.review.result==="承認"?'✅ 承認':'↩ 差し戻し')+'（'+escapeHtml(t.review.by||"")+'）'+(t.review.note?' '+escapeHtml(t.review.note):'')+'</div>' : '')+
-          (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
-            var st = v.status||"未連絡";
-            var done = VENDOR_STATUS.indexOf(st) >= 1;
-            return '<div style="display:flex; align-items:center; gap:6px; font-size:.85rem;"><span>依頼先 '+escapeHtml(v.name)+'</span>'+
-              '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(done?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
-          }).join("")+'</div>' : '')+
-          '<div class="kc-actions">'+
-            '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'（複数可）</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
-            '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
-            '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
-            '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
-            '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
-            (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'💴 追加見積りへ')+'</button>':'')+
-            (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
-            (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
-            (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
-            '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
-            '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
-          '</div>'+
-          (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
-            return '<button data-taskact="setstatus" data-id="'+t.id+'" data-status="'+st+'"'+(st===status?' class="cur"':'')+'>'+st+'</button>';
-          }).join("")+'</div>' : '')+
-          '</div></div>';
-      });
-      var cards;
+      var body;
       if(status==="完了" && rows.length){
-        // 完了は「月ごと」にまとめて開け閉めする（完了日の月・日本時間。新しい月が上、月の中も新しい順）
+        // 完了は「月ごと」にまとめて開け閉めする（完了日の月・日本時間。新しい月が上）
         state.doneMonthOpen = state.doneMonthOpen || {};
         var monthOf = function(t){
           var at = Date.parse(t.completedAt || t.updatedAt || t.createdAt || "");
@@ -2992,23 +3096,45 @@
           var d = new Date(at + 9*3600*1000);
           return d.getUTCFullYear()+"年"+(d.getUTCMonth()+1)+"月";
         };
-        var order = rows.map(function(t, i){ return {t:t, i:i, key:monthOf(t), at:Date.parse(t.completedAt || t.updatedAt || t.createdAt || "")||0}; });
+        var order = rows.map(function(t){ return {t:t, key:monthOf(t), at:Date.parse(t.completedAt || t.updatedAt || t.createdAt || "")||0}; });
         order.sort(function(x,y){ return y.at - x.at; });
         var groups = [], gmap = {};
-        order.forEach(function(o){ if(!gmap[o.key]){ gmap[o.key] = {key:o.key, html:[], n:0}; groups.push(gmap[o.key]); } gmap[o.key].html.push(cardArr[o.i]); gmap[o.key].n++; });
-        cards = groups.map(function(g){
+        order.forEach(function(o){ if(!gmap[o.key]){ gmap[o.key] = {key:o.key, list:[]}; groups.push(gmap[o.key]); } gmap[o.key].list.push(o.t); });
+        body = groups.map(function(g){
           var mo = !!state.doneMonthOpen[g.key];
-          return '<div class="donemonth'+(mo?" open":"")+'"><button class="donemonthhead" data-donemonthtoggle="'+escapeHtml(g.key)+'" aria-expanded="'+mo+'"><span>'+escapeHtml(g.key)+'</span><span class="kancount tabular">'+g.n+'</span><span class="kanarrow">▾</span></button>'+
-            '<div class="donemonthgrid">'+g.html.join("")+'</div></div>';
+          return '<div class="donemonth'+(mo?" open":"")+'"><button class="donemonthhead" data-donemonthtoggle="'+escapeHtml(g.key)+'" aria-expanded="'+mo+'"><span>'+escapeHtml(g.key)+'</span><span class="kancount tabular">'+g.list.length+'</span><span class="kanarrow">▾</span></button>'+
+            (mo ? '<div class="klist">'+g.list.map(function(t){ return kanCardHtml(t, status); }).join("")+'</div>' : '')+'</div>';
         }).join("");
+      } else if(!rows.length){
+        body = '<div class="kempty">なし</div>';
       } else {
-        cards = cardArr.join("") || '<div class="empty" style="padding:10px 4px;">なし</div>';
+        // 部門の順 → 案件名 → 期限が近い順 → 部位 → 作った順
+        rows.sort(function(a,b){
+          var ia = PROJECT_TYPES.indexOf(deptOfTask(a)), ib = PROJECT_TYPES.indexOf(deptOfTask(b));
+          if(ia!==ib) return ia - ib;
+          var pa = a.projectId ? ((projectById(a.projectId)||{}).name||"") : "￿", pb = b.projectId ? ((projectById(b.projectId)||{}).name||"") : "￿";
+          if(pa!==pb) return pa.localeCompare(pb, "ja");
+          if((a.projectId||"")!==(b.projectId||"")) return (a.projectId||"").localeCompare(b.projectId||"");
+          var da = (a.hasDeadline && a.deadline) ? a.deadline : "", db = (b.hasDeadline && b.deadline) ? b.deadline : "";
+          if(da && !db) return -1;
+          if(!da && db) return 1;
+          if(da && db && da!==db) return da.localeCompare(db);
+          var la = (a.vendorSpec && a.vendorSpec.label) || "", lb = (b.vendorSpec && b.vendorSpec.label) || "";
+          if(!la && lb) return 1;
+          if(la && !lb) return -1;
+          if(la !== lb) return la.localeCompare(lb, "ja");
+          return (a.createdAt||"").localeCompare(b.createdAt||"");
+        });
+        var showAll = !!state.kanShowAll[status] || (state.taskFlash && rows.some(function(t){ return t.id===state.taskFlash.id; }) && rows.findIndex(function(t){ return t.id===state.taskFlash.id; })>=KAN_COL_LIMIT);
+        var shown = showAll ? rows : rows.slice(0, KAN_COL_LIMIT);
+        body = kanGroupedHtml(shown, status) +
+          (rows.length>KAN_COL_LIMIT ? '<button type="button" class="kmore" data-kanshowall="'+status+'">'+(showAll ? '少なく表示 ▴' : 'ほか '+(rows.length-KAN_COL_LIMIT)+'件 ▾')+'</button>' : '');
       }
-      var isOpen = !!state.taskStatusFilter || !!state.taskOpen[status];
-      return '<div class="kancol'+(isOpen?" open":"")+'"><button class="kanhead" data-taskstatustoggle="'+status+'" aria-expanded="'+isOpen+'">'+
-        '<span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span><span>'+status+'</span><span class="kancount tabular">'+rows.length+'</span><span class="kanarrow">▾</span></button>'+
-        '<div class="kangrid">'+cards+'</div></div>';
+      return '<div class="kcol" style="--sc:'+(STATUS_COLORS[status]||"var(--border)")+'">'+
+        '<div class="khead"><span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span><span>'+status+'</span><span class="kn tabular">'+rows.length+'</span></div>'+
+        '<div class="kbody">'+body+'</div></div>';
     }).join("");
+    wrap.scrollLeft = scrollL;
   }
 
   function progressPill(tag){
@@ -3017,12 +3143,12 @@
   }
   function projectTypeOptionsHtml(selected){
     return PROJECT_TYPES.map(function(t){
-      return '<option value="'+escapeHtml(t)+'"'+(t===selected?" selected":"")+'>'+escapeHtml(t)+'</option>';
+      return '<option value="'+escapeHtml(t)+'"'+(t===selected?" selected":"")+'>'+escapeHtml(deptLabel(t))+'</option>';
     }).join("");
   }
   function projectTypePill(type){
     if(!type) return "";
-    return '<span class="pill method">'+escapeHtml(type)+'</span>';
+    return '<span class="pill method">'+escapeHtml(deptLabel(type))+'</span>';
   }
 
   function renderHomeProjList(){
@@ -3047,7 +3173,7 @@
     if(!bar) return;
     var html = '<span class="tagchip'+(state.projectTypeFilter===null?" active":"")+'" data-filtertype="">すべての種別</span>';
     html += PROJECT_TYPES.map(function(t){
-      return '<span class="tagchip'+(state.projectTypeFilter===t?" active":"")+'" data-filtertype="'+escapeHtml(t)+'">'+escapeHtml(t)+'</span>';
+      return '<span class="tagchip'+(state.projectTypeFilter===t?" active":"")+'" data-filtertype="'+escapeHtml(t)+'">'+escapeHtml(deptLabel(t))+'</span>';
     }).join("");
     bar.innerHTML = html;
   }
@@ -10878,6 +11004,8 @@
         renderKanban();
         return;
       }
+      var morek = e.target.closest("[data-kanshowall]");
+      if(morek){ var ks = morek.dataset.kanshowall; state.kanShowAll = state.kanShowAll || {}; state.kanShowAll[ks] = !state.kanShowAll[ks]; renderKanban(); return; }
       var head = e.target.closest("[data-taskstatustoggle]");
       if(head){
         var st0 = head.dataset.taskstatustoggle;
@@ -10950,12 +11078,15 @@
       state.taskStatusFilter = chip.dataset.taskstatusfilter || null;
       renderKanban();
     });
-    document.getElementById("taskFilterToggle").addEventListener("click", function(){
-      state.taskFilterOpen = !state.taskFilterOpen;
-      renderTaskFilterToggle();
+    document.getElementById("taskDeptFilter").addEventListener("change", function(){
+      state.taskDeptFilter = this.value || null;
+      if(state.taskProjectFilter && state.taskProjectFilter!=="__none"){ var pj = projectById(state.taskProjectFilter); if(state.taskDeptFilter && deptOfProject(pj)!==state.taskDeptFilter) state.taskProjectFilter = null; }
+      renderKanban();
     });
+    document.getElementById("taskKindFilter").addEventListener("change", function(){ state.taskKindFilter = this.value || null; renderKanban(); });
+    document.getElementById("taskAssigneeFilter").addEventListener("change", function(){ state.taskAssigneeFilter = this.value || null; renderKanban(); });
     document.getElementById("taskFilterReset").addEventListener("click", function(){
-      state.taskFolderFilter = null; state.taskProjectFilter = null; state.taskStatusFilter = null; state.taskKindFilter = null; state.taskAssigneeFilter = null;
+      state.taskFolderFilter = null; state.taskProjectFilter = null; state.taskStatusFilter = null; state.taskKindFilter = null; state.taskAssigneeFilter = null; state.taskDeptFilter = null;
       renderKanban();
     });
     document.getElementById("taskAssigneeFilterBar").addEventListener("click", function(e){
