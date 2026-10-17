@@ -311,6 +311,8 @@
   .noteitem .nbox .nboxlabel{ font-size:.85rem; font-weight:700; margin-block-end:3px; }
   .noteitem .nbox.decided{ background:var(--accent-soft); }
   .noteitem .nbox.decided .nboxlabel{ color:var(--accent-ink); }
+  .partchip{ display:inline-flex; align-items:center; gap:4px; background:var(--orange-soft); color:var(--ink); border:1px solid var(--border); border-radius:999px; padding:3px 12px; font-size:.9rem; }
+  .partchip b{ font-weight:700; }
   .kc-part{ display:inline-block; background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent); border-radius:999px; padding:3px 12px; margin-block:2px 8px; font-size:.9rem; }
   .kc-part.none{ background:none; border:1px dashed var(--border); color:var(--muted); }
   .kc-memo{ background:var(--surface-2); border-radius:8px; padding:6px 8px; margin-block-start:6px; font-size:.85rem; white-space:pre-wrap; color:var(--text); }
@@ -1886,6 +1888,45 @@
     {label:"インテリア：部屋別", value:"room"},
     {label:"社内だけ（基礎・足場など。お客様に出さない）", value:"internal"}
   ];
+  // 部位の見せ方：大きなまとまり（外部／暖房設備／換気設備／電気配線／あかりプラン／水まわり／インテリア…）を印で、
+  // 文字は中の項目名だけ（例：「🚿 キッチン」「🔥 暖房設備」）。保存している scope／category は変えない。
+  var PART_BIG = {
+    exterior:{name:"外部", icon:"🏠"}, facility:{name:"水まわり", icon:"🚿"},
+    interiorColor:{name:"インテリア", icon:"🎨"}, room:{name:"インテリア（部屋別）", icon:"🎨"},
+    siteCheck:{name:"その他の確認", icon:"🔧"}, internal:{name:"社内だけ", icon:"🔒"},
+    general:{name:"総合", icon:"📋"}, custom:{name:"追加した部位", icon:"📌"}
+  };
+  var EQUIP_ICON = { "暖房設備":"🔥", "換気設備":"🌀", "電気配線":"🔌", "あかりプラン":"💡" };
+  var PART_ITEM_ALIAS = { "お風呂":"浴室" };
+  function partInfo(part, pid){
+    if(!part) return null;
+    var sc = part.scope, cat = part.category;
+    if(sc==="equipment"){
+      var nm = cat || "暖房・換気・電気";
+      return { icon: EQUIP_ICON[cat] || "🔌", text: nm, group: nm };
+    }
+    var big = PART_BIG[sc] || { name: specPartGroupLabel(sc), icon:"📍" };
+    var text;
+    if(sc==="room"){
+      var proj = projectById(pid || part.projectId || state.currentProjectId);
+      var room = proj && (proj.rooms||[]).find(function(r){ return r.id===part.roomId; });
+      var rc = cat && roomCatsFor(proj).find(function(x){ return x.id===cat; });
+      text = room ? room.name+(rc?"・"+rc.label:"") : "部屋別";
+    } else if(sc==="custom"){
+      text = (part.label || "").replace(/^追加した部位・/, "") || "追加した部位";
+    } else if(sc==="general"){
+      text = "総合";
+    } else {
+      text = cat ? (PART_ITEM_ALIAS[cat] || cat) + (part.side ? "（"+part.side+"）" : "") : big.name;
+    }
+    return { icon: big.icon, text: text, group: big.name };
+  }
+  function partText(part, pid){ var i = partInfo(part, pid); return i ? i.icon+" "+i.text : ""; }
+  function partChipHtml(part, cls){
+    var i = partInfo(part);
+    if(!i) return "";
+    return '<span class="partchip'+(cls?" "+cls:"")+'" title="'+escapeHtml(i.group)+'">'+i.icon+' <b>'+escapeHtml(i.text)+'</b></span>';
+  }
   function specPartGroupLabel(scope){
     if(scope==="general") return "総合";
     if(scope==="custom") return "追加した部位";
@@ -3169,7 +3210,7 @@
     var nAtt = (t.attachments||[]).length;
     var who = t.assignee || "";
     var meta = [];
-    if(t.vendorSpec) meta.push('<span>📍'+escapeHtml(t.vendorSpec.label||"")+'</span>');
+    if(t.vendorSpec) meta.push('<span>'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</span>');
     if(t.hasDeadline && t.deadline){ var dd = daysSince(t.deadline); meta.push('<span class="'+(dd!==null && dd>=-2?"due":"")+'">⏰ '+escapeHtml(String(t.deadline).slice(5).replace("-","/"))+'</span>'); }
     if(isVendor) meta.push('<span class="vend">業者</span>');
     if(t.checker) meta.push('<span class="chk">確認：'+escapeHtml(t.checker)+'</span>');
@@ -3187,7 +3228,7 @@
       '<div class="kc-full">'+
       '<div class="kc-state"><span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span>いまの状態：<b>'+status+'</b></div>'+
       '<div class="kc-proj">'+(proj?escapeHtml(proj.name)+' <span class="muted" style="font-size:.85rem; font-weight:400;">'+escapeHtml(deptLabel(deptOfProject(proj)))+'</span>':"（案件なし）")+'</div>'+
-      (t.vendorSpec ? '<div class="kc-part">📍 <b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
+      (t.vendorSpec ? '<div class="kc-part">'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
       '<div class="kc-meta">'+
         (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
         (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
@@ -3624,7 +3665,7 @@
       return '<div class="kancard" style="margin:0;">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
         (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
-        (t.vendorSpec ? '<div class="kc-part">📍 部位：<b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '')+
+        (t.vendorSpec ? '<div class="kc-part">'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</div>' : '')+
         (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+(t.attachments||[]).map(function(a){ return '<a href="'+a.url+'" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none; background:var(--surface-2); padding:2px 8px; border-radius:4px;">📎 '+escapeHtml(a.name||"添付")+'</a>'; }).join(" ")+'</div>' : '')+
         '<div class="kc-meta">'+
           '<span>完了 '+escapeHtml(String(t.completedAt||t.archivedAt).slice(0,10))+'</span>'+
@@ -3650,7 +3691,7 @@
         '<div class="kc-proj"><span class="pill">'+escapeHtml(t.status||"未着手")+'</span>'+(t.requestTo?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+'</div>'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
         (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
-        (t.vendorSpec ? '<div class="kc-part">📍 部位：<b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '')+
+        (t.vendorSpec ? '<div class="kc-part">'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</div>' : '')+
         '<div class="kc-meta">'+
           (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
           (t.requestTo?'<span>依頼先 '+escapeHtml(t.requestTo)+'</span>':'')+
@@ -3961,7 +4002,7 @@
       }).join("");
       var contentHtml = "";
       if(r.content){
-        contentHtml = '<div class="reqcontent">'+(r.part&&r.part.label?'<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(r.part.label)+'</span> ':'')+
+        contentHtml = '<div class="reqcontent">'+(r.part&&(r.part.scope||r.part.label)?(r.part.scope?partChipHtml(r.part):'<span class="partchip">📍 <b>'+escapeHtml(r.part.label)+'</b></span>')+' ':'')+
           '<div class="reqcontent-text">'+escapeHtml(r.content)+'</div>'+
           ((r.files&&r.files.length)?fileThumbRowHtml(r.files,52):"")+'</div>';
       }
@@ -4523,7 +4564,7 @@
       var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files, 120)+'</div>' : "";
       var chHtml = (n.channel && n.channel!=="打合せ") ? '<span class="pill" style="background:#06c755; color:#fff; font-weight:700;">'+escapeHtml(n.channel)+'</span> ' : "";
       var specHtml = n.specPart ?
-        '<span class="pill" style="background:var(--orange-soft); color:var(--orange);">部位：'+escapeHtml(n.specPart.label)+'</span>' : "";
+        partChipHtml(n.specPart) : "";
       var decided = n.decided!=null ? n.decided : (n.content||"");
       var open = n.open!=null ? n.open : "";
       var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（'+(n.talkPublic?'お客様にも表示':'社内メモ・お客様には出ません')+'）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
@@ -10044,10 +10085,27 @@
   }
   function askSpecPart(callback, projectId){
     var proj = projectById(projectId || state.currentProjectId);
-    var groups = SPEC_PART_GROUPS.slice();
-    if(customPartsOf(proj).length) groups.push({label:"追加した部位（この案件だけ）", value:"custom"});
-    askChoice("部位を選択", "受領した変更内容を、どの部位の仕様に反映しますか？", groups, function(scope){
+    var groups = [
+      {label:"🏠 外部", value:"exterior"},
+      {label:"🔥 暖房設備", value:"eq:暖房設備"},
+      {label:"🌀 換気設備", value:"eq:換気設備"},
+      {label:"🔌 電気配線", value:"eq:電気配線"},
+      {label:"💡 あかりプラン", value:"eq:あかりプラン"},
+      {label:"🚿 水まわり", value:"facility"},
+      {label:"🎨 クロス・インテリア（家全体）", value:"interiorColor"},
+      {label:"🎨 インテリア：部屋別", value:"room"},
+      {label:"🔧 外部散水栓・インターホンなど", value:"siteCheck"},
+      {label:"📋 総合（部位を限定しない）", value:"general"},
+      {label:"🔒 社内だけ（基礎・足場）", value:"internal"}
+    ];
+    if(customPartsOf(proj).length) groups.push({label:"📌 追加した部位（この案件だけ）", value:"custom"});
+    askChoice("部位を選択", "どの部位の記録・依頼ですか？", groups, function(scope){
       if(!scope){ callback(null); return; }
+      if(scope.indexOf("eq:")===0){
+        var ec = scope.slice(3);
+        callback({scope:"equipment", category:ec, roomId:null, side:null, label:ec});
+        return;
+      }
       if(scope==="custom"){
         askChoice("追加した部位を選択", "", customPartsOf(proj).map(function(c){ return {label:c.name, value:c.id}; }), function(id){
           if(!id){ callback(null); return; }
@@ -10067,21 +10125,21 @@
       if(scope==="exterior"){
         // 外壁・屋根・破風…の細かい項目選択は行わず、「外部仕様」のみで確定する。
         // （この場合、仕様タブの外部仕様・該当項目タイムラインへの自動反映は行われない）
-        callback({scope:"exterior", category:null, roomId:null, side:null, label:"外部仕様"});
+        callback({scope:"exterior", category:null, roomId:null, side:null, label:"外部"});
         return;
       }
       var cats = specPartCategoryList(scope, proj);
       if(!cats.length){ toast("選べるカテゴリーがありません"); callback(null); return; }
-      askChoice("カテゴリーを選択", "", cats.map(function(c){ return {label:c, value:c}; }), function(cat){
+      askChoice((PART_BIG[scope]?PART_BIG[scope].icon+" "+PART_BIG[scope].name:"")+"：項目を選択", "", cats.map(function(c){ return {label:(PART_ITEM_ALIAS[c]||c), value:c}; }), function(cat){
         if(!cat){ callback(null); return; }
         if(scope==="interiorColor"){
           askChoice("表・裏を選択", "", [{label:"表", value:"表"},{label:"裏", value:"裏"}], function(side){
             if(!side){ callback(null); return; }
-            callback({scope:scope, category:cat, roomId:null, side:side, label:specPartGroupLabel(scope)+"・"+cat+"（"+side+"）"});
+            callback({scope:scope, category:cat, roomId:null, side:side, label:cat+"（"+side+"）"});
           });
           return;
         }
-        callback({scope:scope, category:cat, roomId:null, side:null, label:specPartGroupLabel(scope)+"・"+cat});
+        callback({scope:scope, category:cat, roomId:null, side:null, label:(PART_ITEM_ALIAS[cat]||cat)});
       });
     });
   }
