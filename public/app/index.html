@@ -532,6 +532,15 @@
       <div class="row" id="taskAssigneeFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="kanbanwrap" id="kanbanWrap"></div>
     </div>
+    <div class="card" id="homeReqCard">
+      <div class="row" style="justify-content:space-between; margin-block-end:8px; flex-wrap:wrap; gap:8px;">
+        <h2 style="margin:0;">見積り依頼（全案件）</h2>
+        <select id="homeReqProject" style="min-width:160px;"></select>
+      </div>
+      <div class="row" id="homeReqStatusBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
+      <div id="homeReqList" style="display:flex; flex-direction:column; gap:6px;"></div>
+      <div class="empty" id="homeReqEmpty" hidden>該当する見積り依頼はありません。</div>
+    </div>
     <div class="statrow">
       <div class="stat"><div class="label">案件数</div><div class="value tabular" id="statProjects">–</div></div>
       <div class="stat warn"><div class="label">未受領見積</div><div class="value tabular" id="statPending">–</div></div>
@@ -2498,6 +2507,7 @@
     renderVendorCheckboxList();
     renderProjectTable();
     renderPendingTable();
+    renderHomeRequests();
     renderVendorTable();
     renderAttachments();
     renderPlanSourceList();
@@ -3554,6 +3564,51 @@
     }).join("");
   }
 
+  // ---- ホームの「見積り依頼（全案件）」 ----
+  var homeReqStatus = "all", homeReqProject = "";
+  function reqDisplayStatus(r){ return (r.status==="依頼済み" && r.replyDetected) ? "返信あり" : (r.status||"未依頼"); }
+  function renderHomeRequests(){
+    var bar = document.getElementById("homeReqStatusBar"), sel = document.getElementById("homeReqProject");
+    var list = document.getElementById("homeReqList"), empty = document.getElementById("homeReqEmpty");
+    if(!bar || !sel || !list) return;
+    var all = liveRequests().filter(function(r){ return projectById(r.projectId); });
+    var cnt = {all: all.length};
+    all.forEach(function(r){ var k = reqDisplayStatus(r); cnt[k] = (cnt[k]||0)+1; });
+    var opts = [["all","すべて"],["未依頼","未依頼"],["依頼済み","依頼済み"],["返信あり","返信あり"],["受領済み","受領済み"]];
+    bar.innerHTML = opts.map(function(o){
+      return '<button class="btn small '+(homeReqStatus===o[0]?'':'secondary')+'" data-hrstatus="'+o[0]+'">'+o[1]+' '+(cnt[o[0]]||0)+'</button>';
+    }).join("");
+    var pids = {}; all.forEach(function(r){ pids[r.projectId] = true; });
+    var plist = Object.keys(pids).map(function(id){ return projectById(id); }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||"","ja"); });
+    if(homeReqProject && !pids[homeReqProject]) homeReqProject = "";
+    sel.innerHTML = '<option value="">すべての案件</option>'+plist.map(function(pr){ return '<option value="'+pr.id+'"'+(homeReqProject===pr.id?' selected':'')+'>'+escapeHtml(pr.name)+'</option>'; }).join("");
+    var order = {"返信あり":0,"依頼済み":1,"未依頼":2,"受領済み":3};
+    var rows = all.filter(function(r){
+      return (homeReqStatus==="all" || reqDisplayStatus(r)===homeReqStatus) && (!homeReqProject || r.projectId===homeReqProject);
+    }).sort(function(a,b){
+      var d = (order[reqDisplayStatus(a)]||0) - (order[reqDisplayStatus(b)]||0);
+      return d || String(b.requestedAt||"").localeCompare(String(a.requestedAt||""));
+    });
+    empty.hidden = rows.length !== 0;
+    list.innerHTML = rows.map(function(r){
+      var pr = projectById(r.projectId), v = vendorById(r.vendorId) || {name:"（削除済み業者）"};
+      var st = reqDisplayStatus(r);
+      var el = (r.status==="依頼済み" && r.requestedAt) ? daysSince(r.requestedAt) : null;
+      var late = el!==null && el>=5;
+      var content = (r.content||"").replace(/\s+/g," ").slice(0,40);
+      return '<div class="projrow" data-hropen="'+r.projectId+'" style="cursor:pointer; flex-wrap:wrap; gap:6px;">'+
+        '<div class="pname">'+escapeHtml(pr.name)+'<span class="psub"> '+escapeHtml(v.name)+'</span></div>'+
+        '<span class="pill status-'+(st==="返信あり"?"受領済み":st)+'">'+st+'</span>'+
+        (r.requestedAt ? '<span class="muted tabular" style="font-size:.85rem;">依頼 '+fmtDate(r.requestedAt)+'</span>' : '')+
+        (el!==null ? '<span class="tabular" style="font-size:.85rem;'+(late?'color:var(--danger);font-weight:700;':'')+'">'+el+'日経過</span>' : '')+
+        (content ? '<span class="muted" style="font-size:.85rem;">'+escapeHtml(content)+'</span>' : '')+
+      '</div>';
+    }).join("");
+  }
+  function openRequestsOfProject(pid){
+    switchTab("projects"); openProjectDetail(pid);
+    var b = document.querySelector('.sub-btn[data-sub="quote"]'); if(b) b.click();
+  }
   function renderPendingTable(){
     var body = document.getElementById("pendingTableBody");
     var empty = document.getElementById("pendingEmpty");
@@ -4010,7 +4065,7 @@
         noteSendButtonHtml(n, sent, "companytask")+
         noteSendButtonHtml(n, sent, "vendortask")+
         noteSendButtonHtml(n, sent, "estreq")+
-        '<button class="'+((sent.vendortask&&sent.estreq)?"on":"")+'" data-act="notebundle" data-id="'+n.id+'" title="業者タスク・見積依頼・Gmail下書きを一度に作る（送信はしません）">→業者タスク＋見積依頼＋Gmail下書き</button>'+
+        '<button class="'+(sent.estreq?"on":"")+'" data-act="notebundle" data-id="'+n.id+'" title="見積依頼とGmail下書きを一度に作る（送信はしません。タスクは作りません）">→見積依頼＋Gmail下書き</button>'+
         noteSendButtonHtml(n, sent, "confirm")+
         noteSendButtonHtml(n, sent, "consider")+
         noteSendButtonHtml(n, sent, "estimate")+
@@ -6531,7 +6586,7 @@
     var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
     if(!note){ toast("打合せ記録が見つかりません"); return; }
     var info = noteSentInfo(note);
-    if(info.vendortask && info.estreq){ toast("すでに業者タスクと見積依頼が登録済みです"); return; }
+    if(info.estreq){ toast("すでに見積依頼が登録済みです"); return; }
     var content = (note.content||"").trim();
     if(!content){
       var alt = [note.title, note.talk, note.decided, note.message];
@@ -6554,20 +6609,8 @@
     var names = vendors.map(function(v){ return v.name; });
     var files = (note.files||[]).slice();
 
-    // 1) 業者タスク（メールはまだ送っていないので、進捗は「未着手」・各社「未連絡」のまま）
-    if(!info.vendortask){
-      var t = { id: uid("task"), projectId: pid1, content: content,
-        assignee: assignee, instructor: "", creator: state.currentUser||"",
-        hasDeadline: false, deadline: "", requestMethod: "", attachmentAssetIds: [],
-        attachments: files.slice(), vendorSpec: part, private: false,
-        reflected: false, reflectedAt: null, status: "未着手", createdAt: nowIso(), updatedAt: nowIso() };
-      Object.assign(t, newTaskVendorFields(names));
-      state.tasks.push(t);
-      if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
-      note.sent = note.sent || {};
-      note.sent.vendortask = { at: nowIso(), by: state.currentUser||"", ref: t.id };
-      saveDoc("tasks", t.id, t);
-    }
+    // 1) 業者タスクは作らない（見積依頼の一覧で進み具合を見る。ホームの「見積り依頼」にも出る）
+    if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
     // 2) 見積依頼（会社ごと）。下書きを作れた会社は「依頼済み」にする（Gmail方法）
     var made = [], reqs = [];
     if(!info.estreq){
@@ -6582,7 +6625,7 @@
       note.sent.estreq = { at: nowIso(), by: state.currentUser||"", ref: made[0], refs: made };
     }
     render();
-    toast("業者タスクと見積依頼を作りました。Gmail下書きを作っています…");
+    toast("見積依頼を作りました。Gmail下書きを作っています…");
 
     // 3) Gmail下書き（会社ごと）。添付は記録のファイル
     // 添付は「ファイルの場所」だけ渡す（サーバーが直接読むので、大きいファイルも付けられる。合計17MBまで）
@@ -6612,9 +6655,8 @@
     reqs.forEach(function(x){ saveDoc("requests", x.req.id, x.req); });
     saveDoc("meetingNotes", note.id, note);
     render();
-    logActivity("打合せ記録から業者タスク＋見積依頼＋Gmail下書きを作成しました（"+names.join("、")+"）");
-    goToTaskBoard(note.sent && note.sent.vendortask && !info.vendortask ? note.sent.vendortask.ref : undefined);
-    var msg = "✅ 業者タスクと見積依頼を作り、Gmail下書きを"+okNames.length+"件作りました（送信はしていません。Gmailで確認して送ってください）";
+    logActivity("打合せ記録から見積依頼＋Gmail下書きを作成しました（"+names.join("、")+"）");
+    var msg = "✅ 見積依頼を作り、Gmail下書きを"+okNames.length+"件作りました（送信はしていません。Gmailで確認して送ってください）";
     if(noMail.length) msg += "。メール未登録："+noMail.join("、")+"（下書きで宛先を入れてください）";
     if(failNames.length) msg += "。下書きに失敗："+failNames.join("、")+"（見積タブの「依頼する」からやり直せます）";
     if(atts.length) msg += "。添付"+attachedN+"件";
@@ -10242,6 +10284,13 @@
       var row = e.target.closest("[data-open-project]");
       if(row) openProjectDetail(row.dataset.openProject);
     });
+    document.getElementById("homeReqCard").addEventListener("click", function(e){
+      var f = e.target.closest("[data-hrstatus]");
+      if(f){ homeReqStatus = f.dataset.hrstatus; renderHomeRequests(); return; }
+      var row = e.target.closest("[data-hropen]");
+      if(row) openRequestsOfProject(row.dataset.hropen);
+    });
+    document.getElementById("homeReqProject").addEventListener("change", function(){ homeReqProject = this.value; renderHomeRequests(); });
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);
