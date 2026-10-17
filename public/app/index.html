@@ -420,8 +420,22 @@
     .subtabs::-webkit-scrollbar{ display:none; }
     .subtabs button{ flex-shrink:0; white-space:nowrap; }
     .detailhead:has([data-backhome]){ display:none; }
-    .projrow[data-hropen] .pname{ flex-basis:100%; }
+    .meetingsubtabs{ flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; margin-inline:-12px; padding-inline:12px; }
+    .meetingsubtabs::-webkit-scrollbar{ display:none; }
+    .meetingsubtabs > *{ flex-shrink:0; white-space:nowrap; }
   }
+  /* 案件のタブ「その他 ▾」 */
+  .sub-extra{ display:none; }
+  .subtabs.showextra .sub-extra, .sub-extra.active{ display:inline-block; }
+  .sub-morebtn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px dashed var(--border); background:none; color:var(--muted); cursor:pointer; flex-shrink:0; white-space:nowrap; }
+  .sub-morebtn.on{ border-style:solid; color:var(--accent-ink); }
+  .subtabs:not(.showextra) .sub-extra.active{ order:0; }
+  /* 見積り依頼：案件ごとのまとまり */
+  .hrgroup{ margin-block-end:12px; }
+  .hrhead{ display:flex; align-items:center; gap:8px; width:100%; border:0; background:none; padding:4px 2px 6px; font-family:inherit; font-size:1rem; font-weight:700; color:var(--accent-ink); text-align:start; cursor:pointer; }
+  .hrhead .muted{ font-size:.85rem; font-weight:400; margin-inline-start:auto; }
+  .hrgroup .hrrow{ margin-block-end:6px; margin-inline-start:6px; }
+  .hrgroup .hrrow .pname{ flex:0 1 auto; }
   /* 記録の部位カードに出す「見積の書類・依頼」 */
   .relpart{ margin-block-start:10px; padding:8px 10px; border-radius:10px; background:var(--surface-2); }
   .relhd{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:.85rem; font-weight:700; color:var(--muted); }
@@ -648,7 +662,6 @@
     <button class="tab-btn" data-tab="settings">業者・設定</button>
     <button class="tab-btn" data-tab="gmail">Gmail</button>
     <button class="tab-btn" data-tab="trash">ゴミ箱・履歴</button>
-    <button class="tab-btn" data-tab="brand">アプリアイコン</button>
   </nav>
 
   <!-- スマホだけ：画面の下に固定するタブ -->
@@ -663,7 +676,6 @@
       <button type="button" data-bnavgo="settings">🧰 業者・設定</button>
       <button type="button" data-bnavgo="gmail">✉️ Gmail</button>
       <button type="button" data-bnavgo="trash">🗑 ゴミ箱・履歴</button>
-      <button type="button" data-bnavgo="brand">🎨 アプリアイコン</button>
       <button type="button" class="bmore-close" data-bnavclose="1">閉じる</button>
     </div>
   </div>
@@ -775,6 +787,7 @@
             <div class="pd-more" id="pdMore">
             <button class="btn secondary small" id="btnEditProject">編集</button>
             <button class="btn secondary small" id="btnExportProject" title="この案件の記録・仕様・タスク・写真などをまとめてZIPで保存します">📦 全情報をダウンロード</button>
+            <button class="btn secondary small" id="btnCopyOkaiNoteLink">🔗 お客様用リンクをコピー</button>
             <button class="btn secondary small" id="btnFinishProject">🏁 工事完了として保存</button>
             <button class="btn danger-ghost" id="btnDeleteProject">案件を削除</button>
             </div>
@@ -795,24 +808,24 @@
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
-          <button class="btn ghost small" id="btnCopyOkaiNoteLink">お客様用リンクをコピー</button>
           <span class="muted" id="okaiNoteStatusLabel" style="font-size:.85rem;"></span>
         </div>
       </div>
 
       <div class="subtabs">
-        <button class="sub-btn active" data-sub="overview">概要</button>
-        <button class="sub-btn" data-sub="customer">お客様情報</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
-        <button class="sub-btn" data-sub="confirm">お客様への確認</button>
+        <button class="sub-btn" data-sub="tasks">タスク</button>
         <button class="sub-btn" data-sub="quote">見積</button>
         <button class="sub-btn" data-sub="photos">写真・アルバム</button>
         <button class="sub-btn" data-sub="plan">図面</button>
-        <button class="sub-btn" data-sub="reservation">予約</button>
-        <button class="sub-btn" data-sub="message">メッセージ</button>
-        <button class="sub-btn" data-sub="tasks">タスク</button>
-        <button class="sub-btn" data-sub="taskhistory">タスク履歴</button>
-        <button class="sub-btn" data-sub="okainote">おうちノート連携</button>
+        <button type="button" class="sub-morebtn" id="subMoreBtn" aria-expanded="false">その他 ▾</button>
+        <button class="sub-btn sub-extra active" data-sub="overview">概要</button>
+        <button class="sub-btn sub-extra" data-sub="customer">お客様情報</button>
+        <button class="sub-btn sub-extra" data-sub="confirm">お客様への確認</button>
+        <button class="sub-btn sub-extra" data-sub="reservation">予約</button>
+        <button class="sub-btn sub-extra" data-sub="message">メッセージ</button>
+        <button class="sub-btn sub-extra" data-sub="taskhistory">タスク履歴</button>
+        <button class="sub-btn sub-extra" data-sub="okainote">おうちノート連携</button>
       </div>
 
       <!-- タスク（この案件の進行中タスク） subpanel -->
@@ -1275,6 +1288,7 @@
   <!-- ========== SETTINGS ========== -->
   <section class="panel" id="panel-settings">
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
+    <div class="row" style="justify-content:flex-end; margin-block-end:8px;"><button type="button" class="btn secondary small" data-bnavgo-inline="brand">🎨 アプリアイコンを変える</button></div>
     <div class="card">
       <h3>業者を追加</h3>
       <div class="addform">
@@ -3711,6 +3725,15 @@
     }).join("");
   }
 
+  // 案件のタブの「その他 ▾」：開いているか、その他の中のタブを選んでいるときは中身を出す
+  function syncSubMoreBtn(){
+    var b = document.getElementById("subMoreBtn"); if(!b) return;
+    var box = b.parentNode, open = box.classList.contains("showextra");
+    var act = box.querySelector(".sub-extra.active");
+    b.textContent = open ? "閉じる ▴" : (act ? "その他：" + act.textContent + " ▾" : "その他 ▾");
+    b.classList.toggle("on", !!act || open);
+    b.setAttribute("aria-expanded", open ? "true" : "false");
+  }
   function openProjectDetail(id){
     state.currentProjectId = id;
     state.editingProject = false;
@@ -3722,6 +3745,8 @@
     renderPlanSourceList(); renderDrawingsList(); renderMeetingNotes();
     renderOverview(); renderCustomerInfo(); renderMessages(); renderSpecTab(); renderSpecSiteCheck(); renderConfirmTab(); renderPhotosTab(); renderReservationTab();
     switchMeetingSubTab("record");
+    // 案件を開いたら、最初は「打合せ記録」
+    var mb = document.querySelector('.sub-btn[data-sub="meeting"]'); if(mb) mb.click();
   }
   function closeProjectDetail(){
     document.getElementById("projectDetailView").hidden = true;
@@ -3730,6 +3755,7 @@
   function switchTab(tabName){
     document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===tabName); });
     var bn = ({home:"home", projects:"projects", estimates:"estimates", pending:"estimates"})[tabName] || "more";
+    if(tabName==="brand") document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab==="settings"); });
     document.querySelectorAll("[data-bnav]").forEach(function(b){ b.classList.toggle("on", b.dataset.bnav===bn); });
     var bm = document.getElementById("bottomMore"); if(bm) bm.hidden = true;
     document.querySelectorAll(".panel").forEach(function(p){ p.classList.toggle("active", p.id === "panel-"+tabName); });
@@ -3879,20 +3905,30 @@
       return d || String(b.requestedAt||"").localeCompare(String(a.requestedAt||""));
     });
     empty.hidden = rows.length !== 0;
-    list.innerHTML = rows.map(function(r){
-      var pr = projectById(r.projectId), v = vendorById(r.vendorId) || {name:"（削除済み業者）"};
+    // 案件ごとにまとめる（案件名は見出しに1回だけ）。案件の並びは、いちばん急ぐ依頼の順
+    var groups = [], gmap = {};
+    rows.forEach(function(r){ if(!gmap[r.projectId]){ gmap[r.projectId] = []; groups.push(r.projectId); } gmap[r.projectId].push(r); });
+    list.innerHTML = groups.map(function(pid){
+      var pr0 = projectById(pid);
+      return '<div class="hrgroup"><button type="button" class="hrhead" data-hropen="'+pid+'">'+escapeHtml(pr0.name)+' <span class="muted">'+gmap[pid].length+'件 ›</span></button>'+
+        gmap[pid].map(hrRowHtml).join("")+'</div>';
+    }).join("");
+  }
+  function hrRowHtml(r){
+    {
+      var v = vendorById(r.vendorId) || {name:"（削除済み業者）"};
       var st = reqDisplayStatus(r);
       var el = (r.status==="依頼済み" && r.requestedAt) ? daysSince(r.requestedAt) : null;
       var late = el!==null && el>=5;
       var content = (r.content||"").replace(/\s+/g," ").slice(0,40);
-      return '<div class="projrow" data-hropen="'+r.projectId+'" style="cursor:pointer; flex-wrap:wrap; gap:6px;">'+
-        '<div class="pname">'+escapeHtml(pr.name)+'<span class="psub"> '+escapeHtml(v.name)+'</span></div>'+
+      return '<div class="projrow hrrow" data-hropen="'+r.projectId+'" style="cursor:pointer; flex-wrap:wrap; gap:6px;">'+
+        '<div class="pname">'+escapeHtml(v.name)+'</div>'+
         '<span class="pill status-'+(st==="返信あり"?"受領済み":st)+'">'+st+'</span>'+
         (r.requestedAt ? '<span class="muted tabular" style="font-size:.85rem;">依頼 '+fmtDate(r.requestedAt)+'</span>' : '')+
         (el!==null ? '<span class="tabular" style="font-size:.85rem;'+(late?'color:var(--danger);font-weight:700;':'')+'">'+el+'日経過</span>' : '')+
-        (content ? '<span class="muted" style="font-size:.85rem;">'+escapeHtml(content)+'</span>' : '')+
+        (content ? '<span class="muted" style="font-size:.85rem; flex-basis:100%;">'+escapeHtml(content)+'</span>' : '')+
       '</div>';
-    }).join("");
+    }
   }
   function openRequestsOfProject(pid){
     switchTab("projects"); openProjectDetail(pid);
@@ -10616,6 +10652,9 @@
       if(g){ switchTab(g.dataset.bnavgo); window.scrollTo({top:0}); return; }
       if(e.target.closest("[data-bnavclose]") || e.target===this) this.hidden = true;
     });
+    document.querySelectorAll("[data-bnavgo-inline]").forEach(function(b){
+      b.addEventListener("click", function(){ switchTab(b.dataset.bnavgoInline); window.scrollTo({top:0}); });
+    });
     document.querySelectorAll("[data-esttab]").forEach(function(b){
       b.addEventListener("click", function(){ switchTab(b.dataset.esttab); });
     });
@@ -10627,7 +10666,15 @@
     })();
     // 案件のタブ（スマホは1行の横スクロール）：押したタブを見える位置へ
     document.querySelectorAll(".sub-btn").forEach(function(b){
-      b.addEventListener("click", function(){ if(b.scrollIntoView) b.scrollIntoView({block:"nearest", inline:"center", behavior:"smooth"}); });
+      b.addEventListener("click", function(){
+        var box = b.parentNode;
+        if(!b.classList.contains("sub-extra")) box.classList.remove("showextra");
+        setTimeout(syncSubMoreBtn, 0); // タブの切り替え（別の処理）が終わってから表示を合わせる
+        if(b.scrollIntoView) b.scrollIntoView({block:"nearest", inline:"center", behavior:"smooth"});
+      });
+    });
+    document.getElementById("subMoreBtn").addEventListener("click", function(){
+      var box = this.parentNode; box.classList.toggle("showextra"); syncSubMoreBtn();
     });
     document.querySelectorAll("[data-backhome]").forEach(function(btn){
       btn.addEventListener("click", function(){ switchTab("home"); });
