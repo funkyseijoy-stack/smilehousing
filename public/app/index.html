@@ -602,6 +602,11 @@
     background:var(--surface); padding-block:calc(10px + env(safe-area-inset-top,0px)) 10px; margin-block:calc(-10px - env(safe-area-inset-top,0px)) 10px; border-bottom:1px solid var(--border); }
   .mnsheethead h3{ margin:0; }
   body.mnlock{ overflow:hidden; }
+  /* 「＋ 〜」で開く入力欄（ふだんは閉じる） */
+  .revealbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:12px; }
+  .uploadrow[hidden], .row[hidden], .revealbox[hidden]{ display:none !important; }
+  .revealbox{ border:1px dashed var(--border); border-radius:12px; padding:10px; margin-block-end:12px; background:var(--surface-2); }
+  [data-reveal].on{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   /* 説明の文章：ふだんは隠し、「⋯」の「説明を表示」で出す */
   body:not(.showhelp) .help{ display:none !important; }
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
@@ -1009,7 +1014,8 @@
         <div class="card">
           <h3>家づくり参考写真</h3>
           <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様が気に入った施工事例などの参考写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。クリックで拡大表示できます。</p>
-          <div class="row" style="margin-block-end:10px; gap:6px;">
+          <div class="revealbar" style="margin-block-end:8px;"><button type="button" class="btn secondary small" data-reveal="refCatBox">＋ カテゴリー</button></div>
+          <div class="row revealbox" id="refCatBox" hidden style="gap:6px;">
             <input type="text" id="refCatInput" placeholder="例：外観">
             <button class="btn secondary small" id="btnAddRefCat">＋ カテゴリー追加</button>
           </div>
@@ -1018,7 +1024,8 @@
         <div class="card">
           <h3>おうちアルバム</h3>
           <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">工事中〜完成後の記録写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。</p>
-          <div class="row" style="margin-block-end:10px; gap:6px;">
+          <div class="revealbar" style="margin-block-end:8px;"><button type="button" class="btn secondary small" data-reveal="albumCatBox">＋ カテゴリー</button></div>
+          <div class="row revealbox" id="albumCatBox" hidden style="gap:6px;">
             <input type="text" id="albumCatInput" placeholder="例：着工">
             <button class="btn secondary small" id="btnAddAlbumCat">＋ カテゴリー追加</button>
           </div>
@@ -1189,25 +1196,11 @@
 
       <!-- 見積 subpanel -->
       <div class="subpanel" id="sub-quote">
-        <div class="card">
-          <h3>添付資料（平面図・見積書など）</h3>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
-          <div class="uploadrow">
-            <input type="file" id="attachmentInput" multiple>
-            <select id="attachmentKind">
-              <option value="plan">図面</option>
-              <option value="プランボード">プランボード</option>
-              <option value="定価">定価</option>
-              <option value="NET">NET</option>
-              <option value="other">その他</option>
-            </select>
-            <button class="btn secondary small" id="btnUploadAttachment">追加</button>
-          </div>
-          <div class="filelist" id="attachmentList"></div>
-          <div class="empty" id="attachmentEmpty" hidden style="padding:10px 4px;">添付資料はまだ登録されていません。</div>
+        <div class="revealbar">
+          <button type="button" class="btn" data-reveal="requestFormCard">＋ 見積を依頼</button>
+          <button type="button" class="btn secondary" data-reveal="attUploadBox">＋ 書類を追加</button>
         </div>
-
-        <div class="card" id="requestFormCard">
+        <div class="card" id="requestFormCard" hidden>
           <h3>見積依頼を追加</h3>
           <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">複数の業者にまとめて依頼できます。</p>
           <div class="row" style="justify-content:space-between; margin-block-end:6px;">
@@ -1222,7 +1215,6 @@
             <button class="btn" id="btnAddRequest">選んだ業者に依頼を追加</button>
           </div>
         </div>
-
         <div class="card">
           <div class="row" style="justify-content:space-between; margin-block-end:10px;">
             <h2 style="margin:0;">見積依頼状況</h2>
@@ -1235,6 +1227,25 @@
           </div>
           <div class="empty" id="projectEmpty" hidden>この案件にはまだ見積依頼がありません。</div>
         </div>
+        <div class="card" id="quoteAttCard">
+          <h3>添付資料（平面図・見積書など）</h3>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
+          <div class="uploadrow revealbox" id="attUploadBox" hidden>
+            <input type="file" id="attachmentInput" multiple>
+            <select id="attachmentKind">
+              <option value="plan">図面</option>
+              <option value="プランボード">プランボード</option>
+              <option value="定価">定価</option>
+              <option value="NET">NET</option>
+              <option value="other">その他</option>
+            </select>
+            <button class="btn secondary small" id="btnUploadAttachment">追加</button>
+          </div>
+          <div class="filelist" id="attachmentList"></div>
+          <div class="empty" id="attachmentEmpty" hidden style="padding:10px 4px;">添付資料はまだ登録されていません。</div>
+        </div>
+
+
 
         <div class="card" id="changeRequestForm" hidden>
           <h3>変更依頼を送る（<span id="changeRequestVendorLabel"></span>）</h3>
@@ -1400,7 +1411,7 @@
   <section class="panel" id="panel-settings">
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
     <div class="row" style="justify-content:flex-end; margin-block-end:8px;"><button type="button" class="btn secondary small" data-bnavgo-inline="brand">🎨 アプリアイコンを変える</button></div>
-    <div class="card">
+    <div class="card revealbox" id="vendorAddCard" hidden>
       <h3>業者を追加</h3>
       <div class="addform">
         <label class="field">業者名<input type="text" id="vendorName" placeholder="例：電気業者"></label>
@@ -1411,7 +1422,7 @@
       </div>
     </div>
     <div class="card">
-      <h2 style="margin:0 0 10px;">業者一覧</h2>
+      <div class="row" style="justify-content:space-between; align-items:center; margin-block-end:10px;"><h2 style="margin:0;">業者一覧</h2><button type="button" class="btn small" data-reveal="vendorAddCard">＋ 業者を追加</button></div>
       <div class="tablewrap"><table><thead><tr><th>業者名</th><th>カテゴリ</th><th>方法</th><th>メール</th><th></th></tr></thead><tbody id="vendorTableBody"></tbody></table></div>
       <div class="empty" id="vendorEmpty" hidden>業者が登録されていません。</div>
     </div>
@@ -1419,7 +1430,8 @@
     <div class="card">
       <h3>おうちノートの「お知らせ・豆知識」</h3>
       <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここで登録した内容は、すべてのお客様の新しいおうちノート（ホーム画面）に表示されます。</p>
-      <div class="addform">
+      <div class="revealbar"><button type="button" class="btn secondary small" data-reveal="ntcForm">＋ お知らせを追加</button></div>
+      <div class="addform revealbox" id="ntcForm" hidden>
         <label class="field">表示場所<select id="ntcKind">
           <option value="notice">お知らせ・豆知識</option>
           <option value="process">契約後に知っておきたいこと</option>
@@ -3024,6 +3036,7 @@
     document.getElementById("ntcKind").value = "notice";
     document.getElementById("btnNtcSave").textContent = "登録する";
     document.getElementById("btnNtcCancel").hidden = true;
+    var nf = document.getElementById("ntcForm"); if(nf) nf.hidden = true;
   }
   async function saveNotice(){
     var title = document.getElementById("ntcTitle").value.trim();
@@ -3060,6 +3073,7 @@
     document.getElementById("ntcOrder").value = n.order!=null ? n.order : 10;
     document.getElementById("btnNtcSave").textContent = "更新する";
     document.getElementById("btnNtcCancel").hidden = false;
+    document.getElementById("ntcForm").hidden = false;
     document.getElementById("ntcTitle").scrollIntoView({behavior:"smooth", block:"center"});
   }
   async function deleteNotice(id){
@@ -11272,6 +11286,20 @@
     document.getElementById("btnOpenNoteImport").addEventListener("click", openNoteImport);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
     document.getElementById("btnOpenMnSheet").addEventListener("click", openMnSheet);
+    // 「＋ 〜」ボタン：対応する入力欄を開く／閉じる
+    document.addEventListener("click", function(e){
+      var b = e.target.closest("[data-reveal]");
+      if(!b) return;
+      var el = document.getElementById(b.dataset.reveal);
+      if(!el) return;
+      el.hidden = !el.hidden;
+      document.querySelectorAll('[data-reveal="'+b.dataset.reveal+'"]').forEach(function(x){ x.classList.toggle("on", !el.hidden); });
+      if(!el.hidden){
+        var f = el.querySelector("input:not([type=checkbox]):not([type=file]), textarea, select");
+        try{ el.scrollIntoView({behavior:"smooth", block:"nearest"}); }catch(err){}
+        if(f && f.tagName!=="SELECT") setTimeout(function(){ try{ f.focus(); }catch(err){} }, 150);
+      }
+    });
     document.addEventListener("click", function(e){
       var sm = e.target.closest("summary[data-specops]");
       if(!sm) return;
