@@ -195,10 +195,22 @@
   .attfiles .filechip{ flex-wrap:wrap; }
   .attfiles .filechip .finame{ flex:1 1 160px; min-width:0; overflow-wrap:anywhere; }
   .pfmobtn{ display:none; }
+  .addform[hidden], .tagbar[hidden]{ display:none; }
+  #projFolderTiles{ display:none; }
+  @media (min-width:761px){ .pfmobonly{ display:none !important; } }
+  .pjflt{ display:flex; flex-wrap:wrap; gap:8px; margin-block-end:10px; }
+  .pjflt .tfsel{ display:flex; align-items:center; gap:6px; border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:4px 4px 4px 10px; font-size:.85rem; color:var(--muted); }
+  .pjflt select, .pjflt input{ border:0; background:transparent; font-size:.9rem; color:var(--ink); padding:4px 2px; min-width:0; }
+  .pjflt .pjsearch{ flex:1 1 180px; }
+  .pjflt .pjsearch input{ flex:1; width:100%; outline:none; }
   @media (max-width:760px){ .attwrap{ grid-template-columns:1fr; }
     #projFolderWrap > .attleft{ display:none; }
     #projFolderWrap.pfshow > .attleft{ display:block; }
-    .pfmobtn{ display:inline-block; margin-block-end:8px; }
+    .pjflt{ display:grid; grid-template-columns:1fr 1fr; }
+    .pjflt .tfsel{ min-width:0; }
+    .pjflt select{ flex:1; width:100%; }
+    .pjflt .pjsearch{ grid-column:1 / -1; }
+    #projFolderCrumb{ display:none; }
   }
   .reqcontent{ font-weight:400; font-size:.85rem; margin-block-start:4px; padding:6px 8px; background:var(--orange-soft); border-radius:8px; }
   .reqcontent-text{ white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
@@ -234,6 +246,7 @@
   .projrow:hover{ background:var(--surface-2); }
   .projrow .pname{ font-weight:700; flex:1; min-width:0; }
   .projrow .psub{ font-size:.85rem; color:var(--muted); }
+  @media (max-width:760px){ .projrow{ flex-wrap:wrap; row-gap:6px; } .projrow .pname{ flex:1 1 100%; } }
 
   .detailhead{ display:flex; align-items:center; gap:10px; margin-block-end:6px; flex-wrap:wrap; }
   .backbtn{ background:none; border:none; color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:.85rem; padding:4px 2px; }
@@ -772,8 +785,14 @@
             <div class="attcrumb" id="projFolderCrumb"></div>
             <div class="attacts" id="projFolderActs"></div>
             <div class="atttiles" id="projFolderTiles"></div>
-            <div class="tagbar" id="projectTypeFilterBar"></div>
-            <div class="tagbar" id="progressFilterBar"></div>
+            <div class="pjflt">
+              <label class="tfsel pfmobonly"><span>フォルダー</span><select id="pjFolderSel"></select></label>
+              <label class="tfsel"><span>種別</span><select id="pjTypeSel"></select></label>
+              <label class="tfsel"><span>進捗</span><select id="pjProgSel"></select></label>
+              <label class="tfsel pjsearch"><span>🔍</span><input type="search" id="pjSearch" placeholder="名前で探す" autocomplete="off"></label>
+            </div>
+            <div class="tagbar" id="projectTypeFilterBar" hidden></div>
+            <div class="tagbar" id="progressFilterBar" hidden></div>
             <div class="projlist" id="fullProjList"></div>
             <div class="empty" id="fullProjEmpty" hidden>このフォルダーに案件はありません。</div>
           </div>
@@ -3284,7 +3303,21 @@
     bar.innerHTML = html;
   }
 
+  function renderProjFilterRow(){
+    var fs = document.getElementById("pjFolderSel");
+    if(!fs) return;
+    var sel = state.projFolderSel || "all";
+    fs.innerHTML = '<option value="all">すべて</option>'+pfOptionsHtml(sel);
+    fs.value = sel;
+    var ts = document.getElementById("pjTypeSel");
+    ts.innerHTML = '<option value="">すべて</option>'+PROJECT_TYPES.map(function(t){ return '<option value="'+escapeHtml(t)+'">'+escapeHtml(deptLabel(t))+'</option>'; }).join("");
+    ts.value = state.projectTypeFilter || "";
+    var ps = document.getElementById("pjProgSel");
+    ps.innerHTML = '<option value="">すべて</option>'+(state.settings.progressTags||[]).map(function(t){ return '<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>'; }).join("");
+    ps.value = state.progressFilter || "";
+  }
   function renderProjectTypeFilterBar(){
+    renderProjFilterRow();
     var bar = document.getElementById("projectTypeFilterBar");
     if(!bar) return;
     var html = '<span class="tagchip'+(state.projectTypeFilter===null?" active":"")+'" data-filtertype="">すべての種別</span>';
@@ -3298,17 +3331,21 @@
     var wrap = document.getElementById("fullProjList");
     var empty = document.getElementById("fullProjEmpty");
     var sel = state.projFolderSel || "all";
-    var inIds = sel==="all" ? null : pfDescIds(sel);
+    var q = String(state.projSearch||"").trim().toLowerCase();
+    var inIds = (sel==="all" || q) ? null : pfDescIds(sel);
     var rows = liveProjects().filter(function(p){
+      if(q && ((p.name||"")+" "+(p.customer||"")).toLowerCase().indexOf(q) < 0) return false;
       return (!inIds || inIds.indexOf(pfOf(p))>=0) &&
         (!state.progressFilter || p.progressTag === state.progressFilter) &&
         (!state.projectTypeFilter || p.type === state.projectTypeFilter);
     });
     empty.hidden = rows.length !== 0;
-    empty.textContent = sel==="all" ? "案件がありません。" : "このフォルダーに案件はありません。";
+    empty.textContent = q ? "「"+String(state.projSearch).trim()+"」に合う案件はありません。" : (sel==="all" ? "案件がありません。" : "このフォルダーに案件はありません。");
     wrap.innerHTML = rows.map(function(p){
       var fid = pfOf(p);
-      var where = (fid && (sel==="all" || fid!==sel)) ? '<span class="pill tag">📁 '+escapeHtml(pfPath(fid))+'</span>' : "";
+      var fpath = fid ? pfPath(fid) : "";
+      // フォルダー名が種別と同じ（例：新築フォルダーの新築）なら重ねて出さない
+      var where = (fid && p.folderId && (sel==="all" || fid!==sel) && fpath!==p.type && fpath!==deptLabel(p.type)) ? '<span class="pill tag">📁 '+escapeHtml(fpath)+'</span>' : "";
       return '<div class="projrow" data-open-project="'+p.id+'"><div class="pname">'+escapeHtml(p.name)+(p.customer?'<span class="psub"> '+escapeHtml(p.customer)+'</span>':'')+'</div>'+where+projectTypePill(p.type)+progressPill(p.progressTag)+'</div>';
     }).join("");
   }
@@ -3396,7 +3433,7 @@
       pfTreeHtml("", 0, sel, cnt)+
       '<div style="margin-block-start:8px;"><button class="btn small secondary" data-pfact="new" data-pid="">＋フォルダー</button></div>';
     document.getElementById("projFolderCrumb").textContent = sel==="all" ? "🗂 すべての案件" : "📁 "+pfPath(sel);
-    var acts = "";
+    var acts = sel==="all" ? '<button class="btn small secondary pfmobonly" data-pfact="new" data-pid="">＋フォルダー</button>' : "";
     if(sel!=="all"){
       acts = (pfDepth(sel) < PF_MAX_DEPTH ? '<button class="btn small secondary" data-pfact="new" data-pid="'+sel+'">＋サブフォルダー</button> ' : '')+
         '<button class="btn small ghost" data-pfact="rename" data-pid="'+sel+'">名前変更</button> '+
@@ -10830,6 +10867,14 @@
       render();
     });
 
+    document.getElementById("pjFolderSel").addEventListener("change", function(e){
+      state.projFolderSel = e.target.value==="all" ? null : e.target.value;
+      var nf = document.getElementById("newProjectFolder"); if(nf) nf.value = "";
+      render();
+    });
+    document.getElementById("pjTypeSel").addEventListener("change", function(e){ state.projectTypeFilter = e.target.value || null; render(); });
+    document.getElementById("pjProgSel").addEventListener("change", function(e){ state.progressFilter = e.target.value || null; renderProgressFilterBar(); renderFullProjList(); });
+    document.getElementById("pjSearch").addEventListener("input", function(e){ state.projSearch = e.target.value; renderFullProjList(); });
     ["projFolderTree","projFolderTiles","projFolderActs","pfMobToggle"].forEach(function(id){
       document.getElementById(id).addEventListener("click", pfHandleClick);
     });
