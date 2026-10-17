@@ -74,8 +74,8 @@
   .wrap{ max-width:none; margin:0 auto; padding-block-end:40px; }
 
   header.top{
-    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30;
-    background: var(--bg); padding-block: 14px 10px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 30;
+    background: var(--bg); padding-block: calc(14px + env(safe-area-inset-top, 0px)) 10px; border-bottom: 1px solid var(--border);
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
   }
   .brand{ display:flex; align-items:center; gap:10px; }
@@ -85,6 +85,31 @@
   .brand-text p{ margin:0; font-size:.85rem; color:var(--muted); }
   .userpicker{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .userpicker select{ font-size:.85rem; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:inherit; }
+  /* ログイン中の人（個人ログインした端末は名前の選択欄の代わりにこれを出す） */
+  .loginchip{ display:inline-flex; align-items:center; gap:4px; font-size:.85rem; font-weight:700; color:var(--accent-ink); background:var(--accent-soft); border-radius:999px; padding:4px 11px; white-space:nowrap; }
+  .loginchip[hidden], .userpick-legacy[hidden]{ display:none; }
+  .userpick-legacy{ display:inline-flex; align-items:center; gap:6px; }
+  /* ヘッダーの「その他」メニュー：PCではそのまま横に並べ、スマホでは「⋯」で開く */
+  .hdr-morebtn{ display:none; }
+  .hdr-lbl{ display:none; }
+  @media (max-width:760px){ .hdr-lbl{ display:inline; } }
+  .hdr-more{ display:contents; }
+  @media (max-width:760px){
+    header.top{ padding-block: calc(8px + env(safe-area-inset-top, 0px)) 8px; flex-wrap:nowrap; gap:8px; }
+    .brand{ gap:8px; min-width:0; }
+    .brand-mark{ width:32px; height:32px; border-radius:9px; }
+    .brand-mark svg{ width:20px; height:20px; }
+    .brand-text h1{ font-size:1rem; white-space:nowrap; }
+    .brand-text p{ display:none; }
+    .userpicker{ flex-wrap:nowrap; position:relative; }
+    .hdr-morebtn{ display:inline-flex; }
+    .hdr-more{ display:none; position:absolute; right:0; top:calc(100% + 6px); z-index:40; flex-direction:column; align-items:stretch; gap:10px; min-width:220px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow); }
+    .hdr-more.open{ display:flex; }
+    .hdr-more #syncStamp:empty{ display:none; }
+    .hdr-more .btn{ width:100%; justify-content:center; }
+    .userpick-legacy{ display:none; }
+    .hdr-more .userpick-legacy:not([hidden]){ display:flex; }
+  }
 
   nav.tabs{ display:flex; gap:2px; margin-block:12px 14px; border-bottom:1px solid var(--border); overflow-x:auto; }
   nav.tabs button{ appearance:none; border:none; background:none; font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; color:var(--muted); padding:8px 11px 10px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
@@ -362,6 +387,12 @@
   /* 付箋ふうの小さいカード：ふだんは要点だけ。押すと開いて詳細・ボタンが出る */
   .kancol .kangrid{ grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
   @media (max-width:900px){ .kancol .kangrid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  @media (max-width:760px){ .kancol .kangrid{ grid-template-columns:1fr; } }
+  /* タスクの絞り込み（ボタンで開閉） */
+  .tfbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
+  .tfbar .tf-sum{ font-size:.85rem; color:var(--muted); font-weight:400; }
+  #taskFilterBody{ border:1px solid var(--border); border-radius:12px; padding:10px; margin-block-end:10px; background:var(--surface-2); }
+  #taskFilterBody[hidden]{ display:none; }
   .kancard{ cursor:pointer; padding:7px 8px; }
   .kancard .kc-proj{ font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .kancard .kc-content{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-block-end:4px; }
@@ -515,13 +546,17 @@
       </div>
     </div>
     <div class="userpicker">
-      <span class="muted" style="font-size:.85rem;" title="記録や変更履歴に名前が残ります">いま使っている人</span>
-      <select id="userSelect" title="ここで選んだ名前が、記録・タスク・変更履歴に残ります"></select>
-      <button class="btn secondary small" id="btnLogout" title="この端末からログアウトします" hidden>ログアウト</button>
-      <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 最新の内容に更新</button>
-      <span class="muted" id="syncStamp" style="font-size:.85rem;"></span>
-      <span class="fspick" id="fsPick" title="この端末の文字の大きさ"><span class="muted" style="font-size:.85rem; margin-inline-end:4px;">文字</span><button type="button" data-fs="s">小</button><button type="button" data-fs="m">中</button><button type="button" data-fs="l">大</button></span>
-      <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span></button>
+      <span class="loginchip" id="loginChip" hidden title="この名前で記録・タスク・変更履歴に残ります">👤 <span id="loginChipName"></span></span>
+      <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 更新</button>
+      <button class="btn secondary small hdr-morebtn" id="btnHdrMore" type="button" aria-expanded="false" title="文字の大きさ・ログアウトなど">⋯</button>
+      <div class="hdr-more" id="hdrMore">
+        <span class="userpick-legacy" id="userPickLegacy"><span class="muted" style="font-size:.85rem;" title="記録や変更履歴に名前が残ります">いま使っている人</span>
+        <select id="userSelect" title="ここで選んだ名前が、記録・タスク・変更履歴に残ります"></select></span>
+        <span class="muted" id="syncStamp" style="font-size:.85rem;"></span>
+        <span class="fspick" id="fsPick" title="この端末の文字の大きさ"><span class="muted" style="font-size:.85rem; margin-inline-end:4px;">文字</span><button type="button" data-fs="s">小</button><button type="button" data-fs="m">中</button><button type="button" data-fs="l">大</button></span>
+        <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span><span class="hdr-lbl"> 全画面</span></button>
+        <button class="btn secondary small" id="btnLogout" title="この端末からログアウトします" hidden>ログアウト</button>
+      </div>
     </div>
   </header>
 
@@ -543,10 +578,13 @@
         <h2 style="margin:0;">社内タスク【最重要】</h2>
         <button class="btn small" id="btnNewTask">＋ タスク追加</button>
       </div>
+      <div class="tfbar"><button type="button" class="btn secondary small" id="taskFilterToggle" aria-expanded="false">🔍 絞り込み <span id="taskFilterArrow">▾</span></button><span class="tf-sum" id="taskFilterSummary"></span><button type="button" class="btn secondary small" id="taskFilterReset" hidden>解除</button></div>
+      <div id="taskFilterBody" hidden>
       <div class="row" id="taskProjectFilterRow" style="gap:8px; margin-block-end:8px; flex-wrap:wrap;"><label for="taskFolderFilter" style="font-weight:700;">フォルダー</label><select id="taskFolderFilter" style="max-width:100%;"></select><label for="taskProjectFilter" style="font-weight:700;">案件</label><select id="taskProjectFilter" style="max-width:100%;"></select></div>
       <div class="row" id="taskStatusFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
-      <div class="row" id="taskAssigneeFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
+      <div class="row" id="taskAssigneeFilterBar" style="gap:6px; flex-wrap:wrap;"></div>
+      </div>
       <div class="kanbanwrap" id="kanbanWrap"></div>
     </div>
     <div class="statrow">
@@ -2741,7 +2779,7 @@
   function renderTaskKindFilterBar(){
     var bar = document.getElementById("taskKindFilterBar");
     if(!bar) return;
-    var opts = [{label:"すべて", value:null},{label:"社内", value:"internal"},{label:"業者", value:"vendor"},{label:"確認依頼", value:"check"}];
+    var opts = [{label:"種類：すべて", value:null},{label:"社内", value:"internal"},{label:"業者", value:"vendor"},{label:"確認依頼", value:"check"}];
     bar.innerHTML = opts.map(function(o){
       return '<span class="tagchip'+(state.taskKindFilter===o.value?" active":"")+'" data-taskkindfilter="'+(o.value||"")+'">'+o.label+'</span>';
     }).join("");
@@ -2803,6 +2841,9 @@
   function renderTaskAssigneeFilterBar(){
     var bar = document.getElementById("taskAssigneeFilterBar");
     if(!bar) return;
+    // 担当者での絞り込みは朋子（全員のタスクが見える人）だけ。ほかの人は自分のタスクしか見えないので出さない
+    if(state.currentUser && state.currentUser!==TASK_ADMIN){ bar.hidden = true; bar.innerHTML = ""; state.taskAssigneeFilter = null; return; }
+    bar.hidden = false;
     var names = (state.settings.staffList || []).slice();
     liveTasks().forEach(function(t){ if(t.assignee && names.indexOf(t.assignee)<0) names.push(t.assignee); });
     var opts = [{label:"担当・確認：すべて", value:null}].concat(names.map(function(n){ return {label:n, value:n}; })).concat([{label:"担当未設定", value:"__none"}]);
@@ -2844,11 +2885,28 @@
       }).join("");
     }
   }
+  // 絞り込み欄の開閉と、いま効いている条件の表示
+  function renderTaskFilterToggle(){
+    if(state.taskFilterOpen===undefined) state.taskFilterOpen = !(window.matchMedia && window.matchMedia("(max-width:760px)").matches);
+    var body = document.getElementById("taskFilterBody"), btn = document.getElementById("taskFilterToggle");
+    if(body) body.hidden = !state.taskFilterOpen;
+    if(btn) btn.setAttribute("aria-expanded", state.taskFilterOpen?"true":"false");
+    var ar = document.getElementById("taskFilterArrow"); if(ar) ar.textContent = state.taskFilterOpen ? "▴" : "▾";
+    var parts = [];
+    if(state.taskFolderFilter){ var f = pfById(state.taskFolderFilter); parts.push("📁"+(f && f.name ? f.name : "フォルダー")); }
+    if(state.taskProjectFilter){ var pj = state.taskProjectFilter==="__none" ? null : projectById(state.taskProjectFilter); parts.push(pj ? pj.name : "案件未設定"); }
+    if(state.taskStatusFilter) parts.push(state.taskStatusFilter);
+    if(state.taskKindFilter) parts.push({internal:"社内",vendor:"業者",check:"確認依頼"}[state.taskKindFilter] || state.taskKindFilter);
+    if(state.taskAssigneeFilter) parts.push(state.taskAssigneeFilter==="__none" ? "担当未設定" : state.taskAssigneeFilter);
+    var sum = document.getElementById("taskFilterSummary"); if(sum) sum.textContent = parts.length ? parts.join("・") : "すべて表示中";
+    var rs = document.getElementById("taskFilterReset"); if(rs) rs.hidden = !parts.length;
+  }
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
     renderTaskKindFilterBar();
     renderTaskAssigneeFilterBar();
     renderTaskProjectStatusBars();
+    renderTaskFilterToggle();
     var tasks = liveTasks().filter(function(t){
       if(state.taskFolderFilter && !projInTaskFolder(projectById(t.projectId))) return false;
       if(state.taskProjectFilter==="__none" && t.projectId) return false;
@@ -7831,6 +7889,10 @@
     var ln = loginNameLocked();
     if(ln){ state.currentUser = ln; if(list.indexOf(ln)<0) sel.innerHTML += '<option value="'+escapeHtml(ln)+'">'+escapeHtml(ln)+'</option>'; sel.value = ln; sel.disabled = true; }
     else sel.disabled = false;
+    // 個人ログインした端末は「いま使っている人」の選択欄を出さず、名前だけ表示する
+    var chip = document.getElementById("loginChip"), legacy = document.getElementById("userPickLegacy");
+    if(chip){ chip.hidden = !ln; var cn = document.getElementById("loginChipName"); if(cn) cn.textContent = ln || ""; }
+    if(legacy) legacy.hidden = !!ln;
     var lo = document.getElementById("btnLogout"); if(lo) lo.hidden = !(ln || getStaffToken());
     renderSettingsLogin();
   }
@@ -10284,6 +10346,12 @@
       toast(state.currentUser ? "いま使っている人を「"+state.currentUser+"」にしました" : "名前が選ばれていません（記録に名前が残りません）");
     });
     document.getElementById("btnSyncNow").addEventListener("click", function(){ syncFromServer({}); });
+    (function(){
+      var mb = document.getElementById("btnHdrMore"), mm = document.getElementById("hdrMore");
+      if(!mb || !mm) return;
+      mb.addEventListener("click", function(e){ e.stopPropagation(); var o = !mm.classList.contains("open"); mm.classList.toggle("open", o); mb.setAttribute("aria-expanded", o?"true":"false"); });
+      document.addEventListener("click", function(e){ if(mm.classList.contains("open") && !mm.contains(e.target) && e.target!==mb){ mm.classList.remove("open"); mb.setAttribute("aria-expanded","false"); } });
+    })();
     document.getElementById("btnPerfCheck").addEventListener("click", runPerfCheck);
     startAutoRefresh();
     var fsBtn = document.getElementById("btnFullscreen");
@@ -10880,6 +10948,14 @@
       var chip = e.target.closest("[data-taskstatusfilter]");
       if(!chip) return;
       state.taskStatusFilter = chip.dataset.taskstatusfilter || null;
+      renderKanban();
+    });
+    document.getElementById("taskFilterToggle").addEventListener("click", function(){
+      state.taskFilterOpen = !state.taskFilterOpen;
+      renderTaskFilterToggle();
+    });
+    document.getElementById("taskFilterReset").addEventListener("click", function(){
+      state.taskFolderFilter = null; state.taskProjectFilter = null; state.taskStatusFilter = null; state.taskKindFilter = null; state.taskAssigneeFilter = null;
       renderKanban();
     });
     document.getElementById("taskAssigneeFilterBar").addEventListener("click", function(e){
