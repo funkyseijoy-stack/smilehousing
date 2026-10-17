@@ -76,6 +76,8 @@
   header.top{
     position: sticky; top: 0; z-index: 30;
     background: var(--bg); padding-block: calc(14px + env(safe-area-inset-top, 0px)) 10px; border-bottom: 1px solid var(--border);
+    /* iPhoneで上へ動かしたとき、ヘッダーより上（時計の帯）に下の内容が透けないよう、上と左右を背景色で覆う */
+    box-shadow: 0 -160px 0 160px var(--bg);
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
   }
   .brand{ display:flex; align-items:center; gap:10px; }
@@ -1237,10 +1239,13 @@
       <div class="subpanel" id="sub-meeting">
         <div class="meetingsubtabs" id="meetingSubTabBar">
           <button class="meetingsub-btn active" data-meetingsub="record">記録</button>
-          <button class="meetingsub-btn" data-meetingsub="exterior">外部仕様</button>
-          <button class="meetingsub-btn" data-meetingsub="facility">設備仕様</button>
-          <button class="meetingsub-btn" data-meetingsub="equipment">電気設備</button>
-          <button class="meetingsub-btn" data-meetingsub="interiorColor">インテリア</button>
+          <button class="meetingsub-btn" data-meetingsub="exterior">🏠 外部</button>
+          <button class="meetingsub-btn" data-meetingsub="eq_暖房設備">🔥 暖房設備</button>
+          <button class="meetingsub-btn" data-meetingsub="eq_換気設備">🌀 換気設備</button>
+          <button class="meetingsub-btn" data-meetingsub="eq_電気配線">🔌 電気配線</button>
+          <button class="meetingsub-btn" data-meetingsub="eq_あかりプラン">💡 あかりプラン</button>
+          <button class="meetingsub-btn" data-meetingsub="facility">🚿 水まわり</button>
+          <button class="meetingsub-btn" data-meetingsub="interiorColor">🎨 インテリア</button>
           <button class="meetingsub-btn" data-meetingsub="sc_sansui">外部散水栓</button>
           <button class="meetingsub-btn" data-meetingsub="sc_intercom">インターホン親機</button>
           <button class="meetingsub-btn" data-meetingsub="sc_remocon">給湯リモコン</button>
@@ -1312,7 +1317,7 @@
         </div>
         <div class="meetingsubpane" id="meetingsubpane-equipment">
           <div class="card">
-            <h3>暖房・換気・電気設備</h3>
+            <h3 id="specEquipmentTitle">暖房・換気・電気設備</h3>
             <p class="muted" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
             <div id="specEquipmentWrap"></div>
           </div>
@@ -1850,7 +1855,7 @@
     {key:"consider", label:"お客様に検討してもらうこと", cls:"b-consider", group:"next"}
   ];
   var BADGE_AUTO_KEYS = ["companytask","vendortask","confirm","consider"]; // 自動登録を伴うバッジ
-  var FACILITY_CATS = ["キッチン","お風呂","洗面","トイレ","脱衣室","ランドリーバー"];
+  var FACILITY_CATS = ["キッチン","お風呂","洗面","トイレ","脱衣室"];
   var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
   var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口"];
   // 上の4項目は、打合せ記録のサブタブにそれぞれ別のタブとして出す（タブのキー）
@@ -2467,6 +2472,7 @@
     render();
     migrateSiteCheckMoves();
     migrateToiletMerge();
+    migrateLaundryMerge();
     migratePlanboardPartRemoval();
     migrateExteriorNoteEntries();
     migrateAttachmentFolderParts();
@@ -2509,6 +2515,40 @@
         saveDoc("specPhotos", p.id, p);
       });
     }catch(e){ console.warn("planboard part removal failed", e); }
+  }
+  // ランドリーバーは「脱衣室」にまとめた（写真・記録・タスク・書類の部位とメモを移す。何度動かしても同じ結果）
+  function migrateLaundryMerge(){
+    try{
+      var L = "ランドリーバー", D = "脱衣室";
+      state.specPhotos.forEach(function(p){
+        if(p && p.scope==="facility" && p.category===L){ p.category = D; saveDoc("specPhotos", p.id, p); }
+      });
+      state.meetingNotes.forEach(function(n){
+        var sp = n && n.specPart;
+        if(sp && sp.scope==="facility" && sp.category===L){ sp.category = D; sp.label = D; saveDoc("meetingNotes", n.id, n); }
+      });
+      state.tasks.forEach(function(t){
+        var vs = t && t.vendorSpec;
+        if(vs && vs.scope==="facility" && vs.category===L){ vs.category = D; vs.label = D; saveDoc("tasks", t.id, t); }
+      });
+      state.attachments.forEach(function(a){
+        var sp = a && a.specPart;
+        if(sp && sp.scope==="facility" && sp.category===L){ sp.category = D; sp.label = D; saveDoc("attachments", a.id, a); }
+      });
+      state.requests.forEach(function(r){
+        var sp = r && r.part;
+        if(sp && sp.scope==="facility" && sp.category===L){ sp.category = D; sp.label = D; saveDoc("requests", r.id, r); }
+      });
+      state.projects.forEach(function(pr){
+        var fn = pr && pr.facilityNotes; if(!fn || fn[L]==null) return;
+        var parts = [];
+        if(fn[D]) parts.push(fn[D]);
+        if(fn[L]) parts.push("【ランドリーバー】"+fn[L]);
+        fn[D] = parts.join("\n");
+        delete fn[L];
+        saveDoc("projects", pr.id, pr);
+      });
+    }catch(e){ console.warn("laundry merge failed", e); }
   }
   function migrateToiletMerge(){
     try{
@@ -4495,9 +4535,13 @@
   function switchMeetingSubTab(key){
     var bar = document.getElementById("meetingSubTabBar");
     if(!bar) return;
+    if(key==="equipment") key = "eq_"+(state.eqTab||EQUIPMENT_CATS[0]);
     state.meetingSubTab = key;
+    var pane = key;
+    // 暖房設備・換気設備・電気配線・あかりプランは、同じ画面（equipment）を項目ごとに分けて見せる
+    if(key.indexOf("eq_")===0){ pane = "equipment"; state.eqTab = key.slice(3); renderSpecEquipment(); }
     bar.querySelectorAll(".meetingsub-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.meetingsub===key); });
-    document.querySelectorAll(".meetingsubpane").forEach(function(p){ p.classList.toggle("active", p.id==="meetingsubpane-"+key); });
+    document.querySelectorAll(".meetingsubpane").forEach(function(p){ p.classList.toggle("active", p.id==="meetingsubpane-"+pane); });
   }
   function specPartsEqual(a, b){
     if(!a || !b) return false;
@@ -5148,11 +5192,14 @@
     var proj = projectById(state.currentProjectId);
     var notes = (proj && proj.equipmentNotes) || {};
     var equipmentCatsToShow = EQUIPMENT_CATS;
-    if(state.noteSpecFilter && state.noteSpecFilter.scope==="equipment" && state.noteSpecFilter.category){
-      equipmentCatsToShow = EQUIPMENT_CATS.filter(function(c){ return c===state.noteSpecFilter.category; });
+    var eqOne = (state.noteSpecFilter && state.noteSpecFilter.scope==="equipment" && state.noteSpecFilter.category) || (EQUIPMENT_CATS.indexOf(state.eqTab)>=0 ? state.eqTab : null);
+    if(eqOne){
+      equipmentCatsToShow = EQUIPMENT_CATS.filter(function(c){ return c===eqOne; });
     } else {
       equipmentCatsToShow = catsSortedByRecentActivity("equipment", equipmentCatsToShow);
     }
+    var eqTitle = document.getElementById("specEquipmentTitle");
+    if(eqTitle) eqTitle.textContent = eqOne ? (EQUIP_ICON[eqOne]||"")+" "+eqOne : "暖房・換気・電気設備";
     var catsGridHtml = '<div class="speccatgrid">'+equipmentCatsToShow.map(function(cat){
       return '<div class="speccat"><h4>'+escapeHtml(cat)+noteDecisionPill("equipment",cat)+'</h4>'+
         decidedSummaryHtml("equipment",cat,null,null)+
@@ -11588,7 +11635,7 @@
           state.noteSpecFilter = part;
           renderMeetingNotes();
           renderSpecTab();
-          var subKey = part.scope==="custom" ? "custom_"+part.category : (part.scope==="siteCheck" ? (SITECHECK_TABS[part.category]||{}).key : MEETING_SUBTAB_BY_SCOPE[part.scope]);
+          var subKey = part.scope==="custom" ? "custom_"+part.category : (part.scope==="siteCheck" ? (SITECHECK_TABS[part.category]||{}).key : (part.scope==="equipment" && part.category ? "eq_"+part.category : MEETING_SUBTAB_BY_SCOPE[part.scope]));
           if(subKey) switchMeetingSubTab(subKey);
         });
       }
