@@ -359,6 +359,22 @@
   .kancard.reflected{ background:var(--accent-soft); border-color:var(--accent); border-inline-start:6px solid var(--accent); }
   .kancard .kc-proj{ font-weight:700; margin-block-end:3px; }
   .kancard .kc-content{ white-space:pre-wrap; margin-block-end:5px; }
+  /* 付箋ふうの小さいカード：ふだんは要点だけ。押すと開いて詳細・ボタンが出る */
+  .kancol .kangrid{ grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
+  @media (max-width:900px){ .kancol .kangrid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .kancard{ cursor:pointer; padding:7px 8px; }
+  .kancard .kc-proj{ font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kancard .kc-content{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-block-end:4px; }
+  .kancard .kc-part{ font-size:.85rem; padding:1px 8px; margin-block-end:4px; }
+  .kancard .kc-full{ display:none; }
+  .kancard .kc-state{ display:flex; align-items:center; gap:6px; font-weight:700; margin-block-end:6px; }
+  .kancard .kc-state .kandot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
+  .kancard.exp{ grid-column:1 / -1; cursor:default; box-shadow:0 0 0 2px var(--accent); }
+  .kancard.exp .kc-full{ display:block; }
+  .kancard.exp .kc-content{ display:block; -webkit-line-clamp:unset; overflow:visible; }
+  .kancard.exp .kc-proj{ white-space:normal; }
+  @keyframes kcflash{ 0%,100%{ box-shadow:0 0 0 0 transparent; } 30%{ box-shadow:0 0 0 5px var(--orange); } }
+  .kancard.kc-flash{ animation:kcflash 1s ease-in-out 3; }
   .kancard .kc-meta{ display:flex; flex-wrap:wrap; gap:4px; margin-block-end:6px; font-size:.85rem; color:var(--muted); }
   .kancard .kc-meta span{ background:var(--surface-2); border-radius:999px; padding:1px 7px; }
   .kancard .kc-meta span.due-soon{ background:var(--orange-soft); color:var(--orange); font-weight:700; }
@@ -512,6 +528,7 @@
   <nav class="tabs">
     <button class="tab-btn active" data-tab="home">ホーム</button>
     <button class="tab-btn" data-tab="projects">案件管理</button>
+    <button class="tab-btn" data-tab="estimates">見積</button>
     <button class="tab-btn" data-tab="pending">未受領一覧</button>
     <button class="tab-btn" data-tab="settings">業者・設定</button>
     <button class="tab-btn" data-tab="gmail">Gmail</button>
@@ -531,15 +548,6 @@
       <div class="row" id="taskKindFilterBar" style="gap:6px; margin-block-end:8px;"></div>
       <div class="row" id="taskAssigneeFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div class="kanbanwrap" id="kanbanWrap"></div>
-    </div>
-    <div class="card" id="homeReqCard">
-      <div class="row" style="justify-content:space-between; margin-block-end:8px; flex-wrap:wrap; gap:8px;">
-        <h2 style="margin:0;">見積り依頼（全案件）</h2>
-        <select id="homeReqProject" style="min-width:160px;"></select>
-      </div>
-      <div class="row" id="homeReqStatusBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
-      <div id="homeReqList" style="display:flex; flex-direction:column; gap:6px;"></div>
-      <div class="empty" id="homeReqEmpty" hidden>該当する見積り依頼はありません。</div>
     </div>
     <div class="statrow">
       <div class="stat"><div class="label">案件数</div><div class="value tabular" id="statProjects">–</div></div>
@@ -561,6 +569,19 @@
     <div class="card">
       <h2 style="margin:0 0 8px;">案件へ</h2>
       <div class="projlist" id="homeProjList"></div>
+    </div>
+  </section>
+
+  <!-- ========== 見積（全案件の見積り依頼） ========== -->
+  <section class="panel" id="panel-estimates">
+    <div class="card" id="homeReqCard">
+      <div class="row" style="justify-content:space-between; margin-block-end:8px; flex-wrap:wrap; gap:8px;">
+        <h2 style="margin:0;">見積り依頼（全案件）</h2>
+        <select id="homeReqProject" style="min-width:160px;"></select>
+      </div>
+      <div class="row" id="homeReqStatusBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
+      <div id="homeReqList" style="display:flex; flex-direction:column; gap:6px;"></div>
+      <div class="empty" id="homeReqEmpty" hidden>該当する見積り依頼はありません。</div>
     </div>
   </section>
 
@@ -2861,20 +2882,23 @@
       var cardArr = rows.map(function(t){
         var proj = projectById(t.projectId);
         var isVendor = !!t.requestTo;
-        return '<div class="kancard'+(t.reflected?" reflected":"")+'" data-taskid="'+t.id+'">'+
+        var exp = !!(state.taskExpanded && state.taskExpanded[t.id]) || state.taskMenuId===t.id;
+        return '<div class="kancard'+(t.reflected?" reflected":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'" style="border-top:5px solid '+(STATUS_COLORS[status]||"var(--border)")+';">'+
           '<div class="kc-proj">'+(proj?escapeHtml(proj.name)+' <span class="muted" style="font-size:.85rem; font-weight:400;">'+escapeHtml(pfPath(pfOf(proj)))+'</span>':"（案件未設定）")+
             (isVendor?' <span class="pill" style="background:var(--orange-soft); color:var(--orange);">業者</span>':'')+
             (t.private?' <span class="tagchip" style="padding:1px 6px; font-size:.85rem;">🔒自分だけ</span>':'')+'</div>'+
           '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
-          (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
-          (t.vendorSpec ? '<div class="kc-part">📍 部位：<b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
-          (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
+          (t.vendorSpec ? '<div class="kc-part">📍 <b>'+escapeHtml(t.vendorSpec.label||"")+'</b></div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
           '<div class="kc-meta">'+
             (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
             (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
             (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
             fmtDeadline(t)+
           '</div>'+
+          '<div class="kc-full">'+
+          '<div class="kc-state"><span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span>いまの状態：<b>'+status+'</b></div>'+
+          (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
+          (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
           (t.review && t.review.result ? '<div class="kc-memo" style="border-left-color:'+(t.review.result==="承認"?'var(--accent)':'var(--orange)')+';">'+(t.review.result==="承認"?'✅ 承認':'↩ 差し戻し')+'（'+escapeHtml(t.review.by||"")+'）'+(t.review.note?' '+escapeHtml(t.review.note):'')+'</div>' : '')+
           (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
             var st = v.status||"未連絡";
@@ -2898,7 +2922,7 @@
           (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
             return '<button data-taskact="setstatus" data-id="'+t.id+'" data-status="'+st+'"'+(st===status?' class="cur"':'')+'>'+st+'</button>';
           }).join("")+'</div>' : '')+
-          '</div>';
+          '</div></div>';
       });
       var cards;
       if(status==="完了" && rows.length){
@@ -9187,8 +9211,14 @@
     state.taskOpen = state.taskOpen || {};
     state.taskOpen[newStatus] = true;
     if(newStatus==="完了") openDoneMonthOf(t);
+    state.taskFlash = {id:t.id};
     render();
-    toast("「"+newStatus+"」へ移しました");
+    toast("✓「"+(t.content||"").split("\n")[0].slice(0,14)+"」を『"+newStatus+"』にしました（いまの状態：「"+newStatus+"」）", 5000);
+    setTimeout(function(){
+      var c = document.querySelector('.kancard[data-taskid="'+t.id+'"]');
+      if(c && c.scrollIntoView) c.scrollIntoView({behavior:"smooth", block:"center"});
+      setTimeout(function(){ if(state.taskFlash && state.taskFlash.id===t.id){ state.taskFlash = null; var c2 = document.querySelector('.kancard[data-taskid="'+t.id+'"]'); if(c2) c2.classList.remove("kc-flash"); } }, 3200);
+    }, 80);
     await saveDoc("tasks", t.id, t);
     logActivity("タスクのステータスを「"+t.status+"」にしました");
   }
@@ -10789,7 +10819,18 @@
         return;
       }
       var btn = e.target.closest("button[data-taskact]");
-      if(!btn) return;
+      if(!btn){
+        // カード本体を押したら、詳細を開く／閉じる（ボタン・リンク・入力は除く）
+        var cardEl = e.target.closest(".kancard");
+        if(cardEl && !e.target.closest("button, a, label, input, select, textarea, [data-openatt], [data-vendorcycle], [data-delattach]")){
+          var tid = cardEl.dataset.taskid;
+          state.taskExpanded = state.taskExpanded || {};
+          state.taskExpanded[tid] = !state.taskExpanded[tid];
+          if(!state.taskExpanded[tid] && state.taskMenuId===tid) state.taskMenuId = null;
+          renderKanban();
+        }
+        return;
+      }
       var act = btn.dataset.taskact, id = btn.dataset.id;
       if(act==="statusmenu"){ state.taskMenuId = (state.taskMenuId===id ? null : id); renderKanban(); }
       else if(act==="setstatus") setTaskStatus(id, btn.dataset.status);
