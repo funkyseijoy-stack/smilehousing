@@ -3551,8 +3551,10 @@
   var attSelected = {};     // 選択中のファイル
   var attDragging = null;   // ドラッグ中 {type:"file"|"folder", id}
   // 全案件に最初から入っている固定フォルダー（部門）。保存はせず、画面で毎回作る（削除・名前変更・移動はできない。中に自由にサブフォルダー［業者など］を足せる）
-  var ATT_FIXED_NAMES = ["基礎","足場","板金","暖房設備","換気設備","電気配線","あかりプラン","建材","建具・階段","水まわり（キッチン・お風呂・洗面・トイレ・脱衣）","クロス・窓まわり","その他"];
+  var ATT_FIXED_NAMES = ["基礎","足場","板金","暖房設備","換気設備","電気配線","あかりプラン","建材","建具・階段","水まわり","クロス・窓まわり","その他"];
   var ATT_FIXED_FOLDERS = ATT_FIXED_NAMES.map(function(n, i){ return {id:"fx_"+(i+1), name:n, parentId:"", fixed:true, order:i}; });
+  // 水まわり（fx_10）の中の固定サブフォルダー。IDは必ず末尾に足す（fx_13〜）
+  ["キッチン","お風呂","洗面","トイレ","脱衣"].forEach(function(n, i){ ATT_FIXED_FOLDERS.push({id:"fx_"+(13+i), name:n, parentId:"fx_10", fixed:true, order:100+i}); });
   function attFoldersOf(proj){ return ATT_FIXED_FOLDERS.concat(((proj&&proj.attFolders)||[]).filter(function(f){ return !f.deletedAt; })); }
   function attFolderById(proj, id){ return id ? attFoldersOf(proj).find(function(f){ return f.id===id; }) : null; }
   function attChildren(proj, pid){
