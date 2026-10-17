@@ -602,6 +602,8 @@
     background:var(--surface); padding-block:calc(10px + env(safe-area-inset-top,0px)) 10px; margin-block:calc(-10px - env(safe-area-inset-top,0px)) 10px; border-bottom:1px solid var(--border); }
   .mnsheethead h3{ margin:0; }
   body.mnlock{ overflow:hidden; }
+  /* 説明の文章：ふだんは隠し、「⋯」の「説明を表示」で出す */
+  body:not(.showhelp) .help{ display:none !important; }
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
   /* ファイルのサムネイル（タイル）表示：見積の添付資料・図面タブ */
   .ftgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px; }
@@ -725,6 +727,7 @@
         <select id="userSelect" title="ここで選んだ名前が、記録・タスク・変更履歴に残ります"></select></span>
         <span class="muted" id="syncStamp" style="font-size:.85rem;"></span>
         <span class="fspick" id="fsPick" title="この端末の文字の大きさ"><span class="muted" style="font-size:.85rem; margin-inline-end:4px;">文字</span><button type="button" data-fs="s">小</button><button type="button" data-fs="m">中</button><button type="button" data-fs="l">大</button></span>
+        <button class="btn secondary small" id="btnHelpToggle" type="button" title="画面の説明文を表示／非表示">❔ 説明を表示</button>
         <button class="btn secondary small" id="btnFullscreen" title="全画面表示"><span id="fullscreenIcon">⛶</span><span class="hdr-lbl"> 全画面</span></button>
         <button class="btn secondary small" id="btnLogout" title="この端末からログアウトします" hidden>ログアウト</button>
       </div>
@@ -745,7 +748,7 @@
   <nav class="bnav" id="bottomNav">
     <button type="button" data-bnav="home"><span class="bi">🏠</span>ホーム</button>
     <button type="button" data-bnav="projects"><span class="bi">📁</span>案件</button>
-    <button type="button" data-bnav="estimates"><span class="bi">💴</span>見積</button>
+    <button type="button" data-bnav="estimates"><span class="bi">📋</span>見積</button>
     <button type="button" data-bnav="more"><span class="bi">☰</span>その他</button>
   </nav>
   <div class="bmore" id="bottomMore" hidden>
@@ -788,7 +791,7 @@
     </div>
     <div class="card" id="publicBookingCard">
       <h2 style="margin:0 0 4px;">新規のお客様のご予約</h2>
-      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。予約直後に確認メール、前日の朝9時にリマインドメールが自動で届きます。日時変更・キャンセルなどは「メールを送る」から送れます。</p>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">予約ページ（/yoyaku/）から入った「ショールーム見学＆おうち相談」のご予約です。今日以降の予約を日付順に表示します。Googleカレンダー「お客様予約」にも登録されています。予約直後に確認メール、前日の朝9時にリマインドメールが自動で届きます。日時変更・キャンセルなどは「メールを送る」から送れます。</p>
       <div id="publicBookingList" style="display:flex; flex-direction:column; gap:8px;"></div>
       <div class="empty" id="publicBookingEmpty" hidden>今後のご予約はありません。</div>
     </div>
@@ -849,7 +852,7 @@
       </div>
       <div class="card" id="finishedProjCard" hidden>
         <h2 style="margin:0 0 4px;">🏁 完工・保存</h2>
-        <p class="muted" style="margin:0 0 10px; font-size:.85rem;">工事が終わった案件です。記録・仕様・写真・タスク履歴などはそのまま見られます。案件を開いて「保存を解除する」で元の一覧に戻せます。</p>
+        <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">工事が終わった案件です。記録・仕様・写真・タスク履歴などはそのまま見られます。案件を開いて「保存を解除する」で元の一覧に戻せます。</p>
         <div class="projlist" id="finishedProjList"></div>
       </div>
     </div>
@@ -918,7 +921,7 @@
             <h3 style="margin:0;">この案件のタスク</h3>
             <button class="btn small" id="btnProjNewTask">＋ この案件のタスクを追加</button>
           </div>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">進行中のタスクです。進捗の変更や複製などは、ホームのタスク画面で行えます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">進行中のタスクです。進捗の変更や複製などは、ホームのタスク画面で行えます。</p>
           <div id="projTaskList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="projTaskEmpty" hidden>この案件のタスクはまだありません。</div>
         </div>
@@ -928,7 +931,7 @@
       <div class="subpanel" id="sub-taskhistory">
         <div class="card">
           <h3>タスク履歴（アーカイブ）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">「完了」にして3日たったタスクは、ホームのタスク画面から外れてここに移ります。内容の確認と「元に戻す」ができます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">「完了」にして3日たったタスクは、ホームのタスク画面から外れてここに移ります。内容の確認と「元に戻す」ができます。</p>
           <div id="taskHistoryList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="taskHistoryEmpty" hidden>アーカイブされたタスクはまだありません。</div>
         </div>
@@ -946,7 +949,7 @@
       <div class="subpanel" id="sub-customer">
         <div class="card">
           <h3>お客様情報</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">家族情報・身長・家電サイズ・持込み家具など、必要な項目を自由に追加できます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">家族情報・身長・家電サイズ・持込み家具など、必要な項目を自由に追加できます。</p>
           <div id="customerInfoList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="addform" style="margin-block-start:10px;">
             <label class="field">項目名<input type="text" id="ciLabel" placeholder="例：ご家族構成"></label>
@@ -960,7 +963,7 @@
       <div class="subpanel" id="sub-confirm">
         <div class="card">
           <h3>お客様への確認</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">お客様への確認事項を登録し、回答を記録できます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様への確認事項を登録し、回答を記録できます。</p>
           <div id="confirmList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="confirmEmpty" hidden>まだ確認事項がありません。</div>
           <div class="addform" style="flex-direction:column; align-items:stretch; margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -983,7 +986,7 @@
         </div>
         <div class="card">
           <h3>お客様の検討事項</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">検討中 → 仮決定 → 決定の順に進めます。これまでの経過は残ります。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">検討中 → 仮決定 → 決定の順に進めます。これまでの経過は残ります。</p>
           <div id="considerList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="considerEmpty" hidden>まだお客様の検討事項がありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -998,7 +1001,7 @@
       <div class="subpanel" id="sub-photos">
         <div class="card">
           <h3>家づくり参考写真</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">お客様が気に入った施工事例などの参考写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。クリックで拡大表示できます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様が気に入った施工事例などの参考写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。クリックで拡大表示できます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px;">
             <input type="text" id="refCatInput" placeholder="例：外観">
             <button class="btn secondary small" id="btnAddRefCat">＋ カテゴリー追加</button>
@@ -1007,7 +1010,7 @@
         </div>
         <div class="card">
           <h3>おうちアルバム</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">工事中〜完成後の記録写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">工事中〜完成後の記録写真です。カテゴリーを自由に追加して振り分けられます。まとめて登録でき、自動で軽量化されます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px;">
             <input type="text" id="albumCatInput" placeholder="例：着工">
             <button class="btn secondary small" id="btnAddAlbumCat">＋ カテゴリー追加</button>
@@ -1016,7 +1019,7 @@
         </div>
         <div class="card">
           <h3>お家のイメージ（お客様と共有）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所です。おうちノートの「イメージ」タブに表示されます。お客様が追加した写真には「お客様」と表示され、ここから削除もできます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">アルバムとは別に、お客様とスタッフが双方で写真を追加できる場所です。おうちノートの「イメージ」タブに表示されます。お客様が追加した写真には「お客様」と表示され、ここから削除もできます。</p>
           <div class="row" style="margin-block-end:10px; gap:6px; align-items:center;">
             <select id="imgBoardPlace"></select>
             <label class="btn secondary small" for="imgBoardFile" style="cursor:pointer;">＋ 写真を追加</label>
@@ -1026,7 +1029,7 @@
         </div>
         <div class="card" id="sitePhotoCard" hidden>
           <h3>現場写真（スタッフ限定）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">リフォームの現場で撮った写真を、スタッフだけで共有する場所です。お客様のおうちノートには表示されません。複数枚をまとめて追加でき、自動で軽量化されます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">リフォームの現場で撮った写真を、スタッフだけで共有する場所です。お客様のおうちノートには表示されません。複数枚をまとめて追加でき、自動で軽量化されます。</p>
           <div class="row" style="margin-block-end:8px; gap:6px; align-items:center; flex-wrap:wrap;">
             <select id="sitePhotoPlace"></select>
             <input type="date" id="sitePhotoDate" aria-label="撮影日">
@@ -1044,7 +1047,7 @@
       <div class="subpanel" id="sub-reservation">
         <div class="card">
           <h3>予約を追加</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">受付時間は9:00〜17:00・30分単位です。日曜日は定休日のため登録できません（祝日は各自ご確認ください）。登録するとGoogleカレンダーにも予定が追加されます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">受付時間は9:00〜17:00・30分単位です。日曜日は定休日のため登録できません（祝日は各自ご確認ください）。登録するとGoogleカレンダーにも予定が追加されます。</p>
           <div class="addform" style="flex-direction:column; align-items:stretch;">
             <div class="row">
               <label class="field">種別<select id="resType">
@@ -1076,7 +1079,7 @@
       <div class="subpanel" id="sub-message">
         <div class="card">
           <h3>メッセージ</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様がお知らせメールを登録している場合は、下のチェックで、メールでも知らせられます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様がお知らせメールを登録している場合は、下のチェックで、メールでも知らせられます。</p>
           <div class="notelist" id="messageList"></div>
           <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
           <div class="row" style="margin-block-start:10px;">
@@ -1091,7 +1094,7 @@
       <div class="subpanel" id="sub-okainote">
         <div class="card" style="border:2px solid var(--accent);">
           <h3 style="margin:0;">新しいおうちノート（試作版）</h3>
-          <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。下の「追加見積り」「ご家族・家電・持ち込み品」「家づくりリスト」「A's 3Dリンク」も、住まいるアプリに保存され、そのまま表示されます（旧おうちノートの内容は、最初に開いたときに1回だけ写してあります）。お客様は各項目を「仮決定」「決定」できます。</p>
+          <p class="muted help" style="margin:6px 0 10px; font-size:.85rem;">住まいるアプリのデータをそのまま表示する、新しいおうちノートです。平面図（見積タブの「図面」）、「おうちノートに反映」した写真・プランボード・打合せ記録、アルバム、予約、メッセージが自動で連動します。下の「追加見積り」「ご家族・家電・持ち込み品」「家づくりリスト」「A's 3Dリンク」も、住まいるアプリに保存され、そのまま表示されます（旧おうちノートの内容は、最初に開いたときに1回だけ写してあります）。お客様は各項目を「仮決定」「決定」できます。</p>
           <div id="newNoteLinkArea" style="font-size:.85rem; word-break:break-all;"></div>
           <div class="row" style="margin-block-start:10px; gap:6px; flex-wrap:wrap;">
             <button class="btn small" id="btnNewNoteIssue">リンクを発行する</button>
@@ -1102,7 +1105,7 @@
         </div>
         <div class="card">
           <h3>家づくりの進み具合（お客様のホームに表示）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">工程ごとに予定日を自由に入力できます（例：「10月10日ごろ」「10月中旬」）。「現在」を選ぶと、その前の工程は「済」になります。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">工程ごとに予定日を自由に入力できます（例：「10月10日ごろ」「10月中旬」）。「現在」を選ぶと、その前の工程は「済」になります。</p>
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiProgOn"> お客様の画面に表示する</label>
           <div id="okaiProgRows" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="row" style="gap:6px; margin-block-start:10px; flex-wrap:wrap;">
@@ -1112,21 +1115,21 @@
         </div>
         <div class="card">
           <h3>打合せの予定（お客様のホーム「次回のご予約」の下に表示）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">次回の打合せで決める内容などを自由に書けます。書き換えて保存すると、お客様の画面も書き換わります。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">次回の打合せで決める内容などを自由に書けます。書き換えて保存すると、お客様の画面も書き換わります。</p>
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiNextMeetOn"> お客様の画面に表示する</label>
           <textarea id="okaiNextMeetText" rows="4" style="width:100%;" placeholder="例：外壁・屋根の色を決めます。サンプルをご覧いただきます。"></textarea>
           <div class="row" style="gap:6px; margin-block-start:10px;"><button class="btn small" id="btnOkaiNextMeetSave">保存</button></div>
         </div>
         <div class="card">
           <h3>決めることの一覧（決まったらチェック）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">決まった項目にチェックを入れて保存すると、お客様の画面にも「決まった」と表示されます。項目は、お客様ごとに追加できます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">決まった項目にチェックを入れて保存すると、お客様の画面にも「決まった」と表示されます。項目は、お客様ごとに追加できます。</p>
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiChkOn"> お客様の画面に表示する</label>
           <div id="okaiChkList"></div>
           <div class="row" style="gap:6px; margin-block-start:10px;"><button class="btn small" id="btnOkaiChkSave">保存</button></div>
         </div>
         <div class="card">
           <h3>予約状況（お客様がおうちノートで確認・予約）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">Googleカレンダーに既存の予定がある場合は、ここから手動で追加するとお客様のおうちノートにも表示されます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">Googleカレンダーに既存の予定がある場合は、ここから手動で追加するとお客様のおうちノートにも表示されます。</p>
           <div id="okaiBookingList" style="display:flex; flex-direction:column; gap:6px;"></div>
           <div class="empty" id="okaiBookingEmpty" hidden>予約はまだありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
@@ -1140,7 +1143,7 @@
 
         <div class="card">
           <h3>追加見積り</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">追加見積りを登録して金額を入れると、お客様が新しいおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面の「状態」に反映され、通知メールも届きます。状態は、ここで手動でも変えられます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">追加見積りを登録して金額を入れると、お客様が新しいおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面の「状態」に反映され、通知メールも届きます。状態は、ここで手動でも変えられます。</p>
           <p style="margin:0 0 8px; font-size:.85rem; font-weight:700; padding:6px 10px; border-radius:8px; background:var(--surface-2);">💡 金額は、各カードの「金額を入力」欄から入れます。空欄のままだと、お客様には「金額確認中」と表示されます。</p>
           <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.85rem; font-weight:700;" hidden></p>
           <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -1160,14 +1163,14 @@
 
         <div class="card">
           <h3>家づくりリスト（お客様・スタッフ共有の検討項目）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここには直接追加できません。「打合せ記録」から「お客様への確認」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここには直接追加できません。「打合せ記録」から「お客様への確認」タブのお客様の検討事項に登録し、その項目の「→家づくりリストへ反映」を押すとここに表示されます。</p>
           <div id="okaiConsiderList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiConsiderEmpty" hidden>まだ項目がありません。</div>
         </div>
 
         <div class="card">
           <h3>A's 3D リンク</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">この案件専用のA's 3Dリンクです（お客様ごとに異なるもの）。お客様のおうちノートに表示されます。https:// で始まるURLを入力してください。※ポイントカードは全お客様共通のリンクのため、ここでは設定できません。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">この案件専用のA's 3Dリンクです（お客様ごとに異なるもの）。お客様のおうちノートに表示されます。https:// で始まるURLを入力してください。※ポイントカードは全お客様共通のリンクのため、ここでは設定できません。</p>
           <div class="row">
             <input type="text" id="okaiAce3dUrl" placeholder="https://..." style="flex:1;">
             <button class="btn secondary small" id="btnOkaiSaveAce3d">保存</button>
@@ -1181,7 +1184,7 @@
       <div class="subpanel" id="sub-quote">
         <div class="card">
           <h3>添付資料（平面図・見積書など）</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
           <div class="uploadrow">
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
@@ -1199,7 +1202,7 @@
 
         <div class="card" id="requestFormCard">
           <h3>見積依頼を追加</h3>
-          <p class="muted" style="margin:0 0 8px; font-size:.85rem;">複数の業者にまとめて依頼できます。</p>
+          <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">複数の業者にまとめて依頼できます。</p>
           <div class="row" style="justify-content:space-between; margin-block-end:6px;">
             <div class="vendorlist" id="reqVendorList"></div>
           </div>
@@ -1228,7 +1231,7 @@
 
         <div class="card" id="changeRequestForm" hidden>
           <h3>変更依頼を送る（<span id="changeRequestVendorLabel"></span>）</h3>
-          <p class="muted" style="margin:0 0 8px; font-size:.85rem;">打合せで決まった変更内容を入力してください。登録済みの添付資料も一緒に送られます。</p>
+          <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">打合せで決まった変更内容を入力してください。登録済みの添付資料も一緒に送られます。</p>
           <div class="addform" style="flex-direction:column; align-items:stretch;">
             <label class="field"><textarea id="changeRequestNote" rows="4" placeholder="例：キッチンの仕様変更に伴い、天板色をホワイトグレーに変更してください。"></textarea></label>
             <div class="row"><button class="btn" id="btnSendChangeRequest">Gmailで変更依頼を送信</button><button class="btn secondary" id="btnCancelChangeRequest">キャンセル</button></div>
@@ -1240,7 +1243,7 @@
       <div class="subpanel" id="sub-plan">
         <div class="card">
           <h3>この案件の図面</h3>
-          <p class="muted" style="margin:0 0 10px; font-size:.85rem;">見積タブで登録した図面の一覧です。タップするとそのままプランボードで開き、見たり書き込んだりできます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">見積タブで登録した図面の一覧です。タップするとそのままプランボードで開き、見たり書き込んだりできます。</p>
           <div class="pbsourcelist" id="drawingsList"></div>
           <div class="empty" id="drawingsEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
         </div>
@@ -1272,7 +1275,7 @@
           </div>
           <div class="card" id="decidedSummaryCard" hidden>
             <h3>✅ 決定事項のまとめ</h3>
-            <p class="muted" style="margin:0 0 8px; font-size:.85rem;">この案件で決まったことを、新しい順にまとめています。</p>
+            <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">この案件で決まったことを、新しい順にまとめています。</p>
             <div class="decsum" id="decidedSummaryList"></div>
           </div>
           <div class="card mnsheet" id="mnFormCard" role="dialog" aria-modal="true" aria-labelledby="mnSheetTitle">
@@ -1311,7 +1314,7 @@
           </div>
           <div class="card">
             <h3>これまでの記録</h3>
-            <p class="muted" style="margin:0 0 8px; font-size:.85rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認でき、該当する仕様タブに自動で切り替わります。</p>
+            <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">最新の記録が上に表示されます。部位で絞り込むと、その部位の記録だけを確認でき、該当する仕様タブに自動で切り替わります。</p>
             <div class="row" id="noteSpecFilterBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
             <div class="notelist" id="meetingNoteList"></div>
             <div class="empty" id="meetingNoteEmpty" hidden>まだ記録がありません。</div>
@@ -1322,7 +1325,7 @@
         <div class="meetingsubpane" id="meetingsubpane-exterior">
           <div class="card">
             <h3>外部仕様</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+            <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
             <div id="specExteriorWrap"></div>
           </div>
         </div>
@@ -1335,14 +1338,14 @@
         <div class="meetingsubpane" id="meetingsubpane-equipment">
           <div class="card">
             <h3 id="specEquipmentTitle">暖房・換気・電気設備</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
+            <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">カテゴリーごとに複数枚の写真を登録できます。＋で追加、×で削除できます。</p>
             <div id="specEquipmentWrap"></div>
           </div>
         </div>
         <div class="meetingsubpane" id="meetingsubpane-interiorColor">
           <div class="card">
             <h3>インテリア</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここは見る場所です。写真・PDFは「記録」から入れます（部位で「インテリア：メイン」か「インテリア：部屋別」を選びます）。内容のある項目だけを表示します。</p>
+            <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここは見る場所です。写真・PDFは「記録」から入れます（部位で「インテリア：メイン」か「インテリア：部屋別」を選びます）。内容のある項目だけを表示します。</p>
             <h4 style="margin:6px 0 8px;">メインインテリア（家全体の基本色）</h4>
             <div id="specInteriorWrap"></div>
             <h4 style="margin:22px 0 8px; padding-block-start:14px; border-block-start:1px solid var(--line, #ddd);">部屋別インテリア</h4>
@@ -1355,7 +1358,7 @@
         <div class="meetingsubpane" id="meetingsubpane-planboard">
           <div class="card">
             <h3>プランボード</h3>
-            <p class="muted" style="margin:0 0 10px; font-size:.85rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
+            <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">見積タブで登録した図面や、プランボードで保存した書き込み済み図面がここに並びます。選んでプランボードを開くと、書き込み・Gmail送信ができます。</p>
             <div class="pbsourcelist" id="planSourceList"></div>
             <div class="empty" id="planSourceEmpty" hidden>この案件にはまだ図面が登録されていません。見積タブから追加してください。</div>
             <div class="row" style="margin-block-start:10px;">
@@ -1376,7 +1379,7 @@
         <h2 style="margin:0;">全案件から「依頼済みのまま未受領」を一覧表示</h2>
         <button class="btn small secondary" id="btnCheckReplies">Gmail受信を確認</button>
       </div>
-      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">経過日数が長い順に並びます。</p>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">経過日数が長い順に並びます。</p>
       <div class="tablewrap">
         <table><thead><tr><th>お客様名</th><th>業者</th><th>方法</th><th>依頼日</th><th>経過日数</th><th>Gmail</th><th></th></tr></thead>
           <tbody id="pendingTableBody"></tbody>
@@ -1408,7 +1411,7 @@
 
     <div class="card">
       <h3>おうちノートの「お知らせ・豆知識」</h3>
-      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">ここで登録した内容は、すべてのお客様の新しいおうちノート（ホーム画面）に表示されます。</p>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここで登録した内容は、すべてのお客様の新しいおうちノート（ホーム画面）に表示されます。</p>
       <div class="addform">
         <label class="field">表示場所<select id="ntcKind">
           <option value="notice">お知らせ・豆知識</option>
@@ -1434,7 +1437,7 @@
 
     <div class="card">
       <h3>アプリの重さの診断</h3>
-      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">データの件数と、読み込み・画面の描き直しにかかる時間を測ります（何も変更・削除しません）。重いと感じるときに押して、結果をお知らせください。</p>
+      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">データの件数と、読み込み・画面の描き直しにかかる時間を測ります（何も変更・削除しません）。重いと感じるときに押して、結果をお知らせください。</p>
       <button class="btn secondary small" id="btnPerfCheck">診断する</button>
       <pre id="perfResult" style="white-space:pre-wrap; font-size:.85rem; margin:10px 0 0;"></pre>
     </div>
@@ -1445,23 +1448,23 @@
       <div class="tagbar" id="settingsStaffList" style="margin-block-start:10px;"></div>
       <div id="settingsLoginCard" hidden>
         <h4 style="margin:16px 0 4px;">ログインの合い言葉（朋子さんだけ）</h4>
-        <p class="muted" style="margin:0 0 8px; font-size:.85rem;">スタッフごとの合い言葉を、ここで決めてお伝えください（6文字以上）。合い言葉を決めた人だけが、ログイン画面の名前に出ます。変更・解除もここでできます。</p>
+        <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">スタッフごとの合い言葉を、ここで決めてお伝えください（6文字以上）。合い言葉を決めた人だけが、ログイン画面の名前に出ます。変更・解除もここでできます。</p>
         <div id="settingsLoginList"></div>
       </div>
       <h4 style="margin:16px 0 4px;">担当者への通知（ワークス／メール）</h4>
-      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">タスクの担当者・確認者になったとき、期限の前日と当日の朝（9時）、完了のときに、その人へお知らせします。「ワークスのユーザーID」を入れた人にはワークス（LINE WORKS）の個人宛メッセージだけ、入れていない人（またはワークスに送れなかったとき）にはメールで届きます。どちらも空の人には届きません（入力欄を出たときに保存されます）。</p>
+      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">タスクの担当者・確認者になったとき、期限の前日と当日の朝（9時）、完了のときに、その人へお知らせします。「ワークスのユーザーID」を入れた人にはワークス（LINE WORKS）の個人宛メッセージだけ、入れていない人（またはワークスに送れなかったとき）にはメールで届きます。どちらも空の人には届きません（入力欄を出たときに保存されます）。</p>
       <div id="settingsStaffMail"></div>
     </div>
 
     <div class="card">
       <h3>NETのロック用の暗証番号</h3>
-      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">「NET」の書類を見るときに求める番号です（「プランボード」「定価」はロックされません。お客様に出せるのは「プランボード」だけです）。業者向けメールには見積の種類は表示されません。</p>
+      <p class="muted help" style="font-size:.85rem; margin:0 0 8px;">「NET」の書類を見るときに求める番号です（「プランボード」「定価」はロックされません。お客様に出せるのは「プランボード」だけです）。業者向けメールには見積の種類は表示されません。</p>
       <div class="row"><input type="password" id="pinInput" placeholder="4桁など" style="width:140px;"><button class="btn secondary small" id="btnSavePin">保存</button></div>
     </div>
 
     <div class="card">
       <h3>Gmail連携（プランボードの下書き作成用）</h3>
-      <p class="muted" style="font-size:.85rem; margin:0 0 8px;">プランボード画面の「Gmail下書きを作成」を使うには、最初に一度だけ smilehousing8@gmail.com でこの連携を許可してください。一度許可すれば、以後は操作不要です。</p>
+      <p class="muted help" style="font-size:.85rem; margin:0 0 8px;">プランボード画面の「Gmail下書きを作成」を使うには、最初に一度だけ smilehousing8@gmail.com でこの連携を許可してください。一度許可すれば、以後は操作不要です。</p>
       <div class="row" style="align-items:center; gap:10px;">
         <span id="gmailConnStatus" class="muted">確認中…</span>
         <button class="btn secondary small" id="btnConnectGmail">Gmailと連携する</button>
@@ -1477,7 +1480,7 @@
         <h2 style="margin:0;">Gmail受信箱</h2>
         <button class="btn small secondary" id="btnRefreshGmail">更新</button>
       </div>
-      <p class="muted" style="margin:0 0 10px; font-size:.85rem;">メールをクリックするとGmailでそのメールが開きます。添付ファイルはGmail側から保存し、各案件の仕様タブ・見積タブから手動で取り込んでください。</p>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">メールをクリックするとGmailでそのメールが開きます。添付ファイルはGmail側から保存し、各案件の仕様タブ・見積タブから手動で取り込んでください。</p>
       <div class="row" style="margin-block-end:10px;">
         <input type="text" id="gmailSearchInput" placeholder="例：メーカー名や件名で絞り込み（空欄で受信箱全体）" style="flex:1;">
         <button class="btn secondary small" id="btnSearchGmail">検索</button>
@@ -1501,7 +1504,7 @@
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
     <div class="card">
       <h2 style="margin:0 0 10px;">ゴミ箱（削除した項目）</h2>
-      <p class="muted" style="font-size:.85rem; margin:0 0 10px;">削除してもすぐには消えず、ここから復元できます。「完全に削除」したものは元に戻せません。</p>
+      <p class="muted help" style="font-size:.85rem; margin:0 0 10px;">削除してもすぐには消えず、ここから復元できます。「完全に削除」したものは元に戻せません。</p>
       <div class="row" style="margin-block-end:10px;"><button class="btn small danger-ghost" id="btnEmptyTrash" hidden>🗑 ゴミ箱を空にする</button></div>
       <div id="trashList"></div>
       <div class="empty" id="trashEmpty" hidden>ゴミ箱は空です。</div>
@@ -1518,7 +1521,7 @@
     <div class="detailhead"><button class="backbtn" data-backhome="1">← ホームへ</button></div>
     <div class="card">
       <h2 style="margin:0 0 4px;">アプリアイコン</h2>
-      <p class="muted" style="font-size:.85rem; margin:0 0 10px;">住まいるハウジングの「家」と「笑顔（スマイル）」をモチーフにした、社内アプリ共通のアイコンです。</p>
+      <p class="muted help" style="font-size:.85rem; margin:0 0 10px;">住まいるハウジングの「家」と「笑顔（スマイル）」をモチーフにした、社内アプリ共通のアイコンです。</p>
       <div class="brandshow">
         <div class="bigicon" id="bigIconSlot"></div>
         <button class="btn secondary" id="btnDownloadIcon">アイコン画像を保存（PNG）</button>
@@ -3308,7 +3311,7 @@
         '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
         '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
-        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'💴 追加見積りへ')+'</button>':'')+
+        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
         (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
         (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
@@ -11258,6 +11261,16 @@
     document.getElementById("btnOpenNoteImport").addEventListener("click", openNoteImport);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
     document.getElementById("btnOpenMnSheet").addEventListener("click", openMnSheet);
+    (function(){
+      var hb = document.getElementById("btnHelpToggle");
+      function apply(on){ document.body.classList.toggle("showhelp", on); if(hb) hb.textContent = on ? "❔ 説明を隠す" : "❔ 説明を表示"; }
+      var on0 = false; try{ on0 = localStorage.getItem("sumairu_help")==="1"; }catch(e){}
+      apply(on0);
+      if(hb) hb.addEventListener("click", function(){
+        var on = !document.body.classList.contains("showhelp");
+        apply(on); try{ localStorage.setItem("sumairu_help", on?"1":"0"); }catch(e){}
+      });
+    })();
     // ✕ 閉じる：新しく書いている途中なら書きかけは残す（次に開くと続きから）。編集中なら編集をやめる。
     document.getElementById("btnCloseMnSheet").addEventListener("click", function(){
       if(editingMeetingNoteId) cancelEditMeetingNote(); else closeMnSheet();
