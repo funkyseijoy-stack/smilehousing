@@ -99,8 +99,14 @@
     .brand{ gap:8px; min-width:0; }
     .brand-mark{ width:32px; height:32px; border-radius:9px; }
     .brand-mark svg{ width:20px; height:20px; }
-    .brand-text h1{ font-size:1rem; white-space:nowrap; }
+    .brand{ flex:1 1 auto; }
+    .brand-mark{ flex-shrink:0; }
+    .brand-text{ min-width:0; }
+    .brand-text h1{ font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .brand-text p{ display:none; }
+    .userpicker{ flex-shrink:0; }
+    #btnSyncNow, .hdr-morebtn{ white-space:nowrap; flex-shrink:0; }
+    .loginchip{ max-width:7.5em; overflow:hidden; text-overflow:ellipsis; flex-shrink:1; min-width:0; display:inline-block; }
     .userpicker{ flex-wrap:nowrap; position:relative; }
     .hdr-morebtn{ display:inline-flex; }
     .hdr-more{ display:none; position:absolute; right:0; top:calc(100% + 6px); z-index:40; flex-direction:column; align-items:stretch; gap:10px; min-width:220px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow); }
@@ -109,6 +115,15 @@
     .hdr-more .btn{ width:100%; justify-content:center; }
     .userpick-legacy{ display:none; }
     .hdr-more .userpick-legacy:not([hidden]){ display:flex; }
+  }
+  @media (max-width:420px){ .sync-lbl{ display:none; } }
+  /* 添付資料：スマホはフォルダーの木の代わりにプルダウン */
+  .attmobsel{ display:none; }
+  @media (max-width:760px){
+    #attachmentList .attleft{ display:none; }
+    #attachmentList .attmobsel{ display:flex; align-items:center; gap:6px; margin-block-end:8px; border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:4px 4px 4px 10px; font-size:.85rem; color:var(--muted); }
+    #attachmentList .attmobsel select{ flex:1; min-width:0; border:0; background:transparent; font-size:.9rem; color:var(--ink); font-weight:700; padding:5px 2px; }
+    #attachmentList .attcrumb{ display:none; }
   }
 
   nav.tabs{ display:flex; gap:2px; margin-block:12px 14px; border-bottom:1px solid var(--border); overflow-x:auto; }
@@ -688,7 +703,7 @@
     </div>
     <div class="userpicker">
       <span class="loginchip" id="loginChip" hidden title="この名前で記録・タスク・変更履歴に残ります">👤 <span id="loginChipName"></span></span>
-      <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄 更新</button>
+      <button class="btn secondary small" id="btnSyncNow" title="他の端末で追加された内容を読み込み直します">🔄<span class="sync-lbl"> 更新</span></button>
       <button class="btn secondary small hdr-morebtn" id="btnHdrMore" type="button" aria-expanded="false" title="文字の大きさ・ログアウトなど">⋯</button>
       <div class="hdr-more" id="hdrMore">
         <span class="userpick-legacy" id="userPickLegacy"><span class="muted" style="font-size:.85rem;" title="記録や変更履歴に名前が残ります">いま使っている人</span>
@@ -4164,9 +4179,18 @@
       '<div style="margin-block-start:8px;"><button class="btn small secondary" data-attact="newfolder" data-pid="">＋フォルダー</button></div>';
     // 右：現在の場所・操作・サブフォルダー・ファイル
     var crumb = cur==="all" ? "🗂 すべて" : (cur==="none" ? "📄 未分類" : "📁 "+escapeHtml(attPathLabel(proj, cur)));
-    var acts = "";
+    var cntIn = function(fid){ return rows.filter(function(a){ return attFileFolderId(proj, a)===fid; }).length; };
+    var optWalk = function(pid, depth){
+      return attChildren(proj, pid).map(function(f){
+        return '<option value="'+f.id+'"'+(cur===f.id?" selected":"")+'>'+escapeHtml("　".repeat(depth)+f.name)+'（'+cntIn(f.id)+'）</option>'+optWalk(f.id, depth+1);
+      }).join("");
+    };
+    var mobSel = '<label class="attmobsel"><span>📁 フォルダー</span><select data-attmobsel>'+
+      '<option value="all"'+(cur==="all"?" selected":"")+'>すべて（'+rows.length+'）</option>'+
+      '<option value="none"'+(cur==="none"?" selected":"")+'>未分類（'+unfiled.length+'）</option>'+optWalk("", 0)+'</select></label>';
+    var acts = '<button class="btn small secondary pfmobonly" data-attact="newfolder" data-pid="">＋フォルダー</button> ';
     if(curFolder){
-      acts = (attDepth(proj, cur) < ATT_FOLDER_MAX_DEPTH ? '<button class="btn small secondary" data-attact="newfolder" data-pid="'+cur+'">＋サブフォルダー</button> ' : '')+
+      acts += (attDepth(proj, cur) < ATT_FOLDER_MAX_DEPTH ? '<button class="btn small secondary" data-attact="newfolder" data-pid="'+cur+'">＋サブフォルダー</button> ' : '')+
         ('<button class="btn small ghost" data-attact="renamefolder" data-pid="'+cur+'">名前変更</button> '+
         '<button class="btn small ghost" data-attact="movefolder" data-pid="'+cur+'">📁 移動</button> '+
         '<button class="btn small danger-ghost" data-attact="delfolder" data-pid="'+cur+'">フォルダー削除</button>');
@@ -4203,7 +4227,7 @@
     }).join("");
     if(filesHtml) filesHtml = '<div class="ftgrid">'+filesHtml+'</div>';
     if(!filesHtml) filesHtml = '<div class="muted" style="padding:10px 4px;">'+(rows.length ? "このフォルダーにファイルはありません。ファイルをここへドラッグするか、「📁 移動」で入れられます。" : "添付資料はまだ登録されていません。")+'</div>';
-    list.innerHTML = '<div class="attwrap"><div class="attleft">'+left+'</div><div class="attright"><div class="attcrumb">'+crumb+'</div>'+
+    list.innerHTML = '<div class="attwrap"><div class="attleft">'+left+'</div><div class="attright">'+mobSel+'<div class="attcrumb">'+crumb+'</div>'+
       (acts?'<div class="attacts">'+acts+'</div>':'')+tiles+selBar+'<div class="attfiles">'+filesHtml+'</div></div></div>';
   }
   // 移動先のフォルダーを選ぶ。cb(folderId)：""＝未分類（いちばん上）／キャンセルは null。
@@ -4338,6 +4362,8 @@
   function attInitDnD(){
     var list = document.getElementById("attachmentList");
     list.addEventListener("change", function(e){
+      var ms = e.target.closest("[data-attmobsel]");
+      if(ms){ state.attFolder = ms.value; if(ms.value!=="all" && ms.value!=="none") attFolderOpen[ms.value] = true; renderAttachments(); return; }
       var c = e.target.closest("[data-attsel]");
       if(!c) return;
       if(c.checked) attSelected[c.dataset.attsel] = true; else delete attSelected[c.dataset.attsel];
