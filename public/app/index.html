@@ -424,6 +424,21 @@
     .meetingsubtabs::-webkit-scrollbar{ display:none; }
     .meetingsubtabs > *{ flex-shrink:0; white-space:nowrap; }
   }
+  /* 打合せ内容の入力（行に印を付ける） */
+  .mnrow{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .mnfield{ display:flex; flex-direction:column; gap:4px; margin-block:4px 6px; }
+  .mnfield > span{ font-size:.85rem; color:var(--muted); }
+  .mnhint{ font-size:.85rem; color:var(--muted); }
+  .mnlines{ display:flex; flex-direction:column; gap:4px; margin-top:2px; }
+  .mnlines[hidden]{ display:none; }
+  .mnline{ display:flex; align-items:flex-start; gap:8px; width:100%; text-align:start; font-family:inherit; font-size:.92rem; color:var(--ink); background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:7px 10px; cursor:pointer; }
+  .mnline .mnmark{ flex-shrink:0; width:1.4em; text-align:center; color:var(--muted); }
+  .mnline .mntext{ flex:1; min-width:0; word-break:break-word; }
+  .mnline.m-d{ background:var(--accent-soft); border-color:var(--accent); }
+  .mnline.m-o{ background:var(--gold-soft); border-color:var(--gold); }
+  details.mnmore{ margin-block:6px; border:1px solid var(--border); border-radius:10px; padding:6px 10px; background:var(--surface-2); }
+  details.mnmore > summary{ cursor:pointer; font-size:.85rem; font-weight:700; color:var(--muted); padding:4px 0; }
+  details.mnmore[open] > summary{ margin-block-end:6px; }
   /* 案件のタブ「その他 ▾」 */
   .sub-extra{ display:none; }
   .subtabs.showextra .sub-extra, .sub-extra.active{ display:inline-block; }
@@ -1187,23 +1202,32 @@
           </div>
           <div class="card">
             <h3>打合せ内容を記録</h3>
-            <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
-            <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
-            <label class="field">連絡方法<select id="meetingNoteChannel"><option value="打合せ">打合せ</option><option value="LINE">LINE</option><option value="電話">電話</option><option value="メール">メール</option></select></label>
-            <label class="field">打合せ内容（LINEで来た変更点などもここに）<textarea id="meetingNoteTalk" rows="3" placeholder="打合せで話した内容・経過、LINEで来たご要望など"></textarea></label>
-            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 打合せ内容をお客様にも見せる（「反映する」とおうちノートに出ます）</label>
-            <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
-            <label class="field">決定事項<textarea id="meetingNoteDecided" rows="3" placeholder="決定したことを書きます"></textarea></label>
-            <label class="field">未決・お客様に確認すること<textarea id="meetingNoteOpen" rows="3" placeholder="まだ決まっていないこと・確認したいこと"></textarea></label>
-            <div id="meetingNoteExistingFiles" hidden></div>
-            <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
-            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteAsPlan"> 添付したPDF・写真を「図面」にも登録する（図面タブ・プランボードの元図面・お客様の平面図に入ります）</label>
-            <div class="row" style="align-items:center; gap:8px; margin-block-start:4px;">
+            <div class="mnrow">
+              <label class="field">打合せ日<input type="date" id="meetingNoteDate"></label>
+              <label class="field">連絡方法<select id="meetingNoteChannel"><option value="打合せ">打合せ</option><option value="LINE">LINE</option><option value="電話">電話</option><option value="メール">メール</option></select></label>
+            </div>
+            <div class="row" style="align-items:center; gap:8px; margin-block:2px 8px;">
               <span class="muted" style="font-size:.85rem;">部位：</span>
               <span id="meetingNoteSpecPartLabel" style="font-size:.85rem; font-weight:700;">（未設定）</span>
               <button type="button" class="btn secondary small" id="btnSetMeetingNoteSpecPart">部位を選択</button>
             </div>
-            <div id="meetingNoteBadgePicker"></div>
+            <label class="field">題名<input type="text" id="meetingNoteTitle" placeholder="題名（例：キッチン仕様）"></label>
+            <div class="field mnfield">
+              <span>打合せ内容（LINEで来た内容もここに。1行に1つずつ）</span>
+              <textarea id="mnBody" rows="5" placeholder="例）キッチンはリシェルSI、色はホワイトに決定&#10;食洗機の有無は次回までにご検討いただく&#10;吊戸棚の高さは現場で確認"></textarea>
+              <div class="mnhint">書いたら下の行を押して印を付けます：<b>✅ 決定したこと</b> → <b>💭 お客様に検討いただくこと</b> → 印なし</div>
+              <div id="mnLines" class="mnlines"></div>
+            </div>
+            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 印のない行（打合せの内容）もお客様に見せる（✅・💭の行は「反映する」とお客様に出ます）</label>
+            <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea>
+            <div id="meetingNoteExistingFiles" hidden></div>
+            <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
+            <details class="mnmore">
+              <summary>そのほか（お客様へのメッセージ・図面にも登録・タスクなど）</summary>
+              <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
+              <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteAsPlan"> 添付したPDF・写真を「図面」にも登録する（図面タブ・プランボードの元図面・お客様の平面図に入ります）</label>
+              <div id="meetingNoteBadgePicker"></div>
+            </details>
             <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.85rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは、上の「いまの添付」で削除・差し替え、下の欄で追加ができます）。</p>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
             <div class="row" style="margin-block-start:10px;"><button type="button" class="btn secondary small" id="btnOpenNoteImport">📥 まとめて取り込む（貼り付け）</button></div>
@@ -4405,7 +4429,7 @@
       var open = n.open!=null ? n.open : "";
       var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（'+(n.talkPublic?'お客様にも表示':'社内メモ・お客様には出ません')+'）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
       var msgHtml = n.message ? '<div class="nbox msg"><div class="nboxlabel">お客様へのメッセージ</div><div class="ntext">'+escapeHtml(n.message)+'</div></div>' : "";
-      var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">未決・お客様に確認すること</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
+      var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">💭 お客様に検討いただくこと</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
       var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
@@ -4590,7 +4614,7 @@
       '<div>登録日：'+escapeHtml(proj.createdAt||"—")+'</div>'+
       '<div>見積：依頼済み '+pending+' 件・受領済み '+done+' 件</div>'+
       '<div>添付資料：'+atts.length+' 件</div>'+
-      '<div>直近の打合せ記録：'+(lastNote?escapeHtml(lastNote.content.slice(0,40))+(lastNote.content.length>40?"…":""):"まだありません")+'</div>';
+      '<div>直近の打合せ記録：'+(lastNote?(function(c){ c = String(c||""); return escapeHtml(c.slice(0,40))+(c.length>40?"…":""); })(lastNote.content||lastNote.decided||lastNote.title||lastNote.talk):"まだありません")+'</div>';
   }
 
   function renderCustomerInfo(){
@@ -8957,7 +8981,46 @@
     var label = document.getElementById("meetingNoteSpecPartLabel");
     if(label) label.textContent = newMeetingNoteSpecPart ? newMeetingNoteSpecPart.label : "（未設定）";
   }
+  // ===== 打合せ内容の「行に印を付ける」入力（✅決定したこと／💭お客様に検討いただくこと） =====
+  // 書くのは #mnBody だけ。保存のときに 印なし→talk、✅→decided、💭→open に分けて、これまでと同じ形で保存する。
+  // 行の並びと印は noteLines（[{t,m}] m="d"|"o"|""）にも保存し、編集で開いたときに元どおりにする。
+  var mnMarks = {};
+  function mnLines(){ var el = document.getElementById("mnBody"); return String(el && el.value || "").split("\n").map(function(x){ return x.trim(); }).filter(Boolean); }
+  function mnRender(){
+    var box = document.getElementById("mnLines"); if(!box) return;
+    var lines = mnLines();
+    box.innerHTML = lines.map(function(t, i){
+      var m = mnMarks[t] || "";
+      return '<button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>';
+    }).join("");
+    box.hidden = !lines.length;
+    mnSync();
+  }
+  function mnSync(){
+    var lines = mnLines(), d = [], o = [], t = [];
+    lines.forEach(function(x){ var m = mnMarks[x]; if(m==="d") d.push(x); else if(m==="o") o.push(x); else t.push(x); });
+    document.getElementById("meetingNoteTalk").value = t.join("\n");
+    document.getElementById("meetingNoteDecided").value = d.join("\n");
+    document.getElementById("meetingNoteOpen").value = o.join("\n");
+  }
+  function mnNoteLines(){ return mnLines().map(function(x){ return {t:x, m:mnMarks[x]||""}; }); }
+  function mnLoad(talk, decided, open, noteLines){
+    mnMarks = {};
+    var lines = [];
+    if(Array.isArray(noteLines) && noteLines.length){
+      noteLines.forEach(function(l){ var t = String(l.t||"").trim(); if(!t) return; lines.push(t); if(l.m) mnMarks[t] = l.m; });
+    } else {
+      // 以前の記録：打合せ内容 → 決定事項（✅）→ 未決（💭）の順に1つにまとめる
+      var split = function(v){ return String(v||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean); };
+      split(talk).forEach(function(t){ lines.push(t); });
+      split(decided).forEach(function(t){ if(lines.indexOf(t)<0) lines.push(t); mnMarks[t] = "d"; });
+      split(open).forEach(function(t){ if(lines.indexOf(t)<0) lines.push(t); mnMarks[t] = "o"; });
+    }
+    var el = document.getElementById("mnBody"); if(el) el.value = lines.join("\n");
+    mnRender();
+  }
   async function addMeetingNote(){
+    mnSync();
     var titleInput = document.getElementById("meetingNoteTitle");
     var decidedInput = document.getElementById("meetingNoteDecided");
     var openInput = document.getElementById("meetingNoteOpen");
@@ -9013,6 +9076,7 @@
       existing.open = open;
       existing.talk = talk;
       existing.talkPublic = talkPublic;
+      existing.noteLines = mnNoteLines();
       existing.channel = channel;
       existing.message = message;
       existing.content = meetingNoteDerivedContent(decided, open);
@@ -9045,7 +9109,7 @@
       return;
     }
 
-    var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, channel:channel, message:message,
+    var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, noteLines:mnNoteLines(), channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
@@ -9286,6 +9350,8 @@
     document.getElementById("meetingNoteMessage").value = n.message || "";
     document.getElementById("meetingNoteChannel").value = n.channel || "打合せ";
     document.getElementById("meetingNoteTalkShow").checked = !!n.talkPublic; // これまでの記録は社内メモ扱いのまま（チェックを入れた記録だけお客様に出る）
+    mnLoad(n.talk, (n.decided!=null ? n.decided : (n.content||"")), n.open, n.noteLines);
+    var mm = document.querySelector("details.mnmore"); if(mm && (n.message || (n.badges && Object.keys(n.badges).some(function(k){ return n.badges[k]; })))) mm.open = true;
     if(dateInput) dateInput.value = n.date || todayStr();
     if(fileInput) fileInput.value = "";
     newMeetingNoteSpecPart = n.specPart || null;
@@ -9318,6 +9384,7 @@
     document.getElementById("meetingNoteMessage").value = "";
     document.getElementById("meetingNoteChannel").value = "打合せ";
     document.getElementById("meetingNoteTalkShow").checked = true;
+    mnLoad("", "", "", null);
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
     var asPlanBox = document.getElementById("meetingNoteAsPlan"); if(asPlanBox) asPlanBox.checked = false;
@@ -10686,6 +10753,17 @@
       toast(state.currentUser ? "いま使っている人を「"+state.currentUser+"」にしました" : "名前が選ばれていません（記録に名前が残りません）");
     });
     document.getElementById("btnSyncNow").addEventListener("click", function(){ syncFromServer({}); });
+    // 打合せ内容：書くたびに行の一覧を作り直し、行を押すと 印なし→✅→💭→印なし
+    document.getElementById("mnBody").addEventListener("input", mnRender);
+    document.getElementById("mnLines").addEventListener("click", function(e){
+      var b = e.target.closest("[data-mnline]"); if(!b) return;
+      var t = mnLines()[parseInt(b.dataset.mnline,10)]; if(!t) return;
+      var cur = mnMarks[t] || "";
+      var next = cur==="" ? "d" : cur==="d" ? "o" : "";
+      if(next) mnMarks[t] = next; else delete mnMarks[t];
+      mnRender();
+    });
+    mnRender();
     // 記録の部位カードの「見積依頼 n件 ›」「タスク n件 ›」：その案件のタブへ移る
     document.addEventListener("click", function(e){
       var g = e.target.closest("[data-gosub]"); if(!g) return;
