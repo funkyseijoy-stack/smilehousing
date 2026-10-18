@@ -609,6 +609,18 @@
   [data-reveal].on{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   /* 説明の文章：ふだんは隠し、「⋯」の「説明を表示」で出す */
   body:not(.showhelp) .help{ display:none !important; }
+  /* 受領登録（Gmailの添付を選んで取り込む） */
+  .rcvov{ position:fixed; inset:0; background:rgba(20,16,12,.55); z-index:95; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .rcvbox{ background:var(--surface); border-radius:16px; padding:18px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; box-shadow:var(--shadow); }
+  .rcvlist{ display:flex; flex-direction:column; gap:6px; }
+  .rcvrow{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:10px; padding:8px 10px; cursor:pointer; background:var(--surface-2); }
+  .rcvrow input{ width:20px; height:20px; flex:none; }
+  .rcvrow.done{ opacity:.6; }
+  .rcvic{ font-size:1.4rem; flex:none; }
+  .rcvtx{ display:flex; flex-direction:column; min-width:0; }
+  .rcvtx b{ font-size:.9rem; overflow-wrap:anywhere; }
+  .rcvtx small{ font-size:.85rem; color:var(--muted); }
+  .rcvbtns{ display:flex; flex-direction:column; gap:8px; margin-block-start:14px; }
   .notefilerow{ display:flex; gap:8px; overflow-x:auto; padding-block:2px; }
   /* ファイルのサムネイル（タイル）表示：見積の添付資料・図面タブ */
   .ftgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px; }
@@ -626,6 +638,13 @@
   .ftacts{ display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; align-items:center; }
   .ftacts .btn{ padding:3px 8px; }
   .ftacts a.btn{ text-decoration:none; color:var(--ink); display:inline-flex; align-items:center; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); padding:3px 10px; }
+  .ftopsbtn{ position:absolute; top:6px; right:6px; z-index:2; width:34px; height:30px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.92); font-size:1.1rem; font-weight:700; line-height:1; cursor:pointer; color:var(--ink); padding:0; }
+  .ftopsbtn.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .fttile .ftops{ display:none; }
+  .fttile.opsopen .ftops{ display:flex; flex-direction:column; gap:5px; border-top:1px dashed var(--border); padding-top:6px; margin-top:2px; }
+  .ftops > .btn, .ftops > .pill{ align-self:flex-start; }
+  .ftmark{ font-size:.85rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .ftmark.ok{ color:var(--accent-ink); font-weight:700; }
   .fttile.locked .ftthumb{ font-size:2.2rem; border-radius:0; justify-content:center; padding:0; }
   .fttile.locked .ftname{ padding:6px 8px; -webkit-line-clamp:unset; display:block; }
   @media (max-width:760px){ .ftgrid{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; } }
@@ -4337,17 +4356,23 @@
       // 暗証番号が必要な見積書は、解除するまでファイル名・種類・大きさを一切出さない（誰の見積書か漏れないように）
       var chkT = '<label class="ftchk">'+chk+'</label>';
       var del = '<button class="btn small danger-ghost" data-act="delattachment" data-id="'+a.id+'" title="削除">×</button>';
+      // ふだんは絵・名前・小さな印だけ。部位・反映・移動・削除は右上の「⋯」で開く
+      var opsOpen = !!attOpsOpen[a.id];
+      var opsBtn = '<button type="button" class="ftopsbtn'+(opsOpen?' on':'')+'" data-attops="'+a.id+'" title="操作（部位・反映・移動・削除）">⋯</button>';
       if(locked){
-        return '<div class="fttile locked" draggable="true" data-attfile="'+a.id+'">'+chkT+'<div class="ftthumb lockbox">🔒</div>'+
+        return '<div class="fttile locked'+(opsOpen?' opsopen':'')+'" draggable="true" data-attfile="'+a.id+'">'+chkT+opsBtn+'<div class="ftthumb lockbox">🔒</div>'+
           '<div class="ftbody"><div class="ftname lockbox">ロック中（タップで解除）</div>'+(where?'<div class="ftmeta">'+where+'</div>':'')+
-          '<div class="ftacts">'+mv+del+'</div></div></div>';
+          '<div class="ftops"><div class="ftacts">'+mv+del+'</div></div></div></div>';
       }
       var kindLabel = a.kind === "quote" ? quotePill(a.quoteType) : (a.kind === "plan" ? '<span class="pill tag">図面</span>' : "");
-      return '<div class="fttile" draggable="true" data-attfile="'+a.id+'">'+chkT+
+      var marks = kindLabel+
+        (a.reflected && quoteSharable(a) ? '<span class="ftmark ok">✓反映</span>' : '')+
+        (a.specPart && a.specPart.scope ? '<span class="ftmark">'+escapeHtml(partText(a.specPart))+'</span>' : '');
+      return '<div class="fttile'+(opsOpen?' opsopen':'')+'" draggable="true" data-attfile="'+a.id+'">'+chkT+opsBtn+
         '<div class="ftthumb" data-openatt="'+a.id+'" title="タップして開く">'+fileThumbInner(a.url, a.contentType, a.name)+'</div>'+
         '<div class="ftbody"><div class="ftname" data-openatt="'+a.id+'" title="'+escapeHtml(a.name)+'">'+escapeHtml(a.name)+'</div>'+
-        '<div class="ftmeta">'+kindLabel+'<span class="tabular">'+fmtSize(a.sizeBytes)+'</span>'+where+'</div>'+
-        quoteShareHtml(a)+'<div class="ftacts">'+mv+del+'</div></div></div>';
+        (marks||where ? '<div class="ftmeta">'+marks+where+'</div>' : '')+
+        '<div class="ftops">'+quoteShareHtml(a)+'<div class="ftacts">'+mv+del+'</div></div></div></div>';
     }).join("");
     if(filesHtml) filesHtml = '<div class="ftgrid">'+filesHtml+'</div>';
     if(!filesHtml) filesHtml = '<div class="muted" style="padding:10px 4px;">'+(rows.length ? "このフォルダーにファイルはありません。ファイルをここへドラッグするか、「📁 移動」で入れられます。" : "添付資料はまだ登録されていません。")+'</div>';
@@ -4526,11 +4551,12 @@
   // 「プランボード」の書類だけ、部位を指定してお客様のおうちノートに出せる（定価・NETは出せない）
   // お客様に出せる書類：プランボード・定価（NETは絶対に出さない）
   function quoteSharable(a){ var n = a && a.kind==="quote" ? quoteTypeNorm(a.quoteType) : ""; return n==="プランボード" || n==="定価"; }
+  var attOpsOpen = {};
   function quoteShareHtml(a){
     if(!a) return "";
     if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return "";
     var hasPart = !!(a.specPart && a.specPart.scope);
-    var partBtn = '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="この書類の部位を選ぶ（記録の同じ部位にも並びます）">📍 '+(hasPart ? escapeHtml(a.specPart.label||"部位") : "部位")+'</button>';
+    var partBtn = '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="この書類の部位を選ぶ（記録の同じ部位にも並びます）">'+(hasPart ? escapeHtml(partText(a.specPart)||a.specPart.label||"📍 部位") : "📍 部位")+'</button>';
     if(!quoteSharable(a)) return partBtn;
     return partBtn + '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="この書類をお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
   }
@@ -8972,9 +8998,122 @@
     logActivity("見積を受領登録しました");
     toast("受領済みに更新しました");
   }
-  function markReceived(id){
+  // 受領登録：業者さんからの返信メールに添付（見積書など）があれば、一覧から選んでそのまま書類に取り込む
+  async function findGmailAttachmentsFor(r){
+    var hdr = { "X-Staff-Token": getStaffToken()||"" };
+    var vendor = vendorById(r.vendorId);
+    var email = vendor && vendor.email ? vendor.email.toLowerCase() : "";
+    var tids = [r.replyThreadId, r.gmailThreadId].filter(function(x, i, a){ return x && a.indexOf(x)===i; });
+    if(!tids.length && email){
+      var d = new Date((r.requestedAt||"")+"T00:00:00+09:00");
+      if(isNaN(d.getTime())) d = new Date(Date.now()-30*86400000);
+      d = new Date(d.getTime()-86400000);
+      var q = "from:"+vendor.email+" after:"+d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()+" has:attachment";
+      var sr = await fetch("/api/gmail-search-threads?maxResults=3&q="+encodeURIComponent(q), { headers:hdr });
+      if(sr.status===409) return { error:"not_connected" };
+      if(!sr.ok) return { error:"search_failed" };
+      var sd = await sr.json();
+      tids = (sd.threads||[]).map(function(t){ return t.id; }).filter(Boolean).slice(0,3);
+    }
+    if(!tids.length) return { items:[] };
+    var res = await fetch("/api/gmail-attachments?threadId="+encodeURIComponent(tids.join(",")), { headers:hdr });
+    if(res.status===409) return { error:"not_connected" };
+    if(!res.ok) return { error:"list_failed" };
+    var data = await res.json();
+    var items = (data.items||[]);
+    if(email) items = items.filter(function(it){ return String(it.sender||"").toLowerCase().indexOf(email)!==-1; });
+    // すでにこの依頼に取り込んだ添付は除く
+    var done = {}; liveAttachments().forEach(function(a){ if(a.gmailRef) done[a.gmailRef]=1; });
+    items.forEach(function(it){ it.ref = it.messageId+"|"+it.partId; it.already = !!done[it.ref]; });
+    return { items: items };
+  }
+  async function importGmailAttachment(r, it, quoteType){
+    var res = await fetch("/api/gmail-attachments", { method:"POST",
+      headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
+      body: JSON.stringify({ slug: r.projectId || "_global", messageId: it.messageId, partId: it.partId }) });
+    if(!res.ok) throw new Error("http_"+res.status);
+    var j = await res.json();
+    var slug = r.projectId || "_global";
+    var att = { id:uid("att"), projectId:r.projectId, assetId: slug+"/"+j.key, name: it.filename || j.filename || "添付",
+      url: '/api/get-photo?slug='+encodeURIComponent(slug)+'&key='+encodeURIComponent(j.key),
+      contentType: j.contentType || it.mimeType, sizeBytes: j.sizeBytes || it.size, uploadedAt: todayStr(),
+      kind:"quote", quoteType: quoteType||"定価", requestId: r.id, vendorId: r.vendorId, gmailRef: it.ref };
+    var proj = projectById(r.projectId);
+    if(proj && typeof attApplyFolderPart==="function"){ try{ attApplyFolderPart(att, proj); }catch(e){} }
+    state.attachments.push(att);
+    var ok = await saveDoc("attachments", att.id, att);
+    if(ok===false) throw new Error("save_failed");
+    logActivity("Gmailの添付「"+att.name+"」を見積書として取り込みました");
+    return att;
+  }
+  function rcvDate(d){
+    var t = new Date(d); if(isNaN(t.getTime())) return String(d||"");
+    return (t.getMonth()+1)+"/"+t.getDate()+" "+t.getHours()+":"+String(t.getMinutes()).padStart(2,"0")+" 受信";
+  }
+  function openReceiveSheet(r, items){
+    var staff = state.settings.staffList || [];
+    var me = state.currentUser || "";
+    var overlay = document.createElement("div");
+    overlay.className = "rcvov";
+    var vendor = vendorById(r.vendorId);
+    var proj = projectById(r.projectId);
+    var rowsHtml = items.map(function(it, i){
+      var isImg = /^image\//.test(it.mimeType||"");
+      return '<label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-rcv="'+i+'"'+(it.already?' disabled':(isImg?'':' checked'))+'>'+
+        '<span class="rcvic">'+(/pdf/i.test(it.mimeType||"")||/\.pdf$/i.test(it.filename||"")?"📄":(isImg?"🖼":"📎"))+'</span>'+
+        '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>';
+    }).join("");
+    overlay.innerHTML = '<div class="rcvbox" role="dialog" aria-modal="true">'+
+      '<h3 style="margin:0 0 4px;">受領登録</h3>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-end:10px;">'+escapeHtml((proj?proj.name:"")+"　"+(vendor?vendor.name:""))+'</div>'+
+      (items.length ? '<div style="font-weight:700; font-size:.9rem; margin-block-end:6px;">📧 Gmailに届いた添付（付けるものにチェック）</div><div class="rcvlist">'+rowsHtml+'</div>'+
+        '<label class="field" style="margin-block-start:10px;">書類の種類<select id="rcvType">'+QUOTE_TYPES.map(function(q){ return '<option'+(q==="定価"?" selected":"")+'>'+q+'</option>'; }).join("")+'</select></label>'
+        : '<div class="muted" style="font-size:.9rem;">Gmailに添付付きの返信は見つかりませんでした。</div>')+
+      '<label class="field" style="margin-block-start:10px;">受領者<select id="rcvBy">'+
+        staff.map(function(n){ return '<option'+(n===me?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+'<option value="">（未設定）</option></select></label>'+
+      '<div class="rcvbtns">'+
+        '<button class="btn" data-rcvgo="1">'+(items.length?"チェックした添付を付けて受領登録":"受領登録する")+'</button>'+
+        '<button class="btn secondary" data-rcvgo="cancel">やめる</button>'+
+      '</div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", async function(e){
+      if(e.target===overlay){ overlay.remove(); return; }
+      var b = e.target.closest("[data-rcvgo]"); if(!b) return;
+      if(b.dataset.rcvgo==="cancel"){ overlay.remove(); return; }
+      var by = overlay.querySelector("#rcvBy").value;
+      var chosen = Array.prototype.slice.call(overlay.querySelectorAll("[data-rcv]:checked")).map(function(x){ return items[+x.dataset.rcv]; });
+      var qt = overlay.querySelector("#rcvType") ? overlay.querySelector("#rcvType").value : "定価";
+      if(chosen.length){
+        overlay.querySelectorAll("button").forEach(function(x){ x.disabled = true; });
+        b.textContent = "取り込み中…（0/"+chosen.length+"）";
+        var okN = 0, failN = 0;
+        for(var i=0;i<chosen.length;i++){
+          try{ await importGmailAttachment(r, chosen[i], qt); okN++; }catch(err){ failN++; }
+          b.textContent = "取り込み中…（"+(i+1)+"/"+chosen.length+"）";
+        }
+        render();
+        if(failN && !okN){ toast("添付を取り込めませんでした。受領登録はしていません。もう一度お試しください", 9000); overlay.remove(); return; }
+        if(failN) toast("添付"+okN+"件を付けました（"+failN+"件は取り込めませんでした）", 9000);
+        else toast("添付"+okN+"件を見積書として付けました");
+      }
+      overlay.remove();
+      markReceivedFinish(r, by);
+    });
+  }
+  async function markReceived(id, skipGmail){
     var r = state.requests.find(function(x){ return x.id===id; });
     if(!r) return;
+    var vendor = vendorById(r.vendorId);
+    var tryGmail = !skipGmail && !!(r.replyThreadId || r.gmailThreadId || (r.method==="gmail" && vendor && vendor.email));
+    if(tryGmail){
+      toast("Gmailの添付を探しています…");
+      var found = null;
+      try{ found = await findGmailAttachmentsFor(r); }catch(e){ found = { error:"network" }; }
+      if(found && found.error==="not_connected") toast("Gmailが連携されていないため、添付は探せませんでした");
+      else if(found && found.error) toast("Gmailの添付を確認できませんでした（受領登録はできます）");
+      openReceiveSheet(r, (found && found.items) || []);
+      return;
+    }
     var staff = state.settings.staffList || [];
     if(staff.length===0){ markReceivedFinish(r, ""); return; }
     var choices = staff.map(function(s){ return {label:s, value:s}; }).concat([{label:"（未設定のまま進める）", value:""}]);
@@ -11215,7 +11354,7 @@
       askChoice("書類の種類", "NETだけ暗証番号でロックされます。お客様に出せるのはプランボードだけです（定価・NETは出ません）。", [{label:"プランボード", value:"プランボード"},{label:"定価", value:"定価"},{label:"NET", value:"NET"}], function(qt){
         if(qt===null) return;
         uploadAttachments(files, "quote", qt, rid).then(function(n){
-          if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid); }
+          if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid, true); }
         });
       });
     });
@@ -11301,6 +11440,13 @@
       }
     });
     document.addEventListener("click", function(e){
+      var ob = e.target.closest("[data-attops]");
+      if(ob){
+        var oid = ob.dataset.attops; attOpsOpen[oid] = !attOpsOpen[oid];
+        var tile = ob.closest(".fttile"); if(tile) tile.classList.toggle("opsopen", attOpsOpen[oid]);
+        ob.classList.toggle("on", attOpsOpen[oid]);
+        return;
+      }
       var sm = e.target.closest("summary[data-specops]");
       if(!sm) return;
       var id = sm.dataset.specops; var d = sm.parentElement;
