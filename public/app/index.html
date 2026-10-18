@@ -423,6 +423,7 @@
   /* ===== スマホの下のタブ・案件画面の整理 ===== */
   .bnav{ display:none; }
   .bmore[hidden]{ display:none; }
+  .hracts{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; flex-basis:100%; justify-content:flex-end; }
   .estswitch{ display:inline-flex; gap:4px; background:var(--surface-2); border-radius:999px; padding:4px; margin-block-end:12px; }
   .estswitch button{ border:0; background:none; font-family:inherit; font-size:.85rem; font-weight:700; color:var(--muted); padding:6px 14px; border-radius:999px; cursor:pointer; }
   .estswitch button.on{ background:var(--surface); color:var(--accent-ink); box-shadow:var(--shadow); }
@@ -769,7 +770,6 @@
     <button class="tab-btn active" data-tab="home">ホーム</button>
     <button class="tab-btn" data-tab="projects">案件管理</button>
     <button class="tab-btn" data-tab="estimates">見積</button>
-    <button class="tab-btn" data-tab="pending">未受領一覧</button>
     <button class="tab-btn" data-tab="settings">業者・設定</button>
     <button class="tab-btn" data-tab="gmail">Gmail</button>
     <button class="tab-btn" data-tab="trash">ゴミ箱・履歴</button>
@@ -834,11 +834,13 @@
 
   <!-- ========== 見積（全案件の見積り依頼） ========== -->
   <section class="panel" id="panel-estimates">
-    <div class="estswitch"><button type="button" class="on" data-esttab="estimates">見積り依頼</button><button type="button" data-esttab="pending">未受領一覧</button></div>
     <div class="card" id="homeReqCard">
       <div class="row" style="justify-content:space-between; margin-block-end:8px; flex-wrap:wrap; gap:8px;">
-        <h2 style="margin:0;">見積り依頼（全案件）</h2>
-        <select id="homeReqProject" style="min-width:160px;"></select>
+        <h2 style="margin:0;">見積（全案件）</h2>
+        <div class="row" style="gap:6px; flex-wrap:wrap;">
+          <select id="homeReqProject" style="min-width:160px;"></select>
+          <button class="btn small secondary" id="btnCheckReplies2">📧 Gmail受信を確認</button>
+        </div>
       </div>
       <div class="row" id="homeReqStatusBar" style="gap:6px; margin-block-end:8px; flex-wrap:wrap;"></div>
       <div id="homeReqList" style="display:flex; flex-direction:column; gap:6px;"></div>
@@ -1410,7 +1412,6 @@
 
   <!-- ========== PENDING (all projects) ========== -->
   <section class="panel" id="panel-pending">
-    <div class="estswitch"><button type="button" data-esttab="estimates">見積り依頼</button><button type="button" class="on" data-esttab="pending">未受領一覧</button></div>
     <div class="card">
       <div class="row" style="justify-content:space-between; margin-block-end:4px;">
         <h2 style="margin:0;">全案件から「依頼済みのまま未受領」を一覧表示</h2>
@@ -3991,6 +3992,7 @@
     document.getElementById("projectListView").hidden = false;
   }
   function switchTab(tabName){
+    if(tabName==="pending"){ tabName = "estimates"; homeReqStatus = "wait"; } // 未受領一覧は「見積」の「受け取り待ち」にまとめた
     document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===tabName); });
     var bn = ({home:"home", projects:"projects", estimates:"estimates", pending:"estimates"})[tabName] || "more";
     if(tabName==="brand") document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab==="settings"); });
@@ -4118,16 +4120,21 @@
   }
 
   // ---- ホームの「見積り依頼（全案件）」 ----
-  var homeReqStatus = "all", homeReqProject = "";
+  var homeReqStatus = "wait", homeReqProject = "";
+  function hrMatch(r, k){
+    var st = reqDisplayStatus(r);
+    if(k==="all") return true;
+    if(k==="wait") return st==="依頼済み" || st==="返信あり";
+    return st===k;
+  }
   function reqDisplayStatus(r){ return (r.status==="依頼済み" && r.replyDetected) ? "返信あり" : (r.status||"未依頼"); }
   function renderHomeRequests(){
     var bar = document.getElementById("homeReqStatusBar"), sel = document.getElementById("homeReqProject");
     var list = document.getElementById("homeReqList"), empty = document.getElementById("homeReqEmpty");
     if(!bar || !sel || !list) return;
     var all = liveRequests().filter(function(r){ return projectById(r.projectId); });
-    var cnt = {all: all.length};
-    all.forEach(function(r){ var k = reqDisplayStatus(r); cnt[k] = (cnt[k]||0)+1; });
-    var opts = [["all","すべて"],["未依頼","未依頼"],["依頼済み","依頼済み"],["返信あり","返信あり"],["受領済み","受領済み"]];
+    var opts = [["wait","📥 受け取り待ち"],["未依頼","まだ依頼していない"],["受領済み","受領済み"],["all","すべて"]];
+    var cnt = {}; opts.forEach(function(o){ cnt[o[0]] = all.filter(function(r){ return hrMatch(r, o[0]); }).length; });
     bar.innerHTML = opts.map(function(o){
       return '<button class="btn small '+(homeReqStatus===o[0]?'':'secondary')+'" data-hrstatus="'+o[0]+'">'+o[1]+' '+(cnt[o[0]]||0)+'</button>';
     }).join("");
@@ -4137,12 +4144,13 @@
     sel.innerHTML = '<option value="">すべての案件</option>'+plist.map(function(pr){ return '<option value="'+pr.id+'"'+(homeReqProject===pr.id?' selected':'')+'>'+escapeHtml(pr.name)+'</option>'; }).join("");
     var order = {"返信あり":0,"依頼済み":1,"未依頼":2,"受領済み":3};
     var rows = all.filter(function(r){
-      return (homeReqStatus==="all" || reqDisplayStatus(r)===homeReqStatus) && (!homeReqProject || r.projectId===homeReqProject);
+      return hrMatch(r, homeReqStatus) && (!homeReqProject || r.projectId===homeReqProject);
     }).sort(function(a,b){
       var d = (order[reqDisplayStatus(a)]||0) - (order[reqDisplayStatus(b)]||0);
-      return d || String(b.requestedAt||"").localeCompare(String(a.requestedAt||""));
+      return d || String(a.requestedAt||"9").localeCompare(String(b.requestedAt||"9")); // 古い依頼（待っている日数が長い）を上に
     });
     empty.hidden = rows.length !== 0;
+    empty.textContent = homeReqStatus==="wait" ? "受け取り待ちの見積はありません。" : "該当する見積り依頼はありません。";
     // 案件ごとにまとめる（案件名は見出しに1回だけ）。案件の並びは、いちばん急ぐ依頼の順
     var groups = [], gmap = {};
     rows.forEach(function(r){ if(!gmap[r.projectId]){ gmap[r.projectId] = []; groups.push(r.projectId); } gmap[r.projectId].push(r); });
@@ -4159,12 +4167,20 @@
       var el = (r.status==="依頼済み" && r.requestedAt) ? daysSince(r.requestedAt) : null;
       var late = el!==null && el>=5;
       var content = (r.content||"").replace(/\s+/g," ").slice(0,40);
-      return '<div class="projrow hrrow" data-hropen="'+r.projectId+'" style="cursor:pointer; flex-wrap:wrap; gap:6px;">'+
+      var acts = "";
+      if(st==="依頼済み" || st==="返信あり"){
+        acts = (st==="返信あり" ? '<button class="pill status-受領済み" data-act="replyinfo" data-id="'+r.id+'" style="border:0;cursor:pointer;">返信あり ▸</button>' : '')+
+          '<button class="btn small'+(st==="返信あり"?'':' secondary')+'" data-act="receive" data-id="'+r.id+'">受領登録</button>';
+      } else if(st==="未依頼"){
+        acts = '<button class="btn small secondary" data-hropen="'+r.projectId+'">案件で依頼する ›</button>';
+      }
+      return '<div class="projrow hrrow" style="flex-wrap:wrap; gap:6px;">'+
         '<div class="pname">'+escapeHtml(v.name)+'</div>'+
-        '<span class="pill status-'+(st==="返信あり"?"受領済み":st)+'">'+st+'</span>'+
+        (st==="返信あり" ? '' : '<span class="pill status-'+st+'">'+st+'</span>')+
         (r.requestedAt ? '<span class="muted tabular" style="font-size:.85rem;">依頼 '+fmtDate(r.requestedAt)+'</span>' : '')+
         (el!==null ? '<span class="tabular" style="font-size:.85rem;'+(late?'color:var(--danger);font-weight:700;':'')+'">'+el+'日経過</span>' : '')+
         (content ? '<span class="muted" style="font-size:.85rem; flex-basis:100%;">'+escapeHtml(content)+'</span>' : '')+
+        (acts ? '<div class="hracts">'+acts+'</div>' : '')+
       '</div>';
     }
   }
@@ -9050,7 +9066,7 @@
     var t = new Date(d); if(isNaN(t.getTime())) return String(d||"");
     return (t.getMonth()+1)+"/"+t.getDate()+" "+t.getHours()+":"+String(t.getMinutes()).padStart(2,"0")+" 受信";
   }
-  function openReceiveSheet(r, items){
+  function openReceiveSheet(r, items, triedGmail){
     var staff = state.settings.staffList || [];
     var me = state.currentUser || "";
     var overlay = document.createElement("div");
@@ -9068,7 +9084,8 @@
       '<div class="muted" style="font-size:.85rem; margin-block-end:10px;">'+escapeHtml((proj?proj.name:"")+"　"+(vendor?vendor.name:""))+'</div>'+
       (items.length ? '<div style="font-weight:700; font-size:.9rem; margin-block-end:6px;">📧 Gmailに届いた添付（付けるものにチェック）</div><div class="rcvlist">'+rowsHtml+'</div>'+
         '<label class="field" style="margin-block-start:10px;">書類の種類<select id="rcvType">'+QUOTE_TYPES.map(function(q){ return '<option'+(q==="定価"?" selected":"")+'>'+q+'</option>'; }).join("")+'</select></label>'
-        : '<div class="muted" style="font-size:.9rem;">Gmailに添付付きの返信は見つかりませんでした。</div>')+
+        : (triedGmail ? '<div class="muted" style="font-size:.9rem;">Gmailに添付付きの返信は見つかりませんでした。</div>' : ''))+
+      '<div style="margin-block-start:8px;"><button type="button" class="btn small secondary" data-rcvgo="file">📎 ファイルから見積書を選ぶ</button></div>'+
       '<label class="field" style="margin-block-start:10px;">受領者<select id="rcvBy">'+
         staff.map(function(n){ return '<option'+(n===me?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+'<option value="">（未設定）</option></select></label>'+
       '<div class="rcvbtns">'+
@@ -9080,6 +9097,12 @@
       if(e.target===overlay){ overlay.remove(); return; }
       var b = e.target.closest("[data-rcvgo]"); if(!b) return;
       if(b.dataset.rcvgo==="cancel"){ overlay.remove(); return; }
+      if(b.dataset.rcvgo==="file"){
+        overlay.remove();
+        pendingReqAttachId = r.id; pendingReqAttachThenReceive = true;
+        document.getElementById("reqAttachInput").click();
+        return;
+      }
       var by = overlay.querySelector("#rcvBy").value;
       var chosen = Array.prototype.slice.call(overlay.querySelectorAll("[data-rcv]:checked")).map(function(x){ return items[+x.dataset.rcv]; });
       var qt = overlay.querySelector("#rcvType") ? overlay.querySelector("#rcvType").value : "定価";
@@ -9111,9 +9134,10 @@
       try{ found = await findGmailAttachmentsFor(r); }catch(e){ found = { error:"network" }; }
       if(found && found.error==="not_connected") toast("Gmailが連携されていないため、添付は探せませんでした");
       else if(found && found.error) toast("Gmailの添付を確認できませんでした（受領登録はできます）");
-      openReceiveSheet(r, (found && found.items) || []);
+      openReceiveSheet(r, (found && found.items) || [], true);
       return;
     }
+    if(!skipGmail){ openReceiveSheet(r, [], false); return; }
     var staff = state.settings.staffList || [];
     if(staff.length===0){ markReceivedFinish(r, ""); return; }
     var choices = staff.map(function(s){ return {label:s, value:s}; }).concat([{label:"（未設定のまま進める）", value:""}]);
@@ -11222,7 +11246,10 @@
       var row = e.target.closest("[data-open-project]");
       if(row) openProjectDetail(row.dataset.openProject);
     });
+    document.getElementById("homeReqList").addEventListener("click", handleTableClick);
+    document.getElementById("btnCheckReplies2").addEventListener("click", checkGmailReplies);
     document.getElementById("homeReqCard").addEventListener("click", function(e){
+      if(e.target.closest("[data-act]")) return;
       var f = e.target.closest("[data-hrstatus]");
       if(f){ homeReqStatus = f.dataset.hrstatus; renderHomeRequests(); return; }
       var row = e.target.closest("[data-hropen]");
