@@ -74,6 +74,29 @@ export default async (req: Request, context: Context) => {
   try {
     if (req.method === "GET") {
       const url = new URL(req.url);
+      // 取り込む前の見本・確認用：1つの添付の中身をそのまま返す（保存はしない）
+      const viewMid = (url.searchParams.get("messageId") || "").trim();
+      const viewPid = (url.searchParams.get("partId") || "").trim();
+      if (viewMid && viewPid) {
+        const mRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + encodeURIComponent(viewMid) + "?format=full", { headers: auth });
+        if (!mRes.ok) return jsonResponse({ error: "message_not_found" }, 404);
+        const m: any = await mRes.json();
+        const parts: any[] = [];
+        walkParts(m.payload, parts);
+        const p = parts.find((x) => String(x.partId) === viewPid);
+        if (!p) return jsonResponse({ error: "attachment_not_found" }, 404);
+        const aRes = await fetch(
+          "https://gmail.googleapis.com/gmail/v1/users/me/messages/" + encodeURIComponent(viewMid) + "/attachments/" + encodeURIComponent(p.body.attachmentId),
+          { headers: auth },
+        );
+        const aData: any = await aRes.json();
+        if (!aRes.ok || !aData.data) return jsonResponse({ error: "attachment_fetch_failed" }, 502);
+        const bytes = b64urlToBytes(aData.data);
+        if (bytes.length > 5_500_000) return jsonResponse({ error: "too_large" }, 413);
+        let ct = p.mimeType || "application/octet-stream";
+        if (ct === "application/octet-stream" && /\.pdf$/i.test(p.filename || "")) ct = "application/pdf";
+        return new Response(bytes, { status: 200, headers: { ...CORS_HEADERS, "Content-Type": ct, "Cache-Control": "private, max-age=600" } });
+      }
       const ids = (url.searchParams.get("threadId") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 5);
       if (!ids.length) return jsonResponse({ error: "threadId_required" }, 400);
       const items: any[] = [];

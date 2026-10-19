@@ -621,7 +621,11 @@
   .rcvrow input{ width:20px; height:20px; flex:none; }
   .rcvrow.done{ opacity:.6; }
   .rcvitem{ display:flex; flex-direction:column; gap:4px; }
-  .rcvitem .rcvtype{ align-self:flex-end; font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
+  .rcvthumb{ flex:none; width:84px; height:84px; border-radius:8px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:zoom-in; }
+  .rcvthumb img{ width:100%; height:100%; object-fit:contain; background:#fff; }
+  .rcvthumb.loading{ opacity:.6; }
+  .rcvbar{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; }
+  .rcvitem .rcvtype{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
   .rcvitem .rcvtype.need{ border:2px solid var(--danger); background:var(--danger-soft, #fbe9e5); }
   .rcvic{ font-size:1.4rem; flex:none; }
   .rcvtx{ display:flex; flex-direction:column; min-width:0; }
@@ -9140,6 +9144,64 @@
     var t = new Date(d); if(isNaN(t.getTime())) return String(d||"");
     return (t.getMonth()+1)+"/"+t.getDate()+" "+t.getHours()+":"+String(t.getMinutes()).padStart(2,"0")+" 受信";
   }
+  // ---- 受領登録：取り込む前の見本（1ページ目）と「見る」 ----
+  var rcvBlobCache = {};
+  async function rcvFetchBlob(it){
+    var key = it.messageId+"|"+it.partId;
+    if(rcvBlobCache[key]) return rcvBlobCache[key];
+    var res = await fetch("/api/gmail-attachments?messageId="+encodeURIComponent(it.messageId)+"&partId="+encodeURIComponent(it.partId), { headers:{ "X-Staff-Token": getStaffToken()||"" } });
+    if(!res.ok) throw new Error(res.status===413 ? "too_large" : "http_"+res.status);
+    var b = await res.blob();
+    var isPdf = /pdf/i.test(it.mimeType||"") || /\.pdf$/i.test(it.filename||"");
+    if(isPdf && b.type!=="application/pdf") b = new Blob([b], {type:"application/pdf"});
+    rcvBlobCache[key] = b;
+    return b;
+  }
+  async function rcvOpenItem(it){
+    if(!it) return;
+    var win = null;
+    try{ win = window.open("", "_blank"); }catch(e){ win = null; }
+    try{
+      var b = await rcvFetchBlob(it);
+      var u = URL.createObjectURL(b);
+      if(win && !win.closed) win.location.href = u; else window.open(u, "_blank");
+    }catch(e){
+      if(win) win.close();
+      toast(String(e.message)==="too_large" ? "ファイルが大きいため、ここでは開けません（Gmailで確認してください）" : "ファイルを開けませんでした", 7000);
+    }
+  }
+  function rcvLoadThumbs(overlay, items){
+    var queue = items.map(function(it, i){ return i; }), running = 0;
+    function one(i){
+      var it = items[i], box = overlay.querySelector('[data-rcvthumb="'+i+'"]');
+      if(!box || !document.body.contains(overlay)) return Promise.resolve();
+      var isPdf = /pdf/i.test(it.mimeType||"") || /\.pdf$/i.test(it.filename||"");
+      var isImg = /^image\//.test(it.mimeType||"");
+      if(!isPdf && !isImg) return Promise.resolve();
+      box.classList.add("loading");
+      return rcvFetchBlob(it).then(async function(b){
+        if(isImg){ box.innerHTML = '<img alt="" src="'+URL.createObjectURL(b)+'">'; return; }
+        if(typeof pdfjsLib === "undefined") throw new Error("nopdfjs");
+        var doc = await pdfjsLib.getDocument({data: await b.arrayBuffer()}).promise;
+        try{
+          var page = await doc.getPage(1);
+          var vp1 = page.getViewport({scale:1});
+          var vp = page.getViewport({scale: 240/Math.max(vp1.width, vp1.height)});
+          var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+          await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+          box.innerHTML = '<img alt="" src="'+c.toDataURL("image/jpeg", .8)+'">';
+          c.width = c.height = 0;
+        } finally { try{ await doc.destroy(); }catch(e){} }
+      }).catch(function(){ /* 見本が作れなくても「見る」で開ける */ }).then(function(){ box.classList.remove("loading"); });
+    }
+    function pump(){
+      while(running<2 && queue.length){
+        running++;
+        one(queue.shift()).then(function(){ running--; pump(); });
+      }
+    }
+    pump();
+  }
   function openReceiveSheet(r, items, triedGmail){
     var staff = state.settings.staffList || [];
     var me = state.currentUser || "";
@@ -9152,8 +9214,9 @@
       var sel = it.already ? '' : '<select class="rcvtype" data-rcvtype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+
         QUOTE_TYPES.map(function(q){ return '<option value="'+q+'">'+q+'</option>'; }).join("")+'</select>';
       return '<div class="rcvitem'+(it.already?' done':'')+'"><label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-rcv="'+i+'"'+(it.already?' disabled':(isImg?'':' checked'))+'>'+
-        '<span class="rcvic">'+(/pdf/i.test(it.mimeType||"")||/\.pdf$/i.test(it.filename||"")?"📄":(isImg?"🖼":"📎"))+'</span>'+
-        '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>'+sel+'</div>';
+        '<span class="rcvthumb" data-rcvthumb="'+i+'"><span class="rcvic">'+(/pdf/i.test(it.mimeType||"")||/\.pdf$/i.test(it.filename||"")?"📄":(isImg?"🖼":"📎"))+'</span></span>'+
+        '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>'+
+        '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button>'+sel+'</div></div>';
     }).join("");
     overlay.innerHTML = '<div class="rcvbox" role="dialog" aria-modal="true">'+
       '<h3 style="margin:0 0 4px;">受領登録</h3>'+
@@ -9169,8 +9232,11 @@
         '<button class="btn secondary" data-rcvgo="cancel">やめる</button>'+
       '</div></div>';
     document.body.appendChild(overlay);
+    rcvLoadThumbs(overlay, items);
     overlay.addEventListener("click", async function(e){
       if(e.target===overlay){ overlay.remove(); return; }
+      var vb = e.target.closest("[data-rcvview]") || e.target.closest("[data-rcvthumb]");
+      if(vb){ e.preventDefault(); rcvOpenItem(items[+(vb.dataset.rcvview||vb.dataset.rcvthumb)]); return; }
       var b = e.target.closest("[data-rcvgo]"); if(!b) return;
       if(b.dataset.rcvgo==="cancel"){ overlay.remove(); return; }
       if(b.dataset.rcvgo==="file"){
