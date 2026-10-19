@@ -97,13 +97,20 @@ export default async (req: Request, context: Context) => {
         if (ct === "application/octet-stream" && /\.pdf$/i.test(p.filename || "")) ct = "application/pdf";
         return new Response(bytes, { status: 200, headers: { ...CORS_HEADERS, "Content-Type": ct, "Cache-Control": "private, max-age=600" } });
       }
-      const ids = (url.searchParams.get("threadId") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 5);
+      const ids = (url.searchParams.get("threadId") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 10);
       if (!ids.length) return jsonResponse({ error: "threadId_required" }, 400);
       const items: any[] = [];
-      for (const tid of ids) {
-        const tRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" + encodeURIComponent(tid) + "?format=full", { headers: auth });
-        if (!tRes.ok) continue;
-        const t: any = await tRes.json();
+      // スレッドは同時に読む（10件を順番に読むと関数の時間切れになりやすいため）
+      const fetched = await Promise.all(ids.map(async (tid) => {
+        try {
+          const tRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" + encodeURIComponent(tid) + "?format=full", { headers: auth });
+          return tRes.ok ? { tid, t: await tRes.json() } : null;
+        } catch { return null; }
+      }));
+      for (const f of fetched) {
+        if (!f) continue;
+        const tid = f.tid;
+        const t: any = f.t;
         for (const m of t.messages || []) {
           if ((m.labelIds || []).includes("SENT")) continue; // 自分が送ったメール（依頼メールに付けた図面など）は除く
           const headers = (m.payload && m.payload.headers) || [];
