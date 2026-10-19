@@ -625,6 +625,9 @@
   .rcvthumb img{ width:100%; height:100%; object-fit:contain; background:#fff; }
   .rcvthumb.loading{ opacity:.6; }
   .rcvitem .rcvproj{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
+  .rcvlinks{ margin-block-start:10px; padding:10px; border:1px solid var(--gold); background:var(--gold-soft); border-radius:10px; display:flex; flex-direction:column; gap:6px; }
+  .rcvlink{ display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; font-size:.9rem; color:var(--accent-ink); text-decoration:none; padding:6px 8px; border-radius:8px; background:var(--surface); border:1px solid var(--border); }
+  .rcvlink small{ color:var(--muted); font-size:.85rem; }
   .rcvbar{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; }
   .rcvitem .rcvtype{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
   .rcvitem .rcvtype.need{ border:2px solid var(--danger); background:var(--danger-soft, #fbe9e5); }
@@ -9120,7 +9123,21 @@
     }
     var seen = {};
     items = items.filter(function(it){ if(seen[it.ref]) return false; seen[it.ref]=1; return true; });
-    return { items: items };
+    // 添付ではなく「ダウンロードのリンク」で届くメール（TOTOなど）も探して案内する（失敗しても無視）
+    var links = [];
+    if(info.email){
+      try{
+        var lq = vendorFromQuery(info)+" after:"+gmailAfterStr(r)+" -has:attachment {ダウンロード パスワード}";
+        var lr = await fetch("/api/gmail-search-threads?maxResults=5&q="+encodeURIComponent(lq), { headers:hdr });
+        if(lr.ok){
+          var ld = await lr.json();
+          links = (ld.threads||[]).map(function(t){
+            return { id:t.id, subject:String(t.subject||"").replace(/^\s*\[Password\]\s*/i,""), date:t.date, url:t.viewUrl || ("https://mail.google.com/mail/u/0/#all/"+t.id) };
+          });
+        }
+      }catch(e){}
+    }
+    return { items: items, links: links };
   }
   async function importGmailAttachment(r, it, quoteType){
     var res = await fetch("/api/gmail-attachments", { method:"POST",
@@ -9203,7 +9220,8 @@
     }
     pump();
   }
-  function openReceiveSheet(r, items, triedGmail){
+  function openReceiveSheet(r, items, triedGmail, links){
+    links = links || [];
     var staff = state.settings.staffList || [];
     var me = state.currentUser || "";
     var overlay = document.createElement("div");
@@ -9234,6 +9252,10 @@
       (items.length ? '<div style="font-weight:700; font-size:.9rem; margin-block-end:6px;">📧 Gmailに届いた添付（付けるものにチェックして、ファイルごとに種類を選ぶ）</div><div class="rcvlist">'+rowsHtml+'</div>'
         : (typeof triedGmail==="string" ? '<div class="muted" style="font-size:.9rem; color:var(--danger,#b4462f);">⚠ '+escapeHtml(triedGmail)+'</div>'
           : (triedGmail ? '<div class="muted" style="font-size:.9rem;">Gmailに、この業者さん（同じ会社のアドレスを含む）から依頼日以降に届いた添付付きのメールは見つかりませんでした。</div>' : '')))+
+      (links.length ? '<div class="rcvlinks"><div style="font-weight:700; font-size:.9rem;">🔗 ダウンロードのリンクで届いているメール</div>'+
+        '<div class="muted" style="font-size:.85rem;">添付ではなくリンクで届くため、ここには取り込めません。Gmailで開いてPDFを保存し、下の「📎 ファイルから見積書を選ぶ」で付けてください。</div>'+
+        links.map(function(l){ return '<a class="rcvlink" href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener">📧 '+escapeHtml(l.subject||"(件名なし)")+(l.date?'<small>'+escapeHtml(rcvDate(l.date))+'</small>':'')+' ›</a>'; }).join("")+
+      '</div>' : '')+
       '<div style="margin-block-start:8px;"><button type="button" class="btn small secondary" data-rcvgo="file">📎 ファイルから見積書を選ぶ</button></div>'+
       '<label class="field" style="margin-block-start:10px;">受領者<select id="rcvBy">'+
         staff.map(function(n){ return '<option'+(n===me?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+'<option value="">（未設定）</option></select></label>'+
@@ -9346,7 +9368,7 @@
       finally{ delete receivingNow[id]; }
       var errMsg = (found && found.error) ? gmailErrText(found.error==="network" ? "failed" : found.error) : "";
       if(errMsg) toast(errMsg+"（受領登録はできます）", 9000);
-      openReceiveSheet(r, (found && found.items) || [], errMsg || true);
+      openReceiveSheet(r, (found && found.items) || [], errMsg || true, (found && found.links) || []);
       return;
     }
     if(!skipGmail){ openReceiveSheet(r, [], false); return; }
