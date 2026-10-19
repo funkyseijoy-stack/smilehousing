@@ -624,6 +624,7 @@
   .rcvthumb{ flex:none; width:84px; height:84px; border-radius:8px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:zoom-in; }
   .rcvthumb img{ width:100%; height:100%; object-fit:contain; background:#fff; }
   .rcvthumb.loading{ opacity:.6; }
+  .rcvitem .rcvproj{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
   .rcvbar{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; }
   .rcvitem .rcvtype{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
   .rcvitem .rcvtype.need{ border:2px solid var(--danger); background:var(--danger-soft, #fbe9e5); }
@@ -1815,7 +1816,7 @@
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <div class="muted" id="reqEditInfo" style="font-size:.85rem;"></div>
       <label class="field">依頼内容<textarea id="reqEditContent" rows="3"></textarea></label>
-      <label class="field">依頼方法<select id="reqEditMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option></select></label>
+      <label class="field">依頼方法<select id="reqEditMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option><option value="verbal">口頭</option></select></label>
       <label class="field">状況<select id="reqEditStatus"><option value="未依頼">未依頼</option><option value="依頼済み">依頼済み</option><option value="受領済み">受領済み</option></select></label>
       <label class="field">依頼日<input type="date" id="reqEditRequestedAt"></label>
       <label class="field">回答期限<input type="date" id="reqEditDueDate"></label>
@@ -4079,7 +4080,7 @@
   }
 
   function statusPill(status){ return '<span class="pill status-'+status+'">'+status+'</span>'; }
-  function methodPill(method){ return '<span class="pill method">'+(method==="gmail"?"Gmail":"FAX")+'</span>'; }
+  function methodPill(method){ return '<span class="pill method">'+(method==="gmail"?"Gmail":(method==="verbal"?"口頭":"FAX"))+'</span>'; }
   // 書類の種類：プランボード（お客様に出せる）／定価／NET（NETは暗証番号でロック。お客様に出せるのはプランボードだけ）。
   // 以前の「見積もり」は定価、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
   var QUOTE_TYPES = ["プランボード","見積","定価","NET"]; // 見積＝社内用（ロックなし・お客様には出さない）
@@ -9209,6 +9210,15 @@
     overlay.className = "rcvov";
     var vendor = vendorById(r.vendorId);
     var proj = projectById(r.projectId);
+    // ファイルごとの案件（最初はこの依頼の案件。別のお客様の分は選び直す）
+    var projOpts = liveProjects().slice();
+    if(proj && projOpts.indexOf(proj)===-1) projOpts.unshift(proj);
+    projOpts.sort(function(a,b){ return a.id===r.projectId ? -1 : (b.id===r.projectId ? 1 : String(a.name||"").localeCompare(String(b.name||""), "ja")); });
+    function projSel(i){
+      return '<select class="rcvproj" data-rcvproj="'+i+'" aria-label="案件">'+projOpts.map(function(p){
+        return '<option value="'+p.id+'"'+(p.id===r.projectId?' selected':'')+'>'+escapeHtml((p.name||p.customer||"（名前なし）")+(p.id===r.projectId?"（この依頼）":""))+'</option>';
+      }).join("")+'</select>';
+    }
     var rowsHtml = items.map(function(it, i){
       var isImg = /^image\//.test(it.mimeType||"");
       var sel = it.already ? '' : '<select class="rcvtype" data-rcvtype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+
@@ -9216,7 +9226,7 @@
       return '<div class="rcvitem'+(it.already?' done':'')+'"><label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-rcv="'+i+'"'+(it.already?' disabled':(isImg?'':' checked'))+'>'+
         '<span class="rcvthumb" data-rcvthumb="'+i+'"><span class="rcvic">'+(/pdf/i.test(it.mimeType||"")||/\.pdf$/i.test(it.filename||"")?"📄":(isImg?"🖼":"📎"))+'</span></span>'+
         '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>'+
-        '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button>'+sel+'</div></div>';
+        '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button>'+(it.already?'':projSel(i))+sel+'</div></div>';
     }).join("");
     overlay.innerHTML = '<div class="rcvbox" role="dialog" aria-modal="true">'+
       '<h3 style="margin:0 0 4px;">受領登録</h3>'+
@@ -9259,17 +9269,61 @@
       // 開いている間に別の画面・端末で受領済みになっていたら止める（二重登録の防止）
       if(r.status==="受領済み"){ toast("この依頼はすでに受領済みです（"+(r.receivedAt?fmtDate(r.receivedAt):"")+(r.receivedBy?"・"+r.receivedBy:"")+"）", 7000); overlay.remove(); return; }
       if(chosen.length){
-        overlay.querySelectorAll("button").forEach(function(x){ x.disabled = true; });
+        overlay.querySelectorAll("button, select").forEach(function(x){ x.disabled = true; });
         b.textContent = "取り込み中…（0/"+chosen.length+"）";
-        var okN = 0, failN = 0;
+        // ファイルごとの行き先（依頼）を決める：この依頼の案件はこの依頼、別の案件は
+        // 同じ業者の受領前の依頼があればそれ、無ければ「口頭」の依頼を新しく作る
+        var targetOf = {}, extraTargets = [], createdN = 0;
+        for(var k=0;k<chosenIdx.length;k++){
+          var ii = chosenIdx[k];
+          var ps = overlay.querySelector('[data-rcvproj="'+ii+'"]');
+          var pid = ps ? ps.value : r.projectId;
+          if(!pid || pid===r.projectId){ targetOf[ii] = r; continue; }
+          var t = extraTargets.find(function(x){ return x.projectId===pid; });
+          if(!t){
+            t = liveRequests().find(function(x){ return x.projectId===pid && x.vendorId===r.vendorId && x.status==="依頼済み"; }) ||
+                liveRequests().find(function(x){ return x.projectId===pid && x.vendorId===r.vendorId && x.status==="未依頼"; });
+            if(!t){
+              var it0 = items[ii], d0 = it0.internalDate ? new Date(it0.internalDate) : new Date();
+              var reqDate = d0.getFullYear()+"-"+String(d0.getMonth()+1).padStart(2,"0")+"-"+String(d0.getDate()).padStart(2,"0");
+              t = { id:uid("req"), projectId: pid, vendorId: r.vendorId, method:"verbal", status:"依頼済み",
+                requestedAt: reqDate, receivedAt:"", dueDate:"", requestedBy:"", receivedBy:"",
+                note:"口頭で依頼（受領登録で "+((vendorById(r.vendorId)||{}).name||"業者")+" からのメールから登録）", createdAt: nowIso() };
+              state.requests.push(t);
+              await saveDoc("requests", t.id, t);
+              createdN++;
+            }
+            t._okN = 0;
+            extraTargets.push(t);
+          }
+          targetOf[ii] = t;
+        }
+        var okN = 0, failN = 0, mainOk = 0;
         for(var i=0;i<chosen.length;i++){
-          try{ await importGmailAttachment(r, chosen[i], typeOf[chosenIdx[i]]); okN++; }catch(err){ failN++; }
+          var tg = targetOf[chosenIdx[i]];
+          try{ await importGmailAttachment(tg, chosen[i], typeOf[chosenIdx[i]]); okN++; if(tg===r) mainOk++; else tg._okN++; }catch(err){ failN++; }
           b.textContent = "取り込み中…（"+(i+1)+"/"+chosen.length+"）";
         }
         render();
         if(failN && !okN){ toast("添付を取り込めませんでした。受領登録はしていません。もう一度お試しください", 9000); overlay.remove(); return; }
-        if(failN) toast("添付"+okN+"件を付けました（"+failN+"件は取り込めませんでした）", 9000);
-        else toast("添付"+okN+"件を見積書として付けました");
+        // 別の案件の依頼：1件以上付けられたものだけ受領済みにする
+        var otherNames = [];
+        for(var e2=0;e2<extraTargets.length;e2++){
+          var et = extraTargets[e2], n2 = et._okN; delete et._okN;
+          if(!n2) continue;
+          if(et.status!=="受領済み"){
+            et.status="受領済み"; et.receivedAt=todayStr(); et.receivedBy=by||"";
+            et.replyDetected=false; et.replySnippet=""; et.replyDate=""; et.replySubject=""; et.replyThreadId="";
+            await saveDoc("requests", et.id, et);
+          }
+          var ep = projectById(et.projectId);
+          otherNames.push((ep?ep.name:"別の案件")+" "+n2+"件");
+        }
+        var msg = "添付"+okN+"件を付けました（この依頼 "+mainOk+"件"+(otherNames.length?"・"+otherNames.join("・"):"")+"）";
+        if(createdN) msg += "。口頭の依頼を"+createdN+"件新しく作り、受領済みにしました";
+        if(failN) msg += "。"+failN+"件は取り込めませんでした";
+        toast(msg, 10000);
+        if(otherNames.length) logActivity("受領登録で別の案件の見積書も登録しました（"+otherNames.join("・")+"）");
       }
       overlay.remove();
       markReceivedFinish(r, by);
@@ -9283,7 +9337,7 @@
     if(receivingNow[id]) return;
     if(document.querySelector(".rcvov")) return;
     var vendor = vendorById(r.vendorId);
-    var tryGmail = !skipGmail && !!(r.replyThreadId || r.gmailThreadId || (r.method==="gmail" && vendor && vendor.email));
+    var tryGmail = !skipGmail && !!(r.replyThreadId || r.gmailThreadId || (r.method!=="fax" && vendor && vendor.email));
     if(tryGmail){
       toast("Gmailの添付を探しています…");
       var found = null;
@@ -9452,7 +9506,7 @@
     var pr = projectById(r.projectId);
     document.getElementById("reqEditInfo").textContent = v.name + (pr ? "　／　" + (pr.customer || pr.name || "") : "");
     document.getElementById("reqEditContent").value = r.content || "";
-    document.getElementById("reqEditMethod").value = r.method==="fax" ? "fax" : "gmail";
+    document.getElementById("reqEditMethod").value = r.method==="fax" ? "fax" : (r.method==="verbal" ? "verbal" : "gmail");
     document.getElementById("reqEditStatus").value = r.status || "未依頼";
     document.getElementById("reqEditRequestedAt").value = r.requestedAt || "";
     document.getElementById("reqEditDueDate").value = r.dueDate || "";
