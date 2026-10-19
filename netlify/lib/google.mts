@@ -17,7 +17,7 @@ export async function getAccessToken(): Promise<
   const clientSecret = Netlify.env.get("GOOGLE_CLIENT_SECRET");
   if (!clientId || !clientSecret) return { ok: false, error: "server_not_configured" };
   const store = getStore("googleAuth");
-  const data: any = await store.get("gmail", { type: "json" });
+  const data: any = await store.get("gmail", { type: "json", consistency: "strong" });
   if (!data || !data.refresh_token) return { ok: false, error: "google_not_connected" };
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",

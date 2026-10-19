@@ -8719,35 +8719,40 @@
     for(var i=0;i<all.length;i++){
       var r = all[i];
       var vendor = vendorById(r.vendorId);
-      if(!vendor || !vendor.email){ noEmail++; continue; }
-      var email = vendor.email.toLowerCase();
+      var info = vendorMailInfo(vendor);
+      if(!info.email){ noEmail++; continue; }
       var reply = null;
       try{
         if(r.gmailThreadId){
-          // 下書きから作った依頼：そのスレッドの中に業者のメールがあるか
+          // 下書きから作った依頼：まずそのスレッドの中に業者さんのメールがあるか
           if(!threadCache[r.gmailThreadId]){
             var res = await fetch("/api/gmail-get-thread?threadId="+encodeURIComponent(r.gmailThreadId), { headers:hdr });
-            if(!res.ok) throw new Error("thread "+res.status);
-            var data = await res.json();
-            threadCache[r.gmailThreadId] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date, subject:m.subject }; });
+            if(!res.ok){
+              var c1 = await gmailErrCode(res);
+              if(c1==="expired" || c1==="not_connected"){ toast(gmailErrText(c1), 12000); return; }
+              threadCache[r.gmailThreadId] = []; // 下書きを消したなどでスレッドが無い → 下の検索へ
+            } else {
+              var data = await res.json();
+              threadCache[r.gmailThreadId] = (data.messages||[]).map(function(m){ return { sender:m.sender, snippet:m.snippet, date:m.date, subject:m.subject }; });
+            }
           }
           var tidNow = r.gmailThreadId;
-          reply = threadCache[tidNow].find(function(m){ return m.sender && m.sender.toLowerCase().indexOf(email)!==-1 && !isReplyIgnored(r, tidNow, m.date); }) || null;
+          reply = threadCache[tidNow].find(function(m){ return senderMatchesVendor(m.sender, info) && !isReplyIgnored(r, tidNow, m.date); }) || null;
           if(reply) reply.threadId = tidNow;
-        } else {
-          // スレッドIDが無い依頼（記録だけ依頼済み・Gmailから直接送った分）：業者から届いたメールを検索
-          var d = new Date((r.requestedAt||"")+"T00:00:00+09:00");
-          if(isNaN(d.getTime())) d = new Date(Date.now()-30*86400000);
-          d = new Date(d.getTime()-86400000); // 時差ぶん1日前から
-          var ds = d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate();
-          var q = "from:"+vendor.email+" after:"+ds;
+        }
+        if(!reply){
+          // スレッドに無い（新しいメールで届いた）・スレッドIDが無い依頼：業者さんから届いたメールを検索
+          var q = vendorFromQuery(info)+" after:"+gmailAfterStr(r);
           var res2 = await fetch("/api/gmail-search-threads?maxResults=5&q="+encodeURIComponent(q), { headers:hdr });
-          if(res2.status===409){ toast("Gmailが連携されていません。「業者・設定」でGmail連携をしてください"); return; }
-          if(!res2.ok) throw new Error("search "+res2.status);
+          if(!res2.ok){
+            var c2 = await gmailErrCode(res2);
+            if(c2==="expired" || c2==="not_connected"){ toast(gmailErrText(c2), 12000); return; }
+            throw new Error("search "+res2.status);
+          }
           var d2 = await res2.json();
-          var th = (d2.threads||[]).filter(function(t){ return !isReplyIgnored(r, t.id, t.date); });
+          var th = (d2.threads||[]).filter(function(t){ return senderMatchesVendor(t.sender, info) && !isReplyIgnored(r, t.id, t.date); });
           if(th.length){
-            var mine = th.find(function(t){ return t.sender && t.sender.toLowerCase().indexOf(email)!==-1; }) || th[0];
+            var mine = th[0];
             // 別件のメールを拾う可能性があるので、スレッドIDは依頼に固定せず、拾ったメールだけを記録する
             reply = { snippet:mine.snippet, date:mine.date, subject:mine.subject, threadId:mine.id };
           }
@@ -9014,33 +9019,82 @@
     logActivity("見積を受領登録しました");
     toast("受領済みに更新しました");
   }
-  // 受領登録：業者さんからの返信メールに添付（見積書など）があれば、一覧から選んでそのまま書類に取り込む
+  // ---- Gmail：業者さんのメールかどうかの判定（登録アドレス、または同じ会社のドメイン） ----
+  // 個人向けのメール（gmail・icloud など）は同じドメインでも別人なので、アドレス完全一致だけ。
+  var GMAIL_PUBLIC_DOMAINS = ["gmail.com","googlemail.com","icloud.com","me.com","mac.com","outlook.jp","outlook.com","hotmail.com","hotmail.co.jp","live.jp","live.com","msn.com","yahoo.co.jp","yahoo.com","ymail.com","docomo.ne.jp","ezweb.ne.jp","au.com","softbank.ne.jp","i.softbank.jp","nifty.com","ocn.ne.jp","biglobe.ne.jp","so-net.ne.jp","plala.or.jp"];
+  function vendorMailInfo(vendor){
+    var email = vendor && vendor.email ? String(vendor.email).trim().toLowerCase() : "";
+    var dom = email.indexOf("@")!==-1 ? email.split("@").pop() : "";
+    return { email: email, domain: (dom && GMAIL_PUBLIC_DOMAINS.indexOf(dom)===-1) ? dom : "" };
+  }
+  function senderMatchesVendor(sender, info){
+    var s = String(sender||"").toLowerCase();
+    if(!info || !info.email) return false;
+    if(s.indexOf(info.email)!==-1) return true;
+    if(info.domain){
+      var m = s.match(/@([a-z0-9.\-]+)/);
+      if(m && (m[1]===info.domain || m[1].slice(-(info.domain.length+1))==="."+info.domain)) return true;
+    }
+    return false;
+  }
+  function vendorFromQuery(info){ return info.domain ? "from:("+info.email+" OR "+info.domain+")" : "from:"+info.email; }
+  function gmailAfterStr(r){
+    var d = new Date((r.requestedAt||"")+"T00:00:00+09:00");
+    if(isNaN(d.getTime())) d = new Date(Date.now()-30*86400000);
+    d = new Date(d.getTime()-86400000); // 時差ぶん1日前から
+    return d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate();
+  }
+  // サーバーの失敗理由を読み取る（not_connected＝未連携／expired＝連携切れ／failed＝その他）
+  async function gmailErrCode(res){
+    if(res.status===409) return "not_connected";
+    try{ var j = await res.json(); if(j && j.error==="refresh_failed") return "expired"; if(j && (j.error==="gmail_not_connected"||j.error==="google_not_connected")) return "not_connected"; }catch(e){}
+    return "failed";
+  }
+  function gmailErrText(code){
+    if(code==="expired") return "Gmailの連携が切れています。「業者・設定」の「Gmailと連携する」からやり直してください（連携し直した直後は1分ほど待ってからお試しください）";
+    if(code==="not_connected") return "Gmailが連携されていません。「業者・設定」の「Gmailと連携する」から連携してください";
+    return "Gmailを確認できませんでした。少し待ってからもう一度お試しください";
+  }
+  // 受領登録：業者さんからのメールに添付（見積書など）があれば、一覧から選んでそのまま書類に取り込む
+  // ①依頼のスレッドの中 → ②無ければ、依頼日以降に業者さん（同じ会社のアドレスを含む）から届いた添付付きメール全体
   async function findGmailAttachmentsFor(r){
     var hdr = { "X-Staff-Token": getStaffToken()||"" };
     var vendor = vendorById(r.vendorId);
-    var email = vendor && vendor.email ? vendor.email.toLowerCase() : "";
-    var tids = [r.replyThreadId, r.gmailThreadId].filter(function(x, i, a){ return x && a.indexOf(x)===i; });
-    if(!tids.length && email){
-      var d = new Date((r.requestedAt||"")+"T00:00:00+09:00");
-      if(isNaN(d.getTime())) d = new Date(Date.now()-30*86400000);
-      d = new Date(d.getTime()-86400000);
-      var q = "from:"+vendor.email+" after:"+d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()+" has:attachment";
-      var sr = await fetch("/api/gmail-search-threads?maxResults=3&q="+encodeURIComponent(q), { headers:hdr });
-      if(sr.status===409) return { error:"not_connected" };
-      if(!sr.ok) return { error:"search_failed" };
-      var sd = await sr.json();
-      tids = (sd.threads||[]).map(function(t){ return t.id; }).filter(Boolean).slice(0,3);
-    }
-    if(!tids.length) return { items:[] };
-    var res = await fetch("/api/gmail-attachments?threadId="+encodeURIComponent(tids.join(",")), { headers:hdr });
-    if(res.status===409) return { error:"not_connected" };
-    if(!res.ok) return { error:"list_failed" };
-    var data = await res.json();
-    var items = (data.items||[]);
-    if(email) items = items.filter(function(it){ return String(it.sender||"").toLowerCase().indexOf(email)!==-1; });
-    // すでにこの依頼に取り込んだ添付は除く
+    var info = vendorMailInfo(vendor);
     var done = {}; liveAttachments().forEach(function(a){ if(a.gmailRef) done[a.gmailRef]=1; });
-    items.forEach(function(it){ it.ref = it.messageId+"|"+it.partId; it.already = !!done[it.ref]; });
+    function pick(list){
+      var items = (list||[]);
+      if(info.email) items = items.filter(function(it){ return senderMatchesVendor(it.sender, info); });
+      items.forEach(function(it){ it.ref = it.messageId+"|"+it.partId; it.already = !!done[it.ref]; });
+      return items;
+    }
+    async function listOf(tids){
+      var res = await fetch("/api/gmail-attachments?threadId="+encodeURIComponent(tids.join(",")), { headers:hdr });
+      if(!res.ok) return { error: await gmailErrCode(res) };
+      var data = await res.json();
+      return { items: pick(data.items) };
+    }
+    var tids = [r.replyThreadId, r.gmailThreadId].filter(function(x, i, a){ return x && a.indexOf(x)===i; });
+    var items = [];
+    if(tids.length){
+      var got = await listOf(tids);
+      if(got.error) return got;
+      items = got.items;
+    }
+    if(!items.length && info.email){
+      var q = vendorFromQuery(info)+" after:"+gmailAfterStr(r)+" has:attachment";
+      var sr = await fetch("/api/gmail-search-threads?maxResults=5&q="+encodeURIComponent(q), { headers:hdr });
+      if(!sr.ok) return { error: await gmailErrCode(sr) };
+      var sd = await sr.json();
+      var more = (sd.threads||[]).map(function(t){ return t.id; }).filter(function(x){ return x && tids.indexOf(x)===-1; }).slice(0,5);
+      if(more.length){
+        var got2 = await listOf(more);
+        if(got2.error) return got2;
+        items = got2.items;
+      }
+    }
+    var seen = {};
+    items = items.filter(function(it){ if(seen[it.ref]) return false; seen[it.ref]=1; return true; });
     return { items: items };
   }
   async function importGmailAttachment(r, it, quoteType){
@@ -9084,7 +9138,8 @@
       '<div class="muted" style="font-size:.85rem; margin-block-end:10px;">'+escapeHtml((proj?proj.name:"")+"　"+(vendor?vendor.name:""))+'</div>'+
       (items.length ? '<div style="font-weight:700; font-size:.9rem; margin-block-end:6px;">📧 Gmailに届いた添付（付けるものにチェック）</div><div class="rcvlist">'+rowsHtml+'</div>'+
         '<label class="field" style="margin-block-start:10px;">書類の種類<select id="rcvType">'+QUOTE_TYPES.map(function(q){ return '<option'+(q==="定価"?" selected":"")+'>'+q+'</option>'; }).join("")+'</select></label>'
-        : (triedGmail ? '<div class="muted" style="font-size:.9rem;">Gmailに添付付きの返信は見つかりませんでした。</div>' : ''))+
+        : (typeof triedGmail==="string" ? '<div class="muted" style="font-size:.9rem; color:var(--danger,#b4462f);">⚠ '+escapeHtml(triedGmail)+'</div>'
+          : (triedGmail ? '<div class="muted" style="font-size:.9rem;">Gmailに、この業者さん（同じ会社のアドレスを含む）から依頼日以降に届いた添付付きのメールは見つかりませんでした。</div>' : '')))+
       '<div style="margin-block-start:8px;"><button type="button" class="btn small secondary" data-rcvgo="file">📎 ファイルから見積書を選ぶ</button></div>'+
       '<label class="field" style="margin-block-start:10px;">受領者<select id="rcvBy">'+
         staff.map(function(n){ return '<option'+(n===me?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+'<option value="">（未設定）</option></select></label>'+
@@ -9132,9 +9187,9 @@
       toast("Gmailの添付を探しています…");
       var found = null;
       try{ found = await findGmailAttachmentsFor(r); }catch(e){ found = { error:"network" }; }
-      if(found && found.error==="not_connected") toast("Gmailが連携されていないため、添付は探せませんでした");
-      else if(found && found.error) toast("Gmailの添付を確認できませんでした（受領登録はできます）");
-      openReceiveSheet(r, (found && found.items) || [], true);
+      var errMsg = (found && found.error) ? gmailErrText(found.error==="network" ? "failed" : found.error) : "";
+      if(errMsg) toast(errMsg+"（受領登録はできます）", 9000);
+      openReceiveSheet(r, (found && found.items) || [], errMsg || true);
       return;
     }
     if(!skipGmail){ openReceiveSheet(r, [], false); return; }

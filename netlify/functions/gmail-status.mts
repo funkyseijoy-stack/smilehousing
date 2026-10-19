@@ -25,7 +25,7 @@ export default async (req: Request, context: Context) => {
   }
 
   const store = getStore("googleAuth");
-  const data = await store.get("gmail", { type: "json" });
+  const data = await store.get("gmail", { type: "json", consistency: "strong" });
   const connected = !!(data && (data as any).refresh_token);
 
   // どのGoogleアカウントで連携されているかを確認する（設定タブに表示するため）。
