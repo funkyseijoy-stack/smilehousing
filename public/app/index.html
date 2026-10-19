@@ -655,6 +655,9 @@
   .rcvlink small{ color:var(--muted); font-size:.85rem; }
   .rcvbar{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; }
   .rcvitem .rcvtype{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
+  .rcvitem .rcvpart{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
+  .rcvrefl{ display:inline-flex; align-items:center; gap:4px; font-size:.85rem; white-space:nowrap; color:var(--accent-ink); }
+  .rcvrefl.off{ color:var(--muted); opacity:.6; }
   .rcvitem .rcvproj.need0{ border-color:var(--gold); }
   .rcvitem .rcvproj.need, .rcvitem .rcvtype.need{ border:2px solid var(--danger); background:var(--danger-soft); }
   .rcvitem .rcvtype.need{ border:2px solid var(--danger); background:var(--danger-soft, #fbe9e5); }
@@ -877,7 +880,7 @@
   <section class="panel" id="panel-estimates">
     <div class="card" id="inboxCard">
       <h2 style="margin:0 0 8px;">📥 業者さんから届いた書類</h2>
-      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">業者さんを選ぶと、Gmailに届いた添付（前後半年）を探します。ファイルごとに案件と種類を選んで登録すると、その案件の依頼が「受領済み」になります（依頼が無ければ「口頭」の依頼を作ります）。リンクで届く見積は、PDFを保存して「📎 パソコンのファイルを追加」から付けてください。</p>
+      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">業者さんを選ぶと、Gmailに届いた添付（前後半年）を探します。ファイルごとに案件・種類・部位を選んで登録すると、その案件の依頼が「受領済み」になり、部位に合うフォルダーに入ります（依頼が無ければ「口頭」の依頼を作ります）。「おうちノートに出す」にチェックしたプランボード・定価は、そのままお客様に出ます。リンクで届く見積は、PDFを保存して「📎 パソコンのファイルを追加」から付けてください。</p>
       <div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">
         <select id="inboxVendor" style="min-width:200px;"></select>
         <button class="btn small" id="inboxSearch">📧 Gmailから探す</button>
@@ -9304,6 +9307,60 @@
     });
     return tie ? "" : best;
   }
+  // 部位：選択肢・ファイル名からの推測・部位に合う添付資料のフォルダー
+  var INBOX_PART_GROUPS = [
+    ["🚿 水まわり","facility",FACILITY_CATS], ["🔥🌀🔌💡 設備","equipment",EQUIPMENT_CATS],
+    ["🏠 外部","exterior",EXTERIOR_CATS], ["🎨 インテリア","interiorColor",INTERIOR_COLOR_CATS], ["🔒 社内だけ","internal",INTERNAL_CATS]
+  ];
+  var INBOX_PART_WORDS = [
+    [/浴室|お風呂|風呂|ユニットバス|UB|バスルーム/i,"facility","お風呂"], [/キッチン|台所/,"facility","キッチン"], [/洗面/,"facility","洗面"],
+    [/トイレ|便器/,"facility","トイレ"], [/脱衣|ランドリー/,"facility","脱衣室"],
+    [/暖房|ヒーター|床暖/,"equipment","暖房設備"], [/換気|換気扇|ダクト/,"equipment","換気設備"],
+    [/照明|あかり|ライティング/,"equipment","あかりプラン"], [/電気|配線|コンセント|スイッチ/,"equipment","電気配線"],
+    [/玄関ドア/,"exterior","玄関ドア"], [/外壁|サイディング/,"exterior","外壁"], [/屋根|板金/,"exterior","屋根"],
+    [/クロス|壁紙/,"interiorColor","メインクロス"], [/建具|ドア/,"interiorColor","ドア"], [/フローリング|床材/,"interiorColor","床"],
+    [/カーテン|ブラインド|窓まわり/,"interiorColor","窓まわり"], [/基礎/,"internal","基礎"], [/足場/,"internal","足場"]
+  ];
+  function inboxGuessPart(text){
+    var t = String(text||"").normalize("NFKC");
+    for(var i=0;i<INBOX_PART_WORDS.length;i++){ if(INBOX_PART_WORDS[i][0].test(t)) return INBOX_PART_WORDS[i][1]+"|"+INBOX_PART_WORDS[i][2]; }
+    return "";
+  }
+  function inboxPartObj(key){
+    if(!key) return null;
+    var k = key.split("|"), sc = k[0], cat = k[1]||null;
+    return { scope:sc, category:cat, roomId:null, side:null, label: cat ? specPartGroupLabel(sc)+"・"+cat : specPartGroupLabel(sc) };
+  }
+  function inboxFolderForPart(proj, part){
+    if(!proj || !part) return "";
+    var ids = Object.keys(ATT_FOLDER_PARTS);
+    for(var i=0;i<ids.length;i++){
+      var m = ATT_FOLDER_PARTS[ids[i]];
+      if(m.scope===part.scope && m.category===part.category){ var f = attFolderById(proj, ids[i]); if(f && !f.deletedAt) return ids[i]; }
+    }
+    return "";
+  }
+  function inboxPartSel(i, key){
+    return '<select class="rcvpart" data-inpart="'+i+'" aria-label="部位"><option value="">部位（なし）</option>'+
+      INBOX_PART_GROUPS.map(function(g){
+        return '<optgroup label="'+escapeHtml(g[0])+'">'+g[2].map(function(c){
+          var v = g[1]+"|"+c;
+          return '<option value="'+escapeHtml(v)+'"'+(v===key?' selected':'')+'>'+escapeHtml(partText({scope:g[1], category:c})||c)+'</option>';
+        }).join("")+'</optgroup>';
+      }).join("")+'<option value="general|"'+(key==="general|"?' selected':'')+'>📋 総合</option></select>';
+  }
+  // 「おうちノートに出す」：プランボード・定価で、お客様に出せる部位のときだけ押せる。最初はプランボードだけチェック
+  function inboxReflAllowed(it){ return (it.qt==="プランボード" || it.qt==="定価") && !!it.part && taskPartReflectable(inboxPartObj(it.part)); }
+  function inboxReflOn(it){ return inboxReflAllowed(it) && (it.refl!==undefined ? it.refl : it.qt==="プランボード"); }
+  function inboxReflHtml(i, it){
+    var ok = inboxReflAllowed(it);
+    return '<label class="rcvrefl'+(ok?'':' off')+'" data-inrefllbl="'+i+'"><input type="checkbox" data-inrefl="'+i+'"'+(inboxReflOn(it)?' checked':'')+(ok?'':' disabled')+'> おうちノートに出す</label>';
+  }
+  function inboxSyncRefl(i){
+    var it = inbox.items[i], box = document.querySelector('[data-inrefllbl="'+i+'"]'); if(!it || !box) return;
+    var ok = inboxReflAllowed(it), cb = box.querySelector("input");
+    box.classList.toggle("off", !ok); cb.disabled = !ok; cb.checked = inboxReflOn(it);
+  }
   function inboxVendors(){
     return (state.vendors||[]).filter(function(v){ return !v.deletedAt; }).sort(function(a,b){
       var wa = liveRequests().filter(function(r){ return r.vendorId===a.id && r.status==="依頼済み"; }).length;
@@ -9341,7 +9398,8 @@
           '<span class="rcvthumb" data-rcvthumb="'+i+'"><span class="rcvic">'+(isPdf?"📄":(isImg?"🖼":"📎"))+'</span></span>'+
           '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.local?'　パソコンから':(it.date?'　'+escapeHtml(rcvDate(it.date)):""))+(it.already?'　✓取り込み済み':'')+(it.subject?'　'+escapeHtml(String(it.subject).slice(0,40)):'')+'</small></span></label>'+
           (it.already ? '' : '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button>'+inboxProjSel(i, it.pid)+
-            '<select class="rcvtype" data-intype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+QUOTE_TYPES.map(function(q){ return '<option value="'+q+'"'+(it.qt===q?' selected':'')+'>'+q+'</option>'; }).join("")+'</select></div>')+
+            '<select class="rcvtype" data-intype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+QUOTE_TYPES.map(function(q){ return '<option value="'+q+'"'+(it.qt===q?' selected':'')+'>'+q+'</option>'; }).join("")+'</select>'+
+            inboxPartSel(i, it.part)+inboxReflHtml(i, it)+'</div>')+
         '</div>';
       }).join("")+'</div>';
     }
@@ -9375,6 +9433,7 @@
     if(found.error){ inbox.msg = gmailErrText(found.error); inbox.items = localKeep; inbox.links = []; renderInbox(); return; }
     var gm = (found.items||[]).map(function(it){
       it.pid = inboxGuessProject((it.filename||"")+" "+(it.subject||""));
+      it.part = inboxGuessPart((it.filename||"")+" "+(it.subject||""));
       it.checked = !it.already && !/^image\//.test(it.mimeType||"");
       return it;
     });
@@ -9418,16 +9477,28 @@
       }
       targets[pid] = { req:t, ok:0 };
     }
-    var okN = 0, failN = 0;
+    var okN = 0, failN = 0, reflN = 0;
     for(var j=0;j<chosen.length;j++){
       var c = chosen[j], tg = targets[c.pid];
       if(btn) btn.textContent = "登録中…（"+(j+1)+"/"+chosen.length+"）";
       try{
+        var att = null;
         if(c.local){
+          var before = state.attachments.length;
           var n = await uploadAttachments([c.file], "quote", c.qt, tg.req.id);
-          if(n>0){ okN++; tg.ok++; c.already = true; } else failN++;
+          if(n>0){ okN++; tg.ok++; c.already = true; att = state.attachments[before] || null; } else failN++;
         } else {
-          await importGmailAttachment(tg.req, c, c.qt); okN++; tg.ok++; c.already = true;
+          att = await importGmailAttachment(tg.req, c, c.qt); okN++; tg.ok++; c.already = true;
+        }
+        // 部位・フォルダー・おうちノートへの反映も、ここで一度に
+        if(att){
+          var part = inboxPartObj(c.part), pj0 = projectById(att.projectId), touched = false;
+          if(part){
+            att.specPart = part; delete att.specPartAuto; touched = true;
+            var fid = inboxFolderForPart(pj0, part); if(fid){ att.folderId = fid; }
+          }
+          if(inboxReflOn(c)){ att.reflected = true; att.reflectedAt = nowIso(); touched = true; reflN++; }
+          if(touched) await saveDoc("attachments", att.id, att);
         }
       }catch(e){ failN++; }
     }
@@ -9443,7 +9514,7 @@
       var pj = projectById(k); names.push((pj?pj.name:"案件")+" "+tg2.ok+"件");
     }
     inbox.items.forEach(function(it){ if(it.already) it.checked = false; });
-    inbox.msg = "登録しました："+names.join("・")+(created?"（口頭の依頼を"+created+"件作りました）":"")+(failN?"／"+failN+"件は登録できませんでした":"");
+    inbox.msg = "登録しました："+names.join("・")+(reflN?"（おうちノートに"+reflN+"件出しました）":"")+(created?"（口頭の依頼を"+created+"件作りました）":"")+(failN?"／"+failN+"件は登録できませんでした":"");
     if(names.length) logActivity(v.name+"の書類を登録しました（"+names.join("・")+"）");
     render(); renderInbox();
     toast(inbox.msg, 9000);
@@ -9459,7 +9530,7 @@
     document.getElementById("inboxFileInput").addEventListener("change", function(e){
       var files = Array.prototype.slice.call(e.target.files||[]); e.target.value = "";
       files.forEach(function(f){
-        inbox.items.unshift({ local:true, file:f, filename:f.name, mimeType:f.type, size:f.size, checked:true, pid: inboxGuessProject(f.name) });
+        inbox.items.unshift({ local:true, file:f, filename:f.name, mimeType:f.type, size:f.size, checked:true, pid: inboxGuessProject(f.name), part: inboxGuessPart(f.name) });
       });
       if(files.length){ inbox.msg = "パソコンのファイルを"+files.length+"件追加しました。案件と種類を選んで登録してください"; renderInbox(); }
     });
@@ -9468,7 +9539,9 @@
       var t = e.target, i;
       if(t.dataset.incheck!==undefined){ inbox.items[+t.dataset.incheck].checked = t.checked; }
       else if(t.dataset.inproj!==undefined){ i = +t.dataset.inproj; inbox.items[i].pid = t.value; t.classList.toggle("need0", !t.value); t.classList.remove("need"); }
-      else if(t.dataset.intype!==undefined){ i = +t.dataset.intype; inbox.items[i].qt = t.value; t.classList.remove("need"); }
+      else if(t.dataset.intype!==undefined){ i = +t.dataset.intype; inbox.items[i].qt = t.value; t.classList.remove("need"); inboxSyncRefl(i); }
+      else if(t.dataset.inpart!==undefined){ i = +t.dataset.inpart; inbox.items[i].part = t.value; inboxSyncRefl(i); }
+      else if(t.dataset.inrefl!==undefined){ inbox.items[+t.dataset.inrefl].refl = t.checked; }
     });
     card.addEventListener("click", function(e){
       var vb = e.target.closest("[data-rcvview]") || e.target.closest("[data-rcvthumb]");
