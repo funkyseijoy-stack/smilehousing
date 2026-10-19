@@ -181,6 +181,7 @@
   .pill.method{ background:var(--surface-2); color:var(--muted); font-weight:500; }
   .pill.tag{ background:var(--accent-soft); color:var(--accent-ink); }
   .pill.quote-プランボード{ background:var(--accent-soft); color:var(--accent-ink); }
+  .pill.quote-見積{ background:var(--surface-2); color:var(--ink); border:1px solid var(--border); }
   .pill.quote-定価{ background:var(--gold-soft); color:var(--gold); }
   .pill.quote-NET{ background:var(--blue-soft); color:var(--blue); }
 
@@ -480,6 +481,8 @@
   .subtabs:not(.showextra) .sub-extra.active{ order:0; }
   /* 見積り依頼：案件ごとのまとまり */
   .hrgroup{ margin-block-end:12px; }
+  .hrfiles{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .hrfile{ display:inline-flex; align-items:center; gap:4px; font-size:.85rem; padding:4px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); cursor:pointer; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .hrhead{ display:flex; align-items:center; gap:8px; width:100%; border:0; background:none; padding:4px 2px 6px; font-family:inherit; font-size:1rem; font-weight:700; color:var(--accent-ink); text-align:start; cursor:pointer; }
   .hrhead .muted{ font-size:.85rem; font-weight:400; margin-inline-start:auto; }
   .hrgroup .hrrow{ margin-block-end:6px; margin-inline-start:6px; }
@@ -617,6 +620,9 @@
   .rcvrow{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:10px; padding:8px 10px; cursor:pointer; background:var(--surface-2); }
   .rcvrow input{ width:20px; height:20px; flex:none; }
   .rcvrow.done{ opacity:.6; }
+  .rcvitem{ display:flex; flex-direction:column; gap:4px; }
+  .rcvitem .rcvtype{ align-self:flex-end; font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
+  .rcvitem .rcvtype.need{ border:2px solid var(--danger); background:var(--danger-soft, #fbe9e5); }
   .rcvic{ font-size:1.4rem; flex:none; }
   .rcvtx{ display:flex; flex-direction:column; min-width:0; }
   .rcvtx b{ font-size:.9rem; overflow-wrap:anywhere; }
@@ -1250,12 +1256,13 @@
         </div>
         <div class="card" id="quoteAttCard">
           <h3>添付資料（平面図・見積書など）</h3>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">平面図はここに登録すると、見積依頼メールに自動で添付され、プランボードの元図面としても使えます。受領した見積書は種類（プランボード／見積／定価／NET）を指定して登録できます。入れたフォルダーに合わせて部位が自動で付き、記録の同じ部位にも並びます。</p>
           <div class="uploadrow revealbox" id="attUploadBox" hidden>
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
               <option value="plan">図面</option>
               <option value="プランボード">プランボード</option>
+              <option value="見積">見積</option>
               <option value="定価">定価</option>
               <option value="NET">NET</option>
               <option value="other">その他</option>
@@ -4071,7 +4078,7 @@
   function methodPill(method){ return '<span class="pill method">'+(method==="gmail"?"Gmail":"FAX")+'</span>'; }
   // 書類の種類：プランボード（お客様に出せる）／定価／NET（NETは暗証番号でロック。お客様に出せるのはプランボードだけ）。
   // 以前の「見積もり」は定価、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
-  var QUOTE_TYPES = ["プランボード","定価","NET"];
+  var QUOTE_TYPES = ["プランボード","見積","定価","NET"]; // 見積＝社内用（ロックなし・お客様には出さない）
   function quoteTypeNorm(t){ return t==="見積もり" ? "定価" : (t==="仕切り" ? "NET" : (t||"")); }
   function quoteLocked(t){ return quoteTypeNorm(t) === "NET"; }
   function quotePill(qt){ var n = quoteTypeNorm(qt); return n ? '<span class="pill quote-'+n+'">'+n+'</span>' : ""; }
@@ -4174,12 +4181,24 @@
       } else if(st==="未依頼"){
         acts = '<button class="btn small secondary" data-hropen="'+r.projectId+'">案件で依頼する ›</button>';
       }
+      var filesHtml = "";
+      if(st==="受領済み"){
+        var ra = liveAttachments().filter(function(a){ return a.requestId===r.id; });
+        filesHtml = '<div class="hrfiles">'+
+          '<span class="muted" style="font-size:.85rem;">受領 '+(r.receivedAt?fmtDate(r.receivedAt):"")+(r.receivedBy?"・"+escapeHtml(r.receivedBy):"")+'</span>'+
+          (ra.length ? ra.map(function(a){
+            if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return '<span class="lockbox hrfile" style="cursor:pointer;">🔒 NET（タップして解除）</span>';
+            return '<span class="hrfile" data-openatt="'+a.id+'">📄 '+escapeHtml(a.name)+' '+quotePill(a.quoteType)+'</span>';
+          }).join("") : '<span class="muted" style="font-size:.85rem;">（書類は付いていません）</span>')+
+        '</div>';
+      }
       return '<div class="projrow hrrow" style="flex-wrap:wrap; gap:6px;">'+
         '<div class="pname">'+escapeHtml(v.name)+'</div>'+
         (st==="返信あり" ? '' : '<span class="pill status-'+st+'">'+st+'</span>')+
         (r.requestedAt ? '<span class="muted tabular" style="font-size:.85rem;">依頼 '+fmtDate(r.requestedAt)+'</span>' : '')+
         (el!==null ? '<span class="tabular" style="font-size:.85rem;'+(late?'color:var(--danger);font-weight:700;':'')+'">'+el+'日経過</span>' : '')+
         (content ? '<span class="muted" style="font-size:.85rem; flex-basis:100%;">'+escapeHtml(content)+'</span>' : '')+
+        filesHtml+
         (acts ? '<div class="hracts">'+acts+'</div>' : '')+
       '</div>';
     }
@@ -9013,6 +9032,7 @@
     for(var i=0;i<allRows.length;i++){ await saveDoc("requests", allRows[i].id, allRows[i]); }
   }
   function markReceivedFinish(r, receivedBy){
+    if(r.status==="受領済み"){ toast("この依頼はすでに受領済みです"); return; }
     r.status="受領済み"; r.receivedAt=todayStr(); r.receivedBy=receivedBy||""; r.replyDetected=false; r.replySnippet=""; r.replyDate=""; r.replySubject=""; r.replyThreadId="";
     render();
     saveDoc("requests", r.id, r);
@@ -9129,15 +9149,16 @@
     var proj = projectById(r.projectId);
     var rowsHtml = items.map(function(it, i){
       var isImg = /^image\//.test(it.mimeType||"");
-      return '<label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-rcv="'+i+'"'+(it.already?' disabled':(isImg?'':' checked'))+'>'+
+      var sel = it.already ? '' : '<select class="rcvtype" data-rcvtype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+
+        QUOTE_TYPES.map(function(q){ return '<option value="'+q+'">'+q+'</option>'; }).join("")+'</select>';
+      return '<div class="rcvitem'+(it.already?' done':'')+'"><label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-rcv="'+i+'"'+(it.already?' disabled':(isImg?'':' checked'))+'>'+
         '<span class="rcvic">'+(/pdf/i.test(it.mimeType||"")||/\.pdf$/i.test(it.filename||"")?"📄":(isImg?"🖼":"📎"))+'</span>'+
-        '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>';
+        '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>'+sel+'</div>';
     }).join("");
     overlay.innerHTML = '<div class="rcvbox" role="dialog" aria-modal="true">'+
       '<h3 style="margin:0 0 4px;">受領登録</h3>'+
       '<div class="muted" style="font-size:.85rem; margin-block-end:10px;">'+escapeHtml((proj?proj.name:"")+"　"+(vendor?vendor.name:""))+'</div>'+
-      (items.length ? '<div style="font-weight:700; font-size:.9rem; margin-block-end:6px;">📧 Gmailに届いた添付（付けるものにチェック）</div><div class="rcvlist">'+rowsHtml+'</div>'+
-        '<label class="field" style="margin-block-start:10px;">書類の種類<select id="rcvType">'+QUOTE_TYPES.map(function(q){ return '<option'+(q==="定価"?" selected":"")+'>'+q+'</option>'; }).join("")+'</select></label>'
+      (items.length ? '<div style="font-weight:700; font-size:.9rem; margin-block-end:6px;">📧 Gmailに届いた添付（付けるものにチェックして、ファイルごとに種類を選ぶ）</div><div class="rcvlist">'+rowsHtml+'</div>'
         : (typeof triedGmail==="string" ? '<div class="muted" style="font-size:.9rem; color:var(--danger,#b4462f);">⚠ '+escapeHtml(triedGmail)+'</div>'
           : (triedGmail ? '<div class="muted" style="font-size:.9rem;">Gmailに、この業者さん（同じ会社のアドレスを含む）から依頼日以降に届いた添付付きのメールは見つかりませんでした。</div>' : '')))+
       '<div style="margin-block-start:8px;"><button type="button" class="btn small secondary" data-rcvgo="file">📎 ファイルから見積書を選ぶ</button></div>'+
@@ -9160,13 +9181,23 @@
       }
       var by = overlay.querySelector("#rcvBy").value;
       var chosen = Array.prototype.slice.call(overlay.querySelectorAll("[data-rcv]:checked")).map(function(x){ return items[+x.dataset.rcv]; });
-      var qt = overlay.querySelector("#rcvType") ? overlay.querySelector("#rcvType").value : "定価";
+      var chosenIdx = Array.prototype.slice.call(overlay.querySelectorAll("[data-rcv]:checked")).map(function(x){ return +x.dataset.rcv; });
+      var typeOf = {}, missing = 0;
+      overlay.querySelectorAll(".rcvtype").forEach(function(x){ x.classList.remove("need"); });
+      chosenIdx.forEach(function(i){
+        var se = overlay.querySelector('[data-rcvtype="'+i+'"]');
+        var v = se ? se.value : "";
+        if(!v){ missing++; if(se) se.classList.add("need"); } else typeOf[i] = v;
+      });
+      if(missing){ toast("チェックしたファイルの種類を選んでください（"+missing+"件が未選択）", 6000); return; }
+      // 開いている間に別の画面・端末で受領済みになっていたら止める（二重登録の防止）
+      if(r.status==="受領済み"){ toast("この依頼はすでに受領済みです（"+(r.receivedAt?fmtDate(r.receivedAt):"")+(r.receivedBy?"・"+r.receivedBy:"")+"）", 7000); overlay.remove(); return; }
       if(chosen.length){
         overlay.querySelectorAll("button").forEach(function(x){ x.disabled = true; });
         b.textContent = "取り込み中…（0/"+chosen.length+"）";
         var okN = 0, failN = 0;
         for(var i=0;i<chosen.length;i++){
-          try{ await importGmailAttachment(r, chosen[i], qt); okN++; }catch(err){ failN++; }
+          try{ await importGmailAttachment(r, chosen[i], typeOf[chosenIdx[i]]); okN++; }catch(err){ failN++; }
           b.textContent = "取り込み中…（"+(i+1)+"/"+chosen.length+"）";
         }
         render();
@@ -9178,15 +9209,21 @@
       markReceivedFinish(r, by);
     });
   }
+  var receivingNow = {}; // Gmailを探している間に2回押されても画面を2つ開かない
   async function markReceived(id, skipGmail){
     var r = state.requests.find(function(x){ return x.id===id; });
     if(!r) return;
+    if(r.status==="受領済み"){ toast("この依頼はすでに受領済みです（"+(r.receivedAt?fmtDate(r.receivedAt):"")+(r.receivedBy?"・"+r.receivedBy:"")+"）。もう一度登録はできません", 7000); return; }
+    if(receivingNow[id]) return;
+    if(document.querySelector(".rcvov")) return;
     var vendor = vendorById(r.vendorId);
     var tryGmail = !skipGmail && !!(r.replyThreadId || r.gmailThreadId || (r.method==="gmail" && vendor && vendor.email));
     if(tryGmail){
       toast("Gmailの添付を探しています…");
       var found = null;
+      receivingNow[id] = true;
       try{ found = await findGmailAttachmentsFor(r); }catch(e){ found = { error:"network" }; }
+      finally{ delete receivingNow[id]; }
       var errMsg = (found && found.error) ? gmailErrText(found.error==="network" ? "failed" : found.error) : "";
       if(errMsg) toast(errMsg+"（受領登録はできます）", 9000);
       openReceiveSheet(r, (found && found.items) || [], errMsg || true);
@@ -11301,7 +11338,18 @@
       var row = e.target.closest("[data-open-project]");
       if(row) openProjectDetail(row.dataset.openProject);
     });
-    document.getElementById("homeReqList").addEventListener("click", handleTableClick);
+    document.getElementById("homeReqList").addEventListener("click", function(e){
+      var openEl = e.target.closest("[data-openatt]");
+      if(openEl){ openAttachment(openEl.dataset.openatt); return; }
+      if(e.target.closest(".lockbox")){
+        askPin(function(val){
+          if(val === state.settings.pin){ state.quoteUnlocked = true; render(); toast("解除しました"); scheduleQuoteAutoLock(); }
+          else if(val !== null){ toast("暗証番号が違います"); }
+        });
+        return;
+      }
+      handleTableClick(e);
+    });
     document.getElementById("btnCheckReplies2").addEventListener("click", checkGmailReplies);
     document.getElementById("homeReqCard").addEventListener("click", function(e){
       if(e.target.closest("[data-act]")) return;
@@ -11433,12 +11481,26 @@
       var rid = pendingReqAttachId; input.value = "";
       var thenReceive = pendingReqAttachThenReceive; pendingReqAttachThenReceive = false;
       if(!files.length || !rid) return;
-      askChoice("書類の種類", "NETだけ暗証番号でロックされます。お客様に出せるのはプランボードだけです（定価・NETは出ません）。", [{label:"プランボード", value:"プランボード"},{label:"定価", value:"定価"},{label:"NET", value:"NET"}], function(qt){
-        if(qt===null) return;
-        uploadAttachments(files, "quote", qt, rid).then(function(n){
-          if(thenReceive && n>0){ toast("見積書を"+n+"件付けました。受領登録に進みます"); markReceived(rid, true); }
+      // ファイルごとに種類を選ぶ（1つずつ聞く）。途中で「やめる」と何も付けない。
+      var qtOpts = QUOTE_TYPES.map(function(q){ return {label:q, value:q}; });
+      var picked = [];
+      (function askNext(i){
+        if(i>=files.length){
+          var groups = {};
+          picked.forEach(function(x){ (groups[x.qt] = groups[x.qt] || []).push(x.f); });
+          var keys = Object.keys(groups), total = 0;
+          (async function(){
+            for(var k=0;k<keys.length;k++){ total += (await uploadAttachments(groups[keys[k]], "quote", keys[k], rid)) || 0; }
+            if(thenReceive && total>0){ toast("見積書を"+total+"件付けました。受領登録に進みます"); markReceived(rid, true); }
+          })();
+          return;
+        }
+        askChoice("書類の種類"+(files.length>1?"（"+(i+1)+"/"+files.length+"）":""), "「"+files[i].name+"」の種類を選んでください。\nNETだけ暗証番号でロックされます。お客様に出せるのはプランボード・定価だけです。", qtOpts, function(qt){
+          if(qt===null){ toast("やめました（ファイルは付けていません）"); return; }
+          picked.push({f:files[i], qt:qt});
+          askNext(i+1);
         });
-      });
+      })(0);
     });
     document.getElementById("projectTableBody").addEventListener("click", function(e){
       var tg = e.target.closest("[data-reqatttoggle]");
