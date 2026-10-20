@@ -1698,7 +1698,8 @@
       </div>
       <div style="margin-block-start:10px;">
         <h3 style="margin:0 0 6px;">Gmailで送信</h3>
-        <div class="row"><label class="field">宛先<input type="text" id="pbMailTo" placeholder="vendor@example.com"></label></div>
+        <div class="row"><label class="field">宛先<input type="text" id="pbMailTo" list="pbMailToList" placeholder="業者名かメールアドレス（空欄でも下書きは作れます）"></label></div>
+        <datalist id="pbMailToList"></datalist>
         <div class="row"><label class="field">件名<input type="text" id="pbMailSubject" placeholder="【プランボード】〇〇様邸 のご確認"></label></div>
         <label class="field" style="margin-block-start:8px;">本文<textarea id="pbMailBody" rows="3" placeholder="お世話になっております。住まいるハウジングでございます。"></textarea></label>
         <div class="row" style="margin-block-start:10px;"><button class="btn" id="pbSend">この内容でGmail下書きを作成</button></div>
@@ -13080,12 +13081,34 @@
     document.getElementById("pbSaveTop").addEventListener("click", pbSaveToProject);
     document.getElementById("pbDownload").addEventListener("click", pbDownloadImage);
     document.getElementById("pbDownloadTop").addEventListener("click", pbDownloadImage);
+    document.getElementById("pbMailTo").addEventListener("focus", function(){
+      var dl = document.getElementById("pbMailToList"); if(!dl) return;
+      dl.innerHTML = (state.vendors||[]).filter(function(v){ return !v.deletedAt && v.email; }).map(function(v){
+        return '<option value="'+escapeHtml(v.email)+'">'+escapeHtml(v.name)+'</option>';
+      }).join("");
+    });
     document.getElementById("pbSend").addEventListener("click", async function(){
       var toRaw = document.getElementById("pbMailTo").value.trim();
       var subject = document.getElementById("pbMailSubject").value.trim();
       var body = document.getElementById("pbMailBody").value;
-      if(!toRaw){ toast("宛先を入力してください"); return; }
-      var to = toRaw.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+      // 宛先：メールアドレスはそのまま、業者名は登録のメールアドレスに置き換える。分からない名前は宛先に入れない
+      // （Gmailはメールアドレス以外の宛先だと下書きを作れないため）
+      var to = [], unknown = [];
+      toRaw.split(/[,、，\s]+/).map(function(x){ return x.trim(); }).filter(Boolean).forEach(function(x){
+        var m = x.match(/[^\s<>"]+@[^\s<>"]+/);
+        if(m){ to.push(m[0]); return; }
+        var key = inboxVendorKey(x);
+        var v = (state.vendors||[]).find(function(y){ return !y.deletedAt && y.email && inboxVendorKey(y.name).indexOf(key)!==-1; });
+        if(v) to.push(String(v.email).trim()); else unknown.push(x);
+      });
+      if(unknown.length){
+        var goOn = await new Promise(function(resolve){
+          askChoice("宛先のメールアドレスが分かりません", "「"+unknown.join("、")+"」は業者一覧にメールアドレスが登録されていません。\n宛先を空けたまま下書きを作り、Gmailで宛先を入れますか？", [
+            {label:"宛先なしで下書きを作る", value:"go"}, {label:"やめる（宛先を直す）", value:"stop"}
+          ], function(v){ resolve(v==="go"); });
+        });
+        if(!goOn) return;
+      }
       var sendBtn = document.getElementById("pbSend");
       sendBtn.disabled = true; sendBtn.textContent = "送信中…";
       try{
@@ -13126,9 +13149,11 @@
         if(!res.ok){
           var errText = "";
           try{ errText = JSON.stringify(await res.json()); }catch(e2){}
+          if(res.status===401) throw new Error("ログインの有効期限が切れました。ログインし直してください");
+          if(/refresh_failed|invalid_grant/.test(errText)) throw new Error("Gmailとの連携が切れています。設定の「Gmailと連携する」からやり直してください");
           throw new Error("HTTP "+res.status+" "+errText);
         }
-        toast("Gmail下書きを作成しました（添付"+atts.length+"件）");
+        toast("Gmail下書きを作成しました（添付"+atts.length+"件"+(to.length?"・宛先 "+to.join(", "):"・宛先なし。Gmailで宛先を入れてください")+"）", 8000);
         logActivity("プランボードのGmail下書きを作成しました");
       }catch(e){ toast("Gmail下書きの作成に失敗しました："+(e && e.message ? e.message : "")); }
       finally{ sendBtn.disabled=false; sendBtn.textContent="この内容でGmail下書きを作成"; }
