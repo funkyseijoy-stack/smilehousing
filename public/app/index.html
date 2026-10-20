@@ -3404,6 +3404,8 @@
     if(t.private) meta.push('<span>🔒</span>');
     if(t.memo) meta.push('<span>📝</span>');
     if(nAtt) meta.push('<span>📎'+nAtt+'</span>');
+    var lastRv = taskReviewList(t).slice(-1)[0];
+    if(lastRv && lastRv.result==="返信") meta.push('<span class="chk" style="color:#3a6ea5;">💬 '+escapeHtml(lastRv.by||"")+'から返信</span>');
     return '<div class="kancard'+(t.reflected?" reflected":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
@@ -3423,7 +3425,7 @@
       '</div>'+
       (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
       (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
-      (t.review && t.review.result ? '<div class="kc-memo" style="border-left-color:'+(t.review.result==="承認"?'var(--accent)':'var(--orange)')+';">'+(t.review.result==="承認"?'✅ 承認':'↩ 差し戻し')+'（'+escapeHtml(t.review.by||"")+'）'+(t.review.note?' '+escapeHtml(t.review.note):'')+'</div>' : '')+
+      taskReviewsHtml(t)+
       (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
         var st = v.status||"未連絡";
         var done = VENDOR_STATUS.indexOf(st) >= 1;
@@ -3440,7 +3442,7 @@
         (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
         (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
-        (canReviewTask(t)?'<button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
+        (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
         '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
       '</div>'+
       (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
@@ -11019,22 +11021,59 @@
     var col = checkStatusFor(t.checker);
     return col ? t.status===col : !t.review;
   }
+  // 確認者のやりとり（承認・差し戻し・返信）。古い t.review だけのタスクも1件として出す
+  function taskReviewList(t){ return Array.isArray(t.reviews) ? t.reviews : (t.review && t.review.result ? [t.review] : []); }
+  var REVIEW_LOOK = { "承認":["✅ 承認","var(--accent)"], "差し戻し":["↩ 差し戻し","var(--orange)"], "返信":["💬 返信","#3a6ea5"] };
+  function taskReviewsHtml(t){
+    var list = taskReviewList(t); if(!list.length) return "";
+    return list.map(function(r){
+      var lk = REVIEW_LOOK[r.result] || [r.result, "var(--muted)"];
+      var d = r.at ? new Date(r.at) : null;
+      var when = d && !isNaN(d.getTime()) ? (d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+":"+String(d.getMinutes()).padStart(2,"0") : "";
+      return '<div class="kc-memo" style="border-left-color:'+lk[1]+'; white-space:pre-wrap;"><b>'+lk[0]+'</b>（'+escapeHtml(r.by||"")+(when?'・'+when:'')+'）'+(r.note?'\n'+escapeHtml(r.note):'')+'</div>';
+    }).join("");
+  }
+  // コメントの入力（複数行）。キャンセルは null
+  function askComment(title, hint, required){
+    return new Promise(function(resolve){
+      var ov = document.createElement("div");
+      ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+      ov.innerHTML = '<div class="taskform-card" style="max-width:520px; width:100%;"><h3 style="margin:0 0 6px;">'+escapeHtml(title)+'</h3>'+
+        '<div class="muted" style="font-size:.85rem; margin-block-end:6px;">'+escapeHtml(hint)+'</div>'+
+        '<textarea rows="5" style="width:100%; box-sizing:border-box;" maxlength="1000"></textarea>'+
+        '<div class="row" style="gap:8px; margin-block-start:10px;"><button type="button" class="btn" data-ok>送る</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
+      document.body.appendChild(ov);
+      var ta = ov.querySelector("textarea"); setTimeout(function(){ ta.focus(); }, 50);
+      ov.addEventListener("click", function(e){
+        if(e.target.closest("[data-cancel]") || e.target===ov){ ov.remove(); resolve(null); return; }
+        if(e.target.closest("[data-ok]")){
+          var v = ta.value.trim();
+          if(required && !v){ toast("返信の内容を書いてください"); ta.focus(); return; }
+          ov.remove(); resolve(v.slice(0,1000));
+        }
+      });
+    });
+  }
   async function reviewTask(id, result){
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t || !canReviewTask(t)) return;
-    var note = "";
-    if(result==="差し戻し"){
-      var v = prompt("差し戻しの理由・コメント（担当者に届きます。空でも構いません）", "");
-      if(v===null) return;
-      note = v.trim().slice(0,300);
-    }
-    t.review = { result: result, by: state.currentUser || t.checker, note: note, at: nowIso() };
-    t.status = result==="承認" ? "対応中" : "未着手";
+    var who = t.assignee || t.creator || "担当者";
+    var note = await askComment(
+      result==="返信" ? "💬 返信して戻す" : (result==="承認" ? "✅ 承認する" : "↩ 差し戻す"),
+      result==="返信" ? "答えを書いてください。"+who+"さんに届き、タスクは「対応中」へ戻ります。" :
+      (result==="承認" ? "コメントがあれば書いてください（空でも承認できます）。タスクは「対応中」へ移ります。" : "差し戻しの理由・コメント（空でも構いません）。タスクは「未着手」へ戻ります。"),
+      result==="返信");
+    if(note===null) return;
+    t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var entry = { result: result, by: state.currentUser || t.checker, note: note, at: nowIso() };
+    t.reviews = taskReviewList(t).concat([entry]);
+    t.review = entry;
+    t.status = result==="差し戻し" ? "未着手" : "対応中";
     t.updatedAt = nowIso(); t.completedAt = null; t.archivedAt = null;
     state.taskOpen = state.taskOpen || {};
     state.taskOpen[t.status] = true;
     render();
-    toast(result==="承認" ? "承認しました（「対応中」へ移しました）" : "差し戻しました（「未着手」へ移しました）");
+    toast(result==="承認" ? "承認しました（「対応中」へ移しました）" : (result==="返信" ? "返信して"+who+"さんへ戻しました（「対応中」へ移しました）" : "差し戻しました（「未着手」へ移しました）"));
     await saveDoc("tasks", t.id, t);
     logActivity("タスクを"+result+"しました（"+(t.content||"").slice(0,20)+"）");
   }
@@ -12915,6 +12954,7 @@
       if(act==="statusmenu"){ state.taskMenuId = (state.taskMenuId===id ? null : id); renderKanban(); }
       else if(act==="setstatus") setTaskStatus(id, btn.dataset.status);
       else if(act==="approve") reviewTask(id, "承認");
+      else if(act==="reply") reviewTask(id, "返信");
       else if(act==="reject") reviewTask(id, "差し戻し");
       else if(act==="del"){ if(confirm2()) deleteTask(id); }
       else if(act==="edit") openTaskForm(id);

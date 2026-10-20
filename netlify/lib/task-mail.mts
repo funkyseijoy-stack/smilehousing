@@ -172,10 +172,11 @@ export async function sendTaskReviewMail(store: any, task: any, by: string) {
   let projectName = "";
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
   const approved = r.result === "承認";
-  const subject = "【住まいる】" + (approved ? "承認されました" : "差し戻されました") + "：" + String(task.content || "").replace(/\s+/g, " ").slice(0, 30);
+  const replied = r.result === "返信";
+  const subject = "【住まいる】" + (replied ? "返信がありました" : approved ? "承認されました" : "差し戻されました") + "：" + String(task.content || "").replace(/\s+/g, " ").slice(0, 30);
   const body = [name + "さん", "",
-    (r.by || by ? (r.by || by) + "さんが、" : "") + (approved ? "次のタスクを承認しました。進めてください。" : "次のタスクを差し戻しました。内容を確認してください。"), "",
-    ...(r.note ? ["コメント：" + String(r.note).slice(0, 300), ""] : []),
+    (r.by || by ? (r.by || by) + "さんが、" : "") + (replied ? "次のタスクに返信しました。" : approved ? "次のタスクを承認しました。進めてください。" : "次のタスクを差し戻しました。内容を確認してください。"), "",
+    ...(r.note ? [(replied ? "返信：" : "コメント：") + String(r.note).slice(0, 1000), ""] : []),
     ...taskLines(task, projectName), "", "▼ 住まいるアプリを開く", APP_URL, "", MAIL_FOOTER].join("\n");
   return await notifyStaff(store, name, subject, body);
 }
