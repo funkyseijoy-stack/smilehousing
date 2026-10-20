@@ -657,6 +657,10 @@
   .rcvitem .rcvtype{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
   .rcvitem .rcvpart{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
   .rcvitem .rcvvend{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
+  .tfptile .ftthumb{ position:relative; }
+  .tfptile .tfpcheck{ position:absolute; top:6px; left:6px; width:28px; height:28px; border-radius:50%; background:var(--surface); border:2px solid var(--border); color:transparent; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .tfptile.on{ outline:3px solid var(--accent); }
+  .tfptile.on .tfpcheck{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .mnflist{ display:flex; flex-direction:column; gap:6px; margin-block:4px 10px; }
   .mnfrow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
   .mnfrow.mnfx{ margin-inline-start:22px; border-color:var(--accent); background:var(--accent-soft, var(--surface-2)); }
@@ -1770,6 +1774,8 @@
       </div>
       <label class="field" style="flex-direction:row; align-items:center; gap:6px;"><input type="checkbox" id="tfPrivate"> 自分だけのタスク（他の人には表示されません）</label>
       <label class="field">添付（写真・PDFなど）<input type="file" id="tfAttachment" multiple></label>
+      <div class="row" style="gap:8px; flex-wrap:wrap; margin-block:-2px 6px;"><button type="button" class="btn secondary small" id="tfPickPlan">📐 この案件の図面・プランボードから選ぶ</button></div>
+      <div id="tfFileList"></div>
       <div class="row" style="margin-block-start:6px;">
         <button class="btn" id="tfSubmit">追加</button>
         <button class="btn secondary" id="tfCancel">キャンセル</button>
@@ -10506,10 +10512,10 @@
     if(!blob) return;
     mnOpenDraw(blob, name, mnIsPdf(ct, name), after);
   }
-  function mnOpenDraw(blob, name, isPdf, after){
+  function mnOpenDraw(blob, name, isPdf, after, sink){
     document.getElementById("pbModal").hidden = false;
     pb.currentAttachmentId = null;
-    pb.saveTarget = { type:"note", after: after, name: name||"図面" };
+    pb.saveTarget = { type:"note", after: after, name: name||"図面", sink: sink||"note" };
     pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
     pbUpdatePdfPageNav();
     document.getElementById("pbActionsCard").hidden = true;
@@ -10530,7 +10536,11 @@
     }
     var base = String(target.name||"図面").replace(/\.[^.]+$/,"").replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","");
     var pid = state.currentProjectId;
-    function add(b, nm, type){ mnExtras.push({ key: uid("mnx"), pid: pid, after: target.after||"x", file: b, name: nm, type: type }); }
+    var toTask = target.sink==="task";
+    function add(b, nm, type){
+      if(toTask) tfExtras.push({ key: uid("tfx"), file: b, name: nm, type: type });
+      else mnExtras.push({ key: uid("mnx"), pid: pid, after: target.after||"x", file: b, name: nm, type: type });
+    }
     if(blobs.length>1){
       var merged = null;
       try{ merged = await combinePngBlobsToPdf(blobs); }catch(e){ merged = null; }
@@ -10539,9 +10549,91 @@
     } else {
       add(blobs[0], base+".png", "image/png");
     }
-    renderMnFileList();
     closePlanBoard();
+    if(toTask){ renderTfFileList(); toast("書き込んだ図面をタスクの添付に足しました（元のファイルも残ります。「追加／保存」で保存されます）", 7000); return; }
+    renderMnFileList();
     toast("書き込んだ図面を記録に足しました（元のファイルも残ります。「記録する／更新」で保存されます）", 7000);
+  }
+  // ---- タスクの入力画面：案件の図面・プランボードを選んで添付（書き込んでからも可） ----
+  var tfExtras = []; // {key, ref?:{id,url,contentType,name}, file?:Blob, name, type}
+  function tfPlanRows(pid){
+    return liveAttachments().filter(function(a){
+      if(a.projectId!==pid) return false;
+      if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return false;
+      var ct = a.contentType||"";
+      return (a.kind==="plan" || a.kind==="quote") && (ct.indexOf("image")===0 || ct.indexOf("pdf")>=0 || /\.pdf$/i.test(a.name||""));
+    }).sort(function(a,b){ return String(b.uploadedAt||"").localeCompare(String(a.uploadedAt||"")); });
+  }
+  function renderTfFileList(){
+    var box = document.getElementById("tfFileList"); if(!box) return;
+    if(!tfExtras.length){ box.innerHTML = ""; return; }
+    box.innerHTML = '<div class="mnflist">'+tfExtras.map(function(x){
+      if(x.file && !x.url) x.url = URL.createObjectURL(x.file);
+      var url = x.ref ? x.ref.url : x.url, ct = x.ref ? x.ref.contentType : x.type, nm = x.ref ? x.ref.name : x.name;
+      return '<div class="mnfrow"><span class="notefiletile mnfthumb">'+mnThumb(url, ct, nm)+'</span>'+
+        '<span class="mnfname">'+(x.file?'✏️ ':'📐 ')+escapeHtml(nm||"添付")+'<small>'+(x.file?'書き込み済み（新しい版）':'案件の図面から')+'</small></span>'+
+        '<button type="button" class="btn small" data-tff-draw="'+x.key+'">✏️ 書き込む</button>'+
+        '<button type="button" class="btn danger-ghost small" data-tff-rm="'+x.key+'">外す</button></div>';
+    }).join("")+'</div>';
+  }
+  async function tfDrawFrom(x){
+    var blob = x.file || await mnBlobOfRef(x.ref); if(!blob) return;
+    var nm = x.ref ? x.ref.name : x.name, ct = x.ref ? x.ref.contentType : x.type;
+    mnOpenDraw(blob, nm, mnIsPdf(ct, nm), "x", "task");
+  }
+  function tfPickPlan(){
+    var pid = document.getElementById("tfProject").value;
+    if(!pid || pid==="__new"){ toast("先に案件を選んでください"); return; }
+    var rows = tfPlanRows(pid);
+    if(!rows.length){ toast("この案件にはまだ図面・プランボードが登録されていません（見積タブの「添付資料」から追加できます）", 7000); return; }
+    var picked = {};
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "90";
+    ov.innerHTML = '<div class="taskform-card" style="max-width:760px; width:100%;"><div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">📐 この案件の図面から選ぶ</h3><button type="button" class="btn secondary small" data-tfp-close>閉じる</button></div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block:4px 8px;">絵を押すと選べます（いくつでも）。「✏️ 書き込む」は書き込んだ版を付けます（元の図面はそのまま）。</div>'+
+      '<div class="ftgrid">'+rows.map(function(a){
+        var kindLbl = a.kind==="plan" ? "図面" : quoteTypeNorm(a.quoteType||"");
+        return '<div class="fttile tfptile" data-tfp="'+a.id+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(a.url, a.contentType, a.name)+'<span class="tfpcheck">✓</span></div>'+
+          '<div class="ftbody"><div class="ftname">'+escapeHtml(a.name||"図面")+'</div><div class="ftmeta"><span class="pill small">'+escapeHtml(kindLbl)+'</span>'+
+          '<button type="button" class="btn small ghost" data-tfp-draw="'+a.id+'">✏️ 書き込む</button></div></div></div>';
+      }).join("")+'</div>'+
+      '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" data-tfp-ok>選んだものを付ける</button><button type="button" class="btn secondary" data-tfp-close>やめる</button></div></div>';
+    document.body.appendChild(ov);
+    function refOf(a){ return { id: a.assetId, url: a.url, contentType: a.contentType, name: a.name }; }
+    ov.addEventListener("click", function(e){
+      if(e.target===ov || e.target.closest("[data-tfp-close]")){ ov.remove(); return; }
+      var dr = e.target.closest("[data-tfp-draw]");
+      if(dr){
+        e.stopPropagation();
+        var a0 = state.attachments.find(function(x){ return x.id===dr.dataset.tfpDraw; }); if(!a0) return;
+        ov.remove(); tfDrawFrom({ ref: refOf(a0) }); return;
+      }
+      if(e.target.closest("[data-tfp-ok]")){
+        var n = 0;
+        rows.forEach(function(a){
+          if(!picked[a.id]) return;
+          if(tfExtras.some(function(x){ return x.ref && x.ref.id===a.assetId; })) return;
+          tfExtras.push({ key: uid("tfx"), ref: refOf(a) }); n++;
+        });
+        ov.remove(); renderTfFileList();
+        if(n) toast(n+"件を添付に入れました（「追加／保存」で保存されます）");
+        return;
+      }
+      var t = e.target.closest("[data-tfp]"); if(!t) return;
+      picked[t.dataset.tfp] = !picked[t.dataset.tfp];
+      t.classList.toggle("on", !!picked[t.dataset.tfp]);
+    });
+  }
+  // 保存時：選んだ図面は同じファイルを参照、書き込んだ版はアップロードしてから付ける
+  async function tfResolveExtras(){
+    var out = [], ex = tfExtras.slice(); tfExtras = [];
+    for(var i=0;i<ex.length;i++){
+      var x = ex[i];
+      if(x.ref){ out.push({ id:x.ref.id, url:x.ref.url, contentType:x.ref.contentType, name:x.ref.name }); continue; }
+      try{ var r = await assets.upload(x.file, {type:x.type}); blobCache[r.id] = x.file; out.push({ id:r.id, url:r.url, contentType:r.contentType||x.type, name:x.name }); }
+      catch(e){ toast(x.name+" の添付に失敗しました"); }
+    }
+    return out;
   }
   // 「📐 この案件の図面から選ぶ」
   function mnPickPlan(){
@@ -10733,6 +10825,7 @@
     document.getElementById("tfDeadline").value = "";
     document.getElementById("tfPrivate").checked = false;
     document.getElementById("tfAttachment").value = "";
+    tfExtras = []; renderTfFileList();
     taskFormVendorSpec = null;
     document.getElementById("tfVendorSpecLabel").textContent = "未選択";
     document.getElementById("tfTitle").textContent = editing ? "タスクを編集" : "タスクを追加";
@@ -10848,6 +10941,10 @@
           }catch(e){ toast(files[j].name+" の添付に失敗しました"); }
         }
       }
+      (await tfResolveExtras()).forEach(function(a){
+        if(editTarget.attachments.some(function(b){ return b.id===a.id; })) return;
+        editTarget.attachmentAssetIds.push(a.id); editTarget.attachments.push(a);
+      });
       editTarget.projectId = projectId||null;
       if(deptToSave) editTarget.dept = deptToSave; else delete editTarget.dept;
       editTarget.content = content;
@@ -10886,6 +10983,10 @@
         catch(e){ toast(files[i].name+" の添付に失敗しました"); }
       }
     }
+    (await tfResolveExtras()).forEach(function(a){
+      if(taskAttachments.some(function(b){ return b.id===a.id; })) return;
+      attachmentAssetIds.push(a.id); taskAttachments.push(a);
+    });
 
     var t = {
       id: uid("task"), projectId: projectId||null, dept: deptToSave || undefined, content: content, memo: memo,
@@ -11927,7 +12028,7 @@
   }
   async function pbSaveToProject(){
     if(pb.saving) return; // 連打による二重・三重保存を防ぐ
-    if(!state.currentProjectId){ toast("案件が選択されていません"); return; }
+    if(!state.currentProjectId && !(pb.saveTarget && pb.saveTarget.type==="note")){ toast("案件が選択されていません"); return; }
     var pid0 = state.currentProjectId; pb.pid = pid0;
     if(!assets){ toast("この画面では保存が利用できません"); return; }
     pb.saving = true;
@@ -12868,6 +12969,13 @@
       if(this.value) document.getElementById("tfDept").value = deptAutoOfTask({projectId: this.value});
     });
     document.getElementById("tfNewProjAdd").addEventListener("click", tfCreateProject);
+    document.getElementById("tfPickPlan").addEventListener("click", tfPickPlan);
+    document.getElementById("tfFileList").addEventListener("click", function(e){
+      var d = e.target.closest("[data-tff-draw]");
+      if(d){ var x = tfExtras.find(function(y){ return y.key===d.dataset.tffDraw; }); if(x) tfDrawFrom(x); return; }
+      var r = e.target.closest("[data-tff-rm]");
+      if(r){ tfExtras = tfExtras.filter(function(y){ return y.key!==r.dataset.tffRm; }); renderTfFileList(); }
+    });
     document.getElementById("tfNewProjName").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); tfCreateProject(); } });
     document.getElementById("tfNewProjCancel").addEventListener("click", function(){ document.getElementById("tfNewProjRow").hidden = true; });
     document.getElementById("projTaskList").addEventListener("click", function(e){
