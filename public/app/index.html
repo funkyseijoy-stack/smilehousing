@@ -534,6 +534,12 @@
     /* ボードはカードの余白をはみ出して画面いっぱいに使う */
     #panel-home .kboard{ margin-inline:-16px; padding-inline:16px; scroll-padding-inline:16px; }
   }
+  .kboard-topscroll{ overflow-x:auto; overflow-y:hidden; height:16px; margin-block-end:4px; }
+  .kboard-topscroll > div{ height:1px; }
+  .kboard-topscroll::-webkit-scrollbar{ height:10px; }
+  .kboard-topscroll::-webkit-scrollbar-track{ background:transparent; }
+  .kboard-topscroll::-webkit-scrollbar-thumb{ background:#8f877e; border-radius:6px; }
+  .kboard-topscroll[hidden]{ display:none; }
   .kboard{ display:flex; gap:12px; overflow-x:auto; align-items:flex-start; padding-block-end:10px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
   .kcol{ flex:0 0 310px; min-width:0; background:var(--surface-2); border-radius:14px; border-top:5px solid var(--sc); padding:10px 8px 8px; scroll-snap-align:start; }
   @media (max-width:760px){ .kcol{ flex-basis:86%; } }
@@ -863,6 +869,7 @@
       </div>
       <!-- 以前の絞り込み（使っていない。古い処理が参照するので空のまま残す） -->
       <div hidden><select id="taskFolderFilter"></select><div id="taskStatusFilterBar"></div><div id="taskKindFilterBar"></div><div id="taskAssigneeFilterBar"></div></div>
+      <div class="kboard-topscroll" id="kanbanTopScroll" aria-hidden="true"><div></div></div>
       <div class="kboard" id="kanbanWrap"></div>
     </div>
     <div class="statrow">
@@ -12571,6 +12578,29 @@
     document.getElementById("meetingNoteInput");
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
     document.getElementById("btnMnPickPlan").addEventListener("click", mnPickPlan);
+    // タスクボードの横スクロールのバーを上にも出す（下のバーと連動）
+    (function(){
+      var top = document.getElementById("kanbanTopScroll"), board = document.getElementById("kanbanWrap");
+      if(!top || !board) return;
+      var inner = top.firstElementChild;
+      function size(){
+        inner.style.width = board.scrollWidth + "px";
+        top.hidden = board.scrollWidth <= board.clientWidth + 2;
+        if(!top.hidden) top.scrollLeft = board.scrollLeft;
+      }
+      var snapT = null;
+      top.addEventListener("scroll", function(){
+        if(Math.abs(board.scrollLeft-top.scrollLeft)<=1) return;
+        board.style.scrollSnapType = "none"; // 上のバーで動かしている間は、列に吸い付かないように
+        board.scrollLeft = top.scrollLeft;
+        clearTimeout(snapT); snapT = setTimeout(function(){ board.style.scrollSnapType = ""; }, 400);
+      });
+      board.addEventListener("scroll", function(){ if(Math.abs(board.scrollLeft-top.scrollLeft)>1) top.scrollLeft = board.scrollLeft; });
+      if(window.ResizeObserver) new ResizeObserver(size).observe(board);
+      new MutationObserver(function(){ requestAnimationFrame(size); }).observe(board, {childList:true, subtree:true});
+      window.addEventListener("resize", size);
+      size();
+    })();
     document.getElementById("meetingNoteFile").addEventListener("change", function(){
       // 選び直したら、前に選んだファイルへの書き込みは「最後」に回す（消さない）
       mnExtras.forEach(function(x){ if(x.after.indexOf("l:")===0) x.after = "x"; });
