@@ -657,6 +657,13 @@
   .rcvitem .rcvtype{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:60%; }
   .rcvitem .rcvpart{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
   .rcvitem .rcvvend{ font-size:.9rem; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); max-width:46%; }
+  .mnflist{ display:flex; flex-direction:column; gap:6px; margin-block:4px 10px; }
+  .mnfrow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+  .mnfrow.mnfx{ margin-inline-start:22px; border-color:var(--accent); background:var(--accent-soft, var(--surface-2)); }
+  .mnfrow .mnfthumb{ width:56px; height:56px; flex:0 0 56px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .mnfrow .mnfthumb img{ width:100%; height:100%; object-fit:cover; }
+  .mnfname{ flex:1; min-width:120px; font-size:.9rem; word-break:break-all; }
+  .mnfname small{ display:block; color:var(--muted); font-size:.85rem; }
   .rcvrefl{ display:inline-flex; align-items:center; gap:4px; font-size:.85rem; white-space:nowrap; color:var(--accent-ink); }
   .rcvrefl.off{ color:var(--muted); opacity:.6; }
   .rcvitem .rcvproj.need0{ border-color:var(--gold); }
@@ -1399,6 +1406,8 @@
             <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea>
             <div id="meetingNoteExistingFiles" hidden></div>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
+            <div class="row" style="gap:8px; flex-wrap:wrap; margin-block:-2px 6px;"><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 この案件の図面から選ぶ</button></div>
+            <div id="mnFileList"></div>
             <details class="mnmore">
               <summary>そのほか（お客様へのメッセージ・図面にも登録・タスクなど）</summary>
               <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
@@ -10124,7 +10133,7 @@
     var channel = document.getElementById("meetingNoteChannel").value || "打合せ";
     var talkPublic = !!document.getElementById("meetingNoteTalkShow").checked;
     // PDF・写真などの資料を添付する場合は、決定事項・未決事項が空でも記録できる（契約書類の保管など）。
-    var hasFilePicked = !!(document.getElementById("meetingNoteFile") && document.getElementById("meetingNoteFile").files && document.getElementById("meetingNoteFile").files.length);
+    var hasFilePicked = !!(document.getElementById("meetingNoteFile") && document.getElementById("meetingNoteFile").files && document.getElementById("meetingNoteFile").files.length) || mnLiveExtras().length>0;
     var editingHasFiles = false;
     if(editingMeetingNoteId){
       var ex0 = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
@@ -10137,7 +10146,25 @@
     var fileInput = document.getElementById("meetingNoteFile");
     var pidNote = state.currentProjectId; // アップロード中に別の案件を開いても、最初の案件に保存する
     var asPlan = !!(document.getElementById("meetingNoteAsPlan") && document.getElementById("meetingNoteAsPlan").checked);
-    var newFiles = await uploadFilesAsAttachmentsArray(fileInput ? fileInput.files : null);
+    // 書き込み済み・図面から選んだファイル（mnExtras）は、元のファイルの隣に入れる
+    var extrasNow = mnLiveExtras(); mnExtras = [];
+    var exFail = 0;
+    async function upX(x){
+      if(x.ref) return x.ref;
+      try{ var r = await assets.upload(x.file, {type:x.type}); blobCache[r.id] = x.file; return { id:r.id, url:r.url, contentType:r.contentType||x.type, name:x.name }; }
+      catch(e){ exFail++; return null; }
+    }
+    async function pushExtras(arr, after){
+      var xs = extrasNow.filter(function(x){ return x.after===after; });
+      for(var xi=0; xi<xs.length; xi++){ var r = await upX(xs[xi]); if(r) arr.push(r); }
+    }
+    var newFiles = [], localsNow = fileInput ? Array.prototype.slice.call(fileInput.files||[]) : [];
+    for(var li=0; li<localsNow.length; li++){
+      var upl = await uploadFilesAsAttachmentsArray([localsNow[li]]);
+      if(upl.length) newFiles.push(upl[0]);
+      await pushExtras(newFiles, "l:"+li);
+    }
+    await pushExtras(newFiles, "x");
     // 「図面にも登録する」: 添付したPDF・写真を、見積タブの「図面」と同じ形（kind:"plan"）でも登録する
     var planFailed = 0;
     if(asPlan && newFiles.length){
@@ -10146,7 +10173,7 @@
         var okType = (pf.contentType||"").indexOf("pdf")>=0 || (pf.contentType||"").indexOf("image")===0;
         if(!okType){ planFailed++; continue; }
         var attId = "att_n_"+pf.id; // 同じファイルを二重に登録しない
-        if(state.attachments.some(function(a){ return a.id===attId; })) continue;
+        if(state.attachments.some(function(a){ return a.id===attId || a.assetId===pf.id; })) continue;
         var attDoc = { id: attId, projectId: pidNote, assetId: pf.id, name: pf.name||"図面", url: pf.url,
           contentType: pf.contentType, sizeBytes: (blobCache[pf.id] && blobCache[pf.id].size) || 0, uploadedAt: todayStr(), kind:"plan" };
         state.attachments.push(attDoc);
@@ -10181,16 +10208,19 @@
       var keptFiles = [], replFailed = 0;
       for(var ei=0; ei<editNoteFiles.length; ei++){
         var ent = editNoteFiles[ei];
-        if(ent.removed) continue;
-        if(ent.repl){
-          var up = await uploadFilesAsAttachmentsArray([ent.repl]);
-          if(up.length){ keptFiles.push(up[0]); continue; }
-          replFailed++;
+        if(!ent.removed){
+          var fin = ent.f;
+          if(ent.repl){
+            var up = await uploadFilesAsAttachmentsArray([ent.repl]);
+            if(up.length) fin = up[0]; else replFailed++;
+          }
+          keptFiles.push(fin);
         }
-        keptFiles.push(ent.f);
+        await pushExtras(keptFiles, "e:"+ei); // この添付に書き込んだ新しい版は、すぐ後ろに入れる
       }
       existing.files = keptFiles.concat(newFiles);
       if(replFailed) toast("差し替えに失敗したファイルが "+replFailed+" 件あります（元のファイルのままです）");
+      if(exFail) toast("書き込んだ図面のうち "+exFail+" 件を保存できませんでした");
       if(newMeetingNoteSpecPart) existing.specPart = newMeetingNoteSpecPart;
       existing.badges = badgesToApply;
       existing.autoCreated = existing.autoCreated || {};
@@ -10206,6 +10236,7 @@
       return;
     }
 
+    if(exFail) toast("書き込んだ図面のうち "+exFail+" 件を保存できませんでした");
     var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, noteLines:mnNoteLines(), channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
@@ -10398,6 +10429,150 @@
     });
   }
 
+  // ---- 記録の入力画面で図面に書き込む（プランボード）・案件の図面から選ぶ ----
+  // mnExtras：記録に足すファイル（書き込み済み・図面から選んだもの）。「記録する／更新」で保存される。
+  //   after："l:<番号>"＝いま選んだファイルの隣／"e:<番号>"＝いまの添付の隣／"x"＝最後
+  //   file（Blob。書き込み済み）か ref（すでに保存済みのファイル {id,url,contentType,name}）のどちらか
+  var mnExtras = [];
+  function mnLocalFiles(){ var i = document.getElementById("meetingNoteFile"); return Array.prototype.slice.call((i && i.files) || []); }
+  function mnIsPdf(ct, name){ return /pdf/i.test(ct||"") || /\.pdf$/i.test(name||""); }
+  function mnLiveExtras(){ var pid = state.currentProjectId; return mnExtras.filter(function(x){ return x.pid===pid; }); }
+  function mnThumb(url, ct, name){
+    if(mnIsPdf(ct, name)) return url ? pdfThumbInnerHtml(url) : '📄';
+    if(/^image\//.test(ct||"")) return '<img loading="lazy" decoding="async" src="'+url+'" alt="">';
+    return '📎';
+  }
+  function renderMnFileList(){
+    var box = document.getElementById("mnFileList"); if(!box) return;
+    var locals = mnLocalFiles(), ex = mnLiveExtras();
+    var rows = [];
+    function exRows(after){
+      ex.filter(function(x){ return x.after===after; }).forEach(function(x){
+        if(x.file && !x.url) x.url = URL.createObjectURL(x.file);
+        var url = x.ref ? x.ref.url : x.url, ct = x.ref ? x.ref.contentType : x.type, nm = x.ref ? x.ref.name : x.name;
+        rows.push('<div class="mnfrow mnfx"><span class="notefiletile mnfthumb">'+mnThumb(url, ct, nm)+'</span>'+
+          '<span class="mnfname">'+(x.file?'✏️ ':'📐 ')+escapeHtml(nm||"添付")+'<small>'+(x.file?'書き込み済み（新しい版）':'案件の図面から')+'</small></span>'+
+          '<button type="button" class="btn small" data-mnf-draw="'+x.key+'">✏️ 書き込む</button>'+
+          '<button type="button" class="btn danger-ghost small" data-mnf-rm="'+x.key+'">外す</button></div>');
+      });
+    }
+    locals.forEach(function(f, i){
+      if(!f._mnUrl) f._mnUrl = URL.createObjectURL(f);
+      rows.push('<div class="mnfrow"><span class="notefiletile mnfthumb">'+mnThumb(f._mnUrl, f.type, f.name)+'</span>'+
+        '<span class="mnfname">'+escapeHtml(f.name)+'<small>これから添付</small></span>'+
+        '<button type="button" class="btn small" data-mnf-draw="l:'+i+'">✏️ 書き込む</button></div>');
+      exRows("l:"+i);
+    });
+    ex.map(function(x){ return x.after; }).filter(function(a, i, arr){ return a.indexOf("e:")===0 && arr.indexOf(a)===i; }).forEach(function(a){
+      var en = editNoteFiles[+a.slice(2)];
+      rows.push('<div class="muted" style="font-size:.85rem; margin-block-start:4px;">「'+escapeHtml(en && en.f ? (en.f.name||"添付") : "いまの添付")+'」に書き込んだもの</div>');
+      exRows(a);
+    });
+    exRows("x");
+    box.innerHTML = rows.length ? '<div class="mnflist">'+rows.join("")+'</div>' : '';
+  }
+  async function mnBlobOfRef(ref){
+    var b = await getAttachmentBlob({ assetId: ref.id, url: ref.url });
+    if(!b) toast("ファイルの読み込みに失敗しました");
+    return b;
+  }
+  // 書き込む元を決めて、プランボードを開く
+  async function mnDrawFrom(key){
+    var blob = null, name = "", ct = "", after = key;
+    if(key.indexOf("l:")===0){
+      var f = mnLocalFiles()[+key.slice(2)]; if(!f) return;
+      blob = f; name = f.name; ct = f.type;
+    } else if(key.indexOf("e:")===0){
+      var en = editNoteFiles[+key.slice(2)]; if(!en) return;
+      if(en.repl){ blob = en.repl; name = en.repl.name; ct = en.repl.type; }
+      else { blob = await mnBlobOfRef(en.f); name = en.f.name; ct = en.f.contentType; }
+    } else {
+      var x = mnExtras.find(function(y){ return y.key===key; }); if(!x) return;
+      after = x.after;
+      if(x.file){ blob = x.file; name = x.name; ct = x.type; }
+      else { blob = await mnBlobOfRef(x.ref); name = x.ref.name; ct = x.ref.contentType; }
+    }
+    if(!blob) return;
+    mnOpenDraw(blob, name, mnIsPdf(ct, name), after);
+  }
+  function mnOpenDraw(blob, name, isPdf, after){
+    document.getElementById("pbModal").hidden = false;
+    pb.currentAttachmentId = null;
+    pb.saveTarget = { type:"note", after: after, name: name||"図面" };
+    pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
+    pbUpdatePdfPageNav();
+    document.getElementById("pbActionsCard").hidden = true;
+    pb.startEdit = true;
+    pbLoadFromBlob(blob, isPdf);
+  }
+  // プランボードの保存：記録の入力画面に「書き込み済み」の新しい版として足す（元のファイルはそのまま）
+  async function pbSaveToNoteForm(target, blob){
+    var pages = await new Promise(function(resolve){
+      if(pb.pdfDoc && pb.pdfNumPages>1){
+        askPagePicker("記録に入れるページを選んでください（"+pb.pdfNumPages+"ページ中）", pb.pdfNumPages, pb.pdfPage, function(v){ resolve(v); });
+      } else { resolve([1]); }
+    });
+    if(pages===null) return;
+    var blobs = [];
+    for(var i=0;i<pages.length;i++){
+      if(pages[i]===pb.pdfPage || !pb.pdfDoc) blobs.push(blob); else blobs.push(await pbRenderPdfPageToBlob(pages[i]));
+    }
+    var base = String(target.name||"図面").replace(/\.[^.]+$/,"").replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","");
+    var pid = state.currentProjectId;
+    function add(b, nm, type){ mnExtras.push({ key: uid("mnx"), pid: pid, after: target.after||"x", file: b, name: nm, type: type }); }
+    if(blobs.length>1){
+      var merged = null;
+      try{ merged = await combinePngBlobsToPdf(blobs); }catch(e){ merged = null; }
+      if(merged) add(merged, base+".pdf", "application/pdf");
+      else blobs.forEach(function(b, k){ if(b) add(b, base+"_p"+(k+1)+".png", "image/png"); });
+    } else {
+      add(blobs[0], base+".png", "image/png");
+    }
+    renderMnFileList();
+    closePlanBoard();
+    toast("書き込んだ図面を記録に足しました（元のファイルも残ります。「記録する／更新」で保存されます）", 7000);
+  }
+  // 「📐 この案件の図面から選ぶ」
+  function mnPickPlan(){
+    var pid = state.currentProjectId;
+    var rows = liveAttachments().filter(function(a){
+      if(a.projectId!==pid) return false;
+      if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return false;
+      var ct = a.contentType||"";
+      return (a.kind==="plan" || a.kind==="quote") && (ct.indexOf("image")===0 || ct.indexOf("pdf")>=0 || /\.pdf$/i.test(a.name||""));
+    }).sort(function(a,b){ return String(b.uploadedAt||"").localeCompare(String(a.uploadedAt||"")); });
+    if(!rows.length){ toast("この案件にはまだ図面・プランボードが登録されていません（見積タブの「添付資料」から追加できます）", 7000); return; }
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal";
+    ov.style.zIndex = "90";
+    ov.innerHTML = '<div class="taskform-card" style="max-width:760px; width:100%;"><div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">📐 この案件の図面から選ぶ</h3><button type="button" class="btn secondary small" data-mnp-close>閉じる</button></div>'+
+      '<div class="ftgrid" style="margin-block-start:10px;">'+rows.map(function(a){
+        var kindLbl = a.kind==="plan" ? "図面" : quoteTypeNorm(a.quoteType||"");
+        return '<div class="fttile" data-mnp="'+a.id+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(a.url, a.contentType, a.name)+'</div>'+
+          '<div class="ftbody"><div class="ftname">'+escapeHtml(a.name||"図面")+'</div><div class="ftmeta"><span class="pill small">'+escapeHtml(kindLbl)+'</span></div></div></div>';
+      }).join("")+'</div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener("click", function(e){
+      if(e.target===ov || e.target.closest("[data-mnp-close]")){ ov.remove(); return; }
+      var t = e.target.closest("[data-mnp]"); if(!t) return;
+      var a = state.attachments.find(function(x){ return x.id===t.dataset.mnp; }); if(!a) return;
+      ov.remove();
+      var ref = { id: a.assetId, url: a.url, contentType: a.contentType, name: a.name };
+      askChoice("この図面をどうしますか？", "「"+(a.name||"図面")+"」", [
+        {label:"✏️ 書き込んでから記録に入れる", value:"draw"},
+        {label:"そのまま記録に添付する", value:"asis"}
+      ], async function(v){
+        if(v==="asis"){
+          mnExtras.push({ key: uid("mnx"), pid: pid, after:"x", ref: ref });
+          renderMnFileList(); toast("記録に添付しました（「記録する／更新」で保存されます）");
+        } else if(v==="draw"){
+          var b = await mnBlobOfRef(ref); if(!b) return;
+          mnOpenDraw(b, a.name, mnIsPdf(a.contentType, a.name), "x");
+        }
+      });
+    });
+  }
+
   // 編集フォームに出す「いまの添付」：一つずつ削除・差し替えができる（「更新」を押すまで保存されない）
   var editNoteFiles = [];
   function renderEditNoteFiles(){
@@ -10415,12 +10590,13 @@
           '<span style="font-size:.85rem; flex:1; min-width:120px; word-break:break-all;">'+escapeHtml(f.name||"添付")+'</span>'+state2+
           (e.removed
             ? '<button type="button" class="btn secondary small" data-nf-undo="'+i+'">元に戻す</button>'
-            : '<button type="button" class="btn secondary small" data-nf-repl="'+i+'">差し替え</button><button type="button" class="btn danger-ghost small" data-nf-del="'+i+'">削除</button>')+
+            : '<button type="button" class="btn small" data-nf-draw="'+i+'">✏️ 書き込む</button><button type="button" class="btn secondary small" data-nf-repl="'+i+'">差し替え</button><button type="button" class="btn danger-ghost small" data-nf-del="'+i+'">削除</button>')+
           '</div>';
       }).join("");
     box.onclick = function(ev){
       var b = ev.target.closest("button"); if(!b) return;
-      var del = b.getAttribute("data-nf-del"), und = b.getAttribute("data-nf-undo"), rp = b.getAttribute("data-nf-repl");
+      var del = b.getAttribute("data-nf-del"), und = b.getAttribute("data-nf-undo"), rp = b.getAttribute("data-nf-repl"), dr = b.getAttribute("data-nf-draw");
+      if(dr!=null){ mnDrawFrom("e:"+dr); return; }
       if(del!=null){ editNoteFiles[+del].removed = true; editNoteFiles[+del].repl = null; renderEditNoteFiles(); }
       else if(und!=null){ editNoteFiles[+und].removed = false; renderEditNoteFiles(); }
       else if(rp!=null){
@@ -10481,6 +10657,7 @@
     closeMnSheet();
     editingMeetingNoteId = null;
     editNoteFiles = []; renderEditNoteFiles();
+    mnExtras = []; setTimeout(renderMnFileList, 0);
     var titleInput = document.getElementById("meetingNoteTitle");
     var decidedInput = document.getElementById("meetingNoteDecided");
     var openInput = document.getElementById("meetingNoteOpen");
@@ -11396,6 +11573,7 @@
     pb.items=[]; pb.zoom=1; pbApplyZoom();
     requestAnimationFrame(function(){ pb.zoom = pbComputeFitZoom(w); pbApplyZoom(); });
     pbRenderSwatches(); pbPopulateSymbolSelects(); pbSetMode("view");
+    if(pb.startEdit){ pb.startEdit = false; pbSetMode("edit"); }
   }
   function pbSetupBlankCanvas(w, h){
     w = w || 900; h = h || 650;
@@ -11410,6 +11588,7 @@
     pb.items=[]; pb.zoom=1; pbApplyZoom();
     requestAnimationFrame(function(){ pb.zoom = pbComputeFitZoom(w); pbApplyZoom(); });
     pbRenderSwatches(); pbPopulateSymbolSelects(); pbSetMode("view");
+    if(pb.startEdit){ pb.startEdit = false; pbSetMode("edit"); }
   }
   function pbLoadImageFile(file){
     var reader = new FileReader();
@@ -11697,6 +11876,7 @@
     try{
       var blob = await pbCanvasToBlob();
       var target = pb.saveTarget || {type:"attachment"};
+      if(target.type === "note"){ await pbSaveToNoteForm(target, blob); return; }
       if(target.type === "spec"){
         if(target.sourcePhotoId){
           await new Promise(function(resolve){
@@ -12191,6 +12371,17 @@
 
     document.getElementById("meetingNoteInput");
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
+    document.getElementById("btnMnPickPlan").addEventListener("click", mnPickPlan);
+    document.getElementById("meetingNoteFile").addEventListener("change", function(){
+      // 選び直したら、前に選んだファイルへの書き込みは「最後」に回す（消さない）
+      mnExtras.forEach(function(x){ if(x.after.indexOf("l:")===0) x.after = "x"; });
+      renderMnFileList();
+    });
+    document.getElementById("mnFileList").addEventListener("click", function(e){
+      var d = e.target.closest("[data-mnf-draw]"); if(d){ mnDrawFrom(d.dataset.mnfDraw); return; }
+      var r = e.target.closest("[data-mnf-rm]");
+      if(r){ mnExtras = mnExtras.filter(function(x){ return x.key!==r.dataset.mnfRm; }); renderMnFileList(); }
+    });
     document.getElementById("btnOpenNoteImport").addEventListener("click", openNoteImport);
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
     document.getElementById("btnOpenMnSheet").addEventListener("click", openMnSheet);
