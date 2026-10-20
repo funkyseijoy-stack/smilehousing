@@ -1739,8 +1739,13 @@
     <h3 style="margin:0 0 10px;" id="tfTitle">タスクを追加</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <div class="row" style="gap:8px; flex-wrap:wrap;">
-        <label class="field" style="flex:2; min-width:200px;">案件<select id="tfProject"></select></label>
         <label class="field" style="flex:1; min-width:150px;">部門<select id="tfDept"></select></label>
+        <label class="field" style="flex:2; min-width:200px;">案件<select id="tfProject"></select></label>
+      </div>
+      <div class="row" id="tfNewProjRow" style="gap:8px; align-items:flex-end; flex-wrap:wrap;" hidden>
+        <label class="field" style="flex:1; min-width:200px;">新しい案件の名前<input type="text" id="tfNewProjName" placeholder="例：〇〇様邸"></label>
+        <button type="button" class="btn small" id="tfNewProjAdd">この名前で案件を作る</button>
+        <button type="button" class="btn secondary small" id="tfNewProjCancel">やめる</button>
       </div>
       <label class="field">内容<textarea id="tfContent" rows="3" placeholder="対応内容を入力してください"></textarea></label>
       <label class="field">メモ（社内用・業者やお客様には出ません）<textarea id="tfMemo" rows="3" placeholder="経過・気づいたことなどを自由に書けます"></textarea></label>
@@ -10713,10 +10718,10 @@
     var editing = (typeof taskId === "string") ? state.tasks.find(function(x){ return x.id===taskId; }) : null;
     editingTaskId = editing ? editing.id : null;
     var projSel = document.getElementById("tfProject");
-    projSel.innerHTML = '<option value="">（案件なし）</option>' + liveProjects().map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; }).join("");
     document.getElementById("tfDept").innerHTML = PROJECT_TYPES.map(function(d){ return '<option value="'+escapeHtml(d)+'">'+escapeHtml(deptLabel(d))+'</option>'; }).join("");
-    projSel.value = "";
     document.getElementById("tfDept").value = "その他";
+    tfRenderProjects("その他", "");
+    document.getElementById("tfNewProjRow").hidden = true;
     var staff = state.settings.staffList || [];
     document.getElementById("tfAssignee").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfInstructor").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
@@ -10740,8 +10745,9 @@
         }
         el.value = val || "";
       };
-      setSel("tfProject", editing.projectId || "");
       document.getElementById("tfDept").value = deptOfTask(editing);
+      tfRenderProjects(deptOfTask(editing), editing.projectId || "");
+      setSel("tfProject", editing.projectId || "");
       document.getElementById("tfContent").value = editing.content || "";
       document.getElementById("tfMemo").value = editing.memo || "";
       setSel("tfAssignee", editing.assignee || "");
@@ -10765,6 +10771,45 @@
     box.innerHTML = names.length ? names.map(function(n){
       return '<label style="display:flex; align-items:center; gap:6px; font-size:.88rem;"><input type="checkbox" data-tfvendor="'+escapeHtml(n)+'"'+(checkedNames.indexOf(n)>=0?" checked":"")+'> '+escapeHtml(n)+'</label>';
     }).join("") : '<span class="muted" style="font-size:.85rem;">業者が登録されていません</span>';
+  }
+  // タスクの入力画面：選んだ部門の案件だけを並べる（いま選んでいる案件は部門が違っても残す）。最後に「＋ 新しい案件を作る」
+  function tfRenderProjects(dept, keepPid){
+    var sel = document.getElementById("tfProject"); if(!sel) return;
+    var list = liveProjects().filter(function(p){ return deptOfProject(p)===dept || p.id===keepPid; })
+      .sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""),"ja"); });
+    sel.innerHTML = '<option value="">（案件なし）</option>' + list.map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name||p.customer||"（名前なし）")+'</option>'; }).join("") +
+      '<option value="__new">＋ 新しい案件を作る…</option>';
+    sel.value = keepPid && list.some(function(p){ return p.id===keepPid; }) ? keepPid : "";
+    sel.dataset.prev = sel.value;
+  }
+  // 部門の案件フォルダー（最上位で同じ名前のフォルダー。無ければ既定）
+  function pfForDept(dept){
+    var f = pfAll().find(function(x){ return !x.parentId && x.name===dept; });
+    return f ? f.id : (pfById(PF_DEFAULT_ID) ? PF_DEFAULT_ID : "");
+  }
+  async function tfCreateProject(){
+    var inp = document.getElementById("tfNewProjName");
+    var name = inp.value.trim();
+    if(!name){ toast("案件の名前を入れてください"); inp.focus(); return; }
+    var dept = document.getElementById("tfDept").value || "その他";
+    var same = liveProjects().find(function(p){ return String(p.name||"").trim()===name; });
+    if(same){
+      toast("同じ名前の案件「"+name+"」があるので、それを選びました");
+      document.getElementById("tfDept").value = deptOfProject(same);
+      tfRenderProjects(deptOfProject(same), same.id);
+      document.getElementById("tfNewProjRow").hidden = true;
+      return;
+    }
+    var p = { id:uid("proj"), name:name, customer:"", type:dept, folderId:pfForDept(dept), progressTag:(state.settings.progressTags||[])[0]||"", createdAt: todayStr() };
+    state.projects.push(p);
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ state.projects = state.projects.filter(function(x){ return x.id!==p.id; }); toast("案件を作れませんでした。もう一度お試しください"); return; }
+    logActivity("案件「"+name+"」を作成しました（タスクの画面から）");
+    tfRenderProjects(dept, p.id);
+    document.getElementById("tfNewProjRow").hidden = true;
+    inp.value = "";
+    toast("案件「"+name+"」を作りました（お客様名などは案件の「編集」から）", 6000);
+    render();
   }
   function closeTaskForm(){ document.getElementById("taskFormModal").hidden = true; }
 
@@ -12800,12 +12845,31 @@
       var pid = state.currentProjectId;
       openTaskForm();
       var ps = document.getElementById("tfProject");
-      if(pid && ps && Array.prototype.some.call(ps.options, function(o){ return o.value===pid; })){ ps.value = pid; ps.dispatchEvent(new Event("change")); }
+      var pp = projectById(pid);
+      if(pp){ var d0 = deptOfProject(pp); document.getElementById("tfDept").value = d0; tfRenderProjects(d0, pid); }
     });
-    // 案件を選ぶと、その案件の部門が自動で入る（あとから変えられる）
+    // 部門を選ぶと、その部門の案件だけが並ぶ
+    document.getElementById("tfDept").addEventListener("change", function(){
+      var cur = document.getElementById("tfProject").value;
+      var cp = cur && cur!=="__new" ? projectById(cur) : null;
+      tfRenderProjects(this.value, cp && deptOfProject(cp)===this.value ? cur : "");
+      document.getElementById("tfNewProjRow").hidden = true;
+    });
+    // 案件を選ぶと、その案件の部門が自動で入る。「＋ 新しい案件を作る」は名前の欄を出す
     document.getElementById("tfProject").addEventListener("change", function(){
-      document.getElementById("tfDept").value = deptAutoOfTask({projectId: this.value||null});
+      if(this.value==="__new"){
+        this.value = this.dataset.prev || "";
+        document.getElementById("tfNewProjRow").hidden = false;
+        document.getElementById("tfNewProjName").focus();
+        return;
+      }
+      this.dataset.prev = this.value;
+      document.getElementById("tfNewProjRow").hidden = true;
+      if(this.value) document.getElementById("tfDept").value = deptAutoOfTask({projectId: this.value});
     });
+    document.getElementById("tfNewProjAdd").addEventListener("click", tfCreateProject);
+    document.getElementById("tfNewProjName").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); tfCreateProject(); } });
+    document.getElementById("tfNewProjCancel").addEventListener("click", function(){ document.getElementById("tfNewProjRow").hidden = true; });
     document.getElementById("projTaskList").addEventListener("click", function(e){
       var b = e.target.closest("[data-projtaskedit]");
       if(b) openTaskForm(b.dataset.projtaskedit);
