@@ -1738,7 +1738,10 @@
   <div class="taskform-card">
     <h3 style="margin:0 0 10px;" id="tfTitle">タスクを追加</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
-      <label class="field">案件<select id="tfProject"></select></label>
+      <div class="row" style="gap:8px; flex-wrap:wrap;">
+        <label class="field" style="flex:2; min-width:200px;">案件<select id="tfProject"></select></label>
+        <label class="field" style="flex:1; min-width:150px;">部門<select id="tfDept"></select></label>
+      </div>
       <label class="field">内容<textarea id="tfContent" rows="3" placeholder="対応内容を入力してください"></textarea></label>
       <label class="field">メモ（社内用・業者やお客様には出ません）<textarea id="tfMemo" rows="3" placeholder="経過・気づいたことなどを自由に書けます"></textarea></label>
       <div class="row">
@@ -2006,7 +2009,9 @@
     }
     return t;
   }
-  function deptOfTask(t){ return t.projectId ? deptOfProject(projectById(t.projectId)) : "その他"; }
+  // タスクの部門：入力画面で選んだ部門（t.dept）があればそれ、無ければ案件から自動（案件なしは「その他」）
+  function deptAutoOfTask(t){ return t.projectId ? deptOfProject(projectById(t.projectId)) : "その他"; }
+  function deptOfTask(t){ return (t.dept && PROJECT_TYPES.indexOf(t.dept)>=0) ? t.dept : deptAutoOfTask(t); }
   // 業者タスクに紐付ける「部位」のグループ一覧。仕様タブの各カテゴリーをそのまま使う。
   // ラベルは仕様タブの各カードの見出しと完全に一致させること（部位選択→仕様タブの
   // 変更履歴が同じ名前で連動していると分かるようにするため）。
@@ -10708,7 +10713,10 @@
     var editing = (typeof taskId === "string") ? state.tasks.find(function(x){ return x.id===taskId; }) : null;
     editingTaskId = editing ? editing.id : null;
     var projSel = document.getElementById("tfProject");
-    projSel.innerHTML = liveProjects().map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; }).join("") || '<option value="">案件がありません</option>';
+    projSel.innerHTML = '<option value="">（案件なし）</option>' + liveProjects().map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; }).join("");
+    document.getElementById("tfDept").innerHTML = PROJECT_TYPES.map(function(d){ return '<option value="'+escapeHtml(d)+'">'+escapeHtml(deptLabel(d))+'</option>'; }).join("");
+    projSel.value = "";
+    document.getElementById("tfDept").value = "その他";
     var staff = state.settings.staffList || [];
     document.getElementById("tfAssignee").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfInstructor").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
@@ -10733,6 +10741,7 @@
         el.value = val || "";
       };
       setSel("tfProject", editing.projectId || "");
+      document.getElementById("tfDept").value = deptOfTask(editing);
       document.getElementById("tfContent").value = editing.content || "";
       document.getElementById("tfMemo").value = editing.memo || "";
       setSel("tfAssignee", editing.assignee || "");
@@ -10761,6 +10770,9 @@
 
   async function submitTaskForm(){
     var projectId = document.getElementById("tfProject").value;
+    var deptSel = document.getElementById("tfDept").value || "";
+    // 案件から自動で決まる部門と同じなら保存しない（案件の種別を後で変えたときに追従させるため）
+    var deptToSave = (deptSel && deptSel !== deptAutoOfTask({projectId: projectId||null})) ? deptSel : "";
     var content = document.getElementById("tfContent").value.trim();
     if(!content){ toast("内容を入力してください"); return; }
     var memo = document.getElementById("tfMemo").value.trim();
@@ -10792,6 +10804,7 @@
         }
       }
       editTarget.projectId = projectId||null;
+      if(deptToSave) editTarget.dept = deptToSave; else delete editTarget.dept;
       editTarget.content = content;
       editTarget.memo = memo;
       editTarget.assignee = assignee||"";
@@ -10830,7 +10843,7 @@
     }
 
     var t = {
-      id: uid("task"), projectId: projectId||null, content: content, memo: memo,
+      id: uid("task"), projectId: projectId||null, dept: deptToSave || undefined, content: content, memo: memo,
       assignee: assignee||"", instructor: instructor||"", checker: checker||"", creator: state.currentUser||"",
       hasDeadline: hasDeadline, deadline: hasDeadline?deadline:"",
       requestMethod: method,
@@ -12787,7 +12800,11 @@
       var pid = state.currentProjectId;
       openTaskForm();
       var ps = document.getElementById("tfProject");
-      if(pid && ps && Array.prototype.some.call(ps.options, function(o){ return o.value===pid; })) ps.value = pid;
+      if(pid && ps && Array.prototype.some.call(ps.options, function(o){ return o.value===pid; })){ ps.value = pid; ps.dispatchEvent(new Event("change")); }
+    });
+    // 案件を選ぶと、その案件の部門が自動で入る（あとから変えられる）
+    document.getElementById("tfProject").addEventListener("change", function(){
+      document.getElementById("tfDept").value = deptAutoOfTask({projectId: this.value||null});
     });
     document.getElementById("projTaskList").addEventListener("click", function(e){
       var b = e.target.closest("[data-projtaskedit]");
