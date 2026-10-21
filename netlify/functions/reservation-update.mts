@@ -1,7 +1,9 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { getAccessToken, CUSTOMER_CALENDAR_ID } from "../lib/google.mts";
-import { calendarBusy, listCollection, hmToMin, toHM, dowOf, BUFFER_AFTER_MIN, CLOSE_MIN, OPEN_MIN } from "../lib/booking.mts";
+import { calendarBusy, listCollection, hmToMin, toHM, dowOf, BUFFER_AFTER_MIN, CLOSE_MIN } from "../lib/booking.mts";
+// スタッフが予約を直すときは、お客様の受付（10:00〜）より早い9:00からでも入れられる
+const STAFF_OPEN_MIN = 9 * 60;
 
 // スタッフが予約の内容（日時・担当・種別・メモ・お客様情報）を編集する。
 // 日時を変えたときは、他の予約・カレンダーの予定との重なりを確認し（force:true なら重なっていても変更）、
@@ -70,7 +72,7 @@ export default async (req: Request, context: Context) => {
     if (!/^\d{2}:\d{2}$/.test(startTime) || !Number.isFinite(duration) || duration < 30 || duration > 480) return json({ error: "invalid_time" }, 400);
     const s = hmToMin(startTime), e = s + duration;
     if (dowOf(date) === 0) return json({ error: "closed_day", message: "日曜日は定休日です" }, 400);
-    if (s < OPEN_MIN || e > CLOSE_MIN) return json({ error: "out_of_hours", message: "受付時間（9:00〜17:00）の範囲にしてください" }, 400);
+    if (s < STAFF_OPEN_MIN || e > CLOSE_MIN) return json({ error: "out_of_hours", message: "受付時間（9:00〜17:00）の範囲にしてください" }, 400);
 
     // 重なりの確認（他の予約・カレンダーの予定。終了後の1時間の間隔も含める）。force:true なら確認せず変更する。
     let tk: any = null;

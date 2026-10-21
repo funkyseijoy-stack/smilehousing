@@ -8,7 +8,7 @@ import { CUSTOMER_CALENDAR_ID, HOLIDAY_CALENDAR_ID } from "./google.mts";
 export const DURATION = 120; // 分（ふつうの種類は2時間）
 // お客様が所要時間を選べる種類（現場は2時間か1時間。最初の値が初期値）
 export const DURATION_OPTIONS: Record<string, number[]> = { "現場": [120, 60] };
-export const OPEN_MIN = 9 * 60;
+export const OPEN_MIN = 10 * 60;
 export const CLOSE_MIN = 17 * 60;
 export const STEP = 30;
 export const DAYS_AHEAD = 28;
