@@ -252,6 +252,12 @@
   .section-item:last-child{ margin-bottom:0; }
   .section-item-title{ font-weight:600; font-size:.9rem; margin-bottom:6px; }
   .section-item-desc{ font-size:.82rem; color:var(--ink2); margin-bottom:6px; line-height:1.4; }
+  .swgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:6px; }
+  .swcard{ background:#fff; border:1px solid #e8e0d8; border-radius:14px; padding:8px 8px 10px; text-align:left; cursor:pointer; font-family:inherit; color:inherit; }
+  .swcard .chip{ height:74px; border-radius:10px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
+  .swcard .nm{ margin-top:8px; font-weight:700; font-size:.92rem; line-height:1.35; word-break:break-all; }
+  .swcard .mt{ margin-top:2px; font-size:.78rem; color:#8a7e74; }
+  .swcard .go{ margin-top:6px; font-size:.75rem; color:#8a7e74; }
   .section-thumbs{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:6px; }
   .section-empty{ color:var(--muted); text-align:center; padding:16px 8px; font-size:.82rem; }
 
@@ -1220,11 +1226,30 @@ function homeHtml(){
     var isSpecCard = function(x){ return x.showDecide && x.key && String(x.key).charAt(0)==="s"; };
     var specCards = items.filter(isSpecCard);
     items = items.filter(function(x){ return !isSpecCard(x); });
+    // 色見本カード（スタッフが色と名前を入れたもの）は、写真ではなくカードで見せる（写真は押すと開く）
+    var swatches = items.filter(function(x){ return x.swatch && x.swatch.color && x.file && x.file.url; });
+    items = items.filter(function(x){ return !(x.swatch && x.swatch.color && x.file && x.file.url); });
     var planboards = items.filter(function(x){ return x.type==="planboard"; });
     var notes = items.filter(function(x){ return x.type==="note"; });
     var taskPdfs = items.filter(function(x){ return x.type==="photo" && x.source && x.source.taskId; });
     var quotes = items.filter(function(x){ return x.type==="photo" && x.isQuote; });
     var photos = items.filter(function(x){ return x.type==="photo" && !x.isQuote && (!x.source || !x.source.taskId); });
+
+    // 色見本 section
+    if(swatches.length){
+      out += '<div class="section decided">'+
+        '<div class="section-header"><span class="section-icon">🎨</span><span>色・仕様のカード</span></div>'+
+        '<div class="section-content"><div class="swgrid">'+
+        swatches.slice().sort(function(a,b){ return (Date.parse(b.at)||0)-(Date.parse(a.at)||0); }).map(function(x){
+          var part = partOf(c, x);
+          return '<button class="swcard" data-img="'+esc(x.file.url)+'">'+
+            '<div class="chip" style="background:'+esc(x.swatch.color)+';"></div>'+
+            '<div class="nm">'+esc(x.swatch.name || "（名前なし）")+'</div>'+
+            '<div class="mt">'+(part?esc(part)+" ・ ":"")+fmtD(x.at)+(x.changing?" ・ 変更依頼中":"")+'</div>'+
+            '<div class="go">写真・資料を見る ›</div></button>';
+        }).join("")+
+        '</div></div></div>';
+    }
 
     // プランボード section
     if(planboards.length){
@@ -1334,7 +1359,7 @@ function homeHtml(){
         return '<div class="tli'+(latest?" latest":"")+'"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+tagCls+'">'+tagLbl+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+(x.label&&x.label!==c.name?'<span class="tag">'+esc(x.label)+'</span>':'')+(latest?'<span class="tag new">最新</span>':'')+'</div>'+
           '<div class="thumbs one" style="max-width:150px;">'+thumbHtml(x.file,"")+'</div></div>';
       }).join("")+'</div>';
-    } else if(!items.length){
+    } else if(!items.length && !swatches.length){
       out += '<div class="empty">打合せが進むと、写真やプランボード・記録がここに時系列で並びます。</div>';
     }
 

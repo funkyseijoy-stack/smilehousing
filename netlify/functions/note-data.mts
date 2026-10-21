@@ -164,6 +164,14 @@ function noteAt(n: any): string {
   return created && !isNaN(created.getTime()) ? created.toISOString() : "";
 }
 
+// 色見本カードの設定（色は #RRGGBB だけ受け付ける）
+function swatchOf(sw: any) {
+  if (!sw || !sw.on) return null;
+  const color = /^#[0-9a-fA-F]{6}$/.test(String(sw.color || "")) ? String(sw.color) : "";
+  if (!color) return null;
+  return { name: String(sw.name || "").slice(0, 40), color };
+}
+
 function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
@@ -424,6 +432,8 @@ export default async (req: Request, context: Context) => {
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
       spec: specBadge(p.badges),
       changing: isChanging(p),
+      // 色見本カード（スタッフが「色見本カードで表示」を入れたものだけ。名前と色だけをお客様に渡す）
+      swatch: swatchOf(p.swatch),
     });
   }
   // 「反映済み」の業者タスクの添付（変更後のPDFなど）は、仕様写真へのコピーの有無にかかわらず
