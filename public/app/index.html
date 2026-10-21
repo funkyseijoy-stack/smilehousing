@@ -1436,6 +1436,7 @@
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
             <div class="row" style="gap:8px; flex-wrap:wrap; margin-block:-2px 6px;"><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 この案件の図面から選ぶ</button></div>
             <div id="mnFileList"></div>
+            <div id="mnAiHint" class="muted" style="font-size:.85rem; margin-block:4px;" hidden></div>
             <details class="mnmore">
               <summary>そのほか（お客様へのメッセージ・図面にも登録・タスクなど）</summary>
               <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
@@ -10634,6 +10635,72 @@
   //   after："l:<番号>"＝いま選んだファイルの隣／"e:<番号>"＝いまの添付の隣／"x"＝最後
   //   file（Blob。書き込み済み）か ref（すでに保存済みのファイル {id,url,contentType,name}）のどちらか
   var mnExtras = [];
+  // ===== 写真を付けたときのAI判定（部位の候補・写真に印字された色名／品番） =====
+  // 写真は小さく縮めて /api/photo-classify に送る（保存はしない）。結果は候補で、部位は未設定のときだけ入れる。
+  // MN_AI_PARTS の名前は netlify/functions/photo-classify.mts の PARTS と同じにすること。
+  var MN_AI_PARTS = {
+    "外部":{scope:"exterior", category:null, label:"外部"},
+    "暖房設備":{scope:"equipment", category:"暖房設備", label:"暖房設備"},
+    "換気設備":{scope:"equipment", category:"換気設備", label:"換気設備"},
+    "電気配線":{scope:"equipment", category:"電気配線", label:"電気配線"},
+    "あかりプラン":{scope:"equipment", category:"あかりプラン", label:"あかりプラン"},
+    "キッチン":{scope:"facility", category:"キッチン", label:"キッチン"},
+    "お風呂":{scope:"facility", category:"お風呂", label:"お風呂"},
+    "洗面":{scope:"facility", category:"洗面", label:"洗面"},
+    "トイレ":{scope:"facility", category:"トイレ", label:"トイレ"},
+    "脱衣室":{scope:"facility", category:"脱衣室", label:"脱衣室"}
+  };
+  var mnAiSeq = 0;
+  async function mnAiAnalyze(){
+    var hint = document.getElementById("mnAiHint"); if(!hint) return;
+    var seq = ++mnAiSeq;
+    var files = mnLocalFiles().filter(function(f){ return /^image\//.test(f.type||"") || isHeicFile(f); }).slice(0, 3);
+    if(!files.length){ hint.hidden = true; hint.innerHTML = ""; return; }
+    hint.hidden = false; hint.textContent = "🤖 写真をAIで判定中…";
+    var results = [], errCode = "";
+    for(var i=0; i<files.length; i++){
+      try{
+        var small = await compressOnce(isHeicFile(files[i]) ? await heicToJpegBlob(files[i], 0.8) : files[i], 1000, 0.7);
+        if(!small) continue;
+        var data = await blobToBase64(small);
+        var res = await fetch("/api/photo-classify", { method:"POST", headers:{"Content-Type":"application/json","X-Staff-Token":getStaffToken()}, body: JSON.stringify({data:data, mediaType:"image/jpeg"}) });
+        var j = await res.json().catch(function(){ return {}; });
+        if(seq!==mnAiSeq) return; // 選び直された
+        if(!res.ok){ errCode = j.error || ("http"+res.status); if(res.status===501||res.status===401) break; continue; }
+        results.push(j);
+      }catch(e){ errCode = "network"; }
+    }
+    if(seq!==mnAiSeq) return;
+    if(!results.length){
+      var msg = errCode==="no_api_key" ? "AIの設定（APIキー）がまだ入っていないため、自動判定はできません。部位は「部位を選択」で選んでください。"
+        : errCode==="unauthorized" ? "ログインが切れています。いちど再読み込みしてください。"
+        : "AIで判定できませんでした（記録そのものには影響しません）。";
+      hint.textContent = "🤖 " + msg; return;
+    }
+    var count = {}, best = "";
+    results.forEach(function(r){ if(r.part){ count[r.part] = (count[r.part]||0)+1; if(!best || count[r.part]>count[best]) best = r.part; } });
+    var note = [];
+    if(best && !newMeetingNoteSpecPart && !editingMeetingNoteId && MN_AI_PARTS[best]){
+      newMeetingNoteSpecPart = Object.assign({roomId:null, side:null}, MN_AI_PARTS[best]);
+      updateMeetingNoteSpecPartLabel();
+      var ti = document.getElementById("meetingNoteTitle");
+      if(ti && (!ti.value.trim() || ti.value === lastAutoFilledMeetingNoteTitle)){ ti.value = MN_AI_PARTS[best].label; lastAutoFilledMeetingNoteTitle = ti.value; }
+      note.push("部位を「"+MN_AI_PARTS[best].label+"」にしました（違えば上の「部位を選択」で直せます）");
+    } else if(best && newMeetingNoteSpecPart){
+      note.push("写真は「"+best+"」のようです（部位は選択済みのためそのままです）");
+    } else if(!best){
+      note.push("部位は判定できませんでした（「部位を選択」で選んでください）");
+    }
+    var texts = []; results.forEach(function(r){ if(r.text && texts.indexOf(r.text)<0) texts.push(r.text); });
+    var html = '🤖 ' + escapeHtml(note.join("。"));
+    if(texts.length){
+      html += '<div style="margin-top:4px;">写真から読み取った文字：' + texts.map(function(t, k){
+        return '<b>'+escapeHtml(t)+'</b> <button type="button" class="btn secondary small" data-mnai-ins="'+k+'">打合せ内容に入れる</button>';
+      }).join("　") + '</div>';
+    }
+    hint.innerHTML = html;
+    hint._texts = texts;
+  }
   function mnLocalFiles(){ var i = document.getElementById("meetingNoteFile"); return Array.prototype.slice.call((i && i.files) || []); }
   function mnIsPdf(ct, name){ return /pdf/i.test(ct||"") || /\.pdf$/i.test(name||""); }
   function mnLiveExtras(){ var pid = state.currentProjectId; return mnExtras.filter(function(x){ return x.pid===pid; }); }
@@ -10959,6 +11026,7 @@
     mnLoad("", "", "", null);
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
+    mnAiSeq++; var aiHint = document.getElementById("mnAiHint"); if(aiHint){ aiHint.hidden = true; aiHint.innerHTML = ""; }
     var asPlanBox = document.getElementById("meetingNoteAsPlan"); if(asPlanBox) asPlanBox.checked = false;
     newMeetingNoteSpecPart = null;
     updateMeetingNoteSpecPartLabel();
@@ -12779,6 +12847,14 @@
       // 選び直したら、前に選んだファイルへの書き込みは「最後」に回す（消さない）
       mnExtras.forEach(function(x){ if(x.after.indexOf("l:")===0) x.after = "x"; });
       renderMnFileList();
+      mnAiAnalyze();
+    });
+    document.getElementById("mnAiHint").addEventListener("click", function(e){
+      var b = e.target.closest("[data-mnai-ins]"); if(!b) return;
+      var t = (this._texts||[])[parseInt(b.dataset.mnaiIns,10)]; if(!t) return;
+      var body = document.getElementById("mnBody"); if(!body) return;
+      body.value = (body.value.replace(/\s+$/,"") + (body.value.trim()?"\n":"") + t);
+      mnRender(); b.disabled = true; b.textContent = "入れました";
     });
     document.getElementById("mnFileList").addEventListener("click", function(e){
       var d = e.target.closest("[data-mnf-draw]"); if(d){ mnDrawFrom(d.dataset.mnfDraw); return; }
