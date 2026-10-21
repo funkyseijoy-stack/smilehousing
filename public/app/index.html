@@ -1878,6 +1878,10 @@
         <label style="display:flex; gap:8px; align-items:center; font-weight:700;"><input type="checkbox" id="spEditSwOn"> 🎨 お客様画面で「色見本カード」にする</label>
         <div id="spEditSwFields" hidden>
           <label class="field">色の名前（例：Aオフホワイト NC）<input type="text" id="spEditSwName" maxlength="40"></label>
+          <div class="row" style="gap:8px; align-items:center; margin-block-end:6px;">
+            <button type="button" class="btn small secondary" id="spEditSwRead">🔍 写真から色の名前を読み取る</button>
+            <span class="muted" id="spEditSwReadMsg" style="font-size:.85rem;"></span>
+          </div>
           <div class="row" style="gap:10px; align-items:center;">
             <label class="field" style="margin:0;">色<input type="color" id="spEditSwColor" value="#cccccc" style="width:64px; height:40px; padding:2px;"></label>
             <div id="spEditSwChip" style="flex:1; height:40px; border-radius:8px; border:1px solid var(--border);"></div>
@@ -8473,12 +8477,50 @@
     document.getElementById("spEditSwChip").style.background = document.getElementById("spEditSwColor").value;
     document.getElementById("spEditSwFields").hidden = !document.getElementById("spEditSwOn").checked;
     swPickCanvas = null;
+    document.getElementById("spEditSwReadMsg").textContent = "";
     var swImg = document.getElementById("spEditSwImg");
     swImg.removeAttribute("src");
     if(canSw){ swImg.src = p.url; }
     document.getElementById("spEditModal").hidden = false;
   }
   var swPickCanvas = null;
+  var swReading = false;
+  // 写真に書かれた色の名前・品番をAIで読み取り、名前の欄に入れる（違えば直せる）
+  async function swReadLabel(auto){
+    if(swReading) return;
+    var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
+    if(!p || !p.url) return;
+    var nameEl = document.getElementById("spEditSwName");
+    var msg = document.getElementById("spEditSwReadMsg");
+    var btn = document.getElementById("spEditSwRead");
+    if(auto && nameEl.value.trim()) return; // 自動のときは、すでに名前があれば何もしない
+    swReading = true; btn.disabled = true; msg.textContent = "読み取り中…";
+    var myId = spEditId;
+    try{
+      var res = await fetch("/api/spec-read-label", { method:"POST", headers:{"Content-Type":"application/json","X-Staff-Token": getStaffToken()}, body: JSON.stringify({ url: p.url }) });
+      var j = await res.json().catch(function(){ return {}; });
+      if(myId!==spEditId) return; // 読み取り中に別の画面へ移ったら入れない
+      if(!res.ok || !j.ok){
+        msg.textContent = j.error==="no_api_key" ? "AIの設定（APIキー）がまだ入っていません。名前は手で入れてください。"
+          : j.error==="too_large" ? "写真が大きすぎて読み取れませんでした。名前は手で入れてください。"
+          : j.error==="not_image" ? "画像ではないため読み取れません。"
+          : j.error==="unauthorized" ? "ログインが切れています。入り直してください。"
+          : "読み取れませんでした。名前は手で入れてください。";
+        return;
+      }
+      var nm = (j.name||"").trim(), code = (j.code||"").trim();
+      if(!nm && !code){ msg.textContent = "写真から名前を読み取れませんでした。手で入れてください。"; return; }
+      var full = nm || code;
+      if(nm && code && nm.indexOf(code)<0) full = nm+" "+code;
+      if(!auto && nameEl.value.trim() && nameEl.value.trim()!==full && !confirm("いまの名前を「"+full+"」に置き換えますか？")){ msg.textContent = ""; return; }
+      nameEl.value = full.slice(0,40);
+      msg.textContent = "読み取りました。違うときは直してください。";
+    }catch(e){
+      msg.textContent = "通信できませんでした。名前は手で入れてください。";
+    }finally{
+      swReading = false; btn.disabled = false;
+    }
+  }
   // 写真を押した場所の色（まわり9×9の平均）を拾う
   function swPickColor(ev){
     var img = document.getElementById("spEditSwImg");
@@ -13038,7 +13080,9 @@
     document.getElementById("spEditSave").addEventListener("click", saveSpecEdit);
     document.getElementById("spEditSwOn").addEventListener("change", function(){
       document.getElementById("spEditSwFields").hidden = !this.checked;
+      if(this.checked) swReadLabel(true); // 名前が空なら、自動で読み取る
     });
+    document.getElementById("spEditSwRead").addEventListener("click", function(){ swReadLabel(false); });
     document.getElementById("spEditSwColor").addEventListener("input", function(){
       document.getElementById("spEditSwChip").style.background = this.value;
     });
