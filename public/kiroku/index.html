@@ -60,6 +60,9 @@
   .rvslot{ background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:12px 0; font:inherit; font-size:.95rem; color:var(--ink); cursor:pointer; }
   .rvslot:disabled{ opacity:.4; text-decoration:line-through; cursor:default; }
   .rvslot.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
+  .rvopen{ width:100%; border-radius:14px; padding:15px 6px; font:inherit; font-size:1.05rem; font-weight:700; letter-spacing:.06em; background:var(--card); border:2px solid var(--brown); color:var(--brown); cursor:pointer; }
+  .rvopen.on{ background:var(--brown); color:#fff; }
+  #rvBox[hidden]{ display:none; }
   .bookbtn{ width:100%; margin-top:18px; border-radius:14px; padding:15px 6px; font:inherit; font-size:1rem; font-weight:700; letter-spacing:.08em; background:var(--brown); border:1.5px solid var(--brown); color:#fff; cursor:pointer; }
   .bookbtn:disabled{ opacity:.45; cursor:default; }
   .rvnote{ color:var(--muted); font-size:.78rem; margin-top:10px; line-height:1.6; }
@@ -109,7 +112,7 @@
   var P = qs.get("p"), T = qs.get("t");
   if(!P || !T){ main.innerHTML = '<div class="err">リンクが正しくありません。お送りしたリンクからもう一度開いてください。</div>'; return; }
   var data = null;
-  var rv = { type:"来店", dur:120, date:"", start:"", avail:null, loading:false, loaded:false, error:"", booking:false };
+  var rv = { type:"来店", dur:120, date:"", start:"", avail:null, loading:false, loaded:false, error:"", booking:false, open:false };
 
   fetch("/api/early-data?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T), {cache:"no-store"})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
@@ -117,7 +120,6 @@
       if(!res.ok){ main.innerHTML = '<div class="err">このリンクは開けません。お手数ですが、担当者にお問い合わせください。</div>'; return; }
       data = res.j; data.reservations = data.reservations || [];
       renderAll();
-      loadAvail();
     })
     .catch(function(){ main.innerHTML = '<div class="err">読み込めませんでした。通信状況を確認して、もう一度開いてください。</div>'; });
 
@@ -172,7 +174,8 @@
         '</div>';
       }).join("");
     }
-    html += '<h2 class="sec" id="sec-resv">ご予約</h2><p class="secsub">空いている日時を選んで、そのまま予約できます。</p><div id="rvBox"></div>';
+    html += '<h2 class="sec" id="sec-resv">ご予約</h2><p class="secsub">「予約する」を押すと、空いている日時を選んで予約できます。</p>'+
+      '<button class="rvopen'+(rv.open?" on":"")+'" id="rvToggle">'+(rv.open?"▲ 閉じる":"📅 予約する")+'</button><div id="rvBox"'+(rv.open?"":" hidden")+'></div>';
     // 会社紹介の文章のあとに、家づくりの進め方（ご契約の考え方）を小さな見出し＋ふつうの文章で添える
     if(data.companyIntro || data.policy){
       html += '<h2 class="sec" id="sec-about">住まいるハウジングについて</h2><div class="about">'+
@@ -262,7 +265,16 @@
       })
       .catch(function(){ rv.booking = false; renderResv(); toast("予約できませんでした。もう一度お試しいただくか、LINEなどでご連絡ください"); });
   }
+  function setResvOpen(on){
+    rv.open = on;
+    var b = document.getElementById("rvToggle"), box = document.getElementById("rvBox");
+    if(b){ b.className = "rvopen"+(on?" on":""); b.textContent = on ? "▲ 閉じる" : "📅 予約する"; }
+    if(box) box.hidden = !on;
+    if(on && !rv.loaded && !rv.loading) loadAvail();
+  }
   main.addEventListener("click", function(e){
+    if(e.target.closest("#rvToggle")){ setResvOpen(!rv.open); return; }
+    if(e.target.closest('.jump a[href="#sec-resv"]')) setResvOpen(true);
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }
     var rdu = e.target.closest("[data-rvdur]"); if(rdu){ rv.dur = parseInt(rdu.dataset.rvdur,10); rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }
     var rd = e.target.closest("[data-rvdate]"); if(rd){ rv.date = rd.dataset.rvdate; rv.start = ""; renderResv(); return; }
