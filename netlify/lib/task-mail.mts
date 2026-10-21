@@ -42,6 +42,18 @@ async function notifyStaff(store: any, name: string, subject: string, body: stri
   return (await sendMailTo({ to, subject, body, fromName: FROM_NAME })).ok;
 }
 
+// ---- ともこ（朋子）には、タスクの通知をすべて「控え」として自動で送る ----
+// 「自分だけ」のタスクは通知の対象外（従来どおり）。本人が操作した分（by）は送らない。
+export const ALL_NOTICE_NAME = "朋子";
+function copyBodyFor(body: string): string {
+  const i = body.indexOf("\n");
+  return ALL_NOTICE_NAME + "さん（すべてのタスク通知の控えです）" + (i >= 0 ? body.slice(i) : "");
+}
+async function notifyAdminCopy(store: any, by: string, toName: string, subject: string, body: string): Promise<boolean> {
+  if (by === ALL_NOTICE_NAME || toName === ALL_NOTICE_NAME) return false;
+  return await notifyStaff(store, ALL_NOTICE_NAME, "【控え】" + subject, copyBodyFor(body));
+}
+
 function taskLines(t: any, projectName: string): string[] {
   const lines = [
     "案件：" + (projectName || "（案件未設定）"),
@@ -74,7 +86,9 @@ export async function sendTaskAssignedMail(store: any, task: any, role: "assigne
     "",
     "（このメールは住まいるアプリから自動で送っています）",
   ].join("\n");
-  return await notifyStaff(store, name, subject, body);
+  const ok = await notifyStaff(store, name, subject, body);
+  await notifyAdminCopy(store, by, name, subject, body).catch(() => false);
+  return ok;
 }
 
 export async function sendDeadlineDigest(store: any, name: string, when: "today" | "tomorrow", items: { task: any; projectName: string; role: string }[]) {
@@ -86,7 +100,7 @@ export async function sendDeadlineDigest(store: any, name: string, when: "today"
     "",
     label + "が期限のタスクです。",
     "",
-    ...items.map((x, i) => (i + 1) + ". " + taskLines(x.task, x.projectName).join("\n   ") + (x.role === "checker" ? "\n   （確認のお願い）" : "")),
+    ...items.map((x, i) => (i + 1) + ". " + taskLines(x.task, x.projectName).join("\n   ") + (x.role === "checker" ? "\n   （確認のお願い）" : x.role === "admin" ? "\n   （担当：" + (x.task.assignee || "未設定") + (x.task.checker ? "／確認：" + x.task.checker : "") + "）" : "")),
     "",
     "▼ 住まいるアプリを開く",
     APP_URL,
@@ -105,6 +119,11 @@ const QUEUE_PREFIX = "notifyQueue/";
 export async function queueTaskNotice(store: any, task: any, role: "assignee" | "checker", name: string, by: string) {
   const key = QUEUE_PREFIX + task.id + "__" + role + "__" + encodeURIComponent(name);
   await store.setJSON(key, { taskId: task.id, role, name, by, queuedAt: new Date().toISOString() });
+  // ともこへの控え（夜のあいだは、翌朝のまとめ通知に入れる）
+  if (name !== ALL_NOTICE_NAME && by !== ALL_NOTICE_NAME) {
+    const k2 = QUEUE_PREFIX + task.id + "__admin" + role + "__" + encodeURIComponent(name);
+    await store.setJSON(k2, { taskId: task.id, role: "admin", forRole: role, forName: name, name: ALL_NOTICE_NAME, by, queuedAt: new Date().toISOString() });
+  }
 }
 
 // 翌朝の定期実行から呼ぶ。たまっていた通知を、人ごとに1通へまとめて送る。
@@ -121,10 +140,10 @@ export async function flushTaskQueue(store: any) {
     if (!q) { dead.push(key); continue; }
     const t: any = await store.get("tasks/" + q.taskId, { type: "json" });
     const stillMine = t && !t.deletedAt && !t.private && (t.status || "") !== "完了" &&
-      (q.role === "checker" ? (t.checker === q.name || t.status === q.name + "確認依頼中" || t.status === q.name + "確認中") : t.assignee === q.name);
+      (q.role === "admin" ? true : q.role === "checker" ? (t.checker === q.name || t.status === q.name + "確認依頼中" || t.status === q.name + "確認中") : t.assignee === q.name);
     if (!stillMine) { dead.push(key); continue; }
     if (!groups.has(q.name)) groups.set(q.name, []);
-    groups.get(q.name)!.push({ key, task: t, role: q.role });
+    groups.get(q.name)!.push({ key, task: t, role: q.role, forName: q.forName, forRole: q.forRole } as any);
   }
   for (const [name, list] of groups) {
     const items: string[] = [];
@@ -132,7 +151,9 @@ export async function flushTaskQueue(store: any) {
       const t = list[i].task;
       let projectName = "";
       if (t.projectId) { const p: any = await store.get("projects/" + t.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
-      items.push((i + 1) + ". " + (list[i].role === "checker" ? "【確認のお願い】" : "【担当】") + "\n   " + taskLines(t, projectName).join("\n   "));
+      const li: any = list[i];
+      const label = li.role === "admin" ? "【控え：" + (li.forName || "") + "さんが" + (li.forRole === "checker" ? "確認" : "担当") + "】" : li.role === "checker" ? "【確認のお願い】" : "【担当】";
+      items.push((i + 1) + ". " + label + "\n   " + taskLines(t, projectName).join("\n   "));
     }
     const body = [name + "さん", "", "昨日の夕方以降に届いたタスクをまとめてお知らせします。", "", ...items, "", "▼ 住まいるアプリを開く", APP_URL, "", "（このメールは住まいるアプリから自動で送っています）"].join("\n");
     const ok = await notifyStaff(store, name, "【住まいる】夜のあいだに届いたタスクが" + list.length + "件あります", body);
@@ -143,7 +164,7 @@ export async function flushTaskQueue(store: any) {
   for (const k of dead) await store.delete(k);
 }
 
-// ---- 完了の報告：完了にするとき画面で選んだ人だけ（社長・朋子にも自動では送らない） ----
+// ---- 完了の報告：完了にするとき画面で選んだ人＋ともこ（控え） ----
 export async function sendTaskDoneMails(store: any, task: any, by: string) {
   const names = new Set<string>();
   if (Array.isArray(task.reportTo)) {
@@ -153,6 +174,7 @@ export async function sendTaskDoneMails(store: any, task: any, by: string) {
     const requester = task.instructor || task.creator || "";
     if (requester) names.add(requester);
   }
+  names.add(ALL_NOTICE_NAME);
   if (by) names.delete(by);
   let projectName = "";
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
@@ -168,7 +190,7 @@ export async function sendTaskDoneMails(store: any, task: any, by: string) {
 export async function sendTaskReviewMail(store: any, task: any, by: string) {
   const r = task.review || {};
   const name = task.assignee || task.creator || task.instructor || "";
-  if (!name || name === by) return false;
+  if (!name) return false;
   let projectName = "";
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
   const approved = r.result === "承認";
@@ -178,5 +200,8 @@ export async function sendTaskReviewMail(store: any, task: any, by: string) {
     (r.by || by ? (r.by || by) + "さんが、" : "") + (replied ? "次のタスクに返信しました。" : approved ? "次のタスクを承認しました。進めてください。" : "次のタスクを差し戻しました。内容を確認してください。"), "",
     ...(r.note ? [(replied ? "返信：" : "コメント：") + String(r.note).slice(0, 1000), ""] : []),
     ...taskLines(task, projectName), "", "▼ 住まいるアプリを開く", APP_URL, "", MAIL_FOOTER].join("\n");
-  return await notifyStaff(store, name, subject, body);
+  const ok = name !== by ? await notifyStaff(store, name, subject, body) : false;
+  // ともこへの控え（承認／差し戻し／返信をしたのが本人のときは送らない）
+  if ((r.by || by) !== ALL_NOTICE_NAME) await notifyAdminCopy(store, by, name, subject, body).catch(() => false);
+  return ok;
 }

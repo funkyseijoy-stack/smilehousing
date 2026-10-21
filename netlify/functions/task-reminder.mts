@@ -1,10 +1,11 @@
 import type { Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { nowJst, addDays, listCollection } from "../lib/booking.mts";
-import { sendDeadlineDigest, flushTaskQueue } from "../lib/task-mail.mts";
+import { sendDeadlineDigest, flushTaskQueue, ALL_NOTICE_NAME } from "../lib/task-mail.mts";
 
 // 期限の「前日」と「当日」の朝（9:00 日本時間）に、担当者・確認者へ個人のメールでリマインドする。
 // 完了したタスク・削除したタスク・「自分だけ」のタスクは対象外。メールアドレスが未登録の人には送らない。
+// ともこ（朋子）には、担当・確認に入っていないタスクも含めて、期限のタスクをすべて送る。
 // 定期実行の関数は、Netlify が本番デプロイに対してのみ実行する。
 export default async () => {
   const store = getStore("staffData");
@@ -24,6 +25,8 @@ export default async () => {
     const people: [string, string][] = [];
     if (t.assignee) people.push([t.assignee, "assignee"]);
     if (t.checker && t.checker !== t.assignee) people.push([t.checker, "checker"]);
+    // ともこには、期限のタスクをすべて（担当・確認に入っていないものも）知らせる
+    if (!people.some(([n]) => n === ALL_NOTICE_NAME)) people.push([ALL_NOTICE_NAME, "admin"]);
     for (const [name, role] of people) {
       const k = name + "|" + when;
       if (!groups.has(k)) groups.set(k, { name, when, items: [] });
