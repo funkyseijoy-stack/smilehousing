@@ -244,7 +244,10 @@
       out += '<button class="bookbtn" id="rvBook"'+((rv.date&&rv.start&&!rv.booking)?"":" disabled")+'>'+(rv.booking?"予約中…":"この内容で予約する")+'</button>';
       out += '<div class="rvnote">ご予約の開始時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.lastStart||lastStart())+'<br>日曜日・祝日のご予約や、変更・キャンセルは、LINEなどで担当者にお知らせください。</div>';
     }
+    // 日付の横並びは、描き直しても押した日付の位置のまま（先頭に戻さない）
+    var rdOld = box.querySelector('.rvdays'), rdLeft = rdOld ? rdOld.scrollLeft : 0;
     box.innerHTML = out;
+    var rdNew = box.querySelector('.rvdays'); if(rdNew && rdLeft) rdNew.scrollLeft = rdLeft;
   }
   function bookNow(){
     if(!rv.date || !rv.start || rv.booking) return;

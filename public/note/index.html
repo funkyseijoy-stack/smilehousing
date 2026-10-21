@@ -658,7 +658,10 @@
     else if(view.tab==="resv") html = resvHtml();
     else if(view.tab==="image") html = imageHtml();
     else html = view.cat ? catDetailHtml(view.cat) : buildHtml();
+    // 予約の日付の横並びは、描き直しても押した日付の位置のまま（先頭に戻さない）
+    var rdOld = main.querySelector('.rvdays'), rdLeft = rdOld ? rdOld.scrollLeft : 0;
     main.innerHTML = '<div class="wrap">'+html+'</div>';
+    var rdNew = main.querySelector('.rvdays'); if(rdNew && rdLeft) rdNew.scrollLeft = rdLeft;
     if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
     if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
   }
