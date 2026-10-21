@@ -586,6 +586,9 @@
   .kancard .kc-meta span{ background:var(--surface-2); border-radius:999px; padding:1px 7px; }
   .kancard .kc-meta span.due-soon{ background:var(--orange-soft); color:var(--orange); font-weight:700; }
   .kancard .kc-actions{ display:flex; gap:4px; flex-wrap:wrap; }
+  .kancard .kc-more{ margin-block-start:6px; padding-block-start:6px; border-block-start:1px dashed var(--border); }
+  .kancard .kc-state{ flex-wrap:wrap; }
+  .kancard .kc-state b{ white-space:nowrap; }
   .taskform-modal{ position:fixed; inset:0; background:rgba(20,16,12,.55); z-index:85; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; }
   .taskform-modal[hidden]{ display:none; }
   #cmCancelRow[hidden]{ display:none; }
@@ -3466,17 +3469,20 @@
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
-        '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
+        (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
         '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
+        '<button class="btn small secondary" data-kcmore="'+t.id+'">'+(state.taskMoreOpen&&state.taskMoreOpen[t.id]?'⋯ その他 ▴':'⋯ その他 ▾')+'</button>'+
+      '</div>'+
+      (state.taskMoreOpen&&state.taskMoreOpen[t.id] ? '<div class="kc-actions kc-more">'+
+        '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
         '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
         '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
         (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
         (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
-        (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
         '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
-      '</div>'+
+      '</div>' : '')+
       (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
         return '<button data-taskact="setstatus" data-id="'+t.id+'" data-status="'+st+'"'+(st===status?' class="cur"':'')+'>'+st+'</button>';
       }).join("")+'</div>' : '')+
@@ -13014,6 +13020,8 @@
     document.getElementById("kanbanWrap").addEventListener("click", function(e){
       var delAttachBtn = e.target.closest("button[data-delattach]");
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
+      var kmore = e.target.closest("[data-kcmore]");
+      if(kmore){ state.taskMoreOpen = state.taskMoreOpen || {}; state.taskMoreOpen[kmore.dataset.kcmore] = !state.taskMoreOpen[kmore.dataset.kcmore]; renderKanban(); return; }
       var vlist = e.target.closest("[data-vendorlist]");
       if(vlist){ state.taskVendOpen = state.taskVendOpen || {}; state.taskVendOpen[vlist.dataset.vendorlist] = !state.taskVendOpen[vlist.dataset.vendorlist]; renderKanban(); return; }
       var vcyc = e.target.closest("[data-vendorcycle]");
