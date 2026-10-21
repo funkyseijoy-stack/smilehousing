@@ -162,12 +162,17 @@
       kinds.sort(function(a,b){ var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b); return (ia<0?9:ia)-(ib<0?9:ib); });
       html += kinds.map(function(k){
         var ds = fins.filter(function(d){ return d.kind===k; });
-        var top = ds[0], olds = ds.slice(1);
-        var f = top.file;
-        var thumb = isImg(f) ? '<img loading="lazy" src="'+esc(f.url)+'" alt="">' : (isPdf(f) ? '<canvas data-pdf="'+esc(f.url)+'"></canvas>' : '<span class="ph">📄</span>');
+        // いちばん新しい日付のものは全部並べて出す（同じ日に2枚以上入れたとき、1枚だけ「以前の版」に隠れないように）
+        var top = ds[0], latest = ds.filter(function(d){ return d.date===top.date; }), olds = ds.filter(function(d){ return d.date!==top.date; });
+        var memos = latest.map(function(d){ return d.memo; }).filter(function(m, i, a){ return m && a.indexOf(m)===i; });
+        var tiles = latest.map(function(d){
+          var f = d.file;
+          var thumb = isImg(f) ? '<img loading="lazy" src="'+esc(f.url)+'" alt="">' : (isPdf(f) ? '<canvas data-pdf="'+esc(f.url)+'"></canvas>' : '<span class="ph">📄</span>');
+          return '<a class="file" href="'+esc(f.url)+'" target="_blank" rel="noopener"><div class="th">'+thumb+'</div><div class="nm"><span>'+esc(f.name||k)+'</span><b>ひらく</b></div></a>';
+        }).join("");
         return '<div class="fin"><div class="fk">'+esc(k)+'</div><div class="fd">'+fmtDate(top.date)+'の版</div>'+
-          (top.memo?'<div class="fm">'+esc(top.memo)+'</div>':'')+
-          '<div class="files"><a class="file" href="'+esc(f.url)+'" target="_blank" rel="noopener"><div class="th">'+thumb+'</div><div class="nm"><span>'+esc(f.name||k)+'</span><b>ひらく</b></div></a></div>'+
+          memos.map(function(m){ return '<div class="fm">'+esc(m)+'</div>'; }).join("")+
+          '<div class="files">'+tiles+'</div>'+
           (olds.length?'<details><summary>以前の版（'+olds.length+'件）</summary>'+olds.map(function(o){
             return '<a class="old" href="'+esc(o.file.url)+'" target="_blank" rel="noopener"><span>'+fmtDate(o.date)+(o.memo?'　'+esc(o.memo):'')+'</span><b>ひらく</b></a>';
           }).join("")+'</details>':'')+
