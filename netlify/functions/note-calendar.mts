@@ -1,7 +1,7 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { getAccessToken, sendNotifyMail, CUSTOMER_CALENDAR_ID } from "../lib/google.mts";
-import { DURATION, DURATION_OPTIONS, OPEN_MIN, CLOSE_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays } from "../lib/booking.mts";
+import { DURATION, DURATION_OPTIONS, OPEN_MIN, CLOSE_MIN, LAST_START_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays } from "../lib/booking.mts";
 
 // おうちノート（お客様画面）の打合せ予約。
 // 空き状況は Google カレンダー「お客様予約」＋ 住まいるアプリの予約（reservations）から判定し、
@@ -56,7 +56,7 @@ export default async (req: Request, context: Context) => {
       const dq = parseInt(url.searchParams.get("d") || "", 10);
       const dur = ALL_DURATIONS.includes(dq) ? dq : DURATION;
       const days = await buildDays(tk.accessToken, store, today, horizon, dur);
-      return json({ types, durationOptions: DURATION_OPTIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), days });
+      return json({ types, durationOptions: DURATION_OPTIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), lastStart: toHM(LAST_START_MIN), days });
     }
 
     // ---------- 予約する ----------

@@ -10,6 +10,8 @@ export const DURATION = 120; // 分（ふつうの種類は2時間）
 export const DURATION_OPTIONS: Record<string, number[]> = { "現場": [120, 60] };
 export const OPEN_MIN = 10 * 60;
 export const CLOSE_MIN = 17 * 60;
+// お客様が選べる最後の開始時間（所要時間に関係なく15:30まで。2時間なら17:30に終わる）
+export const LAST_START_MIN = 15 * 60 + 30;
 export const STEP = 30;
 export const DAYS_AHEAD = 28;
 export const LEAD_MIN = 60; // 当日は1時間後以降の開始のみ
@@ -120,7 +122,7 @@ export async function buildDays(accessToken: string, store: any, from: string, t
     if (hol.has(d)) { days.push({ ...base, status: "closed", reason: "祝日", slots: [] }); continue; }
     const dayBusy = busy.filter((b) => b.date === d);
     const slots: { start: string; available: boolean }[] = [];
-    for (let s = OPEN_MIN; s + duration <= CLOSE_MIN; s += STEP) {
+    for (let s = OPEN_MIN; s <= LAST_START_MIN; s += STEP) {
       let ok = !dayBusy.some((b) => s < b.end && b.start < s + duration);
       if (d === now.date && s < now.min + LEAD_MIN) ok = false;
       if (d < now.date) ok = false;

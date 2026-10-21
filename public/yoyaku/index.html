@@ -163,7 +163,7 @@
       root.innerHTML = out; return;
     }
     out += '<div class="step"><span class="n">1</span>日付を選ぶ</div>'+calHtml();
-    out += '<p class="hint">受付時間 '+esc(st.avail.open)+'〜'+esc(st.avail.close)+'。日曜・祝日はお休みをいただいております。</p>';
+    out += '<p class="hint">ご予約の開始時間 '+esc(st.avail.open)+'〜'+esc(st.avail.lastStart||st.avail.close)+'。日曜・祝日はお休みをいただいております。</p>';
     var day = dayOf(st.date);
     if(day && day.status==="open"){
       out += '<div class="step"><span class="n">2</span>開始時間を選ぶ</div><div class="slots">'+

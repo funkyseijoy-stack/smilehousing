@@ -2,7 +2,7 @@ import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { getAccessToken, sendNotifyMail, sendMailTo, CUSTOMER_CALENDAR_ID, CUSTOMER_MAIL_FROM_NAME } from "../lib/google.mts";
 import { confirmationMail } from "../lib/customer-mail.mts";
-import { DURATION, OPEN_MIN, CLOSE_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays, listCollection } from "../lib/booking.mts";
+import { DURATION, OPEN_MIN, CLOSE_MIN, LAST_START_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays, listCollection } from "../lib/booking.mts";
 
 // 新規のお客様向けの公開予約（/yoyaku/）。ログイン・リンク不要で誰でも使えるページ用。
 // 予約の種類は「ショールーム見学＆おうち相談」のみ。空き状況は note-calendar と同じルール
@@ -44,7 +44,7 @@ export default async (req: Request, context: Context) => {
     // ---------- 空き状況 ----------
     if (req.method === "GET") {
       const days = await buildDays(tk.accessToken, store, today, horizon);
-      return json({ type: BOOKING_TYPE, durationMinutes: DURATION, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), days });
+      return json({ type: BOOKING_TYPE, durationMinutes: DURATION, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), lastStart: toHM(LAST_START_MIN), days });
     }
 
     // ---------- 予約する ----------

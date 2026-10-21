@@ -242,7 +242,7 @@
         return '<button class="rvslot'+(rv.start===sl.start?" on":"")+'" data-rvstart="'+sl.start+'"'+(sl.available?"":" disabled")+'>'+sl.start+'</button>';
       }).join("")+'</div>';
       out += '<button class="bookbtn" id="rvBook"'+((rv.date&&rv.start&&!rv.booking)?"":" disabled")+'>'+(rv.booking?"予約中…":"この内容で予約する")+'</button>';
-      out += '<div class="rvnote">受付時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.close)+'（最終開始 '+lastStart()+'）<br>日曜日・祝日のご予約や、変更・キャンセルは、LINEなどで担当者にお知らせください。</div>';
+      out += '<div class="rvnote">ご予約の開始時間 '+esc(rv.avail.open)+'〜'+esc(rv.avail.lastStart||lastStart())+'<br>日曜日・祝日のご予約や、変更・キャンセルは、LINEなどで担当者にお知らせください。</div>';
     }
     box.innerHTML = out;
   }
