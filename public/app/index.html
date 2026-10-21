@@ -3411,6 +3411,21 @@
     var rs = document.getElementById("taskFilterReset");
     if(rs) rs.hidden = !(state.taskDeptFilter || state.taskProjectFilter || state.taskKindFilter || state.taskAssigneeFilter);
   }
+  // 依頼先の業者：ふだんは1行（「依頼先 5社（連絡済み 3／未連絡 2）▸」）、押すと会社ごとの一覧
+  function taskVendorsHtml(t){
+    var vs = taskVendors(t);
+    var open = !!(state.taskVendOpen && state.taskVendOpen[t.id]);
+    var done = 0;
+    vs.forEach(function(v){ if(VENDOR_STATUS.indexOf(v.status||"未連絡") >= 1) done++; });
+    var head = '<button type="button" class="pill small" data-vendorlist="'+t.id+'" style="cursor:pointer; border:none; font-family:inherit; margin-block-end:6px; background:var(--gray-soft); color:var(--text);">依頼先 '+vs.length+'社（連絡済み '+done+'／未連絡 '+(vs.length-done)+'） '+(open?'▾':'▸')+'</button>';
+    if(!open) return head;
+    return head+'<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+vs.map(function(v,vi){
+      var st = v.status||"未連絡";
+      var d = VENDOR_STATUS.indexOf(st) >= 1;
+      return '<div style="display:flex; align-items:center; gap:6px; font-size:.85rem;"><span>'+escapeHtml(v.name)+'</span>'+
+        '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(d?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
+    }).join("")+'</div>';
+  }
   function kanCardHtml(t, status){
     var proj = projectById(t.projectId);
     var isVendor = !!t.requestTo;
@@ -3448,12 +3463,7 @@
       (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
       (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
       taskReviewsHtml(t)+
-      (taskVendors(t).length ? '<div style="display:flex; flex-direction:column; gap:4px; margin-block-end:6px;">'+taskVendors(t).map(function(v,vi){
-        var st = v.status||"未連絡";
-        var done = VENDOR_STATUS.indexOf(st) >= 1;
-        return '<div style="display:flex; align-items:center; gap:6px; font-size:.85rem;"><span>依頼先 '+escapeHtml(v.name)+'</span>'+
-          '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(done?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
-      }).join("")+'</div>' : '')+
+      (taskVendors(t).length ? taskVendorsHtml(t) : '')+
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
         '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
@@ -13004,6 +13014,8 @@
     document.getElementById("kanbanWrap").addEventListener("click", function(e){
       var delAttachBtn = e.target.closest("button[data-delattach]");
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
+      var vlist = e.target.closest("[data-vendorlist]");
+      if(vlist){ state.taskVendOpen = state.taskVendOpen || {}; state.taskVendOpen[vlist.dataset.vendorlist] = !state.taskVendOpen[vlist.dataset.vendorlist]; renderKanban(); return; }
       var vcyc = e.target.closest("[data-vendorcycle]");
       if(vcyc){ cycleVendorStatus(vcyc.dataset.vendorcycle, parseInt(vcyc.dataset.vidx,10)); return; }
       var mhead = e.target.closest("[data-donemonthtoggle]");
@@ -13028,7 +13040,7 @@
       if(!btn){
         // カード本体を押したら、詳細を開く／閉じる（ボタン・リンク・入力は除く）
         var cardEl = e.target.closest(".kancard");
-        if(cardEl && !e.target.closest("button, a, label, input, select, textarea, [data-openatt], [data-vendorcycle], [data-delattach]")){
+        if(cardEl && !e.target.closest("button, a, label, input, select, textarea, [data-openatt], [data-vendorcycle], [data-vendorlist], [data-delattach]")){
           var tid = cardEl.dataset.taskid;
           state.taskExpanded = state.taskExpanded || {};
           state.taskExpanded[tid] = !state.taskExpanded[tid];
