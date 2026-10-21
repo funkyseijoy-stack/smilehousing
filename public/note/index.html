@@ -1251,17 +1251,6 @@ function homeHtml(){
         '</div></div></div>';
     }
 
-    // プランボード section
-    if(planboards.length){
-      out += '<div class="section decided">'+
-        '<div class="section-header"><span class="section-icon">📐</span><span>プランボード</span></div>'+
-        '<div class="section-content"><div class="section-thumbs">'+
-        planboards.slice().reverse().map(function(x, i){
-          return thumbHtml(x.file, capOf(c, x, (i===0?"最新・":"")+fmtD(x.at))+(x.changing?"・変更依頼中":""));
-        }).join("")+
-        '</div></div></div>';
-    }
-
     // 打ち合わせ記録と「変更後のPDF」を、1つの時系列（新しい順）にカードで並べる。
     // カードごとに「仮決定／決定」を選べる。色は状態で分ける（検討中＝白／仮決定＝黄／決定＝緑）。
     // 同じタスクのPDFは1枚のカードにまとめ、同じファイル（url）は重複させない。
@@ -1279,6 +1268,8 @@ function homeHtml(){
     notes.forEach(function(n){ feed.push({ at: n.at||"", kind:"note", n:n }); });
     Object.keys(pdfGroups).forEach(function(k){ feed.push({ at: pdfGroups[k].at, kind:"pdf", g:pdfGroups[k] }); });
     specCards.forEach(function(x){ feed.push({ at: x.at||"", kind:"spec", x:x }); });
+    // 決定ボタンを出していない写真・PDF・プランボードも、記録と同じ時系列（日付順）に並べる（仮決定／決定は付けない）
+    planboards.concat(photos).forEach(function(x){ feed.push({ at: x.at||"", kind:"spec", x:x, plain:true }); });
     feed.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
     var roomIdOfTab = (String(tabKey).indexOf("rooms:")===0) ? String(tabKey).split(":")[1] : "";
     function cardDecHtml(key, status, label, show){
@@ -1290,7 +1281,7 @@ function homeHtml(){
         ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
     }
     if(feed.length){
-      out += '<div class="sechd"><h3>打ち合わせ記録・変更後の図面</h3><span class="countpill">新しい順</span></div>'+
+      out += '<div class="sechd"><h3>打ち合わせ記録・写真・資料</h3><span class="countpill">新しい順</span></div>'+
         '<div class="feed">'+
         feed.map(function(it, i){
           var newest = i===0 ? '<span class="tag new">最新</span>' : '';
@@ -1304,10 +1295,10 @@ function homeHtml(){
           }
           if(it.kind==="spec"){
             var x = it.x;
-            return '<div class="fcard st-'+esc(x.cardStatus||"検討中")+'">'+
+            return '<div class="fcard'+(it.plain?'':' st-'+esc(x.cardStatus||"検討中"))+'">'+
               '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(x.type==="planboard"?"📐 プランボード":"📷 写真・資料")+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>'+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
-              cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true)+'</div>';
+              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true))+'</div>';
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
@@ -1321,18 +1312,6 @@ function homeHtml(){
           html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
           return html;
         }).join("")+'</div>';
-    }
-
-    // 写真・資料section（部位に直接登録された写真・PDFなど。打合せ記録やプランボード・
-    // 変更後PDFのどれにも当たらない項目は、以前はここで漏れて表示されなかったため追加）
-    if(photos.length){
-      out += '<div class="section decided">'+
-        '<div class="section-header"><span class="section-icon">📷</span><span>写真・資料</span></div>'+
-        '<div class="section-content"><div class="section-thumbs">'+
-        photos.slice().reverse().map(function(x){
-          return thumbHtml(x.file, capOf(c, x, fmtD(x.at))+(x.changing?"・変更依頼中":""));
-        }).join("")+
-        '</div></div></div>';
     }
 
     // プランボード・定価の書類。スタッフが部位を指定して出したものだけ（種類ごとに見出しを分ける）
