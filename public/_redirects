@@ -5,6 +5,8 @@
 /app/migration-check.html  /app/migration-check.html  200!
 /note/*  /note/index.html  200!
 /yoyaku  /yoyaku/index.html  200!
+/kiroku  /kiroku/index.html  200!
+/kiroku/*  /kiroku/index.html  200!
 /yoyaku/*  /yoyaku/index.html  200!
 /app/*  /app/index.html  200!
 /*  /index.html  200

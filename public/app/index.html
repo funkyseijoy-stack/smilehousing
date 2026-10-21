@@ -1027,6 +1027,77 @@
 
       <!-- ヒアリング（どんな家にしたいか） subpanel -->
       <div class="subpanel" id="sub-hearing">
+        <!-- 初期の打合せ記録（手書きメモをPDFで。お客様には専用の簡単なページで見せる） -->
+        <div class="card" id="earlyCard">
+          <div class="row" style="justify-content:space-between; gap:8px; flex-wrap:wrap; margin-block-end:6px;">
+            <h3 style="margin:0;">初期の打合せ記録</h3>
+            <button type="button" class="btn" id="btnEarlyOpen">＋ 記録する</button>
+          </div>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">来店・初回のお打合せの手書きメモを、スマホで撮影するかスキャンしたPDFで日付ごとに残します。撮影した写真は1つのPDFにまとめて保存します。「お客様に見せる」にした記録だけ、下のリンクのページでお客様が見られます（おうちノートとは別の簡単なページです）。</p>
+          <div id="earlyForm" hidden style="border:1px solid var(--border); border-radius:12px; padding:12px; margin-block-end:12px; background:var(--gray-soft);">
+            <div style="font-weight:700; margin-block-end:8px;" id="earlyFormTitle">新しい記録</div>
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <label class="field" style="flex:0 0 auto;">打合せ日<input type="date" id="earlyDate"></label>
+              <label class="field" style="flex:1 1 220px;">題名<input type="text" id="earlyTitle" placeholder="例：初回ご来店・ご要望のヒアリング"></label>
+            </div>
+            <label class="field">ひとことメモ<textarea id="earlyMemo" rows="2" placeholder="例：次回は土地の候補を一緒に見に行きます"></textarea></label>
+            <div style="font-weight:700; font-size:.9rem; margin-block:6px 4px;">手書きメモ</div>
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn secondary" data-earlyfile="earlyCamera">📷 撮影する</button>
+              <button type="button" class="btn secondary" data-earlyfile="earlyPick">📄 写真・PDFを選ぶ</button>
+              <input type="file" id="earlyCamera" accept="image/*" capture="environment" hidden>
+              <input type="file" id="earlyPick" accept="image/*,application/pdf,.pdf,.heic,.heif" multiple hidden>
+            </div>
+            <p class="muted" style="margin:6px 0 0; font-size:.85rem;">複数枚撮るときは「📷 撮影する」を続けて押してください。写真は撮った順に1つのPDFになります。</p>
+            <div id="earlyPending" style="margin-block-start:8px;"></div>
+            <div id="earlyExisting" style="margin-block-start:8px;"></div>
+            <label class="row" style="gap:6px; margin-block-start:10px; font-weight:700;"><input type="checkbox" id="earlyShared" checked> お客様に見せる</label>
+            <div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap; align-items:center;">
+              <button class="btn" id="btnEarlySave">記録する</button>
+              <button class="btn secondary" id="btnEarlyCancel">やめる</button>
+              <span class="muted" id="earlyStatus" style="font-size:.85rem;"></span>
+            </div>
+          </div>
+          <div id="earlyList"></div>
+          <div style="border-top:1px solid var(--border); margin-block-start:12px; padding-block-start:10px;">
+            <div style="font-weight:700; font-size:.9rem; margin-block-end:4px;">お客様に見せるページ</div>
+            <div id="earlyLinkArea" class="muted" style="font-size:.85rem; word-break:break-all;"></div>
+            <div class="row" style="gap:8px; margin-block-start:6px; flex-wrap:wrap;">
+              <button class="btn secondary small" id="btnEarlyLinkIssue">リンクを発行する</button>
+              <button class="btn secondary small" id="btnEarlyLinkCopy" hidden>リンクをコピー</button>
+              <button class="btn secondary small" id="btnEarlyLinkOpen" hidden>👁 お客様の画面を見る</button>
+            </div>
+          </div>
+        </div>
+        <!-- 資金計画・お見積り（同じお客様用ページに、記録とは別の欄で出す） -->
+        <div class="card" id="finCard">
+          <div class="row" style="justify-content:space-between; gap:8px; flex-wrap:wrap; margin-block-end:6px;">
+            <h3 style="margin:0;">資金計画・お見積り</h3>
+            <button type="button" class="btn" id="btnFinOpen">＋ 書類を入れる</button>
+          </div>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">資金計画書・概算見積書などを入れます。「お客様に見せる」にしたものだけ、上の「お客様に見せるページ」（同じリンク）の「資金計画・お見積り」欄に出ます。種類ごとに、いちばん新しい日付のものが上に大きく出て、前の版は「以前の版」にまとまります。</p>
+          <div id="finForm" hidden style="border:1px solid var(--border); border-radius:12px; padding:12px; margin-block-end:12px; background:var(--gray-soft);">
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <label class="field" style="flex:0 0 auto;">種類<select id="finKind"><option>資金計画書</option><option>概算見積書</option><option>その他</option></select></label>
+              <label class="field" style="flex:0 0 auto;">日付<input type="date" id="finDate"></label>
+            </div>
+            <label class="field">ひとことメモ（お客様にも表示）<input type="text" id="finMemo" placeholder="例：土地代を見直した版です"></label>
+            <div class="row" style="gap:8px; flex-wrap:wrap; margin-block-start:4px;">
+              <button type="button" class="btn secondary" data-finfile="finPick">📄 PDF・写真を選ぶ</button>
+              <button type="button" class="btn secondary" data-finfile="finCamera">📷 撮影する</button>
+              <input type="file" id="finPick" accept="application/pdf,.pdf,image/*,.heic,.heif" multiple hidden>
+              <input type="file" id="finCamera" accept="image/*" capture="environment" hidden>
+            </div>
+            <div id="finPending" class="muted" style="font-size:.85rem; margin-block-start:6px;"></div>
+            <label class="row" style="gap:6px; margin-block-start:10px; font-weight:700;"><input type="checkbox" id="finShared" checked> お客様に見せる</label>
+            <div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap; align-items:center;">
+              <button class="btn" id="btnFinSave">入れる</button>
+              <button class="btn secondary" id="btnFinCancel">やめる</button>
+              <span class="muted" id="finStatus" style="font-size:.85rem;"></span>
+            </div>
+          </div>
+          <div id="finList"></div>
+        </div>
         <div class="card">
           <h3 style="margin:0 0 4px;">ヒアリング（どんな家にしたいか）</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.85rem;">初めての打合せで伺った内容を入力します。スタッフだけが見られます（お客様のおうちノートには出ません）。入力したら下の「保存」を押してください。</p>
@@ -1540,6 +1611,21 @@
       <div class="row" style="justify-content:space-between; align-items:center; margin-block-end:10px;"><h2 style="margin:0;">業者一覧</h2><button type="button" class="btn small" data-reveal="vendorAddCard">＋ 業者を追加</button></div>
       <div class="tablewrap"><table><thead><tr><th>業者名</th><th>カテゴリ</th><th>方法</th><th>メール</th><th></th></tr></thead><tbody id="vendorTableBody"></tbody></table></div>
       <div class="empty" id="vendorEmpty" hidden>業者が登録されていません。</div>
+    </div>
+
+    <div class="card" id="companyIntroCard">
+      <h3>打合せ記録ページの「住まいるハウジングについて」</h3>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">見込みのお客様にお送りする「お打合せの記録」ページ（案件の「ヒアリング」タブで発行するリンク）に出る文章です。すべてのお客様に同じ文章が出ます。見出し・本文を空にすると、そのカードは出ません。「保存」を押すまではお客様には出ません。</p>
+      <div style="font-weight:700; margin-block:4px;">家づくりの流れ（会社紹介の下に、小さな見出し付きで出ます）</div>
+      <label class="field">見出し<input type="text" id="ciPolicyTitle"></label>
+      <label class="field">本文<textarea id="ciPolicyText" rows="7" style="width:100%;"></textarea></label>
+      <div style="font-weight:700; margin-block:10px 4px;">会社紹介（ページのいちばん下「住まいるハウジングについて」）</div>
+      <textarea id="ciText" rows="5" style="width:100%;"></textarea>
+      <label class="row" style="gap:6px; margin-block-start:8px;"><input type="checkbox" id="ciOn" checked> お客様のページに表示する</label>
+      <div class="row" style="gap:10px; align-items:center; margin-block-start:10px; flex-wrap:wrap;">
+        <button class="btn" id="btnCiSave">保存</button>
+        <span class="muted" id="ciStatus" style="font-size:.85rem;"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -3053,6 +3139,9 @@
     renderTaskHistory();
     renderProjectTasks();
     renderProjectHearing();
+    renderEarlyMeetings();
+    renderFinanceDocs();
+    renderCompanyIntro();
     renderVendorCheckboxList();
     renderProjectTable();
     renderPendingTable();
@@ -3986,6 +4075,425 @@
     logActivity("案件「"+p.name+"」のヒアリングを保存しました");
     toast("✓ ヒアリングを保存しました");
     renderProjectHearing();
+  }
+
+  // ---- 初期の打合せ記録（手書きメモをPDFで日付ごとに。project.earlyMeetings に保存） ----
+  // お客様には、おうちノートとは別の簡単なページ（/kiroku/?p=<案件ID>&t=<earlyToken>）で「お客様に見せる」記録だけを見せる。
+  var earlyDraft = { editId:null, pid:null, files:[], keep:[] }; // files＝これから足すFile、keep＝編集時の既存の添付
+  var earlySaving = false;
+  function earlyList(p){ return ((p && p.earlyMeetings) || []).filter(function(r){ return !r.deletedAt; }); }
+  function todayJst(){ var d = new Date(Date.now()+9*3600*1000); return d.toISOString().slice(0,10); }
+  function earlyUrl(p){ return location.origin + "/kiroku/?p=" + encodeURIComponent(p.id) + "&t=" + encodeURIComponent(p.earlyToken); }
+  function renderEarlyMeetings(){
+    var listEl = document.getElementById("earlyList");
+    if(!listEl) return;
+    var p = projectById(state.currentProjectId);
+    if(earlyDraft.pid && p && earlyDraft.pid!==p.id) closeEarlyForm(); // 別の案件を開いたら入力欄は閉じる
+    var rows = earlyList(p).slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||"") || (b.createdAt||"").localeCompare(a.createdAt||""); });
+    listEl.innerHTML = rows.length ? rows.map(function(r){
+      return '<div class="earlyrow" style="border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:8px; background:var(--card,#fff);">'+
+        '<div class="row" style="gap:8px; flex-wrap:wrap; align-items:center;">'+
+          '<b>'+escapeHtml((r.date||"").replace(/-/g,"/"))+'</b>'+
+          '<span style="font-weight:700;">'+escapeHtml(r.title||"（題名なし）")+'</span>'+
+          (r.shared ? '<span class="pill" style="background:var(--accent); color:#fff;">お客様に見せる</span>' : '<span class="pill">社内だけ</span>')+
+        '</div>'+
+        (r.memo ? '<div style="white-space:pre-wrap; margin-block-start:4px;">'+escapeHtml(r.memo)+'</div>' : '')+
+        (r.files && r.files.length ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml(r.files, 96)+'</div>' : '<div class="muted" style="font-size:.85rem; margin-block-start:4px;">手書きメモなし</div>')+
+        '<div class="row" style="gap:6px; margin-block-start:8px; flex-wrap:wrap;">'+
+          '<button class="btn secondary small" data-earlyshare="'+r.id+'">'+(r.shared?'社内だけにする':'お客様に見せる')+'</button>'+
+          '<button class="btn secondary small" data-earlyedit="'+r.id+'">✏️ 編集・追加</button>'+
+          '<button class="btn secondary small" data-earlydel="'+r.id+'">削除</button>'+
+        '</div>'+
+      '</div>';
+    }).join("") : '<div class="muted" style="font-size:.85rem; padding:6px 0;">まだ記録がありません。「＋ 記録する」から追加してください。</div>';
+    var area = document.getElementById("earlyLinkArea");
+    var has = !!(p && p.earlyToken);
+    if(area) area.innerHTML = !p ? "" : (has ? escapeHtml(earlyUrl(p)) : "まだ発行されていません。LINEなどでお客様に送るときに発行してください。");
+    var ib = document.getElementById("btnEarlyLinkIssue");
+    if(ib) ib.textContent = has ? "リンクを作り直す（古いリンクは無効）" : "リンクを発行する";
+    var cb = document.getElementById("btnEarlyLinkCopy"); if(cb) cb.hidden = !has;
+    var ob = document.getElementById("btnEarlyLinkOpen"); if(ob) ob.hidden = !has;
+  }
+  function renderEarlyDraft(){
+    var pend = document.getElementById("earlyPending");
+    var ex = document.getElementById("earlyExisting");
+    if(!pend || !ex) return;
+    var imgs = earlyDraft.files.filter(function(f){ return !isEarlyPdf(f); }).length;
+    pend.innerHTML = earlyDraft.files.length ? (
+      '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">これから保存するもの（'+earlyDraft.files.length+'件'+(imgs>1?'・写真'+imgs+'枚は1つのPDFにまとめます':'')+'）</div>'+
+      '<div class="notefilerow">'+earlyDraft.files.map(function(f, i){
+        var isPdf = isEarlyPdf(f);
+        if(!f._preview && !isPdf && !isHeicFile(f)){ try{ f._preview = URL.createObjectURL(f); }catch(e){} }
+        var inner = f._preview ? '<img src="'+f._preview+'" alt="">' : '<div class="ftext">📄<b>'+(isPdf?'PDF':'写真')+'</b></div>';
+        return '<div style="display:flex; flex-direction:column; align-items:center; gap:2px;">'+
+          '<div class="notefiletile" style="width:84px; height:84px;">'+inner+'</div>'+
+          '<span style="font-size:.85rem;">'+(i+1)+'</span>'+
+          '<button type="button" class="btn secondary small" data-earlyrm="'+i+'">外す</button></div>';
+      }).join("")+'</div>'
+    ) : "";
+    ex.innerHTML = earlyDraft.editId && earlyDraft.keep.length ? (
+      '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">いまの手書きメモ</div>'+
+      '<div class="notefilerow">'+earlyDraft.keep.map(function(f, i){
+        return '<div style="display:flex; flex-direction:column; align-items:center; gap:2px;">'+
+          '<a href="'+escapeHtml(f.url)+'" target="_blank" rel="noopener" class="notefiletile" style="width:84px; height:84px;">'+fileThumbInner(f.url, f.contentType, f.name)+'</a>'+
+          '<button type="button" class="btn secondary small" data-earlykeeprm="'+i+'">外す</button></div>';
+      }).join("")+'</div>'
+    ) : "";
+  }
+  function isEarlyPdf(f){ return (f.type==="application/pdf") || /\.pdf$/i.test(f.name||""); }
+  function openEarlyForm(editId){
+    var p = projectById(state.currentProjectId);
+    if(!p){ toast("案件を選択してください"); return; }
+    var r = editId ? earlyList(p).find(function(x){ return x.id===editId; }) : null;
+    earlyDraft = { editId: r ? r.id : null, pid: p.id, files: [], keep: r ? (r.files||[]).slice() : [] };
+    document.getElementById("earlyFormTitle").textContent = r ? "記録を編集（写真・PDFの追加もできます）" : "新しい記録";
+    document.getElementById("earlyDate").value = r ? (r.date||"") : todayJst();
+    document.getElementById("earlyTitle").value = r ? (r.title||"") : "";
+    document.getElementById("earlyMemo").value = r ? (r.memo||"") : "";
+    document.getElementById("earlyShared").checked = r ? !!r.shared : true;
+    document.getElementById("btnEarlySave").textContent = r ? "更新する" : "記録する";
+    document.getElementById("earlyStatus").textContent = "";
+    var form = document.getElementById("earlyForm");
+    form.hidden = false;
+    renderEarlyDraft();
+    try{ form.scrollIntoView({behavior:"smooth", block:"nearest"}); }catch(e){}
+  }
+  function closeEarlyForm(){
+    earlyDraft.files.forEach(function(f){ if(f._preview){ try{ URL.revokeObjectURL(f._preview); }catch(e){} } });
+    earlyDraft = { editId:null, pid:null, files:[], keep:[] };
+    var form = document.getElementById("earlyForm");
+    if(form) form.hidden = true;
+    var pend = document.getElementById("earlyPending"); if(pend) pend.innerHTML = "";
+    var ex = document.getElementById("earlyExisting"); if(ex) ex.innerHTML = "";
+  }
+  function addEarlyFiles(fileList){
+    Array.prototype.forEach.call(fileList||[], function(f){ earlyDraft.files.push(f); });
+    renderEarlyDraft();
+  }
+  // 撮った写真（複数）を1つのPDFにまとめる。書類の影は自動で整える。収まらなければ画質を下げてやり直す
+  async function photosToPdf(files){
+    if(typeof PDFLib === "undefined") throw new Error("PDFを作る機能を読み込めませんでした。ページを読み込み直してください");
+    var steps = [[1600,0.8],[1300,0.7],[1000,0.6]];
+    var prepared = [];
+    for(var i=0; i<files.length; i++){
+      var f = files[i];
+      try{ if(isHeicFile(f)) f = new File([await heicToJpegBlob(f)], (f.name||"photo").replace(/\.\w+$/,"")+".jpg", {type:"image/jpeg"}); }catch(e){}
+      var cl = null;
+      try{ cl = await cleanDocShadow(f); }catch(e){ cl = null; }
+      prepared.push(cl || f);
+    }
+    for(var s=0; s<steps.length; s++){
+      var doc = await PDFLib.PDFDocument.create();
+      var total = 0, okAll = true;
+      for(var j=0; j<prepared.length; j++){
+        var b = await compressOnce(prepared[j], steps[s][0], steps[s][1]);
+        if(!b){ okAll = false; break; }
+        total += b.size;
+        var img = await doc.embedJpg(new Uint8Array(await b.arrayBuffer()));
+        // A4の幅（595pt）に合わせたページにする
+        var W = 595, H = Math.round(595 * img.height / img.width);
+        var pg = doc.addPage([W, H]);
+        pg.drawImage(img, {x:0, y:0, width:W, height:H});
+      }
+      if(!okAll) throw new Error("写真を読み込めませんでした（形式を確認してください）");
+      var bytes = await doc.save();
+      if(bytes.length <= 4.0*1048576) return new File([bytes], "手書きメモ.pdf", {type:"application/pdf"});
+    }
+    throw new Error("写真が多すぎて1つのPDFに収まりませんでした。2回に分けて記録してください");
+  }
+  async function saveEarlyMeeting(){
+    if(earlySaving) return;
+    var pid0 = earlyDraft.pid || state.currentProjectId; // 途中で別の案件を開いても、この案件に保存する
+    if(!projectById(pid0)){ toast("案件を選択してください"); return; }
+    var date = document.getElementById("earlyDate").value;
+    var title = document.getElementById("earlyTitle").value.trim();
+    var memo = document.getElementById("earlyMemo").value.trim();
+    var shared = document.getElementById("earlyShared").checked;
+    if(!date){ toast("打合せ日を入れてください"); return; }
+    if(!title && !memo && !earlyDraft.files.length && !earlyDraft.keep.length){ toast("題名・メモ・手書きメモのどれかを入れてください"); return; }
+    var st = document.getElementById("earlyStatus");
+    var btn = document.getElementById("btnEarlySave");
+    earlySaving = true; btn.disabled = true;
+    try{
+      var newFiles = [];
+      var photos = earlyDraft.files.filter(function(f){ return !isEarlyPdf(f); });
+      var pdfs = earlyDraft.files.filter(isEarlyPdf);
+      var dateLbl = date.replace(/-/g,"");
+      if(photos.length){
+        st.textContent = "写真をPDFにまとめています…";
+        var pdf = await photosToPdf(photos);
+        st.textContent = "保存しています…";
+        var up = await assets.upload(pdf, {type:"application/pdf", noClean:true});
+        newFiles.push({url:up.url, contentType:"application/pdf", name:"手書きメモ_"+dateLbl+".pdf", sizeBytes:up.sizeBytes, pages:photos.length});
+      }
+      for(var i=0; i<pdfs.length; i++){
+        st.textContent = "PDFを保存しています…（"+(i+1)+"/"+pdfs.length+"）";
+        var u2 = await assets.upload(pdfs[i], {type:"application/pdf", noClean:true});
+        newFiles.push({url:u2.url, contentType:"application/pdf", name:pdfs[i].name||("手書きメモ_"+dateLbl+".pdf"), sizeBytes:u2.sizeBytes});
+      }
+      var p = projectById(pid0); // アップロード中に自動更新されても、最新の案件に足す
+      if(!p) throw new Error("案件が見つかりません");
+      p.earlyMeetings = (p.earlyMeetings||[]).slice();
+      var now = nowIso(), who = state.currentUser||"";
+      if(earlyDraft.editId){
+        var idx = p.earlyMeetings.findIndex(function(x){ return x.id===earlyDraft.editId; });
+        if(idx<0) throw new Error("編集中の記録が見つかりません（削除された可能性があります）");
+        p.earlyMeetings[idx] = Object.assign({}, p.earlyMeetings[idx], {date:date, title:title, memo:memo, shared:shared, files:earlyDraft.keep.concat(newFiles), updatedAt:now, updatedBy:who});
+      } else {
+        p.earlyMeetings.push({id:"em"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date:date, title:title, memo:memo, shared:shared, files:newFiles, createdAt:now, createdBy:who});
+      }
+      st.textContent = "保存しています…";
+      var ok = await saveDoc("projects", p.id, p);
+      if(ok===false) throw new Error("保存できませんでした。もう一度押してください");
+      logActivity("案件「"+p.name+"」の初期の打合せ記録を"+(earlyDraft.editId?"更新":"追加")+"しました（"+date+"）");
+      toast(earlyDraft.editId ? "✓ 記録を更新しました" : "✓ 記録しました");
+      closeEarlyForm();
+      renderEarlyMeetings();
+    }catch(e){
+      st.textContent = "";
+      toast("⚠ " + ((e && (e.userMessage||e.message)) || "保存できませんでした"), 9000);
+    }finally{
+      earlySaving = false; btn.disabled = false;
+    }
+  }
+  async function updateEarly(id, fn, label){
+    var p = projectById(state.currentProjectId);
+    if(!p) return;
+    p.earlyMeetings = (p.earlyMeetings||[]).slice();
+    var idx = p.earlyMeetings.findIndex(function(x){ return x.id===id; });
+    if(idx<0) return;
+    p.earlyMeetings[idx] = fn(Object.assign({}, p.earlyMeetings[idx]));
+    renderEarlyMeetings();
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ toast("⚠ 保存できませんでした"); return; }
+    if(label) toast(label);
+  }
+  async function issueEarlyLink(){
+    var p = projectById(state.currentProjectId);
+    if(!p){ toast("案件を選択してください"); return; }
+    if(p.earlyToken && !confirm("リンクを作り直すと、お客様にお送りした古いリンクは開けなくなります。作り直しますか？")) return;
+    var arr = new Uint8Array(18);
+    (window.crypto||window.msCrypto).getRandomValues(arr);
+    p.earlyToken = Array.prototype.map.call(arr, function(b){ return ("0"+b.toString(16)).slice(-2); }).join("");
+    renderEarlyMeetings();
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ toast("⚠ 保存できませんでした"); return; }
+    logActivity("案件「"+p.name+"」の打合せ記録ページのリンクを発行しました");
+    toast("✅ リンクを発行しました");
+  }
+  // ---- 会社紹介（打合せ記録ページ用。settings/main.companyIntro={text,policyTitle,policyText,on,updatedAt,updatedBy}） ----
+  var COMPANY_INTRO_DRAFT = "住まいるハウジングは、北海道釧路市で注文住宅をつくっている工務店です。ASOLIE（アソリエ）の加盟工務店です。\n\n" +
+    "〒085-0814 釧路市緑ヶ岡2丁目38番5号";
+  var COMPANY_POLICY_TITLE_DRAFT = "家づくりの流れ";
+  var COMPANY_POLICY_DRAFT = "家づくりでは、先にご契約をしてから細かい内容を決めていくことが多いですが、住まいるハウジングでは、その順番を逆にしています。\n\n" +
+    "決まった「標準仕様」はありません。キッチンやお風呂、外壁や床など、お客様ご自身で選んだものをそのままお見積もりに入れ、ご予算の中に収まるように一緒に考えていきます。\n\n" +
+    "すべてに納得していただけたところで、はじめてご契約となります。ご契約のあとも、内容は自由に変更していただけます。";
+  function renderCompanyIntro(){
+    var ta = document.getElementById("ciText");
+    if(!ta || ta.dataset.dirty==="1") return; // 入力中は自動更新で上書きしない
+    var ci = (state.settings && state.settings.companyIntro) || null;
+    ta.value = ci ? (ci.text||"") : COMPANY_INTRO_DRAFT;
+    document.getElementById("ciPolicyTitle").value = (ci && ci.policyTitle!=null) ? ci.policyTitle : COMPANY_POLICY_TITLE_DRAFT;
+    document.getElementById("ciPolicyText").value = (ci && ci.policyText!=null) ? ci.policyText : COMPANY_POLICY_DRAFT;
+    document.getElementById("ciOn").checked = !ci || ci.on !== false;
+    var st = document.getElementById("ciStatus");
+    if(st) st.textContent = ci ? ("最終保存：" + String(ci.updatedAt||"").slice(0,10) + (ci.updatedBy?"（"+ci.updatedBy+"）":"")) : "下書きです（まだ保存されていません・お客様には出ていません）";
+  }
+  async function saveCompanyIntro(){
+    var ta = document.getElementById("ciText");
+    state.settings = state.settings || {};
+    state.settings.companyIntro = { text: ta.value.trim(), policyTitle: document.getElementById("ciPolicyTitle").value.trim(), policyText: document.getElementById("ciPolicyText").value.trim(), on: document.getElementById("ciOn").checked, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
+    ta.dataset.dirty = "0";
+    var ok = await saveDoc("settings","main", state.settings);
+    if(ok===false){ ta.dataset.dirty = "1"; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
+    logActivity("打合せ記録ページの会社紹介を保存しました");
+    toast("✓ 会社紹介を保存しました");
+    renderCompanyIntro();
+  }
+  // ---- 資金計画・お見積り（project.financeDocs=[{id,kind,date,memo,shared,file,createdAt,createdBy,deletedAt}]） ----
+  var FIN_KINDS = ["資金計画書","概算見積書","その他"];
+  var finDraft = { pid:null, files:[] };
+  var finSaving = false;
+  function finList(p){ return ((p && p.financeDocs) || []).filter(function(d){ return !d.deletedAt; }); }
+  function renderFinanceDocs(){
+    var el = document.getElementById("finList");
+    if(!el) return;
+    var p = projectById(state.currentProjectId);
+    if(finDraft.pid && p && finDraft.pid!==p.id) closeFinForm();
+    var docs = finList(p).slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||"") || (b.createdAt||"").localeCompare(a.createdAt||""); });
+    if(!docs.length){ el.innerHTML = '<div class="muted" style="font-size:.85rem; padding:6px 0;">まだ書類がありません。</div>'; return; }
+    el.innerHTML = FIN_KINDS.map(function(k){
+      var ds = docs.filter(function(d){ return (FIN_KINDS.indexOf(d.kind)>=0 ? d.kind : "その他")===k; });
+      if(!ds.length) return "";
+      return '<div style="font-weight:700; margin:10px 0 6px;">'+escapeHtml(k)+'（'+ds.length+'件）</div>'+ds.map(function(d, i){
+        return '<div style="border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:8px; background:var(--card,#fff);">'+
+          '<div class="row" style="gap:8px; flex-wrap:wrap; align-items:center;">'+
+            '<b>'+escapeHtml((d.date||"").replace(/-/g,"/"))+'</b>'+
+            (i===0 ? '<span class="pill">いちばん新しい版</span>' : '<span class="pill">以前の版</span>')+
+            (d.shared ? '<span class="pill" style="background:var(--accent); color:#fff;">お客様に見せる</span>' : '<span class="pill">社内だけ</span>')+
+          '</div>'+
+          (d.memo ? '<div style="margin-block-start:4px;">'+escapeHtml(d.memo)+'</div>' : '')+
+          (d.file ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml([d.file], 96)+'</div>' : '')+
+          '<div class="row" style="gap:6px; margin-block-start:8px; flex-wrap:wrap;">'+
+            '<button class="btn secondary small" data-finshare="'+d.id+'">'+(d.shared?'社内だけにする':'お客様に見せる')+'</button>'+
+            '<button class="btn secondary small" data-findel="'+d.id+'">削除</button>'+
+          '</div></div>';
+      }).join("");
+    }).join("");
+  }
+  function openFinForm(){
+    var p = projectById(state.currentProjectId);
+    if(!p){ toast("案件を選択してください"); return; }
+    finDraft = { pid:p.id, files:[] };
+    document.getElementById("finDate").value = todayJst();
+    document.getElementById("finMemo").value = "";
+    document.getElementById("finShared").checked = true;
+    document.getElementById("finStatus").textContent = "";
+    renderFinPending();
+    var f = document.getElementById("finForm"); f.hidden = false;
+    try{ f.scrollIntoView({behavior:"smooth", block:"nearest"}); }catch(e){}
+  }
+  function closeFinForm(){
+    finDraft = { pid:null, files:[] };
+    var f = document.getElementById("finForm"); if(f) f.hidden = true;
+    var pe = document.getElementById("finPending"); if(pe) pe.innerHTML = "";
+  }
+  function renderFinPending(){
+    var el = document.getElementById("finPending");
+    if(!el) return;
+    var imgs = finDraft.files.filter(function(f){ return !isEarlyPdf(f); }).length;
+    el.innerHTML = finDraft.files.length ? (
+      finDraft.files.map(function(f, i){ return '<div class="row" style="gap:6px; align-items:center;">'+(isEarlyPdf(f)?'📄 ':'🖼 ')+escapeHtml(f.name||"写真")+' <button type="button" class="btn secondary small" data-finrm="'+i+'">外す</button></div>'; }).join("")+
+      (imgs>1 ? '<div>写真'+imgs+'枚は1つのPDFにまとめます。</div>' : '')+
+      (finDraft.files.filter(isEarlyPdf).length>1 ? '<div>PDFは1つずつ別の書類として入ります。</div>' : '')
+    ) : "PDFか写真を選んでください。";
+  }
+  async function saveFinanceDoc(){
+    if(finSaving) return;
+    var pid0 = finDraft.pid || state.currentProjectId;
+    if(!projectById(pid0)){ toast("案件を選択してください"); return; }
+    if(!finDraft.files.length){ toast("PDFか写真を選んでください"); return; }
+    var kind = document.getElementById("finKind").value;
+    var date = document.getElementById("finDate").value || todayJst();
+    var memo = document.getElementById("finMemo").value.trim();
+    var shared = document.getElementById("finShared").checked;
+    var st = document.getElementById("finStatus"), btn = document.getElementById("btnFinSave");
+    finSaving = true; btn.disabled = true;
+    try{
+      var files = [];
+      var photos = finDraft.files.filter(function(f){ return !isEarlyPdf(f); });
+      var pdfs = finDraft.files.filter(isEarlyPdf);
+      var lbl = kind + "_" + date.replace(/-/g,"");
+      if(photos.length){
+        st.textContent = "写真をPDFにまとめています…";
+        var pdf = await photosToPdf(photos);
+        var up = await assets.upload(pdf, {type:"application/pdf", noClean:true});
+        files.push({url:up.url, contentType:"application/pdf", name:lbl+".pdf", sizeBytes:up.sizeBytes});
+      }
+      for(var i=0; i<pdfs.length; i++){
+        st.textContent = "保存しています…（"+(i+1)+"/"+pdfs.length+"）";
+        var u2 = await assets.upload(pdfs[i], {type:"application/pdf", noClean:true});
+        files.push({url:u2.url, contentType:"application/pdf", name:lbl+(pdfs.length>1?"_"+(i+1):"")+".pdf", sizeBytes:u2.sizeBytes});
+      }
+      var p = projectById(pid0);
+      if(!p) throw new Error("案件が見つかりません");
+      p.financeDocs = (p.financeDocs||[]).slice();
+      var now = nowIso(), who = state.currentUser||"";
+      files.forEach(function(f, j){
+        p.financeDocs.push({id:"fd"+Date.now().toString(36)+j+Math.random().toString(36).slice(2,6), kind:kind, date:date, memo:memo, shared:shared, file:f, createdAt:now, createdBy:who});
+      });
+      st.textContent = "保存しています…";
+      var ok = await saveDoc("projects", p.id, p);
+      if(ok===false) throw new Error("保存できませんでした。もう一度押してください");
+      logActivity("案件「"+p.name+"」に"+kind+"を入れました（"+date+"）");
+      toast("✓ "+kind+"を入れました");
+      closeFinForm();
+      renderFinanceDocs();
+    }catch(e){
+      st.textContent = "";
+      toast("⚠ " + ((e && (e.userMessage||e.message)) || "保存できませんでした"), 9000);
+    }finally{ finSaving = false; btn.disabled = false; }
+  }
+  async function updateFin(id, fn, label){
+    var p = projectById(state.currentProjectId);
+    if(!p) return;
+    p.financeDocs = (p.financeDocs||[]).slice();
+    var idx = p.financeDocs.findIndex(function(x){ return x.id===id; });
+    if(idx<0) return;
+    p.financeDocs[idx] = fn(Object.assign({}, p.financeDocs[idx]));
+    renderFinanceDocs();
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ toast("⚠ 保存できませんでした"); return; }
+    if(label) toast(label);
+  }
+  function wireFinanceDocs(){
+    document.getElementById("btnFinOpen").addEventListener("click", openFinForm);
+    document.getElementById("btnFinCancel").addEventListener("click", closeFinForm);
+    document.getElementById("btnFinSave").addEventListener("click", saveFinanceDoc);
+    ["finPick","finCamera"].forEach(function(idn){
+      var inp = document.getElementById(idn);
+      inp.addEventListener("change", function(){ Array.prototype.forEach.call(inp.files||[], function(f){ finDraft.files.push(f); }); inp.value = ""; renderFinPending(); });
+    });
+    document.getElementById("finForm").addEventListener("click", function(e){
+      var fb = e.target.closest("[data-finfile]"); if(fb){ document.getElementById(fb.dataset.finfile).click(); return; }
+      var rm = e.target.closest("[data-finrm]"); if(rm){ finDraft.files.splice(Number(rm.dataset.finrm),1); renderFinPending(); }
+    });
+    document.getElementById("finList").addEventListener("click", function(e){
+      var sh = e.target.closest("[data-finshare]");
+      if(sh){ updateFin(sh.dataset.finshare, function(d){ d.shared = !d.shared; d.updatedAt = nowIso(); return d; }, "✓ 切り替えました"); return; }
+      var dl = e.target.closest("[data-findel]");
+      if(dl){
+        if(!confirm("この書類を削除しますか？（お客様のページからも消えます）")) return;
+        updateFin(dl.dataset.findel, function(d){ d.deletedAt = nowIso(); d.deletedBy = state.currentUser||""; return d; }, "削除しました");
+      }
+    });
+  }
+  function wireEarlyMeetings(){
+    wireFinanceDocs();
+    ["ciText","ciPolicyTitle","ciPolicyText"].forEach(function(idn){
+      document.getElementById(idn).addEventListener("input", function(){ document.getElementById("ciText").dataset.dirty = "1"; var st=document.getElementById("ciStatus"); if(st) st.textContent="未保存の変更があります"; });
+    });
+    document.getElementById("ciOn").addEventListener("change", function(){ document.getElementById("ciText").dataset.dirty = "1"; });
+    document.getElementById("btnCiSave").addEventListener("click", saveCompanyIntro);
+    document.getElementById("btnEarlyOpen").addEventListener("click", function(){ openEarlyForm(null); });
+    document.getElementById("btnEarlyCancel").addEventListener("click", closeEarlyForm);
+    document.getElementById("btnEarlySave").addEventListener("click", saveEarlyMeeting);
+    ["earlyCamera","earlyPick"].forEach(function(idName){
+      var inp = document.getElementById(idName);
+      inp.addEventListener("change", function(){ addEarlyFiles(inp.files); inp.value = ""; });
+    });
+    document.getElementById("earlyForm").addEventListener("click", function(e){
+      var fb = e.target.closest("[data-earlyfile]");
+      if(fb){ document.getElementById(fb.dataset.earlyfile).click(); return; }
+      var rm = e.target.closest("[data-earlyrm]");
+      if(rm){ var f = earlyDraft.files.splice(Number(rm.dataset.earlyrm),1)[0]; if(f && f._preview){ try{ URL.revokeObjectURL(f._preview); }catch(er){} } renderEarlyDraft(); return; }
+      var kr = e.target.closest("[data-earlykeeprm]");
+      if(kr){ earlyDraft.keep.splice(Number(kr.dataset.earlykeeprm),1); renderEarlyDraft(); }
+    });
+    document.getElementById("earlyList").addEventListener("click", function(e){
+      var sh = e.target.closest("[data-earlyshare]");
+      if(sh){ updateEarly(sh.dataset.earlyshare, function(r){ r.shared = !r.shared; r.updatedAt = nowIso(); return r; }, "✓ 切り替えました"); return; }
+      var ed = e.target.closest("[data-earlyedit]");
+      if(ed){ openEarlyForm(ed.dataset.earlyedit); return; }
+      var dl = e.target.closest("[data-earlydel]");
+      if(dl){
+        if(!confirm("この記録を削除しますか？（お客様のページからも消えます）")) return;
+        updateEarly(dl.dataset.earlydel, function(r){ r.deletedAt = nowIso(); r.deletedBy = state.currentUser||""; return r; }, "削除しました");
+      }
+    });
+    document.getElementById("btnEarlyLinkIssue").addEventListener("click", issueEarlyLink);
+    document.getElementById("btnEarlyLinkCopy").addEventListener("click", function(){
+      var p = projectById(state.currentProjectId);
+      if(!p || !p.earlyToken) return;
+      var url = earlyUrl(p);
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(function(){ toast("リンクをコピーしました"); }, function(){ toast(url); });
+      } else toast(url);
+    });
+    document.getElementById("btnEarlyLinkOpen").addEventListener("click", function(){
+      var p = projectById(state.currentProjectId);
+      if(p && p.earlyToken) window.open(earlyUrl(p), "_blank", "noopener");
+    });
   }
   async function unarchiveTask(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
@@ -13313,6 +13821,7 @@
     document.getElementById("tfNewProjCancel").addEventListener("click", function(){ document.getElementById("tfNewProjRow").hidden = true; });
     document.getElementById("hearingForm").addEventListener("input", function(){ this.dataset.dirty = "1"; var st=document.getElementById("hearingStatus"); if(st) st.textContent="未保存の変更があります"; });
     document.getElementById("btnHearingSave").addEventListener("click", saveProjectHearing);
+    wireEarlyMeetings();
     document.getElementById("projTaskList").addEventListener("click", function(e){
       var b = e.target.closest("[data-projtaskedit]");
       if(b) openTaskForm(b.dataset.projtaskedit);

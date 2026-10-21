@@ -6,7 +6,8 @@ import { DURATION, DURATION_OPTIONS, OPEN_MIN, CLOSE_MIN, DAYS_AHEAD, WD, toHM, 
 // おうちノート（お客様画面）の打合せ予約。
 // 空き状況は Google カレンダー「お客様予約」＋ 住まいるアプリの予約（reservations）から判定し、
 // 予約が確定したら同カレンダーに予定を登録して、スタッフへ通知メールを送る。
-// 認証は note-data と同じ案件ごとの noteToken。
+// 認証は note-data と同じ案件ごとの noteToken。初期の打合せ記録ページ（/kiroku/）の earlyToken でも予約できる
+// （そのときは種類を EARLY_TYPES に絞り、予約の source は "kiroku"）。
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,8 @@ function json(obj: any, status = 200) {
 }
 
 const TYPES = ["来店", "オンライン", "銀行", "ショールーム", "現場"];
+// 見込みのお客様（打合せ記録ページ）から選べる種類
+const EARLY_TYPES = ["来店", "オンライン", "ショールーム", "現場"];
 const ALL_DURATIONS = Array.from(new Set([DURATION, ...Object.values(DURATION_OPTIONS).flat()]));
 
 export default async (req: Request, context: Context) => {
@@ -35,9 +38,12 @@ export default async (req: Request, context: Context) => {
   const token = String((req.method === "POST" ? body.t : url.searchParams.get("t")) || "");
   if (!projectId || !token) return json({ error: "missing_link" }, 400);
   const project: any = await store.get(`projects/${projectId}`, { type: "json" });
-  if (!project || project.deletedAt || !project.noteToken || project.noteToken !== token) {
-    return json({ error: "forbidden" }, 403);
-  }
+  if (!project || project.deletedAt) return json({ error: "forbidden" }, 403);
+  const viaNote = !!project.noteToken && project.noteToken === token;
+  const viaEarly = !viaNote && !!project.earlyToken && project.earlyToken === token;
+  if (!viaNote && !viaEarly) return json({ error: "forbidden" }, 403);
+  const types = viaEarly ? EARLY_TYPES : TYPES;
+  const pageName = viaEarly ? "打合せ記録ページ" : "おうちノート";
 
   const tk = await getAccessToken();
   if (!tk.ok) return json({ error: tk.error }, 503);
@@ -50,7 +56,7 @@ export default async (req: Request, context: Context) => {
       const dq = parseInt(url.searchParams.get("d") || "", 10);
       const dur = ALL_DURATIONS.includes(dq) ? dq : DURATION;
       const days = await buildDays(tk.accessToken, store, today, horizon, dur);
-      return json({ types: TYPES, durationOptions: DURATION_OPTIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), days });
+      return json({ types, durationOptions: DURATION_OPTIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), days });
     }
 
     // ---------- 予約する ----------
@@ -58,7 +64,7 @@ export default async (req: Request, context: Context) => {
     const type = String(body.type || "");
     const date = String(body.date || "");
     const start = String(body.start || "");
-    if (!TYPES.includes(type)) return json({ error: "invalid_type" }, 400);
+    if (!types.includes(type)) return json({ error: "invalid_type" }, 400);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > horizon) return json({ error: "invalid_date" }, 400);
     // 所要時間：選べる種類（現場）だけ選んだ値を使う。それ以外は2時間
     const opts = DURATION_OPTIONS[type];
@@ -77,7 +83,7 @@ export default async (req: Request, context: Context) => {
         headers: { Authorization: "Bearer " + tk.accessToken, "Content-Type": "application/json" },
         body: JSON.stringify({
           summary: `${type}（${customer}様）`,
-          description: `おうちノートからのご予約\n案件：${project.name || ""}\nお客様：${customer}`,
+          description: `${pageName}からのご予約\n案件：${project.name || ""}\nお客様：${customer}`,
           start: { dateTime: `${date}T${start}:00+09:00`, timeZone: "Asia/Tokyo" },
           end: { dateTime: `${date}T${end}:00+09:00`, timeZone: "Asia/Tokyo" },
         }),
@@ -93,13 +99,13 @@ export default async (req: Request, context: Context) => {
     const now = new Date().toISOString();
     const doc = {
       id, projectId, type, staff: "", date, startTime: start, durationMinutes: dur, endTime: end,
-      notes: "おうちノートから予約", googleEventId: ev.id || null, source: "note", createdAt: now, updatedAt: now,
+      notes: `${pageName}から予約`, googleEventId: ev.id || null, source: viaEarly ? "kiroku" : "note", createdAt: now, updatedAt: now,
     };
     await store.setJSON(`reservations/${id}`, doc);
 
     const mailed = await sendNotifyMail(
-      `【おうちノート】${customer}様が${type}を予約されました`,
-      `${customer}様（${project.name || ""}）が、おうちノートから予約されました。\n\n` +
+      `【${pageName}】${customer}様が${type}を予約されました`,
+      `${customer}様（${project.name || ""}）が、${pageName}から予約されました。\n\n` +
         `種類：${type}\n日時：${date}（${WD[dowOf(date)]}） ${start}〜${end}\n\n` +
         `「お客様予約」カレンダーにも登録済みです。`
     );
