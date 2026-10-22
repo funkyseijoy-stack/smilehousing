@@ -5363,6 +5363,8 @@
     if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return "";
     var hasPart = !!(a.specPart && a.specPart.scope);
     var partBtn = '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="この書類の部位を選ぶ（記録の同じ部位にも並びます）">'+(hasPart ? escapeHtml(partText(a.specPart)||a.specPart.label||"📍 部位") : "📍 部位")+'</button>';
+    // 種類を変える（プランボード／見積／定価の間だけ。NETへ・NETからは変えない）
+    if(a.kind==="quote" && !quoteLocked(a.quoteType)) partBtn = '<button class="btn small ghost" data-act="setquotetype" data-id="'+a.id+'" title="書類の種類を変える">🔁 種類を変える</button>' + partBtn;
     if(!quoteSharable(a)) return partBtn;
     return partBtn + '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="この書類をお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
   }
@@ -10687,6 +10689,34 @@
       if(ok===false) toast("保存に失敗しました。もう一度お試しください");
     }, a.projectId);
   }
+  // 書類の種類を変える（登録し直さずに済むように）。NETは暗証番号でロックする別扱いなので、NETへ・NETからは変えない。
+  // お客様に出せない種類（見積）に変えたときは、反映を外す。
+  async function changeQuoteType(id){
+    var a = state.attachments.find(function(x){ return x.id===id; });
+    if(!a || a.kind!=="quote") return;
+    var cur = quoteTypeNorm(a.quoteType);
+    if(cur==="NET"){ toast("NETの書類は種類を変えられません"); return; }
+    var opts = ["プランボード","見積","定価"].filter(function(t){ return t!==cur; }).map(function(t){
+      return {label:t+(t==="見積" ? "（社内用・お客様には出さない）" : "（お客様に出せる）"), value:t};
+    });
+    askChoice("種類を変える", "いまの種類：「"+cur+"」\n「"+a.name+"」", opts, async function(t){
+      if(!t) return;
+      var before = { quoteType:a.quoteType, reflected:a.reflected, reflectedAt:a.reflectedAt };
+      a.quoteType = t;
+      var unref = false;
+      if(a.reflected && !quoteSharable(a)){ a.reflected = false; a.reflectedAt = null; unref = true; }
+      render();
+      var ok = await saveDoc("attachments", a.id, a);
+      if(ok===false){
+        a.quoteType = before.quoteType; a.reflected = before.reflected; a.reflectedAt = before.reflectedAt;
+        render();
+        toast("保存に失敗しました。もう一度お試しください");
+        return;
+      }
+      logActivity("書類「"+a.name+"」の種類を「"+cur+"」から「"+t+"」に変えました");
+      toast("種類を「"+t+"」にしました"+(unref ? "（お客様に出せない種類なので、反映を外しました）" : (quoteSharable(a) && !a.reflected ? "。お客様に出すときは「反映する」を押してください" : "")));
+    });
+  }
   async function toggleQuoteReflect(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
     if(!a) return;
@@ -14004,6 +14034,7 @@
       else if(act==="attachreceive"){ pendingReqAttachId = id; pendingReqAttachThenReceive = true; document.getElementById("reqAttachInput").click(); }
       else if(act==="editvendor") openVendorEdit(id);
       else if(act==="setquotepart") setQuotePart(id);
+      else if(act==="setquotetype") changeQuoteType(id);
       else if(act==="togglequotereflect") toggleQuoteReflect(id);
       else if(act==="changerequest") openChangeRequestForm(id);
       else if(act==="delrequest"){ if(confirm2()) deleteRequest(id); }
