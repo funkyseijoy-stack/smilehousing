@@ -11,22 +11,19 @@
 <style>
 /* Layout: a quiet header, a sticky row of room chips, then a masonry wall of photos that opens into a full-screen viewer. */
 :root{
-  --bg:#f5f5f2;
-  --surface:#ffffff;
-  --fg:#22262a;
-  --muted:#6b706f;
-  --line:#dddfda;
-  --accent:#3f5b57;
+  --bg:#f7f3ee;
+  --surface:#fffdfa;
+  --fg:#2f2925;
+  --muted:#8a8079;
+  --line:#e9e2da;
+  --accent:#5d5049;
   --accent-ink:#ffffff;
-  --chip:#ebece7;
-  --shade:rgba(20,22,24,.94);
+  --chip:#efe9e3;
+  --shade:rgba(30,24,20,.94);
   --font-display:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
   --font-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#161918;--surface:#1e2221;--fg:#e9ebe7;--muted:#9ba19e;--line:#2e3432;--accent:#8fb3ad;--accent-ink:#13201e;--chip:#252a29;--shade:rgba(8,9,9,.96);color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#161918;--surface:#1e2221;--fg:#e9ebe7;--muted:#9ba19e;--line:#2e3432;--accent:#8fb3ad;--accent-ink:#13201e;--chip:#252a29;--shade:rgba(8,9,9,.96);color-scheme:dark}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
