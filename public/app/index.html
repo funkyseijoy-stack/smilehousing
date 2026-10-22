@@ -6174,7 +6174,8 @@
   function interiorBlock(scope, category, roomId, side){
     var photos = specPhotosFor(scope, category, roomId, side, "photo");
     var rows = specPhotosFor(scope, category, roomId, side);
-    if(!photos.length && !rows.length) return "";
+    var qn = quoteDocsForPart(scope, category, roomId, side).length;
+    if(!photos.length && !rows.length && !qn) return "";
     // 打合せ記録に添付したPDF・写真も、折りたたみの中ではなく写真の並びと一緒に出す
     var noteFiles = [];
     rows.forEach(function(r){
@@ -6184,7 +6185,7 @@
     });
     return (photos.length ? buildSpecGallery(scope, category, roomId, side, {noAdd:true}) : "")+
       (noteFiles.length ? '<div class="intnotefiles">'+fileThumbRowHtml(noteFiles, 72)+'</div>' : "")+
-      (rows.length ? '<details class="spdetails"><summary>変更履歴（'+rows.length+'件）</summary>'+renderSpecTimeline(scope, category, roomId, side)+'</details>' : "");
+      ((rows.length+qn) ? '<details class="spdetails"><summary>変更履歴（'+(rows.length+qn)+'件）</summary>'+renderSpecTimeline(scope, category, roomId, side)+'</details>' : "");
   }
   function renderSpecInterior(){
     var wrap = document.getElementById("specInteriorWrap");
@@ -6771,11 +6772,19 @@
     if(scope==="room" && (sp.roomId||null)!==(roomId||null)) return false;
     return true;
   }
+  // 見積から取り込んだ書類（プランボード・見積・定価。NETは除く）で、この部位のもの。部位タブの変更履歴に並べる
+  // （インテリアの表・裏は「表」にだけ出す）
+  function quoteDocsForPart(scope, category, roomId, side){
+    var pid = state.currentProjectId;
+    if(!pid || scope==="siteCheck" || (side && side!=="表")) return [];
+    return liveAttachments().filter(function(a){ return a.projectId===pid && a.kind==="quote" && !quoteLocked(a.quoteType) && samePartLoose(a.specPart, scope, category, roomId); });
+  }
+  function isTimelineQuote(a){ return a && a.kind==="quote" && !quoteLocked(a.quoteType); }
   // この部位に付いている見積の書類・見積依頼・タスク（記録の各部位のカードに出す）
   function relatedPartHtml(scope, category, roomId){
     var pid = state.currentProjectId;
     if(!pid || scope==="siteCheck") return "";
-    var docs = liveAttachments().filter(function(a){ return a.projectId===pid && samePartLoose(a.specPart, scope, category, roomId); });
+    var docs = liveAttachments().filter(function(a){ return a.projectId===pid && samePartLoose(a.specPart, scope, category, roomId) && !isTimelineQuote(a); });
     var reqs = (state.requests||[]).filter(function(r){ return !r.deletedAt && r.projectId===pid && samePartLoose(r.part, scope, category, roomId); });
     var tasks = liveTasks().filter(function(t){ return t.projectId===pid && samePartLoose(t.vendorSpec, scope, category, roomId); });
     if(!docs.length && !reqs.length && !tasks.length) return "";
@@ -6794,14 +6803,42 @@
   function specOpsHtml(id, inner){
     return '<details class="spectl-ops"'+(specOpsOpen[id]?' open':'')+'><summary data-specops="'+id+'">⋯ 操作</summary>'+inner+'</details>';
   }
+  function quoteTimelineCardHtml(a, opsId){
+    var ct = String(a.contentType||""), url = a.url||"#";
+    var thumb = ct.indexOf("pdf")>=0 || /\.pdf$/i.test(a.name||"") ? pdfThumbInnerHtml(url)
+      : (ct.indexOf("image/")===0 ? '<img src="'+escapeHtml(url)+'" alt="">' : '📄');
+    var v = a.vendorId ? vendorById(a.vendorId) : null;
+    var via = a.viaVendorId ? vendorById(a.viaVendorId) : null;
+    var from = v ? v.name + (via && via.id!==(v&&v.id) ? "（"+via.name+"経由）" : "") : "";
+    var sharable = quoteSharable(a);
+    var st = 'style="cursor:pointer; border:none; font-family:inherit;"';
+    var ops = '<div class="spectl-actions">'+
+      (sharable ? '<button class="pill reflect small'+(a.reflected?" on":"")+'" '+st+' data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<span class="muted" style="font-size:.85rem;">この種類はお客様には出ません</span>')+
+      '<button class="pill tag small" '+st+' data-spec-quotepart="'+a.id+'">📍 部位を変える</button>'+
+      '</div>';
+    return '<div class="spectl-card spectl-type-vendor-border">'+
+      '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
+      '<div class="spectl-meta"><div class="row" style="gap:5px;">'+
+        '<span class="pill small spectl-type-vendor">見積から</span>'+quotePill(a.quoteType)+
+        (a.reflected && sharable ? '<span class="pill reflect small on">✓反映済み</span>' : '')+
+      '</div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml((from?from+"より：":"")+(a.name||""))+'</div></div>'+
+      specOpsHtml(opsId, ops)+
+      '</div>';
+  }
   function renderSpecTimeline(scope, category, roomId, side){
     var rel = relatedPartHtml(scope, category, roomId);
     var rows = specPhotosFor(scope, category, roomId, side).slice();
+    // 見積から取り込んだプランボード・定価などもここに並べる（反映＝おうちノートに出すかは書類側の reflected）
+    quoteDocsForPart(scope, category, roomId, side).forEach(function(a){
+      rows.push({ __att:a, id:"att:"+a.id, createdAt: a.receivedAt || a.createdAt || "" });
+    });
     if(!rows.length) return rel;
     // 新しい順（降順）。経緯を追うには時系列のつながりが大事なので、並び替えは
     // するが「日付でグループ化して見やすくする」だけに留め、時系列自体は崩さない。
     rows.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
     var cards = rows.map(function(p){
+      if(p.__att) return quoteTimelineCardHtml(p.__att, p.id);
       var typeLabel, typeClass, snippet;
       if(p.kind==="note"){
         typeLabel = "打ち合わせ記録"; typeClass = "spectl-type-note";
@@ -10158,7 +10195,7 @@
   }
   // 「おうちノートに出す」：プランボード・定価で、お客様に出せる部位のときだけ押せる。最初はプランボードだけチェック
   function inboxReflAllowed(it){ return (it.qt==="プランボード" || it.qt==="定価") && !!it.part && taskPartReflectable(inboxPartObj(it.part)); }
-  function inboxReflOn(it){ return inboxReflAllowed(it) && (it.refl!==undefined ? it.refl : it.qt==="プランボード"); }
+  function inboxReflOn(it){ return inboxReflAllowed(it) && (it.refl!==undefined ? it.refl : false); }
   function inboxReflHtml(i, it){
     var ok = inboxReflAllowed(it);
     return '<label class="rcvrefl'+(ok?'':' off')+'" data-inrefllbl="'+i+'"><input type="checkbox" data-inrefl="'+i+'"'+(inboxReflOn(it)?' checked':'')+(ok?'':' disabled')+'> おうちノートに出す</label>';
@@ -10738,7 +10775,7 @@
     if(ok===false){ toast("保存に失敗しました。もう一度お試しください"); return; }
     var qn = quoteTypeNorm(a.quoteType);
     logActivity(qn+"「"+a.name+"」を"+(a.reflected?"おうちノートに反映しました":"反映解除しました"));
-    toast(a.reflected ? "✅ 「"+((a.specPart&&a.specPart.label)||"")+"」のおうちノートに、"+qn+"を出しました" : "反映を解除しました");
+    toast(a.reflected ? "✅ おうちノートの「"+(partText(a.specPart)||"")+"」に、"+qn+"を出しました" : "反映を解除しました");
   }
 
   // ---- 業者の編集 ----
@@ -13632,6 +13669,10 @@
         if(cyclereq){ cyclePbReqStatus(cyclereq.dataset.cyclereq); return; }
         var togglereflect = e.target.closest("[data-togglereflect]");
         if(togglereflect){ togglePbReflected(togglereflect.dataset.togglereflect); return; }
+        var qrefl = e.target.closest("[data-spec-quotereflect]");
+        if(qrefl){ toggleQuoteReflect(qrefl.dataset.specQuotereflect); return; }
+        var qpart = e.target.closest("[data-spec-quotepart]");
+        if(qpart){ setQuotePart(qpart.dataset.specQuotepart); return; }
         var spedit = e.target.closest("[data-spec-edit]");
         if(spedit){ openSpecEdit(spedit.dataset.specEdit); return; }
         var sptask = e.target.closest("[data-spec-taskmenu]");
