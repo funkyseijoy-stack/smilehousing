@@ -5372,6 +5372,7 @@
     var partBtn = '<button class="btn small ghost" data-act="setquotepart" data-id="'+a.id+'" title="この書類の部位を選ぶ（記録の同じ部位にも並びます）">'+(hasPart ? escapeHtml(partText(a.specPart)||a.specPart.label||"📍 部位") : "📍 部位")+'</button>';
     // 種類を変える（プランボード／見積／定価の間だけ。NETへ・NETからは変えない）
     if(a.kind==="quote" && !quoteLocked(a.quoteType)) partBtn = '<button class="btn small ghost" data-act="setquotetype" data-id="'+a.id+'" title="書類の種類を変える">🔁 種類を変える</button>' + partBtn;
+    if(a.kind==="quote" && !quoteLocked(a.quoteType)) partBtn += '<button class="btn small ghost" data-act="quotetohearing" data-id="'+a.id+'" title="ヒアリングの「資金計画・お見積り」に入れる（お客様の打合せ記録ページ用）">'+(quoteInHearing(a)?"✓ ヒアリングに入れ済み":"📋 ヒアリングに入れる")+'</button>';
     if(!quoteSharable(a)) return partBtn;
     return partBtn + '<button class="pill reflect'+(a.reflected?" on":"")+'" data-act="togglequotereflect" data-id="'+a.id+'" title="この書類をお客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>';
   }
@@ -6848,6 +6849,7 @@
     var ops = '<div class="spectl-actions">'+
       (sharable ? '<button class="pill reflect small'+(a.reflected?" on":"")+'" '+st+' data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<span class="muted" style="font-size:.85rem;">この種類はお客様には出ません</span>')+
       '<button class="pill tag small" '+st+' data-spec-quotepart="'+a.id+'">📍 部位を変える</button>'+
+      '<button class="pill tag small" '+st+' data-spec-quotehearing="'+a.id+'">'+(quoteInHearing(a)?"✓ ヒアリングに入れ済み":"📋 ヒアリングに入れる")+'</button>'+
       '</div>';
     return '<div class="spectl-card spectl-type-vendor-border">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
@@ -10761,6 +10763,37 @@
   }
   // 書類の種類を変える（登録し直さずに済むように）。NETは暗証番号でロックする別扱いなので、NETへ・NETからは変えない。
   // お客様に出せない種類（見積）に変えたときは、反映を外す。
+  // 見積の書類をヒアリングの「資金計画・お見積り」（project.financeDocs）に入れる。ファイルは同じものを参照し、最初は社内だけ（shared:false）
+  function quoteInHearing(a){
+    var p = a && projectById(a.projectId);
+    return !!(p && (p.financeDocs||[]).some(function(d){ return d && !d.deletedAt && d.sourceAttId===a.id; }));
+  }
+  function quoteToHearing(id){
+    var a = state.attachments.find(function(x){ return x.id===id; });
+    if(!a || a.kind!=="quote") return;
+    if(quoteLocked(a.quoteType)){ toast("NETの書類はヒアリングに入れられません"); return; }
+    var p = projectById(a.projectId);
+    if(!p){ toast("案件が見つかりません"); return; }
+    if(quoteInHearing(a)){ toast("この書類はもうヒアリングに入っています（ヒアリングタブの「資金計画・お見積り」）"); return; }
+    if(!a.url){ toast("ファイルが見つかりません"); return; }
+    askChoice("ヒアリングに入れる", "「"+(a.name||"書類")+"」を、ヒアリングタブの「資金計画・お見積り」に入れます。\n最初は社内だけです。お客様に見せるときは、ヒアリングタブで「お客様に見せる」を押してください。\n種類を選んでください。",
+      FIN_KINDS.map(function(k){ return {label:k, value:k}; }).sort(function(x,y){ return (y.value==="概算見積書") - (x.value==="概算見積書"); }),
+      async function(kind){
+        if(!kind) return;
+        var p2 = projectById(a.projectId);
+        if(!p2) return;
+        p2.financeDocs = (p2.financeDocs||[]).slice();
+        var now = nowIso();
+        var d = String(a.receivedAt||a.createdAt||now).slice(0,10);
+        p2.financeDocs.push({ id:"fd"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), kind:kind, date:d, memo:"", shared:false,
+          file:{ url:a.url, contentType:a.contentType||"application/pdf", name:a.name||"" }, sourceAttId:a.id, createdAt:now, createdBy:state.currentUser||"" });
+        render();
+        var ok = await saveDoc("projects", p2.id, p2);
+        if(ok===false){ p2.financeDocs = p2.financeDocs.filter(function(x){ return x.sourceAttId!==a.id || x.createdAt!==now; }); render(); toast("保存できませんでした。もう一度お試しください"); return; }
+        logActivity("案件「"+p2.name+"」の見積の書類「"+(a.name||"")+"」をヒアリングに入れました（"+kind+"）");
+        toast("✓ ヒアリングの「資金計画・お見積り」に入れました（社内だけ）");
+      });
+  }
   async function changeQuoteType(id){
     var a = state.attachments.find(function(x){ return x.id===id; });
     if(!a || a.kind!=="quote") return;
@@ -13704,6 +13737,8 @@
         if(togglereflect){ togglePbReflected(togglereflect.dataset.togglereflect); return; }
         var qrefl = e.target.closest("[data-spec-quotereflect]");
         if(qrefl){ toggleQuoteReflect(qrefl.dataset.specQuotereflect); return; }
+        var qhear = e.target.closest("[data-spec-quotehearing]");
+        if(qhear){ quoteToHearing(qhear.dataset.specQuotehearing); return; }
         var qpart = e.target.closest("[data-spec-quotepart]");
         if(qpart){ setQuotePart(qpart.dataset.specQuotepart); return; }
         var spedit = e.target.closest("[data-spec-edit]");
@@ -14109,6 +14144,7 @@
       else if(act==="editvendor") openVendorEdit(id);
       else if(act==="setquotepart") setQuotePart(id);
       else if(act==="setquotetype") changeQuoteType(id);
+      else if(act==="quotetohearing") quoteToHearing(id);
       else if(act==="togglequotereflect") toggleQuoteReflect(id);
       else if(act==="changerequest") openChangeRequestForm(id);
       else if(act==="delrequest"){ if(confirm2()) deleteRequest(id); }
