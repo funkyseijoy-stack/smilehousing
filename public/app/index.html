@@ -4064,6 +4064,22 @@
         '<span class="spby cust">'+escapeHtml(p.galleryGroup||"イメージ集")+'</span></div>';
     }).join("");
   }
+  // ヒアリング・写真タブを開いたとき、お客様のいいねを取り直す（3分ごとの自動更新を待たずに出すため）
+  var galLikeLoading = false;
+  async function refreshGalleryLikes(){
+    if(galLikeLoading) return;
+    galLikeLoading = true;
+    try{
+      var items = await apiGet("imageBoard");
+      var byId = {}; items.forEach(function(x){ if(x && x.id) byId[x.id] = x; });
+      var seen = {};
+      state.imageBoard = state.imageBoard.map(function(x){ seen[x.id]=1; return (x.source==="gallery" && byId[x.id]) ? byId[x.id] : x; });
+      items.forEach(function(x){ if(x && x.id && !seen[x.id] && x.source==="gallery") state.imageBoard.push(x); });
+      renderGalleryLikes();
+      if(typeof renderImageBoard==="function") renderImageBoard();
+    }catch(e){ /* 取り直せなくても画面はそのまま */ }
+    finally{ galLikeLoading = false; }
+  }
   function renderProjectHearing(){
     renderGalleryLikes();
     var wrap = document.getElementById("hearingForm");
@@ -13197,6 +13213,7 @@
         document.getElementById("sub-"+currentSub).classList.add("active");
         if(currentSub === "okainote") loadOkaiNotePanel();
         if(currentSub === "message") refreshMessageNotify();
+        if(currentSub === "hearing" || currentSub === "photos") refreshGalleryLikes();
       });
     });
 

@@ -180,9 +180,7 @@ function loadLocal(){ try { return new Set(JSON.parse(localStorage.getItem(LOCAL
 function saveLocal(){ try { localStorage.setItem(LOCAL_KEY, JSON.stringify([...liked])); } catch(e) {} }
 function likedList(){ return PHOTOS.filter(x => liked.has(x[1])).map(([g, f, w, h]) => ({f, w, h})); }
 function setNote(){
-  $("likeNote").textContent = serverMode
-    ? "🩷 を押した写真は、住まいるハウジングのスタッフにも届きます。お打合せの参考にさせていただきます。"
-    : "🩷 を押した写真は「いいね」にまとまります（このスマホに保存されます）。";
+  $("likeNote").textContent = "気に入った写真に 🩷 を押すと、「いいね」にまとまります。";
 }
 let toastTimer = null;
 function toast(msg){
