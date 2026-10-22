@@ -6204,6 +6204,11 @@
         (ura ? '<div class="specside"><span class="sidelabel">裏</span>'+ura+'</div>' : '')+
         '</div>';
     }).filter(Boolean);
+    // 「インテリア全体」（項目を選ばない内装プランなど。category:null）
+    if(!(state.noteSpecFilter && state.noteSpecFilter.scope==="interiorColor" && state.noteSpecFilter.category)){
+      var whole = interiorBlock("interiorColor", null, null, null);
+      if(whole) cards.unshift('<div class="speccat"><h4>🎨 インテリア全体</h4>'+whole+'</div>');
+    }
     wrap.innerHTML = cards.length ? '<div class="speccatgrid">'+cards.join("")+'</div>' : '<div class="muted" style="font-size:.85rem;">まだありません。</div>';
   }
   function renderSpecRooms(){
