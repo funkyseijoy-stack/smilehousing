@@ -2285,10 +2285,30 @@
   }
   // 保存中の件数（自動更新が、保存途中の画面を古いデータで上書きしないよう見張るため）
   var pendingSaves = 0, lastSaveAt = 0;
+  // 保存した直後のデータを2分間覚えておく。サーバーの一覧は保存が反映されるまで数十秒遅れることがあり、
+  // その間に自動更新が古い一覧で画面を上書きすると「入れたものがすぐ消える」ように見えるため（syncFromServer で使う）
+  var RECENT_WRITE_MS = 2*60*1000, recentWrites = {};
+  function rememberWrite(collection, id, data, deleted){
+    try{ recentWrites[collection+"/"+id] = { c:collection, id:id, at:Date.now(), del:!!deleted, data: deleted ? null : JSON.parse(JSON.stringify(data)) }; }catch(e){}
+  }
+  function mergeRecentWrites(collection, items){
+    var now = Date.now(), out = items;
+    Object.keys(recentWrites).forEach(function(k){
+      var w = recentWrites[k];
+      if(now - w.at > RECENT_WRITE_MS){ delete recentWrites[k]; return; }
+      if(w.c !== collection) return;
+      if(out === items) out = items.slice();
+      var idx = -1;
+      for(var i=0;i<out.length;i++){ if(out[i] && out[i].id===w.id){ idx = i; break; } }
+      if(w.del){ if(idx>=0) out.splice(idx,1); return; }
+      if(idx>=0) out[idx] = w.data; else out.push(w.data);
+    });
+    return out;
+  }
   async function saveDoc(collection, id, data){
     pendingSaves++; saveStatusShow("saving");
     var ok = false;
-    try{ ok = await saveDocInner(collection, id, data); return ok; }
+    try{ ok = await saveDocInner(collection, id, data); if(ok) rememberWrite(collection, id, data); return ok; }
     catch(e){ ok = false; throw e; }
     finally{
       pendingSaves--; lastSaveAt = Date.now();
@@ -2370,6 +2390,7 @@
         return false;
       }
       if(!res.ok){ toast("削除に失敗しました（" + collection + "・状態 " + res.status + "）"); return false; }
+      rememberWrite(collection, id, null, true);
       return true;
     }catch(e){ toast("削除に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
@@ -2741,7 +2762,7 @@
     // 2段目：大きいデータを読む
     try{
       var slowResults = await Promise.all(slowCols.map(function(c){ return apiGet(c); }));
-      slowCols.forEach(function(c, i){ state[c] = slowResults[i]; });
+      slowCols.forEach(function(c, i){ state[c] = mergeRecentWrites(c, slowResults[i]); });
     }catch(e){
       if(String(e && e.message)!=="unauthorized") toast("写真・記録などの読み込みに失敗しました。「🔄 最新の内容に更新」を押してください");
       return;
@@ -2943,6 +2964,7 @@
     try{
       var syncCols = DATA_COLLECTIONS.filter(function(c){ return c!=="activity"; });
       var results = await Promise.all(syncCols.map(function(c){ return apiGet(c); }));
+      results = results.map(function(items, i){ return mergeRecentWrites(syncCols[i], items); });
       if(silent){
         // 読み込み中に保存が始まっていたら、古いデータで上書きしないようにやめる
         if(pendingSaves>0 || Date.now()-lastSaveAt<3000) return;
