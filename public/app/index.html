@@ -2199,7 +2199,7 @@
     } else if(sc==="general"){
       text = "総合";
     } else {
-      text = cat ? (PART_ITEM_ALIAS[cat] || cat) + (part.side ? "（"+part.side+"）" : "") : big.name;
+      text = cat ? (PART_ITEM_ALIAS[cat] || cat) + (part.side ? "（"+part.side+"）" : "") : (sc==="interiorColor" ? "インテリア全体" : big.name);
     }
     return { icon: big.icon, text: text, group: big.name };
   }
@@ -12005,7 +12005,7 @@
     if(!vs || !vs.scope) return false;
     if(vs.scope==="internal") return false; // 社内だけの部位はお客様に出さない
     if(vs.category) return true;
-    if(vs.scope==="general" || vs.scope==="exterior") return true;
+    if(vs.scope==="general" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
     if(vs.scope==="room" && vs.roomId) return true;
     return false;
   }
@@ -12257,6 +12257,7 @@
       {label:"🔌 電気配線", value:"eq:電気配線"},
       {label:"💡 あかりプラン", value:"eq:あかりプラン"},
       {label:"🚿 水まわり", value:"facility"},
+      {label:"🎨 インテリア全体（内装プランなど・項目を選ばない）", value:"ic:all"},
       {label:"🎨 クロス・インテリア（家全体）", value:"interiorColor"},
       {label:"🎨 インテリア：部屋別", value:"room"},
       {label:"🔧 外部散水栓・インターホンなど", value:"siteCheck"},
@@ -12276,6 +12277,11 @@
           if(!id){ callback(null); return; }
           callback({scope:"custom", category:id, roomId:null, side:null, label:customPartName(proj,id)});
         });
+        return;
+      }
+      if(scope==="ic:all"){
+        // インテリア全体：メインクロスなどの項目・表裏を選ばずに決める（お客様画面はインテリアのメインに出る）
+        callback({scope:"interiorColor", category:null, roomId:null, side:null, label:"インテリア全体"});
         return;
       }
       if(scope==="general"){

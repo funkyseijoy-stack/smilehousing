@@ -74,6 +74,7 @@ function partLabel(project: any, scope?: string, category?: string | null, roomI
     const c = (project.customParts || []).find((x: any) => x.id === category);
     return c ? c.name : "追加した部位";
   }
+  if (scope === "interiorColor" && !category) return "インテリア全体";
   return category || "";
 }
 
@@ -444,9 +445,9 @@ export default async (req: Request, context: Context) => {
   for (const t of tasks) {
     if (!t.reflected || t.deletedAt || t.private) continue;
     const vs = t.vendorSpec || {};
-    // 外部仕様（項目を選ばず「外部仕様」だけ）と、部屋そのもの（項目を限定しない）は category が空でも出す
+    // 外部仕様（項目を選ばず「外部仕様」だけ）・インテリア全体（項目を選ばない）・部屋そのもの（項目を限定しない）は category が空でも出す
     if (!vs.scope) continue;
-    if (!vs.category && vs.scope !== "general" && vs.scope !== "exterior" && !(vs.scope === "room" && vs.roomId)) continue;
+    if (!vs.category && vs.scope !== "general" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
     for (const att of t.attachments || []) {
       if (!att || !att.url || shownUrls.has(att.url)) continue;
       shownUrls.add(att.url);
@@ -472,7 +473,7 @@ export default async (req: Request, context: Context) => {
     if (a.kind !== "quote" || (qt !== "プランボード" && qt !== "定価") || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;
-    if (!sp.category && sp.scope !== "general" && sp.scope !== "exterior" && !(sp.scope === "room" && sp.roomId)) continue;
+    if (!sp.category && sp.scope !== "general" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
     push(noteCatFor(sp.scope, sp.category), {
       type: "photo",
       isQuote: true,
