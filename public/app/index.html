@@ -1027,6 +1027,8 @@
 
       <!-- ヒアリング（どんな家にしたいか） subpanel -->
       <div class="subpanel" id="sub-hearing">
+        <!-- 次回のご予約（この案件の今日以降の予約。renderHearingNextRes） -->
+        <div class="card" id="hearNextRes" style="padding-block:12px;"></div>
         <!-- 初期の打合せ記録（手書きメモをPDFで。お客様には専用の簡単なページで見せる） -->
         <div class="card" id="earlyCard">
           <div class="row" style="justify-content:space-between; gap:8px; flex-wrap:wrap; margin-block-end:6px;">
@@ -4080,7 +4082,25 @@
     }catch(e){ /* 取り直せなくても画面はそのまま */ }
     finally{ galLikeLoading = false; }
   }
+  // ヒアリングタブ上の「次回のご予約」（お打合せの記録ページ・おうちノートと同じく、今日以降の予約）
+  function renderHearingNextRes(){
+    var el = document.getElementById("hearNextRes");
+    if(!el) return;
+    var pid = state.currentProjectId, today = todayJst();
+    var list = state.reservations.filter(function(r){ return r && !r.deletedAt && r.projectId===pid && String(r.date||"")>=today; })
+      .sort(function(a,b){ return (String(a.date)+String(a.startTime||"")).localeCompare(String(b.date)+String(b.startTime||"")); });
+    var W = ["日","月","火","水","木","金","土"];
+    function dl(d){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||"")); if(!m) return escapeHtml(d||""); var dt=new Date(+m[1],+m[2]-1,+m[3]); return (+m[2])+"月"+(+m[3])+"日（"+W[dt.getDay()]+"）"; }
+    var head = '<div class="row" style="justify-content:space-between; gap:8px; flex-wrap:wrap;"><h3 style="margin:0;">📅 次回のご予約</h3>'+
+      '<button class="btn small" type="button" data-hear-gores>予約タブを開く</button></div>';
+    if(!list.length){ el.innerHTML = head + '<p class="muted" style="margin:6px 0 0;">今日以降の予約はありません。</p>'; return; }
+    var n = list[0];
+    el.innerHTML = head +
+      '<div style="margin-top:6px; font-size:1.15rem; font-weight:700;">'+dl(n.date)+' '+escapeHtml(n.startTime||"")+(n.endTime?'〜'+escapeHtml(n.endTime):'')+'　'+escapeHtml(n.type||"")+'</div>'+
+      (list.length>1 ? '<div class="muted" style="margin-top:4px;">その後の予約：'+list.slice(1,4).map(function(r){ return dl(r.date)+' '+escapeHtml(r.startTime||"")+' '+escapeHtml(r.type||""); }).join("／")+(list.length>4?' ほか'+(list.length-4)+'件':'')+'</div>' : '');
+  }
   function renderProjectHearing(){
+    renderHearingNextRes();
     renderGalleryLikes();
     var wrap = document.getElementById("hearingForm");
     if(!wrap) return;
@@ -13215,6 +13235,10 @@
         if(currentSub === "message") refreshMessageNotify();
         if(currentSub === "hearing" || currentSub === "photos") refreshGalleryLikes();
       });
+    });
+    document.getElementById("hearNextRes").addEventListener("click", function(e){
+      if(!e.target.closest("[data-hear-gores]")) return;
+      var b = document.querySelector('.sub-btn[data-sub="reservation"]'); if(b) b.click();
     });
 
     document.getElementById("btnOkaiAddBooking").addEventListener("click", okaiAddBooking);
