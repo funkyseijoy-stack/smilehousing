@@ -200,6 +200,12 @@
   .imgadd .pick{ display:block; text-align:center; border-radius:14px; padding:13px 6px; font-weight:700; letter-spacing:.08em; background:var(--brown); color:#fff; cursor:pointer; }
   .imgadd .pick.busy{ opacity:.5; pointer-events:none; }
   .imgadd .hint{ font-size:.74rem; color:var(--muted); line-height:1.6; }
+  .gal{ display:flex; align-items:center; gap:12px; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:12px 14px; margin-bottom:12px; text-decoration:none; color:var(--ink); }
+  .gal .gi{ flex:none; width:42px; height:42px; border-radius:12px; background:var(--chip); display:grid; place-items:center; color:var(--brown); }
+  .gal .gt{ flex:1; min-width:0; }
+  .gal .gt b{ display:block; font-size:.92rem; }
+  .gal .gt span{ display:block; color:var(--muted); font-size:.74rem; line-height:1.5; }
+  .gal .ga{ flex:none; color:var(--brown); font-weight:700; font-size:.82rem; }
   .chips{ display:flex; gap:8px; overflow-x:auto; padding:14px 0 4px; -webkit-overflow-scrolling:touch; }
   .chipf{ flex:none; border:1.5px solid var(--line2); background:var(--card); color:var(--ink2); border-radius:999px; padding:7px 13px; font-size:.8rem; cursor:pointer; }
   .chipf.on{ background:var(--brown); border-color:var(--brown); color:#fff; font-weight:700; }
@@ -937,6 +943,8 @@ function homeHtml(){
     if(view.imgFilter!=="all" && !used[view.imgFilter]) view.imgFilter = "all";
     var shown = view.imgFilter==="all" ? imgs : imgs.filter(function(x){ return x.place===view.imgFilter; });
     var out = '<h2 class="big">お家のイメージ</h2><p class="sub">こんなお家にしたい、という写真をお互いに追加できます。追加した写真は住まいるハウジングのスタッフにも共有されます。</p>';
+    out += '<a class="gal" href="/gallery/" target="_blank" rel="noopener"><span class="gi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
+      '<span class="gt"><b>施工事例・イメージ集を見る</b><span>住まいるハウジングで建てたお家の写真です</span></span><span class="ga">ひらく ›</span></a>';
     out += '<div class="imgadd"><div class="row"><label class="l" for="imgPlace">場所</label><select id="imgPlace">'+
       places.map(function(pl){ return '<option value="'+esc(pl)+'"'+(pl===view.imgPlace?' selected':'')+'>'+esc(pl)+'</option>'; }).join("")+
       '</select></div>'+

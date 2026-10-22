@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>住まいるハウジング イメージ集</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@500;700&display=swap">
+<style>
+/* Layout: a quiet header, a sticky row of room chips, then a masonry wall of photos that opens into a full-screen viewer. */
+:root{
+  --bg:#f5f5f2;
+  --surface:#ffffff;
+  --fg:#22262a;
+  --muted:#6b706f;
+  --line:#dddfda;
+  --accent:#3f5b57;
+  --accent-ink:#ffffff;
+  --chip:#ebece7;
+  --shade:rgba(20,22,24,.94);
+  --font-display:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --font-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#161918;--surface:#1e2221;--fg:#e9ebe7;--muted:#9ba19e;--line:#2e3432;--accent:#8fb3ad;--accent-ink:#13201e;--chip:#252a29;--shade:rgba(8,9,9,.96);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#161918;--surface:#1e2221;--fg:#e9ebe7;--muted:#9ba19e;--line:#2e3432;--accent:#8fb3ad;--accent-ink:#13201e;--chip:#252a29;--shade:rgba(8,9,9,.96);color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{padding-block:28px 14px}
+.brand{font-size:12px;letter-spacing:.14em;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,5.4vw,36px);line-height:1.3;margin:4px 0 10px;text-wrap:balance}
+.lead{margin:0;color:var(--muted);font-size:14px;max-width:38em}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;flex-direction:column;gap:10px;padding-block:10px 12px}
+.mode{display:inline-flex;align-self:flex-start;background:var(--chip);border-radius:999px;padding:3px}
+.mode button{appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:500;padding:6px 16px;border-radius:999px;cursor:pointer}
+.mode button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px))}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-size:14px;font-weight:500;padding:7px 14px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+.chip .n{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.8}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+main{padding-block:18px 40px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 12px}
+.sec-head h2{font-family:var(--font-display);font-weight:500;font-size:22px;margin:0}
+.sec-head .count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sec-note{margin:-6px 0 14px;color:var(--muted);font-size:13px}
+
+.wall{columns:2 160px;column-gap:8px}
+@media (min-width:720px){.wall{columns:3 220px;column-gap:12px}}
+@media (min-width:1040px){.wall{columns:4 220px}}
+.tile{display:block;width:100%;break-inside:avoid;margin:0 0 8px;padding:0;border:0;background:var(--chip);border-radius:4px;overflow:hidden;cursor:zoom-in}
+@media (min-width:720px){.tile{margin-bottom:12px}}
+.tile img{display:block;width:100%;height:auto;transition:opacity .2s}
+@media (hover:hover){.tile:hover img{opacity:.88}}
+
+footer{border-top:1px solid var(--line);padding-block:18px 28px;color:var(--muted);font-size:12px}
+
+/* viewer */
+.viewer{position:fixed;inset:0;z-index:50;background:var(--shade);display:flex;flex-direction:column;color:#f2f2ef;touch-action:pan-y}
+.viewer-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(10px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px))}
+.viewer-top .where{font-size:13px;letter-spacing:.04em;font-variant-numeric:tabular-nums;opacity:.85}
+.vbtn{appearance:none;border:0;background:rgba(255,255,255,.12);color:#f2f2ef;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.vbtn:hover{background:rgba(255,255,255,.2)}
+.vbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:4px max(8px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.stage img{max-width:100%;max-height:100%;object-fit:contain;border-radius:2px;user-select:none;-webkit-user-drag:none}
+.nav{position:absolute;top:50%;transform:translateY(-50%)}
+.nav.prev{left:max(12px,env(safe-area-inset-left,0px))}
+.nav.next{right:max(12px,env(safe-area-inset-right,0px))}
+@media (max-width:640px){.nav{display:none}}
+.hint{text-align:center;font-size:12px;opacity:.6;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+@media (min-width:641px){.hint{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<header class="wrap">
+  <div class="brand">住まいるハウジング</div>
+  <h1>イメージ集</h1>
+  <p class="lead">これまでに建てたお家の写真です。場所ごとに見比べたり、1軒まるごと見たりできます。写真をタップすると大きく表示されます。</p>
+</header>
+
+<div class="bar">
+  <div class="wrap">
+    <div class="mode" role="group" aria-label="見方">
+      <button type="button" id="m-room" aria-pressed="true">場所別</button>
+      <button type="button" id="m-case" aria-pressed="false">施工事例</button>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="カテゴリ"></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="sec-head"><h2 id="sec-title"></h2><span class="count" id="sec-count"></span></div>
+  <p class="sec-note" id="sec-note" hidden></p>
+  <div class="wall" id="wall"></div>
+</main>
+
+<footer class="wrap">住まいるハウジング　釧路市緑ヶ岡2丁目38番5号</footer>
+
+<div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="写真の拡大表示">
+  <div class="viewer-top">
+    <span class="where" id="v-where"></span>
+    <button type="button" class="vbtn" id="v-close" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="stage" id="stage">
+    <img id="v-img" alt="">
+    <button type="button" class="vbtn nav prev" id="v-prev" aria-label="前の写真"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button type="button" class="vbtn nav next" id="v-next" aria-label="次の写真"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div class="hint">左右にスワイプで前後の写真へ</div>
+</div>
+
+<script>
+const PHOTOS = [["gaikan","gaikan-001",640,427],["gaikan","gaikan-002",640,427],["gaikan","gaikan-003",640,427],["gaikan","gaikan-004",450,338],["gaikan","gaikan-005",640,427],["gaikan","gaikan-006",640,427],["gaikan","gaikan-007",640,426],["gaikan","gaikan-008",640,440],["gaikan","gaikan-009",640,480],["entrance","entrance-002",640,427],["entrance","entrance-003",426,640],["entrance","entrance-005",640,427],["entrance","entrance-006",427,640],["entrance","entrance-007",480,640],["entrance","entrance-008",480,640],["entrance","entrance-009",480,640],["entrance","entrance-011",480,640],["entrance","entrance-012",434,640],["entrance","entrance-013",640,460],["entrance","entrance-014",640,428],["entrance","entrance-015",428,640],["entrance","entrance-016",428,640],["entrance","entrance-017",428,640],["ldk","ldk-001",640,480],["ldk","ldk-002",480,640],["ldk","ldk-003",640,428],["ldk","ldk-004",480,640],["ldk","ldk-005",640,427],["ldk","ldk-006",640,427],["ldk","ldk-007",640,427],["ldk","ldk-008",640,427],["ldk","ldk-009",427,640],["ldk","ldk-010",640,427],["ldk","ldk-011",640,427],["ldk","ldk-012",640,427],["ldk","ldk-013",640,427],["ldk","ldk-014",640,427],["ldk","ldk-015",640,640],["ldk","ldk-016",544,640],["ldk","ldk-017",640,427],["ldk","ldk-020",640,480],["ldk","ldk-021",480,640],["ldk","ldk-022",480,640],["ldk","ldk-023",480,640],["ldk","ldk-025",640,427],["ldk","ldk-027",640,427],["ldk","ldk-029",480,640],["ldk","ldk-030",640,427],["sanitary","sanitary-001",427,640],["sanitary","sanitary-002",427,640],["sanitary","sanitary-003",360,640],["sanitary","sanitary-004",428,640],["sanitary","sanitary-005",640,426],["sanitary","sanitary-006",480,640],["sanitary","sanitary-007",427,640],["sanitary","sanitary-008",427,640],["sanitary","sanitary-009",480,640],["sanitary","sanitary-010",427,640],["sanitary","sanitary-011",427,640],["sanitary","sanitary-012",427,640],["sanitary","sanitary-013",427,640],["sanitary","sanitary-014",480,640],["sanitary","sanitary-015",480,640],["sanitary","sanitary-016",640,480],["sanitary","sanitary-017",480,640],["sanitary","sanitary-018",640,480],["sanitary","sanitary-019",480,640],["sanitary","sanitary-021",480,640],["sanitary","sanitary-022",427,640],["laundry","laundry-001",427,640],["laundry","laundry-002",427,640],["laundry","laundry-003",480,640],["laundry","laundry-004",480,640],["laundry","laundry-005",480,640],["laundry","laundry-006",640,480],["laundry","laundry-007",427,640],["laundry","laundry-008",640,428],["storage","storage-001",424,640],["storage","storage-002",424,640],["storage","storage-003",480,640],["storage","storage-004",427,640],["storage","storage-005",640,428],["storage","storage-006",360,640],["storage","storage-007",480,640],["storage","storage-016",480,640],["storage","storage-017",480,640],["storage","storage-018",480,640],["storage","storage-023",480,640],["storage","storage-024",480,640],["storage","storage-025",640,480],["storage","storage-026",480,640],["storage","storage-027",480,640],["storage","storage-028",480,640],["storage","storage-029",480,640],["storage","storage-030",480,640],["storage","storage-031",480,640],["storage","storage-032",480,640],["storage","storage-033",480,640],["storage","storage-035",480,640],["storage","storage-036",640,427],["storage","storage-037",480,640],["storage","storage-038",480,640],["storage","storage-039",480,640],["other","entrance-001",427,640],["other","entrance-004",427,640],["other","other-001",427,640],["other","other-002",480,640],["other","other-003",586,640],["other","other-004",640,480],["other","other-005",480,640],["other","other-006",480,640],["other","other-008",427,640],["other","other-009",640,427],["other","other-010",640,427],["other","other-011",640,427],["other","other-013",640,427],["other","other-014",640,427],["other","other-015",640,428],["other","other-016",480,640],["other","other-017",428,640],["other","other-018",640,427],["other","other-019",427,640],["other","other-020",228,304],["other","other-021",480,640],["other","other-022",640,480],["other","other-023",480,640],["other","other-024",480,640],["other","other-025",480,640],["other","other-026",480,640],["other","other-027",480,640],["other","other-028",480,640],["other","other-029",480,640],["other","other-030",427,640],["other","other-031",427,640],["other","other-032",640,427],["other","other-033",640,427],["other","other-035",640,310],["other","other-036",424,640],["other","other-037",427,640],["other","other-038",480,640],["other","other-039",480,640],["other","other-040",480,640],["other","other-041",640,428],["other","other-042",640,480],["other","other-043",480,640],["case1","case1-009",427,640],["case1","case1-025",427,640],["case1","case1-024",640,427],["case1","case1-012",640,427],["case1","case1-014",640,427],["case1","case1-041",427,640],["case1","case1-028",427,640],["case1","case1-006",640,427],["case1","case1-034",640,427],["case1","case1-036",640,427],["case1","case1-018",427,640],["case1","case1-017",427,640],["case1","case1-003",480,640],["case1","case1-005",480,640],["case1","case1-016",640,427],["case1","case1-002",480,640],["case1","case1-040",640,427],["case1","case1-019",427,640],["case1","case1-020",640,427],["case1","case1-038",640,427],["case2","case2-017",640,426],["case2","case2-165",1069,1600],["case2","case2-005",640,480],["case2","case2-151",1200,1600],["case2","case2-156",1200,1600],["case2","case2-001",640,426],["case2","case2-002",640,426],["case2","case2-003",640,426],["case2","case2-099",1200,1600],["case2","case2-170",1600,1069],["case2","case2-116",1069,1600],["case2","case2-175",1069,1600],["case2","case2-028",640,426],["case2","case2-157",1200,1600],["case2","case2-068",428,640],["case2","case2-014",640,426],["case2","case2-133",1069,1600],["case2","case2-092",1200,1600],["case2","case2-182",1200,1600],["case2","case2-025",640,426],["case2","case2-103",1200,1600],["case2","case2-044",426,640],["case2","case2-055",428,640],["case2","case2-087",1600,1069],["case2","case2-008",426,640],["case2","case2-046",640,426],["case2","case2-033",426,640],["case2","case2-147",1600,1069],["case2","case2-150",1069,1600],["case3","case3-015",640,427],["case3","case3-020",427,640],["case3","case3-002",640,427],["case3","case3-011",427,640],["case3","case3-012",427,640],["case3","case3-013",640,427],["case3","case3-006",427,640],["case3","case3-025",1066,1600],["case3","case3-023",1502,1600],["case3","case3-003",472,640],["case3","case3-004",360,640],["case3","case3-024",1066,1600],["case3","case3-018",608,640],["case4","case4-001",1600,1066],["case4","case4-002",1600,1066],["case4","case4-003",1600,1066],["case4","case4-004",1600,1066],["case4","case4-005",1600,1066],["case4","case4-006",1600,1066],["case4","case4-007",1600,1066],["case4","case4-008",1600,1066],["case4","case4-009",1600,1066],["case4","case4-010",1600,1066],["case4","case4-011",1600,1066],["case4","case4-012",1600,1066],["case4","case4-013",1600,1066],["case4","case4-014",1600,1066],["case4","case4-015",1600,1066],["case4","case4-016",1600,1066],["case4","case4-017",1600,1066],["case4","case4-018",1600,1066],["case4","case4-019",1600,1066],["case4","case4-020",1600,1066],["case4","case4-021",1600,1066],["case4","case4-022",1600,1066],["case5","case5-001",1069,1600],["case5","case5-002",1200,1600],["case5","case5-003",1200,1600],["case5","case5-004",1600,1200],["case5","case5-005",1200,1600],["case5","case5-006",1200,1600],["case5","case5-007",1200,1600],["case5","case5-008",1600,1069],["case6","case6-001",1600,1067],["case6","case6-002",1600,1067],["case6","case6-003",1067,1600],["case6","case6-004",1600,1067],["case6","case6-005",1067,1600],["case6","case6-006",1067,1600],["case6","case6-007",1067,1600],["case6","case6-008",1067,1600],["case6","case6-009",1600,1067],["case6","case6-010",1067,1600],["case6","case6-011",1600,1067],["case6","case6-012",1067,1600],["case6","case6-013",1067,1600],["case6","case6-014",1067,1600],["case6","case6-015",1067,1600],["case6","case6-016",1067,1600],["case6","case6-017",1067,1600],["case6","case6-018",1067,1600],["case6","case6-019",1600,1067]];
+const GROUPS = {
+  room: [
+    {id:"gaikan",   name:"外観"},
+    {id:"entrance", name:"エントランス"},
+    {id:"ldk",      name:"LDK"},
+    {id:"sanitary", name:"サニタリー"},
+    {id:"laundry",  name:"ランドリー"},
+    {id:"storage",  name:"収納"},
+    {id:"other",    name:"その他", note:"寝室・子ども部屋・階段・ホールなど"}
+  ],
+  case: [
+    {id:"case1", name:"事例 1", note:"1軒分の写真をまとめて見られます"},
+    {id:"case2", name:"事例 2", note:"1軒分の写真をまとめて見られます"},
+    {id:"case3", name:"事例 3", note:"1軒分の写真をまとめて見られます"},
+    {id:"case4", name:"事例 4", note:"1軒分の写真をまとめて見られます"},
+    {id:"case5", name:"事例 5", note:"1軒分の写真をまとめて見られます"},
+    {id:"case6", name:"事例 6", note:"1軒分の写真をまとめて見られます"}
+  ]
+};
+const byGroup = {};
+for (const [g, f, w, h] of PHOTOS) (byGroup[g] ||= []).push({f, w, h});
+
+let mode = "room", current = "gaikan", list = [], idx = 0;
+const $ = id => document.getElementById(id);
+
+function modeOf(id){ return GROUPS.case.some(g => g.id === id) ? "case" : "room"; }
+function info(id){ return GROUPS[modeOf(id)].find(g => g.id === id); }
+
+function renderChips(){
+  $("m-room").setAttribute("aria-pressed", mode === "room");
+  $("m-case").setAttribute("aria-pressed", mode === "case");
+  $("chips").innerHTML = GROUPS[mode].map(g =>
+    `<button type="button" class="chip" data-id="${g.id}" aria-pressed="${g.id === current}">${g.name}<span class="n">${(byGroup[g.id]||[]).length}</span></button>`
+  ).join("");
+}
+
+function renderWall(){
+  const g = info(current);
+  list = byGroup[current] || [];
+  $("sec-title").textContent = g.name;
+  $("sec-count").textContent = list.length + "枚";
+  $("sec-note").hidden = !g.note;
+  $("sec-note").textContent = g.note || "";
+  $("wall").innerHTML = list.map((p, i) =>
+    `<button type="button" class="tile" data-i="${i}" aria-label="${g.name}の写真 ${i+1}"><img src="/gallery/t/${p.f}.jpg" width="${p.w}" height="${p.h}" loading="${i < 8 ? "eager" : "lazy"}" decoding="async" alt=""></button>`
+  ).join("");
+}
+
+function show(id, opts = {}){
+  if (!info(id)) id = "gaikan";
+  current = id; mode = modeOf(id);
+  renderChips(); renderWall();
+  try { history.replaceState(null, "", "#" + id); } catch(e) {}
+  const chip = document.querySelector(`.chip[data-id="${id}"]`);
+  if (chip) chip.scrollIntoView({inline:"center", block:"nearest"});
+  if (opts.top) window.scrollTo({top:0});
+}
+
+$("chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (b) show(b.dataset.id, {top:true});
+});
+$("m-room").addEventListener("click", () => { if (mode !== "room") show(GROUPS.room[0].id, {top:true}); });
+$("m-case").addEventListener("click", () => { if (mode !== "case") show(GROUPS.case[0].id, {top:true}); });
+
+/* viewer */
+let lastFocus = null;
+function open(i){
+  idx = i; lastFocus = document.activeElement;
+  $("viewer").hidden = false; document.body.style.overflow = "hidden";
+  draw(); $("v-close").focus();
+}
+function close(){
+  $("viewer").hidden = true; document.body.style.overflow = "";
+  if (lastFocus) lastFocus.focus();
+}
+function draw(){
+  const p = list[idx];
+  const img = $("v-img");
+  img.src = "/gallery/t/" + p.f + ".jpg";
+  const full = new Image();
+  full.onload = () => { if (list[idx] === p) img.src = full.src; };
+  full.src = "/gallery/p/" + p.f + ".jpg";
+  $("v-where").textContent = `${info(current).name}　${idx+1} / ${list.length}`;
+  [idx-1, idx+1].forEach(j => { if (list[j]) new Image().src = "/gallery/t/" + list[j].f + ".jpg"; });
+}
+function step(d){ idx = (idx + d + list.length) % list.length; draw(); }
+
+$("wall").addEventListener("click", e => { const t = e.target.closest(".tile"); if (t) open(+t.dataset.i); });
+$("v-close").addEventListener("click", close);
+$("v-prev").addEventListener("click", e => { e.stopPropagation(); step(-1); });
+$("v-next").addEventListener("click", e => { e.stopPropagation(); step(1); });
+$("stage").addEventListener("click", e => { if (e.target.id === "stage") close(); });
+document.addEventListener("keydown", e => {
+  if ($("viewer").hidden) return;
+  if (e.key === "Escape") close();
+  else if (e.key === "ArrowLeft") step(-1);
+  else if (e.key === "ArrowRight") step(1);
+});
+let sx = null, sy = null;
+$("stage").addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive:true});
+$("stage").addEventListener("touchend", e => {
+  if (sx === null) return;
+  const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1);
+  else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) close();
+  sx = sy = null;
+}, {passive:true});
+
+show((location.hash || "").slice(1) || "gaikan");
+</script>
+</body>
+</html>

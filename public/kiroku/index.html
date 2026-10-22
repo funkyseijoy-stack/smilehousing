@@ -62,6 +62,12 @@
   .rvslot.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
   .rvopen{ width:100%; border-radius:14px; padding:15px 6px; font:inherit; font-size:1.05rem; font-weight:700; letter-spacing:.06em; background:var(--card); border:2px solid var(--brown); color:var(--brown); cursor:pointer; }
   .rvopen.on{ background:var(--brown); color:#fff; }
+  .gal{ display:flex; align-items:center; gap:14px; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px 16px; text-decoration:none; color:var(--ink); }
+  .gal .gi{ flex:none; width:46px; height:46px; border-radius:12px; background:var(--chip); display:grid; place-items:center; color:var(--brown); }
+  .gal .gt{ flex:1; min-width:0; }
+  .gal .gt b{ display:block; font-size:1rem; }
+  .gal .gt span{ display:block; color:var(--muted); font-size:.82rem; }
+  .gal .ga{ flex:none; color:var(--brown); font-weight:700; font-size:.9rem; }
   #rvBox[hidden]{ display:none; }
   .bookbtn{ width:100%; margin-top:18px; border-radius:14px; padding:15px 6px; font:inherit; font-size:1rem; font-weight:700; letter-spacing:.08em; background:var(--brown); border:1.5px solid var(--brown); color:#fff; cursor:pointer; }
   .bookbtn:disabled{ opacity:.45; cursor:default; }
@@ -134,7 +140,7 @@
     if(name && !/様$/.test(name)) name += " 様";
     var html = '<h1>'+(name?esc(name):'お客様')+'</h1><p class="sub">住まいるハウジングとのお打合せの記録です。</p>';
     var fins = data.financeDocs || [];
-    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'</div>';
+    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'</div>';
     html += '<div id="nextBox">'+nextHtml()+'</div>';
     html += '<h2 class="sec" id="sec-rec">お打合せの記録</h2><p class="secsub">新しいものから順に並んでいます。資料は押すと開きます。</p>';
     if(!data.records || !data.records.length){
@@ -179,6 +185,9 @@
         '</div>';
       }).join("");
     }
+    html += '<h2 class="sec" id="sec-gal">施工事例・イメージ集</h2><p class="secsub">住まいるハウジングで建てたお家の写真です。場所ごと・お家ごとに見られます。</p>'+
+      '<a class="gal" href="/gallery/" target="_blank" rel="noopener"><span class="gi"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
+      '<span class="gt"><b>イメージ集を見る</b><span>外観・LDK・水まわりなど</span></span><span class="ga">ひらく ›</span></a>';
     html += '<h2 class="sec" id="sec-resv">ご予約</h2><p class="secsub">「予約する」を押すと、空いている日時を選んで予約できます。</p>'+
       '<button class="rvopen'+(rv.open?" on":"")+'" id="rvToggle">'+(rv.open?"▲ 閉じる":"📅 予約する")+'</button><div id="rvBox"'+(rv.open?"":" hidden")+'></div>';
     // 会社紹介の文章のあとに、家づくりの進め方（ご契約の考え方）を小さな見出し＋ふつうの文章で添える
