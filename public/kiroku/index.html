@@ -42,6 +42,17 @@
   .foot{ text-align:center; color:var(--muted); font-size:.78rem; margin-top:24px; }
   .jump{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
   .jump a{ flex:1 1 72px; white-space:nowrap; text-align:center; text-decoration:none; color:var(--ink); background:var(--card); border:1.5px solid var(--line); border-radius:999px; padding:9px 4px; font-size:.85rem; font-weight:700; }
+  .jump a.helpbtn{ background:var(--chip); }
+  .khelp{ position:fixed; inset:0; z-index:50; background:rgba(40,32,28,.45); display:flex; align-items:flex-end; justify-content:center; }
+  .khelp[hidden]{ display:none; }
+  .khelp-card{ position:relative; background:var(--bg); width:100%; max-width:560px; max-height:88vh; overflow-y:auto; border-radius:20px 20px 0 0; padding:22px 20px calc(28px + env(safe-area-inset-bottom)); box-sizing:border-box; }
+  .khelp-card h2{ font-size:1.15rem; margin:0 0 6px; }
+  .khelp-card h3{ font-size:1rem; margin:20px 0 6px; }
+  .khelp-card .lead{ color:var(--ink2); font-size:.92rem; margin:0; }
+  .khelp-card .hsub{ font-weight:700; font-size:.88rem; color:var(--brown); margin:10px 0 2px; }
+  .khelp-card ol, .khelp-card ul{ margin:0; padding-left:1.4em; font-size:.92rem; line-height:1.75; color:var(--ink2); }
+  .khelp-card .x{ position:absolute; top:10px; right:12px; width:36px; height:36px; border-radius:50%; border:none; background:var(--chip); font-size:1.3rem; color:var(--ink2); cursor:pointer; }
+  .khelp-card .close2{ display:block; width:100%; margin-top:22px; padding:12px; border-radius:999px; border:none; background:var(--brown); color:#fff; font:inherit; font-weight:700; cursor:pointer; }
   h2.sec{ font-size:1.12rem; margin:30px 0 4px; scroll-margin-top:12px; }
   .secsub{ color:var(--muted); font-size:.82rem; margin:0 0 12px; }
   .next{ background:var(--brown); color:#fff; border-radius:16px; padding:14px 16px; margin-bottom:18px; }
@@ -140,7 +151,7 @@
     if(name && !/様$/.test(name)) name += " 様";
     var html = '<h1>'+(name?esc(name):'お客様')+'</h1><p class="sub">住まいるハウジングとのお打合せの記録です。</p>';
     var fins = data.financeDocs || [];
-    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'</div>';
+    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
     html += '<div id="nextBox">'+nextHtml()+'</div>';
     html += '<h2 class="sec" id="sec-rec">お打合せの記録</h2><p class="secsub">新しいものから順に並んでいます。資料は押すと開きます。</p>';
     if(!data.records || !data.records.length){
@@ -290,6 +301,7 @@
     if(on && !rv.loaded && !rv.loading) loadAvail();
   }
   main.addEventListener("click", function(e){
+    if(e.target.closest("[data-khelp]")){ e.preventDefault(); openHelp(); return; }
     if(e.target.closest("#rvToggle")){ setResvOpen(!rv.open); return; }
     if(e.target.closest('.jump a[href="#sec-resv"]')) setResvOpen(true);
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }
@@ -298,6 +310,38 @@
     var rs = e.target.closest("[data-rvstart]"); if(rs){ rv.start = rs.dataset.rvstart; renderResv(); return; }
     if(e.target.closest("#rvBook")) bookNow();
   });
+
+  // 「使い方」（ホーム画面への追加方法と画面の見方）。おうちノートの「？」と同じ考え方
+  function openHelp(){
+    var el = document.getElementById("khelp");
+    if(!el){
+      el = document.createElement("div"); el.id = "khelp"; el.className = "khelp";
+      el.addEventListener("click", function(e){ if(e.target===el || e.target.closest("[data-khelpx]")) el.hidden = true; });
+      document.body.appendChild(el);
+    }
+    var fins = (data && data.financeDocs) || [];
+    var about = data && (data.companyIntro || data.policy);
+    el.innerHTML = '<div class="khelp-card" role="dialog" aria-label="このページの使い方">'+
+      '<button class="x" type="button" data-khelpx aria-label="閉じる">×</button>'+
+      '<h2>このページの使い方</h2>'+
+      '<p class="lead">ホーム画面に追加すると、アプリのようにすぐ開けて便利です。</p>'+
+      '<h3>📱 ホーム画面への追加方法</h3>'+
+      '<div class="hsub">iPhone（Safari）の場合</div>'+
+      '<ol><li>画面下の共有ボタン（四角に↑のマーク）をタップ</li><li>「ホーム画面に追加」をタップ</li><li>右上の「追加」をタップ</li></ol>'+
+      '<div class="hsub">Android（Chrome）の場合</div>'+
+      '<ol><li>右上の「⋮」（メニュー）をタップ</li><li>「ホーム画面に追加」または「アプリをインストール」をタップ</li><li>「追加」をタップ</li></ol>'+
+      '<h3>📄 画面の見方</h3>'+
+      '<ul>'+
+        '<li><b>記録</b>：お打合せのメモをご覧いただけます。資料は押すと開きます</li>'+
+        (fins.length ? '<li><b>資金計画・お見積り</b>：資金計画書やお見積りをご覧いただけます</li>' : '')+
+        '<li><b>施工事例・イメージ集</b>：住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと「いいね」にまとまります</li>'+
+        '<li><b>ご予約</b>：「📅 予約する」から、次回のご来店やご相談を予約できます</li>'+
+        (about ? '<li><b>会社について</b>：住まいるハウジングのご紹介です</li>' : '')+
+      '</ul>'+
+      '<button class="close2" type="button" data-khelpx>閉じる</button>'+
+    '</div>';
+    el.hidden = false;
+  }
 
   // PDFの1ページ目を見本として描く（1件ずつ順番に）
   function drawPdfThumbs(){
