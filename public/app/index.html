@@ -4421,6 +4421,7 @@
           (d.file ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml([d.file], 96)+'</div>' : '')+
           '<div class="row" style="gap:6px; margin-block-start:8px; flex-wrap:wrap;">'+
             '<button class="btn secondary small" data-finshare="'+d.id+'">'+(d.shared?'社内だけにする':'お客様に見せる')+'</button>'+
+            '<button class="btn secondary small" data-finkind="'+d.id+'">🔁 種類を変える</button>'+
             '<button class="btn secondary small" data-findel="'+d.id+'">削除</button>'+
           '</div></div>';
       }).join("");
@@ -4524,6 +4525,17 @@
       var rm = e.target.closest("[data-finrm]"); if(rm){ finDraft.files.splice(Number(rm.dataset.finrm),1); renderFinPending(); }
     });
     document.getElementById("finList").addEventListener("click", function(e){
+      var fk = e.target.closest("[data-finkind]");
+      if(fk){
+        var pk = projectById(state.currentProjectId);
+        var cur = pk && (pk.financeDocs||[]).find(function(x){ return x.id===fk.dataset.finkind; });
+        var curKind = cur ? (FIN_KINDS.indexOf(cur.kind)>=0 ? cur.kind : "その他") : "";
+        askChoice("種類を変える", "いまの種類：「"+curKind+"」", FIN_KINDS.filter(function(k){ return k!==curKind; }).map(function(k){ return {label:k, value:k}; }), function(kind){
+          if(!kind) return;
+          updateFin(fk.dataset.finkind, function(d){ d.kind = kind; d.updatedAt = nowIso(); return d; }, "✓ 種類を「"+kind+"」に変えました");
+        });
+        return;
+      }
       var sh = e.target.closest("[data-finshare]");
       if(sh){ updateFin(sh.dataset.finshare, function(d){ d.shared = !d.shared; d.updatedAt = nowIso(); return d; }, "✓ 切り替えました"); return; }
       var dl = e.target.closest("[data-findel]");
