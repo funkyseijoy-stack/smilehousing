@@ -1098,6 +1098,11 @@
           </div>
           <div id="finList"></div>
         </div>
+        <div class="card" id="galLikeCard" hidden>
+          <h3 style="margin:0 0 4px;">🩷 イメージ集でいいねした写真 <span class="muted" id="galLikeCount" style="font-weight:400; font-size:.85rem;"></span></h3>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様が、お打合せの記録・おうちノートから開いた「施工事例・イメージ集」で🩷を押した写真です。新しい順に並びます。写真を押すと大きく開きます。</p>
+          <div id="galLikeWrap" class="specphotos"></div>
+        </div>
         <div class="card">
           <h3 style="margin:0 0 4px;">ヒアリング（どんな家にしたいか）</h3>
           <p class="muted" style="margin:0 0 10px; font-size:.85rem;">初めての打合せで伺った内容を入力します。スタッフだけが見られます（お客様のおうちノートには出ません）。入力したら下の「保存」を押してください。</p>
@@ -4045,7 +4050,22 @@
     {k:"timing", label:"時期・土地", ph:"希望の入居時期、土地の有無・場所、現在の進み具合など"},
     {k:"other", label:"その他・メモ", ph:"気になっていること、ほかに検討している会社など"}
   ];
+  // イメージ集（/gallery/）でお客様がいいねした写真（imageBoard の source:"gallery"。netlify/functions/gallery-like.mts が保存）
+  function renderGalleryLikes(){
+    var card = document.getElementById("galLikeCard"), wrap = document.getElementById("galLikeWrap");
+    if(!card || !wrap) return;
+    var list = state.imageBoard.filter(function(p){ return !p.deletedAt && p.projectId===state.currentProjectId && p.source==="gallery"; })
+      .sort(function(a,b){ return String(b.createdAt||"").localeCompare(String(a.createdAt||"")); });
+    card.hidden = !list.length;
+    var c = document.getElementById("galLikeCount"); if(c) c.textContent = list.length ? "（"+list.length+"枚）" : "";
+    wrap.innerHTML = list.map(function(p){
+      return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+escapeHtml(p.thumbUrl||p.url)+'" alt="">'+
+        '<a href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
+        '<span class="spby cust">'+escapeHtml(p.galleryGroup||"イメージ集")+'</span></div>';
+    }).join("");
+  }
   function renderProjectHearing(){
+    renderGalleryLikes();
     var wrap = document.getElementById("hearingForm");
     if(!wrap) return;
     var pid = state.currentProjectId;
@@ -8776,9 +8796,10 @@
       html += '<div style="margin-block-end:12px;"><strong>'+pl+'</strong>（'+list.length+'）<div class="specphotos" style="margin-block-start:6px;">'+
         list.map(function(p){
           var cust = p.by==="customer";
-          return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+p.url+'" alt="">'+
+          var gal = p.source==="gallery";
+          return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+(p.thumbUrl||p.url)+'" alt="">'+
             '<a href="'+p.url+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
-            '<span class="spby'+(cust?' cust':'')+'">'+(cust?'お客様':'スタッフ')+'</span>'+
+            '<span class="spby'+(cust?' cust':'')+'">'+(gal?'🩷 イメージ集':(cust?'お客様':'スタッフ'))+'</span>'+
             '<button class="spdel" data-delimageboard="'+p.id+'">×</button></div>';
         }).join("")+'</div></div>';
     });

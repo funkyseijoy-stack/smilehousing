@@ -148,7 +148,8 @@ const IMAGE_MAX_BYTES = 4 * 1024 * 1024; // 1枚あたり。画面側で長辺16
 const IMAGE_MAX_PER_PROJECT = 200; // お客様が追加できる枚数の上限（案件ごと）
 
 function imageOf(x: any) {
-  return { id: x.id, url: x.url, place: x.place || "その他", by: x.by === "customer" ? "customer" : "staff", createdAt: x.createdAt || "" };
+  return { id: x.id, url: x.url, place: x.place || "その他", by: x.by === "customer" ? "customer" : "staff", createdAt: x.createdAt || "",
+    gallery: x.source === "gallery" ? String(x.galleryGroup || "イメージ集") : "" };
 }
 
 // 打合せ記録の並び順用の時刻（UTCのISO文字列）。記録を書いた日が打合せ日と同じ（日本時間）なら、書いた時刻を使う。
@@ -359,7 +360,7 @@ export default async (req: Request, context: Context) => {
       if (!bytes.length) return json({ error: "invalid_image" }, 400);
       if (bytes.length > IMAGE_MAX_BYTES) return json({ error: "too_large" }, 413);
       const existing = await listCollection(store, "imageBoard", projectId);
-      if (existing.filter((x) => x.by === "customer").length >= IMAGE_MAX_PER_PROJECT) return json({ error: "limit_reached" }, 429);
+      if (existing.filter((x) => x.by === "customer" && x.source !== "gallery").length >= IMAGE_MAX_PER_PROJECT) return json({ error: "limit_reached" }, 429);
       const photoStore = getStore("customerPhotos");
       const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       await photoStore.set(`${projectId}/${key}`, bytes, { metadata: { contentType } });

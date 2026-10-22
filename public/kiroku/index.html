@@ -185,8 +185,8 @@
         '</div>';
       }).join("");
     }
-    html += '<h2 class="sec" id="sec-gal">施工事例・イメージ集</h2><p class="secsub">住まいるハウジングで建てたお家の写真です。場所ごと・お家ごとに見られます。</p>'+
-      '<a class="gal" href="/gallery/" target="_blank" rel="noopener"><span class="gi"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
+    html += '<h2 class="sec" id="sec-gal">施工事例・イメージ集</h2><p class="secsub">住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと、スタッフに届きます。</p>'+
+      '<a class="gal" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener"><span class="gi"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
       '<span class="gt"><b>イメージ集を見る</b><span>外観・LDK・水まわりなど</span></span><span class="ga">ひらく ›</span></a>';
     html += '<h2 class="sec" id="sec-resv">ご予約</h2><p class="secsub">「予約する」を押すと、空いている日時を選んで予約できます。</p>'+
       '<button class="rvopen'+(rv.open?" on":"")+'" id="rvToggle">'+(rv.open?"▲ 閉じる":"📅 予約する")+'</button><div id="rvBox"'+(rv.open?"":" hidden")+'></div>';

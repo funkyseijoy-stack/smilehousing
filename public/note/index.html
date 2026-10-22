@@ -943,8 +943,8 @@ function homeHtml(){
     if(view.imgFilter!=="all" && !used[view.imgFilter]) view.imgFilter = "all";
     var shown = view.imgFilter==="all" ? imgs : imgs.filter(function(x){ return x.place===view.imgFilter; });
     var out = '<h2 class="big">お家のイメージ</h2><p class="sub">こんなお家にしたい、という写真をお互いに追加できます。追加した写真は住まいるハウジングのスタッフにも共有されます。</p>';
-    out += '<a class="gal" href="/gallery/" target="_blank" rel="noopener"><span class="gi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
-      '<span class="gt"><b>施工事例・イメージ集を見る</b><span>住まいるハウジングで建てたお家の写真です</span></span><span class="ga">ひらく ›</span></a>';
+    out += '<a class="gal" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener"><span class="gi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
+      '<span class="gt"><b>施工事例・イメージ集を見る</b><span>🩷を押した写真は、この「イメージ」にも入ります</span></span><span class="ga">ひらく ›</span></a>';
     out += '<div class="imgadd"><div class="row"><label class="l" for="imgPlace">場所</label><select id="imgPlace">'+
       places.map(function(pl){ return '<option value="'+esc(pl)+'"'+(pl===view.imgPlace?' selected':'')+'>'+esc(pl)+'</option>'; }).join("")+
       '</select></div>'+
@@ -960,7 +960,7 @@ function homeHtml(){
       out += '<div class="imggrid">'+shown.map(function(x){
         var mine = x.by==="customer";
         return '<div class="imgcell"><button class="th" data-img="'+esc(x.url)+'"><img loading="lazy" src="'+esc(x.url)+'" alt=""><span class="cap">'+esc(x.place)+' ・ '+fmtD(x.createdAt)+'</span></button>'+
-          '<span class="by'+(mine?' me':'')+'">'+(mine?'あなた':'スタッフ')+'</span>'+
+          '<span class="by'+(mine?' me':'')+'">'+(x.gallery?'🩷 イメージ集':(mine?'あなた':'スタッフ'))+'</span>'+
           (mine?'<button class="imgdel" data-imgdel="'+esc(x.id)+'" aria-label="この写真を削除">×</button>':'')+'</div>';
       }).join("")+'</div>';
     } else {
