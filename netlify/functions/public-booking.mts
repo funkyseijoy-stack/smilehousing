@@ -2,7 +2,7 @@ import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { getAccessToken, sendNotifyMail, sendMailTo, CUSTOMER_CALENDAR_ID, CUSTOMER_MAIL_FROM_NAME } from "../lib/google.mts";
 import { confirmationMail } from "../lib/customer-mail.mts";
-import { DURATION, OPEN_MIN, CLOSE_MIN, LAST_START_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays, listCollection } from "../lib/booking.mts";
+import { OPEN_MIN, CLOSE_MIN, LAST_START_MIN, DAYS_AHEAD, WD, toHM, hmToMin, nowJst, addDays, dowOf, buildDays, listCollection } from "../lib/booking.mts";
 
 // 新規のお客様向けの公開予約（/yoyaku/）。ログイン・リンク不要で誰でも使えるページ用。
 // 予約の種類は「ショールーム見学＆おうち相談」のみ。空き状況は note-calendar と同じルール
@@ -24,6 +24,9 @@ function json(obj: any, status = 200) {
 }
 
 const BOOKING_TYPE = "ショールーム見学＆おうち相談";
+// お客様が選べる所要時間（分）。最初の値が初期値
+const PUBLIC_DURATIONS = [120, 60];
+const pickDur = (v: any) => (PUBLIC_DURATIONS.includes(Number(v)) ? Number(v) : PUBLIC_DURATIONS[0]);
 const MAX_UPCOMING_PER_CONTACT = 2; // 同じ電話番号・メールで、今後の予約を持てる件数
 const MAX_PER_DAY = 15; // 24時間に受け付ける公開予約の上限（いたずら・連打対策）
 
@@ -43,8 +46,9 @@ export default async (req: Request, context: Context) => {
   try {
     // ---------- 空き状況 ----------
     if (req.method === "GET") {
-      const days = await buildDays(tk.accessToken, store, today, horizon);
-      return json({ type: BOOKING_TYPE, durationMinutes: DURATION, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), lastStart: toHM(LAST_START_MIN), days });
+      const dur = pickDur(new URL(req.url).searchParams.get("d"));
+      const days = await buildDays(tk.accessToken, store, today, horizon, dur);
+      return json({ type: BOOKING_TYPE, durationOptions: PUBLIC_DURATIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), lastStart: toHM(LAST_START_MIN), days });
     }
 
     // ---------- 予約する ----------
@@ -78,11 +82,12 @@ export default async (req: Request, context: Context) => {
     if (mine.length >= MAX_UPCOMING_PER_CONTACT) return json({ error: "already_booked" }, 409);
 
     // 直前に空きを取り直して、同じ枠が先に埋まっていないか確認する
-    const days = await buildDays(tk.accessToken, store, date, date);
+    const dur = pickDur(body.duration);
+    const days = await buildDays(tk.accessToken, store, date, date, dur);
     const slot = days[0]?.slots.find((s: any) => s.start === start);
     if (!slot || !slot.available) return json({ error: "slot_taken" }, 409);
 
-    const end = toHM(hmToMin(start) + DURATION);
+    const end = toHM(hmToMin(start) + dur);
     const evRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}/events`,
       {
@@ -102,7 +107,7 @@ export default async (req: Request, context: Context) => {
     const id = "rv_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const now = new Date().toISOString();
     const doc: any = {
-      id, projectId: "", type: BOOKING_TYPE, staff: "", date, startTime: start, durationMinutes: DURATION, endTime: end,
+      id, projectId: "", type: BOOKING_TYPE, staff: "", date, startTime: start, durationMinutes: dur, endTime: end,
       customerName: name, phone, email, notes, googleEventId: ev.id || null, source: "public", createdAt: now, updatedAt: now,
     };
 
@@ -115,7 +120,7 @@ export default async (req: Request, context: Context) => {
     const mailed = await sendNotifyMail(
       `【新規予約】${name}様が${BOOKING_TYPE}を予約されました`,
       `新規のお客様が、予約ページから予約されました。\n\n` +
-        `種類：${BOOKING_TYPE}\n日時：${date}（${WD[dowOf(date)]}） ${start}〜${end}\n\n` +
+        `種類：${BOOKING_TYPE}（${dur / 60}時間）\n日時：${date}（${WD[dowOf(date)]}） ${start}〜${end}\n\n` +
         `お名前：${name}\n電話：${phone}\nメール：${email}\nご相談内容：${notes || "（未入力）"}\n\n` +
         `お客様への確認メール：${sent.ok ? "送信しました" : "送信できませんでした（お電話・メールでご連絡ください）"}\n` +
         `「お客様予約」カレンダーにも登録済みです。`

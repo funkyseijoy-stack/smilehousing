@@ -14,7 +14,8 @@ export const CLOSE_MIN = 17 * 60;
 export const LAST_START_MIN = 15 * 60 + 30;
 export const STEP = 30;
 export const DAYS_AHEAD = 28;
-export const LEAD_MIN = 60; // 当日は1時間後以降の開始のみ
+// お客様の予約は当日不可。翌日の分は前日のこの時刻（17:00）まで受け付ける（それ以降は翌々日から）
+export const CUTOFF_MIN = 17 * 60;
 export const BUFFER_AFTER_MIN = 60; // 予約と予約の間を1時間空ける（前の予定の終了直後は予約不可にする）
 export const WD = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -114,18 +115,19 @@ export async function buildDays(accessToken: string, store: any, from: string, t
     busy.push({ date: r.date, start: hmToMin(r.startTime), end: Math.min(24 * 60, hmToMin(r.endTime) + BUFFER_AFTER_MIN) });
   }
   const now = nowJst();
+  // 予約できる最初の日（当日は不可。17:00を過ぎたら翌日も不可）
+  const firstDate = addDays(now.date, now.min >= CUTOFF_MIN ? 2 : 1);
   const days: any[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) {
     const dow = dowOf(d);
     const base = { date: d, dow, wd: WD[dow] };
     if (dow === 0) { days.push({ ...base, status: "closed", reason: "日曜", slots: [] }); continue; }
     if (hol.has(d)) { days.push({ ...base, status: "closed", reason: "祝日", slots: [] }); continue; }
+    if (d < firstDate) { days.push({ ...base, status: "closed", reason: "受付終了", slots: [] }); continue; }
     const dayBusy = busy.filter((b) => b.date === d);
     const slots: { start: string; available: boolean }[] = [];
     for (let s = OPEN_MIN; s <= LAST_START_MIN; s += STEP) {
       let ok = !dayBusy.some((b) => s < b.end && b.start < s + duration);
-      if (d === now.date && s < now.min + LEAD_MIN) ok = false;
-      if (d < now.date) ok = false;
       slots.push({ start: toHM(s), available: ok });
     }
     days.push({ ...base, status: slots.some((x) => x.available) ? "open" : "full", slots });

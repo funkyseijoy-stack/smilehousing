@@ -48,6 +48,8 @@
   .slot{ border:1.5px solid var(--line2); background:var(--card); border-radius:12px; padding:12px 0; font-weight:700; cursor:pointer; color:var(--ink); }
   .slot:disabled{ background:transparent; border-color:var(--line); color:#c3b9b0; text-decoration:line-through; cursor:default; }
   .slot.on{ background:var(--brown); border-color:var(--brown); color:#fff; }
+  .durs{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .durs .slot small{ display:block; font-weight:400; font-size:.76rem; margin-top:3px; opacity:.8; }
   .hint{ color:var(--muted); font-size:.78rem; margin:10px 0 0; }
   .empty{ color:var(--muted); font-size:.88rem; text-align:center; padding:22px 10px; background:var(--card); border:1px dashed var(--line2); border-radius:14px; }
   label.f{ display:block; margin:0 0 14px; font-size:.84rem; font-weight:700; color:var(--ink2); }
@@ -83,7 +85,7 @@
 (function(){
   var WD = ["日","月","火","水","木","金","土"];
   var root = document.getElementById("root");
-  var st = { avail:null, loading:true, error:"", date:"", start:"", sending:false, formErr:"", done:null,
+  var st = { avail:null, loading:true, error:"", dur:120, date:"", start:"", sending:false, formErr:"", done:null,
              name:"", phone:"", email:"", notes:"" };
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
@@ -92,7 +94,7 @@
 
   function load(){
     st.loading = true; st.error = ""; render();
-    fetch("/api/public-booking", {cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||"error"); return j; }); })
+    fetch("/api/public-booking?d="+st.dur, {cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||"error"); return j; }); })
       .then(function(j){
         st.avail = j;
         if(st.date){ var d = dayOf(st.date); if(!d || d.status!=="open") { st.date=""; st.start=""; } }
@@ -105,7 +107,15 @@
   function headHtml(){
     return '<h1>ショールーム見学＆おうち相談</h1>'+
       '<p class="lead">ご希望の日時を選んで、お申し込みください。</p>'+
-      '<span class="pill">所要時間 約2時間</span>';
+      '<span class="pill">所要時間 約'+(st.dur/60)+'時間</span>';
+  }
+  // 所要時間（2時間／1時間）。選び直すと空き状況を取り直す
+  function durHtml(){
+    var opts = (st.avail && st.avail.durationOptions) || [120];
+    if(opts.length < 2) return "";
+    var desc = {120:"じっくりご相談", 60:"見学・短めのご相談"};
+    return '<div class="step"><span class="n">1</span>所要時間を選ぶ</div><div class="durs">'+
+      opts.map(function(m){ return '<button type="button" class="slot'+(st.dur===m?" on":"")+'" data-dur="'+m+'">約'+(m/60)+'時間<small>'+esc(desc[m]||"")+'</small></button>'; }).join("")+'</div>';
   }
 
   function calHtml(){
@@ -162,16 +172,17 @@
         '<div style="margin-top:14px;"><button class="btn" id="btnRetry">もう一度読み込む</button></div>';
       root.innerHTML = out; return;
     }
-    out += '<div class="step"><span class="n">1</span>日付を選ぶ</div>'+calHtml();
-    out += '<p class="hint">ご予約の開始時間 '+esc(st.avail.open)+'〜'+esc(st.avail.lastStart||st.avail.close)+'。日曜・祝日はお休みをいただいております。</p>';
+    var dh = durHtml(), n0 = dh ? 1 : 0;
+    out += dh + '<div class="step"><span class="n">'+(n0+1)+'</span>日付を選ぶ</div>'+calHtml();
+    out += '<p class="hint">ご予約の開始時間 '+esc(st.avail.open)+'〜'+esc(st.avail.lastStart||st.avail.close)+'。ご予約は前日の17時まで（当日のご予約はできません）。日曜・祝日はお休みをいただいております。</p>';
     var day = dayOf(st.date);
     if(day && day.status==="open"){
-      out += '<div class="step"><span class="n">2</span>開始時間を選ぶ</div><div class="slots">'+
+      out += '<div class="step"><span class="n">'+(n0+2)+'</span>開始時間を選ぶ</div><div class="slots">'+
         day.slots.map(function(sl){ return '<button type="button" class="slot'+(st.start===sl.start?" on":"")+'" data-start="'+sl.start+'"'+(sl.available?"":" disabled")+'>'+sl.start+'</button>'; }).join("")+'</div>'+
-        '<p class="hint">30分刻みで選べます（所要時間は約2時間です）。</p>';
+        '<p class="hint">30分刻みで選べます（所要時間は約'+(st.dur/60)+'時間です）。</p>';
     }
     if(st.date && st.start){
-      out += '<div class="step"><span class="n">3</span>お客様情報を入力</div>'+formHtml();
+      out += '<div class="step"><span class="n">'+(n0+3)+'</span>お客様情報を入力</div>'+formHtml();
     }
     root.innerHTML = out;
   }
@@ -196,7 +207,7 @@
     st.sending = true; st.formErr = ""; render();
     var web = document.getElementById("fWebsite");
     fetch("/api/public-booking", { method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ action:"book", date:st.date, start:st.start, name:name, phone:phone, email:email, notes:st.notes.trim(), website: web ? web.value : "" }) })
+      body: JSON.stringify({ action:"book", duration:st.dur, date:st.date, start:st.start, name:name, phone:phone, email:email, notes:st.notes.trim(), website: web ? web.value : "" }) })
     .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok, status:r.status, j:j}; }); })
     .then(function(res){
       st.sending = false;
@@ -214,6 +225,7 @@
 
   root.addEventListener("click", function(e){
     var t = e.target.closest("button"); if(!t) return;
+    if(t.dataset.dur){ readForm(); var m = parseInt(t.dataset.dur,10); if(m!==st.dur){ st.dur = m; st.start = ""; st.formErr = ""; load(); } return; }
     if(t.dataset.date){ readForm(); st.date = t.dataset.date; st.start = ""; st.formErr = ""; render(); return; }
     if(t.dataset.start){ readForm(); st.start = t.dataset.start; st.formErr = ""; render();
       var f = document.getElementById("fName"); if(f && f.scrollIntoView) f.scrollIntoView({behavior:"smooth", block:"center"}); return; }

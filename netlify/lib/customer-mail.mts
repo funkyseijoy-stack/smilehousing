@@ -26,7 +26,7 @@ export function confirmationMail(r: PublicBooking): { subject: string; body: str
       `下記の内容で承りました。\n\n` +
       `■ ご予約内容\n` +
       `種類：${type}\n` +
-      `日時：${dateTimeLabel(r)}（所要時間 約2時間）\n` +
+      `日時：${dateTimeLabel(r)}（所要時間 約${(r.durationMinutes || 120) / 60}時間）\n` +
       (r.notes ? `ご相談内容：${r.notes}\n` : "") +
       `\n当日は、お気をつけてお越しください。\n` +
       `ご予約の変更・キャンセルをご希望の場合や、ご不明な点がございましたら、このメールにご返信ください。\n` +
@@ -45,7 +45,7 @@ export function reminderMail(r: PublicBooking): { subject: string; body: string 
       `明日、下記のご予約をいただいております。\n\n` +
       `■ ご予約内容\n` +
       `種類：${type}\n` +
-      `日時：${dateTimeLabel(r)}（所要時間 約2時間）\n\n` +
+      `日時：${dateTimeLabel(r)}（所要時間 約${(r.durationMinutes || 120) / 60}時間）\n\n` +
       `ご都合が悪くなった場合や、日時を変更されたい場合は、このメールにご返信ください。\n` +
       `お会いできるのを楽しみにしております。\n` +
       CUSTOMER_MAIL_SIGNATURE,
