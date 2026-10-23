@@ -189,15 +189,17 @@ export async function sendTaskDoneMails(store: any, task: any, by: string) {
 // ---- 確認者の承認／差し戻し：担当者（いなければ作成者・指示者）へ知らせる ----
 export async function sendTaskReviewMail(store: any, task: any, by: string) {
   const r = task.review || {};
-  const name = task.assignee || task.creator || task.instructor || "";
+  const commented = r.result === "コメント";
+  // コメントは届け先（to）へ。届け先が無いコメントは誰にも送らない
+  const name = commented ? String(r.to || "") : (task.assignee || task.creator || task.instructor || "");
   if (!name) return false;
   let projectName = "";
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
   const approved = r.result === "承認";
   const replied = r.result === "返信";
-  const subject = "【住まいる】" + (replied ? "返信がありました" : approved ? "承認されました" : "差し戻されました") + "：" + String(task.content || "").replace(/\s+/g, " ").slice(0, 30);
+  const subject = "【住まいる】" + (commented ? (r.back ? "コメントで戻されました" : "コメントがありました") : replied ? "返信がありました" : approved ? "承認されました" : "差し戻されました") + "：" + String(task.content || "").replace(/\s+/g, " ").slice(0, 30);
   const body = [name + "さん", "",
-    (r.by || by ? (r.by || by) + "さんが、" : "") + (replied ? "次のタスクに返信しました。" : approved ? "次のタスクを承認しました。進めてください。" : "次のタスクを差し戻しました。内容を確認してください。"), "",
+    (r.by || by ? (r.by || by) + "さんが、" : "") + (commented ? (r.back ? "次のタスクにコメントして、あなたへ戻しました（進捗は「対応中」）。" : "次のタスクにコメントしました。") : replied ? "次のタスクに返信しました。" : approved ? "次のタスクを承認しました。進めてください。" : "次のタスクを差し戻しました。内容を確認してください。"), "",
     ...(r.note ? [(replied ? "返信：" : "コメント：") + String(r.note).slice(0, 1000), ""] : []),
     ...taskLines(task, projectName), "", "▼ 住まいるアプリを開く", APP_URL, "", MAIL_FOOTER].join("\n");
   const ok = name !== by ? await notifyStaff(store, name, subject, body) : false;
