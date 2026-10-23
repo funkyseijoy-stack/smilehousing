@@ -19,7 +19,8 @@ const CORS_HEADERS = {
 };
 // staff-auth.mts と同じ値にしてください。
 const STAFF_PASSPHRASE = "sumairu2026";
-const TYPES = ["来店", "オンライン", "銀行", "ショールーム", "現場"];
+// 「打合せ」はお客様が予約したときの種類（場所は未定）。スタッフがこの編集で来店・現場などに変える
+const TYPES = ["打合せ", "来店", "オンライン", "銀行", "ショールーム", "現場"];
 
 function json(obj: any, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -116,6 +117,31 @@ export default async (req: Request, context: Context) => {
     }
     // 日時を変えたので、前日リマインドは新しい日時で送り直す（まだ送っていない状態に戻す）
     if (r.reminderSentAt) delete next.reminderSentAt;
+  }
+
+  // 種類を変えたら、Googleカレンダーの予定名の先頭（「打合せ（○○様）」の「打合せ」）も合わせる
+  if (next.type !== r.type && r.type && r.googleEventId && r.source !== "public") {
+    let ok = false;
+    try {
+      const tk = await getAccessToken();
+      if (tk?.ok) {
+        const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CUSTOMER_CALENDAR_ID)}/events/${encodeURIComponent(r.googleEventId)}`;
+        const g = await fetch(u, { headers: { Authorization: "Bearer " + tk.accessToken } });
+        if (g.ok) {
+          const ev: any = await g.json();
+          const s = String(ev.summary || "");
+          if (s.startsWith(r.type)) {
+            const pr = await fetch(u, {
+              method: "PATCH",
+              headers: { Authorization: "Bearer " + tk.accessToken, "Content-Type": "application/json" },
+              body: JSON.stringify({ summary: next.type + s.slice(r.type.length) }),
+            });
+            ok = pr.ok;
+          } else ok = true; // 予定名を手で変えてある場合はそのまま
+        }
+      }
+    } catch { ok = false; }
+    calendarUpdated = calendarUpdated === false ? false : ok;
   }
 
   const now = new Date().toISOString();

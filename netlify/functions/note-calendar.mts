@@ -7,7 +7,7 @@ import { DURATION, DURATION_OPTIONS, OPEN_MIN, CLOSE_MIN, LAST_START_MIN, DAYS_A
 // 空き状況は Google カレンダー「お客様予約」＋ 住まいるアプリの予約（reservations）から判定し、
 // 予約が確定したら同カレンダーに予定を登録して、スタッフへ通知メールを送る。
 // 認証は note-data と同じ案件ごとの noteToken。初期の打合せ記録ページ（/kiroku/）の earlyToken でも予約できる
-// （そのときは種類を EARLY_TYPES に絞り、予約の source は "kiroku"）。
+// （そのときは予約の source は "kiroku"）。
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +21,12 @@ function json(obj: any, status = 200) {
   });
 }
 
-const TYPES = ["来店", "オンライン", "銀行", "ショールーム", "現場"];
-// 見込みのお客様（打合せ記録ページ）から選べる種類
-const EARLY_TYPES = ["来店", "オンライン", "ショールーム", "現場"];
-const ALL_DURATIONS = Array.from(new Set([DURATION, ...Object.values(DURATION_OPTIONS).flat()]));
+// お客様が選べる種類は「打合せ」「オンライン」だけ（おうちノート・打合せ記録ページ共通。どちらも一度お会いした方向け）。
+// 「打合せ」の場所（来店・銀行・ショールーム・現場）は、スタッフが住まいるアプリの予約の編集で決める。
+// 所要時間はどちらも2時間か1時間をお客様が選ぶ（最初の値が初期値）。
+const TYPES = ["打合せ", "オンライン"];
+const TYPE_DURATIONS: Record<string, number[]> = { "打合せ": [120, 60], "オンライン": [120, 60] };
+const ALL_DURATIONS = Array.from(new Set([DURATION, ...Object.values(DURATION_OPTIONS).flat(), ...Object.values(TYPE_DURATIONS).flat()]));
 
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -42,7 +44,7 @@ export default async (req: Request, context: Context) => {
   const viaNote = !!project.noteToken && project.noteToken === token;
   const viaEarly = !viaNote && !!project.earlyToken && project.earlyToken === token;
   if (!viaNote && !viaEarly) return json({ error: "forbidden" }, 403);
-  const types = viaEarly ? EARLY_TYPES : TYPES;
+  const types = TYPES;
   const pageName = viaEarly ? "打合せ記録ページ" : "おうちノート";
 
   const tk = await getAccessToken();
@@ -56,7 +58,7 @@ export default async (req: Request, context: Context) => {
       const dq = parseInt(url.searchParams.get("d") || "", 10);
       const dur = ALL_DURATIONS.includes(dq) ? dq : DURATION;
       const days = await buildDays(tk.accessToken, store, today, horizon, dur);
-      return json({ types, durationOptions: DURATION_OPTIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), lastStart: toHM(LAST_START_MIN), days });
+      return json({ types, durationOptions: TYPE_DURATIONS, durationMinutes: dur, open: toHM(OPEN_MIN), close: toHM(CLOSE_MIN), lastStart: toHM(LAST_START_MIN), days });
     }
 
     // ---------- 予約する ----------
@@ -66,8 +68,8 @@ export default async (req: Request, context: Context) => {
     const start = String(body.start || "");
     if (!types.includes(type)) return json({ error: "invalid_type" }, 400);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > horizon) return json({ error: "invalid_date" }, 400);
-    // 所要時間：選べる種類（現場）だけ選んだ値を使う。それ以外は2時間
-    const opts = DURATION_OPTIONS[type];
+    // 所要時間：選べる値だけ受け付ける（それ以外は初期値）
+    const opts = TYPE_DURATIONS[type];
     const dur = opts ? (opts.includes(Number(body.duration)) ? Number(body.duration) : opts[0]) : DURATION;
     // 直前に空きを取り直して、同じ枠が先に埋まっていないか確認する
     const days = await buildDays(tk.accessToken, store, date, date, dur);

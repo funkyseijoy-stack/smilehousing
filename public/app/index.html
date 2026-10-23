@@ -1947,7 +1947,7 @@
       </div>
       <div class="row" id="reTypeRow">
         <label class="field">種別<select id="reType">
-          <option value="来店">来店</option><option value="オンライン">オンライン</option>
+          <option value="打合せ">打合せ（場所未定）</option><option value="来店">来店</option><option value="オンライン">オンライン</option>
           <option value="銀行">銀行</option><option value="ショールーム">ショールーム</option><option value="現場">現場</option>
         </select></label>
         <label class="field">担当者<select id="reStaff"></select></label>
@@ -9042,8 +9042,8 @@
   }
 
   // ================= 予約・Googleカレンダー連携 =================
-  var RESERVATION_TYPES = ["来店","オンライン","銀行","ショールーム","現場"];
-  var RESERVATION_DEFAULT_DURATION = {"来店":120,"オンライン":120,"銀行":120,"ショールーム":120,"現場":120};
+  var RESERVATION_TYPES = ["打合せ","来店","オンライン","銀行","ショールーム","現場"];
+  var RESERVATION_DEFAULT_DURATION = {"打合せ":120,"来店":120,"オンライン":120,"銀行":120,"ショールーム":120,"現場":120};
   function populateResStartTimeOptions(){
     var sel = document.getElementById("resStartTime");
     if(!sel || sel.options.length) return;

@@ -129,7 +129,7 @@
   var P = qs.get("p"), T = qs.get("t");
   if(!P || !T){ main.innerHTML = '<div class="err">リンクが正しくありません。お送りしたリンクからもう一度開いてください。</div>'; return; }
   var data = null;
-  var rv = { type:"来店", dur:120, date:"", start:"", avail:null, loading:false, loaded:false, error:"", booking:false, open:false };
+  var rv = { type:"打合せ", dur:120, date:"", start:"", avail:null, loading:false, loaded:false, error:"", booking:false, open:false };
 
   fetch("/api/early-data?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T), {cache:"no-store"})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
@@ -237,14 +237,14 @@
     if(!box) return;
     var nb = document.getElementById("nextBox"); if(nb) nb.innerHTML = nextHtml();
     var out = "";
-    var types = (rv.avail && rv.avail.types) || ["来店","オンライン","ショールーム","現場"];
+    var types = (rv.avail && rv.avail.types) || ["打合せ","オンライン"];
     out += '<div class="rvstep">1. ご希望の内容</div><div class="rvtypes">'+types.map(function(t){
       var opt = rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[t];
       return '<button class="rvtype'+(rv.type===t?" on":"")+'" data-rvtype="'+esc(t)+'"><b>'+esc(t)+'</b><span>'+(opt?"1〜2時間":"2時間")+'</span></button>';
     }).join("")+'</div>';
     var durOpts = rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[rv.type];
     if(durOpts){
-      out += '<div class="rvstep">所要時間</div><div class="rvtypes">'+durOpts.map(function(m){
+      out += '<div class="rvstep">所要時間（1時間か2時間）</div><div class="rvtypes">'+durOpts.map(function(m){
         return '<button class="rvtype'+(needDur()===m?" on":"")+'" data-rvdur="'+m+'"><b>'+(m/60)+'時間</b></button>';
       }).join("")+'</div>';
     }

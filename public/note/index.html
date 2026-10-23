@@ -547,8 +547,8 @@
 
   var data = null;
   var view = { tab:"home", buildSeg:"spec", cat:null, imgFilter:"all", imgPlace:"LDK", imgBusy:false, specTab:{} };
-  var rv = { loaded:false, loading:false, error:"", avail:null, type:"来店", date:"", start:"", booking:false, dur:120 };
-  // 現場だけ、所要時間（2時間／1時間）を選べる。ほかの種類は2時間
+  var rv = { loaded:false, loading:false, error:"", avail:null, type:"打合せ", date:"", start:"", booking:false, dur:120 };
+  // 所要時間（2時間／1時間）。選べる値はサーバーの durationOptions
   function rvNeedDur(){ var o = rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[rv.type]; return o ? (o.indexOf(rv.dur)!==-1 ? rv.dur : o[0]) : 120; }
   var main = document.getElementById("main");
 
@@ -1086,6 +1086,7 @@ function homeHtml(){
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
       rv.avail = j; rv.loaded = true;
+      if(j.types && j.types.indexOf(rv.type)===-1) rv.type = j.types[0];
       if(!rv.date){ var f = j.days.filter(function(d){ return d.status==="open"; })[0]; if(f) rv.date = f.date; }
     }catch(e){ rv.error = "unavailable"; rv.loaded = true; }
     rv.loading = false; render();
@@ -1103,11 +1104,11 @@ function homeHtml(){
     if(up.length) out += '<div class="sechd"><h3>ご予約済み</h3></div><div class="catlist">'+up.map(function(r){ return card(r,false); }).join("")+'</div>';
 
     out += '<div class="rvstep">1. ご希望の内容</div><div class="rvtypes">';
-    var types = (rv.avail && rv.avail.types) || ["来店","オンライン","銀行","ショールーム","現場"];
+    var types = (rv.avail && rv.avail.types) || ["打合せ","オンライン"];
     out += types.map(function(t){ return '<button class="rvtype'+(rv.type===t?" on":"")+'" data-rvtype="'+esc(t)+'"><b>'+esc(t)+'</b><span>'+(rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[t] ? "1〜2時間" : "2時間")+'</span></button>'; }).join("")+'</div>';
     var durOpts = rv.avail && rv.avail.durationOptions && rv.avail.durationOptions[rv.type];
     if(durOpts){
-      out += '<div class="rvstep">所要時間</div><div class="rvtypes">'+durOpts.map(function(m){
+      out += '<div class="rvstep">所要時間（1時間か2時間）</div><div class="rvtypes">'+durOpts.map(function(m){
         return '<button class="rvtype'+(rvNeedDur()===m?" on":"")+'" data-rvdur="'+m+'"><b>'+(m/60)+'時間</b></button>';
       }).join("")+'</div>';
     }
