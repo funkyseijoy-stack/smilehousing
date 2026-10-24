@@ -3601,7 +3601,7 @@
       (t.vendorSpec ? '<div class="kc-part">'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
       '<div class="kc-meta">'+
         (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
-        (t.instructor?'<span>指示 '+escapeHtml(t.instructor)+'</span>':'')+
+        (t.instructor?'<span>指示 '+escapeHtml(t.instructor===CUSTOMER_INSTRUCTOR && proj && proj.customer ? CUSTOMER_INSTRUCTOR+'（'+proj.customer+'様）' : t.instructor)+'</span>':'')+
         (t.checker?'<span style="color:var(--orange); font-weight:700;">確認依頼 '+escapeHtml(t.checker)+'</span>':'')+
         fmtDeadline(t)+
       '</div>'+
@@ -11801,7 +11801,7 @@
     document.getElementById("tfNewProjRow").hidden = true;
     var staff = state.settings.staffList || [];
     document.getElementById("tfAssignee").innerHTML = staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
-    document.getElementById("tfInstructor").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
+    document.getElementById("tfInstructor").innerHTML = '<option value="">なし</option><option value="'+CUSTOMER_INSTRUCTOR+'">'+CUSTOMER_INSTRUCTOR+'</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     document.getElementById("tfChecker").innerHTML = '<option value="">なし</option>' + staff.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join("");
     renderTaskVendorBox([]);
     document.getElementById("tfContent").value = "";
@@ -12016,6 +12016,9 @@
       return '<div class="kc-memo" style="border-left-color:'+lk[1]+'; white-space:pre-wrap;"><b>'+lk[0]+'</b>（'+escapeHtml(r.by||"")+(r.to?' → '+escapeHtml(r.to):'')+(when?'・'+when:'')+'）'+(r.note?'\n'+escapeHtml(r.note):'')+'</div>';
     }).join("");
   }
+  // 指示者には「お客様」も選べる（スタッフではないので通知の宛先にはしない）
+  var CUSTOMER_INSTRUCTOR = "お客様";
+  function staffInstructor(t){ return t && t.instructor && t.instructor!==CUSTOMER_INSTRUCTOR ? t.instructor : ""; }
   // コメントして担当者へ戻す（担当者以外の全員）／担当者からのコメント（返事）。
   // やりとりは確認者の承認・返信と同じ t.reviews に result:"コメント"・to（届け先）で積み、
   // t.review を最新にする（サーバーが review.at の変化を見て to の人へ通知する）。
@@ -12036,7 +12039,7 @@
     if(back) to = t.assignee;
     else {
       var prev = taskReviewList(t).slice().reverse().find(function(r){ return r.by && r.by!==me; });
-      to = (prev && prev.by) || t.instructor || t.creator || "";
+      to = (prev && prev.by) || staffInstructor(t) || t.creator || "";
       if(to===me) to = "";
     }
     var note = await askComment(back ? "💬 コメントして戻す" : "💬 コメント",
@@ -12108,7 +12111,7 @@
   function askReportTo(t){
     return new Promise(function(resolve){
       var me = state.currentUser || "";
-      var def = t.instructor || t.creator || "";
+      var def = staffInstructor(t) || t.creator || "";
       var chk = t.checker || "";
       var staff = (state.settings.staffList||[]).filter(function(n){ return n!==me; });
       if(Array.isArray(t.reportTo)) def = null;

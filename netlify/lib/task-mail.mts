@@ -171,7 +171,8 @@ export async function sendTaskDoneMails(store: any, task: any, by: string) {
     for (const n of task.reportTo) { const s = String(n || "").trim(); if (s) names.add(s.slice(0, 30)); }
   } else {
     // 画面を通さずに完了になった場合（古い画面など）は、依頼者だけに知らせる
-    const requester = task.instructor || task.creator || "";
+    // 指示者が「お客様」のときはスタッフではないので作成者へ
+    const requester = (task.instructor && task.instructor !== "お客様" ? task.instructor : "") || task.creator || "";
     if (requester) names.add(requester);
   }
   names.add(ALL_NOTICE_NAME);
@@ -191,7 +192,7 @@ export async function sendTaskReviewMail(store: any, task: any, by: string) {
   const r = task.review || {};
   const commented = r.result === "コメント";
   // コメントは届け先（to）へ。届け先が無いコメントは誰にも送らない
-  const name = commented ? String(r.to || "") : (task.assignee || task.creator || task.instructor || "");
+  const name = commented ? String(r.to || "") : (task.assignee || task.creator || (task.instructor !== "お客様" ? task.instructor : "") || "");
   if (!name) return false;
   let projectName = "";
   if (task.projectId) { const p: any = await store.get("projects/" + task.projectId, { type: "json" }); projectName = (p && p.name) || ""; }
