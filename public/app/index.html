@@ -6851,7 +6851,7 @@
   function specOpsHtml(id, inner){
     return '<details class="spectl-ops"'+(specOpsOpen[id]?' open':'')+'><summary data-specops="'+id+'">⋯ 操作</summary>'+inner+'</details>';
   }
-  function quoteTimelineCardHtml(a, opsId){
+  function quoteTimelineCardHtml(a, opsId, drawCtx){
     var ct = String(a.contentType||""), url = a.url||"#";
     var thumb = ct.indexOf("pdf")>=0 || /\.pdf$/i.test(a.name||"") ? pdfThumbInnerHtml(url)
       : (ct.indexOf("image/")===0 ? '<img src="'+escapeHtml(url)+'" alt="">' : '📄');
@@ -6871,12 +6871,43 @@
         '<span class="pill small spectl-type-vendor">見積から</span>'+quotePill(a.quoteType)+
         (a.reflected && sharable ? '<span class="pill reflect small on">✓反映済み</span>' : '')+
       '</div>'+
-      '<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml((from?from+"より：":"")+(a.name||""))+'</div></div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml((from?from+"より：":"")+(a.name||""))+'</div>'+
+      (drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx) : '')+'</div>'+
       specOpsHtml(opsId, ops)+
       '</div>';
   }
+  // 変更履歴の写真・PDFに「✏️ 書き込む」。押すとプランボードで開き、保存すると
+  // 同じ部位の変更履歴に新しいカード（書き込んだ版・お客様には未反映）として入る。元のファイルはそのまま。
+  var specDrawReg = {};
+  function specDrawable(f){ var ct = String((f&&f.contentType)||""); return !!(f && f.url) && (ct.indexOf("pdf")>=0 || ct.indexOf("image/")===0 || /\.pdf$/i.test(f.name||f.fileName||"")); }
+  function specDrawBtnsHtml(key, files, ctx){
+    var list = (files||[]).filter(specDrawable);
+    if(!list.length) return "";
+    return '<div class="row" style="gap:6px; flex-wrap:wrap; margin-block-start:6px;">'+list.map(function(f, i){
+      var k = key+":"+i;
+      specDrawReg[k] = { url:f.url, isPdf: String(f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||f.fileName||""), name: f.name||f.fileName||"", scope:ctx.scope, category:ctx.category, roomId:ctx.roomId, side:ctx.side };
+      return '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-draw="'+escapeHtml(k)+'" title="プランボードで書き込む（元の図面はそのまま残り、書き込んだ版が新しい変更履歴になります）">✏️ '+(list.length>1?(i+1)+'枚目に書き込む':'書き込む')+'</button>';
+    }).join("")+'</div>';
+  }
+  function openSpecDraw(k){
+    var d = specDrawReg[k]; if(!d) return;
+    document.getElementById("pbModal").hidden = false;
+    pb.currentAttachmentId = null;
+    pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
+    pbUpdatePdfPageNav();
+    var base = String(d.name||"").replace(/\.[^.]+$/,"") || "図面";
+    pb.saveTarget = { type:"spec", scope:d.scope, category:d.category||null, roomId:d.roomId||null, side:d.side||null, kind:"planboard", asNewOnly:true,
+      fileName: base+"_書き込み_"+todayStr().slice(5).replace("-","")+".png" };
+    document.getElementById("pbMailTo").value = "";
+    document.getElementById("pbMailSubject").value = "";
+    document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
+    fetch(d.url).then(function(res){ if(!res.ok) throw new Error("fetch failed"); return res.blob(); })
+      .then(function(blob){ pbLoadFromBlob(blob, d.isPdf); })
+      .catch(function(){ toast("図面の読み込みに失敗しました"); });
+  }
   function renderSpecTimeline(scope, category, roomId, side){
     var rel = relatedPartHtml(scope, category, roomId);
+    var drawCtx = { scope:scope, category:category, roomId:roomId, side:side };
     var rows = specPhotosFor(scope, category, roomId, side).slice();
     // 見積から取り込んだプランボード・定価などもここに並べる（反映＝おうちノートに出すかは書類側の reflected）
     quoteDocsForPart(scope, category, roomId, side).forEach(function(a){
@@ -6887,7 +6918,7 @@
     // するが「日付でグループ化して見やすくする」だけに留め、時系列自体は崩さない。
     rows.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
     var cards = rows.map(function(p){
-      if(p.__att) return quoteTimelineCardHtml(p.__att, p.id);
+      if(p.__att) return quoteTimelineCardHtml(p.__att, p.id, drawCtx);
       var typeLabel, typeClass, snippet;
       if(p.kind==="note"){
         typeLabel = "打ち合わせ記録"; typeClass = "spectl-type-note";
@@ -6982,13 +7013,14 @@
           '<div class="spectl-meta">'+metaHtml+'</div>'+
           '</div>'+
           fileThumbRowHtml(noteFiles, 84)+
+          specDrawBtnsHtml(p.id, noteFiles, drawCtx)+
           memoHtml+
           specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
           '</div>';
       }
       return '<div class="'+cardClass+'">'+
         thumbHtml+
-        '<div class="spectl-meta">'+metaHtml+'</div>'+
+        '<div class="spectl-meta">'+metaHtml+(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], drawCtx) : '')+'</div>'+
         sentBadgesHtml+
         memoHtml+
         specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
@@ -13074,7 +13106,7 @@
   async function pbSaveSpecAsNew(target, blob){
     try{
       var res2 = await assets.upload(blob, {type:"image/png"});
-      var name2 = (target.category||"プランボード") + "_" + todayStr() + ".png";
+      var name2 = target.fileName || ((target.category||"プランボード") + "_" + todayStr() + ".png");
       // 既存の写真を編集した場合は元の種類（写真/プランボード）を引き継ぐ。
       // target.kindが無い場合（白紙から新規作成・新しい図面の取り込み）は
       // これまで通り、設備仕様の図面はプランボード扱いにする。
@@ -13087,7 +13119,7 @@
       render();
       await saveDoc("specPhotos", doc.id, doc);
       logActivity(target.category+"のプランボードを保存しました");
-      toast("新しい写真として保存しました");
+      toast(target.asNewOnly ? "書き込んだ図面を変更履歴に保存しました（お客様にはまだ出ていません。出すときは「反映する」）" : "新しい写真として保存しました");
       closePlanBoard();
     }catch(e){ toast("保存に失敗しました"); }
   }
@@ -13112,7 +13144,7 @@
       var target = pb.saveTarget || {type:"attachment"};
       if(target.type === "note"){ await pbSaveToNoteForm(target, blob); return; }
       if(target.type === "spec"){
-        if(target.sourcePhotoId){
+        if(target.sourcePhotoId && !target.asNewOnly){
           await new Promise(function(resolve){
             askChoice("保存方法を選んでください", "編集前の写真をどうしますか？", [
               {label:"上書き保存する（編集前は残らない）", value:"overwrite"},
@@ -13801,6 +13833,8 @@
         if(qhear){ quoteToHearing(qhear.dataset.specQuotehearing); return; }
         var qpart = e.target.closest("[data-spec-quotepart]");
         if(qpart){ setQuotePart(qpart.dataset.specQuotepart); return; }
+        var spdraw = e.target.closest("[data-spec-draw]");
+        if(spdraw){ openSpecDraw(spdraw.dataset.specDraw); return; }
         var spedit = e.target.closest("[data-spec-edit]");
         if(spedit){ openSpecEdit(spedit.dataset.specEdit); return; }
         var sptask = e.target.closest("[data-spec-taskmenu]");
