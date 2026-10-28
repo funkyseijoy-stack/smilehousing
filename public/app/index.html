@@ -13024,57 +13024,61 @@
     if(scope==="interiorColor") return interiorColorCatsFor(proj).map(function(c){ return c.name; });
     return [];
   }
+  // 部位を選ぶ画面：記録の一覧の絞り込みと同じ「プルダウン2段（部位→項目・部屋）」。インテリアのメインは項目（表・裏）まで選べる
   function askSpecPart(callback, projectId){
     var proj = projectById(projectId || state.currentProjectId);
-    var groups = [
-      {label:"🏠 外部", value:"exterior"},
-      {label:"🔥 暖房設備", value:"eq:暖房設備"},
-      {label:"🌀 換気設備", value:"eq:換気設備"},
-      {label:"🔌 電気配線", value:"eq:電気配線"},
-      {label:"💡 あかりプラン", value:"eq:あかりプラン"},
-      {label:"🚿 水まわり", value:"facility"},
-      {label:"🎨 インテリア（メイン・各部屋）", value:"int"},
-      {label:"🔧 外部散水栓・インターホンなど", value:"siteCheck"},
-      {label:"📋 総合（部位を限定しない）", value:"general"},
-      {label:"🔒 社内だけ（基礎・足場）", value:"internal"}
-    ];
-    if(customPartsOf(proj).length) groups.push({label:"📌 追加した部位（この案件だけ）", value:"custom"});
-    askChoice("部位を選択", "どの部位の記録・依頼ですか？", groups, function(scope){
-      if(!scope){ callback(null); return; }
-      if(scope.indexOf("eq:")===0){
-        var ec = scope.slice(3);
-        callback({scope:"equipment", category:ec, roomId:null, side:null, label:ec});
-        return;
+    var bigs = recBigs(proj).map(function(b){
+      if(b.key!=="int") return b;
+      return {key:b.key, label:b.label, subs:b.subs.filter(function(x){ return x.key!=="r:"; })};
+    });
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:var(--surface);border-radius:16px;padding:18px;max-width:420px;width:100%;box-shadow:var(--shadow);";
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    var st = {big:"", sub:"", item:""};
+    var opt = function(v, label, on){ return '<option value="'+escapeHtml(v)+'"'+(on?" selected":"")+'>'+escapeHtml(label)+'</option>'; };
+    function cur(){ return bigs.filter(function(b){ return b.key===st.big; })[0]; }
+    function result(){
+      var b = cur();
+      if(!b) return null;
+      if(b.key==="int" && st.sub==="main" && st.item){
+        var i = st.item.lastIndexOf("|"), cat = st.item.slice(0, i), side = st.item.slice(i+1);
+        return {scope:"interiorColor", category:cat, roomId:null, side:side, label:cat+"（"+side+"）"};
       }
-      if(scope==="custom"){
-        askChoice("追加した部位を選択", "", customPartsOf(proj).map(function(c){ return {label:c.name, value:c.id}; }), function(id){
-          if(!id){ callback(null); return; }
-          callback({scope:"custom", category:id, roomId:null, side:null, label:customPartName(proj,id)});
-        });
-        return;
+      return recLeafPart(st.big, st.sub, proj);
+    }
+    function draw(){
+      var b = cur();
+      var html = '<h3 style="margin:0 0 4px;">部位を選択</h3><p class="muted" style="margin:0 0 12px; font-size:.85rem;">どの部位の記録・依頼ですか？</p>'+
+        '<label class="field">部位<select data-spbig>'+opt("", "選んでください", !st.big)+
+        bigs.map(function(x){ return opt(x.key, x.label, x.key===st.big); }).join("")+'</select></label>';
+      if(b && (b.subs.length || b.key==="int")){
+        html += '<label class="field">'+(b.key==="int"?"メイン・部屋":"項目")+'<select data-spsub>'+opt("", "選んでください", !st.sub)+
+          b.subs.map(function(x){ return opt(x.key, x.label, x.key===st.sub); }).join("")+
+          (b.key==="int" ? opt("__addroom", "＋ 新しい部屋を追加…", false) : "")+'</select></label>';
       }
-      if(scope==="int"){
-        // インテリア：メイン（家全体）か部屋か。部屋はその場で追加もできる
-        var rooms = (proj && proj.rooms) || [];
-        askChoice("🎨 インテリア：どこですか？", "", [{label:"メイン（家全体の基本色・内装プランなど）", value:"main"}]
-          .concat(rooms.map(function(r){ return {label:r.name, value:"r:"+r.id}; }))
-          .concat([{label:"＋ 新しい部屋を追加", value:"new"}]), function(v){
-          if(!v){ callback(null); return; }
-          if(v==="main"){
-            var ics = specPartCategoryList("interiorColor", proj);
-            askChoice("🎨 メイン：項目を選択", "", [{label:"項目を選ばない（インテリア全体・内装プランなど）", value:"__all"}].concat(ics.map(function(c){ return {label:c, value:c}; })), function(cat){
-              if(!cat){ callback(null); return; }
-              if(cat==="__all"){ callback({scope:"interiorColor", category:null, roomId:null, side:null, label:"インテリア全体"}); return; }
-              askChoice("表・裏を選択", "", [{label:"表", value:"表"},{label:"裏", value:"裏"}], function(side){
-                if(!side){ callback(null); return; }
-                callback({scope:"interiorColor", category:cat, roomId:null, side:side, label:cat+"（"+side+"）"});
-              });
-            });
-            return;
-          }
-          if(v==="new"){
-            var name = (prompt("追加する部屋の名前（例：LDK、寝室、子ども部屋、和室）")||"").trim();
-            if(!name || !proj){ callback(null); return; }
+      if(b && b.key==="int" && st.sub==="main"){
+        var ics = specPartCategoryList("interiorColor", proj);
+        html += '<label class="field">項目<select data-spitem>'+opt("", "項目を選ばない（インテリア全体・内装プランなど）", !st.item)+
+          ics.map(function(c){ return opt(c+"|表", c+"（表）", st.item===c+"|表")+opt(c+"|裏", c+"（裏）", st.item===c+"|裏"); }).join("")+'</select></label>';
+      }
+      var ok = !!result();
+      html += '<div style="display:flex; flex-direction:column; gap:8px; margin-block-start:14px;">'+
+        '<button class="btn" type="button" data-spok style="width:100%;"'+(ok?"":" disabled")+'>この部位にする</button>'+
+        '<button class="btn secondary" type="button" data-spcancel style="width:100%;">キャンセル</button></div>';
+      box.innerHTML = html;
+    }
+    function done(v){ overlay.remove(); callback(v); }
+    box.addEventListener("change", function(e){
+      var t = e.target;
+      if(t.matches("[data-spbig]")){ st.big = t.value; st.sub = ""; st.item = ""; draw(); return; }
+      if(t.matches("[data-spsub]")){
+        if(t.value==="__addroom"){
+          var name = (prompt("追加する部屋の名前（例：LDK、寝室、子ども部屋、和室）")||"").trim();
+          if(name && proj){
+            var rooms = recRoomsOf(proj);
             var hit = rooms.find(function(r){ return r.name===name; });
             if(!hit){
               hit = {id:uid("room"), name:name, accentNote:""};
@@ -13082,51 +13086,21 @@
               saveDoc("projects", proj.id, proj);
               logActivity("部屋「"+name+"」を追加しました");
             }
-            callback({scope:"room", category:null, roomId:hit.id, side:null, label:hit.name});
-            return;
+            var ib = cur();
+            if(ib && !ib.subs.some(function(x){ return x.key==="r:"+hit.id; })) ib.subs.push({key:"r:"+hit.id, label:hit.name});
+            st.sub = "r:"+hit.id;
           }
-          var rid = v.slice(2), room = rooms.find(function(r){ return r.id===rid; });
-          callback({scope:"room", category:null, roomId:rid, side:null, label: room ? room.name : "部屋"});
-        });
-        return;
-      }
-      if(scope==="ic:all"){
-        // インテリア全体：メインクロスなどの項目・表裏を選ばずに決める（お客様画面はインテリアのメインに出る）
-        callback({scope:"interiorColor", category:null, roomId:null, side:null, label:"インテリア全体"});
-        return;
-      }
-      if(scope==="general"){
-        callback({scope:"general", category:null, roomId:null, side:null, label:"総合"});
-        return;
-      }
-      if(scope==="room"){
-        // 部屋は選ばない（部屋別インテリアのまとめとして記録する）
-        callback({scope:"room", category:null, roomId:null, side:null, label:"インテリア：部屋別"});
-        return;
-      }
-      if(scope==="exterior"){
-        // 外部：外壁・屋根…の項目まで選べる（記録の一覧で項目ごとに絞り込めるように）。選ばなければ「外部全体」
-        askChoice("🏠 外部：項目を選択", "", [{label:"項目を選ばない（外部全体）", value:"__all"}].concat(EXTERIOR_CATS.map(function(c){ return {label:c, value:c}; })), function(cat){
-          if(!cat){ callback(null); return; }
-          if(cat==="__all"){ callback({scope:"exterior", category:null, roomId:null, side:null, label:"外部"}); return; }
-          callback({scope:"exterior", category:cat, roomId:null, side:null, label:cat});
-        });
-        return;
-      }
-      var cats = specPartCategoryList(scope, proj);
-      if(!cats.length){ toast("選べるカテゴリーがありません"); callback(null); return; }
-      askChoice((PART_BIG[scope]?PART_BIG[scope].icon+" "+PART_BIG[scope].name:"")+"：項目を選択", "", cats.map(function(c){ return {label:(PART_ITEM_ALIAS[c]||c), value:c}; }), function(cat){
-        if(!cat){ callback(null); return; }
-        if(scope==="interiorColor"){
-          askChoice("表・裏を選択", "", [{label:"表", value:"表"},{label:"裏", value:"裏"}], function(side){
-            if(!side){ callback(null); return; }
-            callback({scope:scope, category:cat, roomId:null, side:side, label:cat+"（"+side+"）"});
-          });
-          return;
+          draw(); return;
         }
-        callback({scope:scope, category:cat, roomId:null, side:null, label:(PART_ITEM_ALIAS[cat]||cat)});
-      });
+        st.sub = t.value; st.item = ""; draw(); return;
+      }
+      if(t.matches("[data-spitem]")){ st.item = t.value; draw(); return; }
     });
+    box.addEventListener("click", function(e){
+      if(e.target.closest("[data-spcancel]")){ done(null); return; }
+      if(e.target.closest("[data-spok]")){ var r = result(); if(r) done(r); }
+    });
+    draw();
   }
 
   // 複数ページのPDFから、書き出したいページを自由に選べる簡易ピッカー。
