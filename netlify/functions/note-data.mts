@@ -478,6 +478,8 @@ export default async (req: Request, context: Context) => {
       type: "photo",
       isQuote: true,
       quoteType: qt,
+      // スタッフが書いた「お客様へのひとこと」（社内コメント staffMemo は出さない）
+      msg: String(a.customerNote || "").slice(0, 500),
       at: a.reflectedAt || a.uploadedAt || "",
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,

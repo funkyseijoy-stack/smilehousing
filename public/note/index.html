@@ -1311,6 +1311,7 @@ function homeHtml(){
             var x = it.x;
             return '<div class="fcard'+(it.plain?'':' st-'+esc(x.cardStatus||"検討中"))+'">'+
               '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>'+
+              (x.msg ? '<div class="section-item-desc" style="font-size:.9rem;"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>' : '')+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
               (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true))+'</div>';
           }
