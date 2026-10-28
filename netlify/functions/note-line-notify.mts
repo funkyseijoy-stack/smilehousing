@@ -7,7 +7,7 @@ import { getStore } from "@netlify/blobs";
 // 「外部システム連携用タグ発動用URL」（https://autosns.jp/api/call-beacon/XXXX/[[uid]]）の
 // [[uid]] を、案件に登録したお客様のプロラインID（uid）に置き換えて呼び出す。
 // - 発動用URLは、業者・設定タブで入力し settings/main.prolineBeaconUrl に保存（リポジトリには書かない）。
-// - お客様のプロラインIDは、案件の「おうちノート連携」タブで入力し projects/<id>.prolineUid に保存。
+// - 送る人のプロラインIDは、案件の「おうちノート連携」タブで入力し projects/<id>.prolineUids=[{uid,name}] に保存（複数可・全員に送る。以前の prolineUid も読む）。
 // - 文面はプロライン側のシナリオで設定する（このプログラムでは文面を持たない）。
 // 認証は他の機能と同じ合言葉（X-Staff-Token）。
 const CORS_HEADERS = {
@@ -39,23 +39,31 @@ export default async (req: Request, context: Context) => {
   const store = getStore("staffData");
   const project: any = await store.get(`projects/${projectId}`, { type: "json" });
   if (!project || project.deletedAt) return json({ error: "not_found" }, 404);
-  const uid = String(project.prolineUid || "").trim();
-  if (!uid) return json({ ok: false, error: "no_uid" }, 400);
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(uid)) return json({ ok: false, error: "bad_uid" }, 400);
+  // 送る人：prolineUids=[{uid,name}]（以前の1人だけの prolineUid も読む）
+  const list: string[] = Array.isArray(project.prolineUids)
+    ? project.prolineUids.map((r: any) => String((r && r.uid) || "").trim()).filter(Boolean)
+    : (project.prolineUid ? [String(project.prolineUid).trim()] : []);
+  const uids = Array.from(new Set(list)).slice(0, 10);
+  if (!uids.length) return json({ ok: false, error: "no_uid" }, 400);
+  if (uids.some((u) => !/^[A-Za-z0-9_-]{1,64}$/.test(u))) return json({ ok: false, error: "bad_uid" }, 400);
 
   const settings: any = await store.get("settings/main", { type: "json" });
   const beacon = String((settings && settings.prolineBeaconUrl) || "").trim();
   if (!beacon) return json({ ok: false, error: "no_beacon" }, 400);
   if (!beacon.startsWith(BEACON_PREFIX) || !beacon.includes("[[uid]]")) return json({ ok: false, error: "bad_beacon" }, 400);
 
-  const url = beacon.replace("[[uid]]", encodeURIComponent(uid));
-  try {
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) return json({ ok: false, error: "proline_failed", status: res.status }, 502);
-  } catch {
-    return json({ ok: false, error: "proline_unreachable" }, 502);
+  const failed: string[] = [];
+  for (const uid of uids) {
+    try {
+      const res = await fetch(beacon.replace("[[uid]]", encodeURIComponent(uid)), { method: "GET" });
+      if (!res.ok) failed.push(uid);
+    } catch {
+      failed.push(uid);
+    }
   }
-  return json({ ok: true, sent: true });
+  const sent = uids.length - failed.length;
+  if (!sent) return json({ ok: false, error: "proline_failed", failed }, 502);
+  return json({ ok: true, sent, failed });
 };
 
 export const config: Config = {

@@ -1315,8 +1315,10 @@
           <div id="lineNotifyBox" style="margin-block-start:12px; padding:10px; background:var(--surface-2); border-radius:9px;">
             <div style="font-weight:700; font-size:.9rem;">📱 LINEでお知らせ（プロライン経由）</div>
             <p class="muted help" style="margin:4px 0 8px; font-size:.85rem;">押したときだけ、お客様のLINEに「おうちノートが更新されました。」が届きます（文面はプロラインのシナリオで設定）。プロラインIDは、プロラインの友だちの詳細画面に出る英数字のユーザーID（uid）です。</p>
-            <div class="row" style="gap:6px; flex-wrap:wrap; align-items:flex-end;">
-              <label class="field" style="margin:0; flex:1; min-width:180px;">お客様のプロラインID<input type="text" id="prolineUidInput" autocomplete="off" placeholder="例：abc1234"></label>
+            <div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">送る人（プロラインID）</div>
+            <div id="prolineUidRows" style="display:flex; flex-direction:column; gap:6px;"></div>
+            <div class="row" style="gap:6px; flex-wrap:wrap; margin-block-start:6px;">
+              <button class="btn secondary small" id="btnProlineUidAdd">＋ 送る人を追加</button>
               <button class="btn secondary small" id="btnProlineUidSave">保存</button>
             </div>
             <button class="btn small" id="btnLineNotify" style="margin-block-start:8px;" disabled>📱 LINEで「おうちノートが更新されました」を送る</button>
@@ -3300,46 +3302,102 @@
     if(ok){ logActivity("新しいおうちノートのリンクを発行しました"); toast("✅ リンクを発行しました"); }
   }
   // ── お客様へのLINE通知（プロライン経由。/api/note-line-notify） ──
+  // 送る人の一覧（以前の1人だけの prolineUid も読む）
+  function prolineRecipients(proj){
+    if(!proj) return [];
+    if(Array.isArray(proj.prolineUids)) return proj.prolineUids.filter(function(r){ return r && r.uid; });
+    return proj.prolineUid ? [{ uid: proj.prolineUid, name: "" }] : [];
+  }
+  var prolineRowsDraft = null; // 編集中の行（保存までは画面だけ）
+  var prolineDraftPid = null;  // 編集中の行がどの案件のものか
+  function prolineRowHtml(r, i){
+    return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">'+
+      '<input type="text" autocomplete="off" data-plname="'+i+'" value="'+escapeHtml(r.name||"")+'" placeholder="名前（例：ご主人）" style="flex:1; min-width:110px;">'+
+      '<input type="text" autocomplete="off" data-pluid="'+i+'" value="'+escapeHtml(r.uid||"")+'" placeholder="プロラインID（例：abc1234）" style="flex:1; min-width:150px;">'+
+      '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>';
+  }
+  function readProlineRows(){
+    var rows = [];
+    document.querySelectorAll("#prolineUidRows [data-pluid]").forEach(function(inp){
+      var i = inp.dataset.pluid;
+      var nm = document.querySelector('#prolineUidRows [data-plname="'+i+'"]');
+      rows.push({ uid: (inp.value||"").trim(), name: (nm && nm.value || "").trim() });
+    });
+    return rows;
+  }
   function renderLineNotifyBox(proj){
-    var inp = document.getElementById("prolineUidInput");
+    var wrap = document.getElementById("prolineUidRows");
     var btn = document.getElementById("btnLineNotify");
     var st = document.getElementById("lineNotifyStatus");
-    if(!inp || !btn) return;
-    if(document.activeElement !== inp) inp.value = (proj && proj.prolineUid) || "";
-    var hasUid = !!(proj && proj.prolineUid);
+    if(!wrap || !btn) return;
+    var editing = wrap.contains(document.activeElement);
+    if(!editing){
+      if(prolineDraftPid !== (proj && proj.id)){ prolineRowsDraft = null; prolineDraftPid = proj && proj.id; }
+      var rows = prolineRowsDraft || prolineRecipients(proj).map(function(r){ return { uid:r.uid, name:r.name||"" }; });
+      if(!rows.length) rows = [{ uid:"", name:"" }];
+      wrap.innerHTML = rows.map(prolineRowHtml).join("");
+    }
+    var saved = prolineRecipients(proj);
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
-    btn.disabled = !(hasUid && hasBeacon);
+    btn.disabled = !(saved.length && hasBeacon);
+    btn.textContent = saved.length > 1 ? "📱 LINEで「おうちノートが更新されました」を送る（"+saved.length+"人）" : "📱 LINEで「おうちノートが更新されました」を送る";
     var last = proj && proj.lineNotifiedAt;
     st.textContent = !hasBeacon ? "「業者・設定」タブで、プロラインの発動用URLを先に保存してください。"
-      : !hasUid ? "お客様のプロラインIDを入れて保存すると、送れるようになります。"
+      : !saved.length ? "送る人のプロラインIDを入れて保存すると、送れるようになります。"
       : (last ? "前回の送信：" + String(last).slice(0,16).replace("T"," ") + (proj.lineNotifiedBy ? "（"+proj.lineNotifiedBy+"）" : "") : "");
+  }
+  function addProlineRow(){
+    var rows = readProlineRows(); rows.push({ uid:"", name:"" });
+    prolineRowsDraft = rows;
+    renderLineNotifyBox(projectById(state.currentProjectId));
+    var last = document.querySelectorAll("#prolineUidRows [data-plname]");
+    if(last.length) last[last.length-1].focus();
+  }
+  function removeProlineRow(i){
+    var rows = readProlineRows(); rows.splice(Number(i),1);
+    if(!rows.length) rows = [{ uid:"", name:"" }];
+    prolineRowsDraft = rows;
+    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+    renderLineNotifyBox(projectById(state.currentProjectId));
   }
   async function saveProlineUid(){
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
-    var v = (document.getElementById("prolineUidInput").value||"").trim();
-    if(v && !/^[A-Za-z0-9_-]{1,64}$/.test(v)){ toast("プロラインIDは英数字だけで入れてください"); return; }
-    proj.prolineUid = v;
+    var rows = readProlineRows().filter(function(r){ return r.uid; });
+    for(var i=0;i<rows.length;i++){
+      if(!/^[A-Za-z0-9_-]{1,64}$/.test(rows[i].uid)){ toast("プロラインIDは英数字だけで入れてください（"+rows[i].uid+"）"); return; }
+    }
+    var seen = {}; rows = rows.filter(function(r){ if(seen[r.uid]) return false; seen[r.uid]=1; return true; });
+    proj.prolineUids = rows;
+    delete proj.prolineUid;
     var ok = await saveDoc("projects", proj.id, proj);
-    toast(ok===false ? "保存できませんでした" : (v ? "プロラインIDを保存しました" : "プロラインIDを消しました"));
+    prolineRowsDraft = null;
+    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+    toast(ok===false ? "保存できませんでした" : (rows.length ? "送る人を保存しました（"+rows.length+"人）" : "送る人を消しました"));
     renderLineNotifyBox(proj);
   }
   var lineNotifying = false;
   async function sendLineNotify(){
     var proj = projectById(state.currentProjectId);
-    if(!proj || !proj.prolineUid || lineNotifying) return;
-    if(!confirm((proj.customer||proj.name||"お客様")+" のLINEに「おうちノートが更新されました。」を送りますか？")) return;
+    var recips = prolineRecipients(proj);
+    if(!proj || !recips.length || lineNotifying) return;
+    var who = recips.map(function(r){ return r.name || r.uid; }).join("、");
+    if(!confirm((proj.customer||proj.name||"お客様")+"（"+who+"）のLINEに「おうちノートが更新されました。」を送りますか？")) return;
     lineNotifying = true;
     var btn = document.getElementById("btnLineNotify"); if(btn) btn.disabled = true;
     try{
       var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: proj.id }) });
       var data = {}; try{ data = await res.json(); }catch(e){}
+      if(res.ok && data.ok && data.failed && data.failed.length){
+        var fn = data.failed.map(function(u){ var r = recips.find(function(x){ return x.uid===u; }); return (r && r.name) || u; }).join("、");
+        toast("⚠ "+data.sent+"人に送りました。送れなかった人：" + fn);
+      }
       if(res.ok && data.ok){
         proj.lineNotifiedAt = new Date().toISOString();
         proj.lineNotifiedBy = state.currentUser || "";
         await saveDoc("projects", proj.id, proj);
         logActivity("LINEで「おうちノートが更新されました」を送りました（"+(proj.customer||proj.name||"")+"）");
-        toast("✅ LINEでお知らせを送りました");
+        if(!(data.failed && data.failed.length)) toast("✅ LINEでお知らせを送りました" + (data.sent > 1 ? "（"+data.sent+"人）" : ""));
       } else {
         var why = { no_uid:"プロラインIDが入っていません", bad_uid:"プロラインIDの形が正しくありません", no_beacon:"「業者・設定」でプロラインの発動用URLが保存されていません", bad_beacon:"プロラインの発動用URLの形が正しくありません（[[uid]] が必要です）", proline_failed:"プロラインが受け付けませんでした", proline_unreachable:"プロラインにつながりませんでした", unauthorized:"ログインし直してください" }[data.error] || "送れませんでした";
         toast("⚠ " + why);
@@ -13843,6 +13901,11 @@
     document.getElementById("btnNewNoteIssue").addEventListener("click", issueNewNoteLink);
     document.getElementById("btnNewNoteCopy").addEventListener("click", copyNewNoteLink);
     document.getElementById("btnProlineUidSave").addEventListener("click", saveProlineUid);
+    document.getElementById("btnProlineUidAdd").addEventListener("click", addProlineRow);
+    document.getElementById("prolineUidRows").addEventListener("click", function(e){
+      var d = e.target.closest("[data-pldel]"); if(d) removeProlineRow(d.dataset.pldel);
+    });
+    document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); });
     document.getElementById("btnLineNotify").addEventListener("click", sendLineNotify);
     document.getElementById("btnSaveProlineBeacon").addEventListener("click", saveProlineBeacon);
     document.getElementById("btnNewNoteOpen").addEventListener("click", function(){
