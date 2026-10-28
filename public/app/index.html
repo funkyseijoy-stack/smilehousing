@@ -3348,12 +3348,16 @@
     var btn = document.getElementById("btnLineNotify");
     var st = document.getElementById("lineNotifyStatus");
     if(!wrap || !btn) return;
-    var editing = wrap.contains(document.activeElement);
+    var pid = (proj && proj.id) || "";
+    // 別の案件に切り替わったら、入力の途中でも必ずその案件の内容に出し直す（前の案件のIDが残って保存される事故の防止）
+    var switched = (wrap.dataset.pid || "") !== pid || prolineDraftPid !== (proj && proj.id);
+    var editing = !switched && wrap.contains(document.activeElement);
     if(!editing){
-      if(prolineDraftPid !== (proj && proj.id)){ prolineRowsDraft = null; prolineDraftPid = proj && proj.id; }
+      if(switched){ prolineRowsDraft = null; prolineDraftPid = proj && proj.id; }
       var rows = prolineRowsDraft || prolineRecipients(proj).map(function(r){ return { uid:r.uid, name:r.name||"" }; });
       if(!rows.length) rows = [{ uid:"", name:"" }];
       wrap.innerHTML = rows.map(prolineRowHtml).join("");
+      wrap.dataset.pid = pid;
     }
     var saved = prolineRecipients(proj);
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
@@ -3381,11 +3385,27 @@
   async function saveProlineUid(){
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
+    var wrap = document.getElementById("prolineUidRows");
+    if(!wrap || (wrap.dataset.pid || "") !== proj.id || prolineDraftPid !== proj.id){
+      toast("別の案件の入力です。画面を出し直したので、もう一度確認してから保存してください");
+      prolineRowsDraft = null;
+      renderLineNotifyBox(proj);
+      return;
+    }
     var rows = readProlineRows().filter(function(r){ return r.uid; });
     for(var i=0;i<rows.length;i++){
       if(!/^[A-Za-z0-9_-]{1,64}$/.test(rows[i].uid)){ toast("プロラインIDは英数字だけで入れてください（"+rows[i].uid+"）"); return; }
     }
     var seen = {}; rows = rows.filter(function(r){ if(seen[r.uid]) return false; seen[r.uid]=1; return true; });
+    // 同じIDが別の案件にも登録されていたら確認する（お客様の取り違い防止）
+    var dup = [];
+    rows.forEach(function(r){
+      (state.projects||[]).forEach(function(p){
+        if(p.id===proj.id || p.deletedAt) return;
+        if(prolineRecipients(p).some(function(x){ return x.uid===r.uid; })) dup.push("「"+r.uid+"」は "+(p.name||p.customer||"別の案件")+" にも登録されています");
+      });
+    });
+    if(dup.length && !confirm(dup.join("\n")+"\n\n"+(proj.name||"この案件")+" に保存しますか？（別のお客様のIDなら「キャンセル」を押してください）")) return;
     proj.prolineUids = rows;
     delete proj.prolineUid;
     var ok = await saveDoc("projects", proj.id, proj);
@@ -4933,6 +4953,7 @@
     renderProjectTable(); renderAttachments(); renderVendorCheckboxList();
     renderPlanSourceList(); renderDrawingsList(); renderMeetingNotes();
     renderOverview(); renderCustomerInfo(); renderMessages(); renderSpecTab(); renderSpecSiteCheck(); renderConfirmTab(); renderPhotosTab(); renderReservationTab();
+    renderNewNotePanel(); // おうちノート連携（リンク・LINEで送る人）も、開いた案件の内容に出し直す
     switchMeetingSubTab("record");
     // 案件を開いたら、最初は「打合せ記録」
     var mb = document.querySelector('.sub-btn[data-sub="meeting"]'); if(mb) mb.click();
@@ -7870,12 +7891,15 @@
   function loadOkaiNotePanel(){
     var proj = projectById(state.currentProjectId);
     if(!proj) return;
+    renderNewNotePanel();
     var unavailable = document.getElementById("okaiUnavailable");
     unavailable.hidden = true;
     document.getElementById("okaiAce3dUrl").value = "";
     Promise.all([
       okaiBridgeFetch('?projectId='+encodeURIComponent(proj.id)+'&resource=data')
     ]).then(function(results){
+      // 読み込み中に別の案件へ移っていたら、前の案件の内容を出さない
+      if(state.currentProjectId !== proj.id) return;
       var dataRes = results[0];
       if(!dataRes.ok){ unavailable.hidden = false; return; }
       okaiBridgeCache[proj.id] = { customer: dataRes.body.customer, link: dataRes.body.link };
@@ -14328,7 +14352,7 @@
     document.getElementById("prolineUidRows").addEventListener("click", function(e){
       var d = e.target.closest("[data-pldel]"); if(d) removeProlineRow(d.dataset.pldel);
     });
-    document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); });
+    document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
     document.getElementById("btnLineNotify").addEventListener("click", sendLineNotify);
     document.getElementById("btnSaveProlineBeacon").addEventListener("click", saveProlineBeacon);
     document.getElementById("btnNewNoteOpen").addEventListener("click", function(){
