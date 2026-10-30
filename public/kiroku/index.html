@@ -54,6 +54,13 @@
   .khelp-card .x{ position:absolute; top:10px; right:12px; width:36px; height:36px; border-radius:50%; border:none; background:var(--chip); font-size:1.3rem; color:var(--ink2); cursor:pointer; }
   .khelp-card .close2{ display:block; width:100%; margin-top:22px; padding:12px; border-radius:999px; border:none; background:var(--brown); color:#fff; font:inherit; font-weight:700; cursor:pointer; }
   h2.sec{ font-size:1.12rem; margin:30px 0 4px; scroll-margin-top:12px; }
+  .nw{ display:inline-block; background:#d9534f; color:#fff; font-size:.72rem; font-weight:700; border-radius:999px; padding:2px 8px; margin-left:6px; vertical-align:middle; }
+  .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:6px; }
+  .upd .ur{ display:flex; align-items:center; gap:8px; width:100%; box-sizing:border-box; text-align:left; text-decoration:none; background:#fff; border:1px solid #f0e2c4; border-radius:12px; padding:10px 12px; margin-top:6px; font-size:.9rem; color:var(--ink); }
+  .upd .ur .ut{ flex:1; min-width:0; }
+  .upd .ur .ug{ color:var(--muted); }
+  .upd .uok{ display:block; margin:10px 0 0 auto; background:var(--brown); color:#fff; border:none; border-radius:999px; padding:8px 16px; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
   .msgs{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
   .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.92rem; white-space:pre-wrap; line-height:1.55; word-break:break-word; }
   .msg .mm{ font-size:.72rem; opacity:.7; margin-bottom:3px; }
@@ -145,10 +152,38 @@
     .then(function(res){
       if(!res.ok){ main.innerHTML = '<div class="err">このリンクは開けません。お手数ですが、担当者にお問い合わせください。</div>'; return; }
       data = res.j; data.reservations = data.reservations || [];
+      initSeen();
       renderAll();
     })
     .catch(function(){ main.innerHTML = '<div class="err">読み込めませんでした。通信状況を確認して、もう一度開いてください。</div>'; });
 
+  // ---------- 前回ご覧になってから更新されたこと（この端末で最後に開いたときと比べる。初めては出さない） ----------
+  var seenSince = null, updDismissed = false;
+  function initSeen(){
+    var key = "kirokuLastSeen:"+P, prev = null;
+    try{ prev = localStorage.getItem(key); localStorage.setItem(key, new Date().toISOString()); }catch(e){}
+    seenSince = prev || null;
+  }
+  function isNew(t){ return !!(seenSince && t && String(t) > seenSince); }
+  function nwTag(t){ return isNew(t) ? '<span class="nw">NEW</span>' : ''; }
+  function updatesHtml(){
+    if(!seenSince || updDismissed) return "";
+    var rows = [];
+    var recs = (data.records||[]).filter(function(r){ return isNew(r.upd); });
+    if(recs.length) rows.push(["🗒", "お打合せの記録 "+recs.length+"件", "sec-rec"]);
+    if((data.hearing||[]).length && isNew(data.hearingUpd)) rows.push(["📋", "ご要望のまとめ", "sec-hear"]);
+    var fins = (data.financeDocs||[]).filter(function(d){ return isNew(d.upd); });
+    if(fins.length) rows.push(["💰", "資金計画・お見積り "+fins.length+"件", "sec-fin"]);
+    var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && isNew(m.createdAt); });
+    if(msgs.length) rows.push(["💬", "メッセージ "+msgs.length+"件", "sec-msg"]);
+    var resv = (data.reservations||[]).filter(function(r){ return isNew(r.createdAt); });
+    if(resv.length) rows.push(["📅", "ご予約 "+resv.map(function(r){ var d = ymd(r.date); return (d ? (d.getMonth()+1)+"/"+d.getDate() : r.date)+" "+r.startTime; }).slice(0,2).join("、"), "sec-resv"]);
+    if(!rows.length) return "";
+    var sd = new Date(seenSince);
+    return '<div class="upd" id="updBox"><div class="uh">🆕 前回（'+(sd.getMonth()+1)+'/'+sd.getDate()+'）ご覧になってからの更新</div>'+
+      rows.map(function(r){ return '<a class="ur" href="#'+r[2]+'"><span>'+r[0]+'</span><span class="ut">'+esc(r[1])+'</span><span class="ug">›</span></a>'; }).join("")+
+      '<button class="uok" type="button" data-updok="1">確認しました</button></div>';
+  }
   function nextHtml(){
     var n = data.reservations[0];
     if(!n) return "";
@@ -162,6 +197,7 @@
     var fins = data.financeDocs || [];
     var hear = data.hearing || [];
     html += '<div class="jump"><a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
+    html += updatesHtml();
     html += '<div id="nextBox">'+nextHtml()+'</div>';
     html += '<h2 class="sec" id="sec-rec">お打合せの記録</h2><p class="secsub">新しいものから順に並んでいます。資料は押すと開きます。</p>';
     if(!data.records || !data.records.length){
@@ -174,7 +210,7 @@
           return '<a class="file" href="'+esc(f.url)+'" target="_blank" rel="noopener"><div class="th">'+thumb+'</div>'+
             '<div class="nm"><span>'+esc(f.name||("資料"+(i+1)))+'</span><b>ひらく</b></div></a>';
         }).join("");
-        return '<div class="rec"><span class="date">'+fmtDate(r.date)+'</span>'+
+        return '<div class="rec"><span class="date">'+fmtDate(r.date)+'</span>'+nwTag(r.upd)+
           (r.title?'<div class="title">'+esc(r.title)+'</div>':'')+
           (r.memo?'<div class="memo">'+esc(r.memo)+'</div>':'')+
           (files?'<div class="files">'+files+'</div>':'')+
@@ -203,7 +239,7 @@
           var thumb = isImg(f) ? '<img loading="lazy" src="'+esc(f.url)+'" alt="">' : (isPdf(f) ? '<canvas data-pdf="'+esc(f.url)+'"></canvas>' : '<span class="ph">📄</span>');
           return '<a class="file" href="'+esc(f.url)+'" target="_blank" rel="noopener"><div class="th">'+thumb+'</div><div class="nm"><span>'+esc(f.name||k)+'</span><b>ひらく</b></div></a>';
         }).join("");
-        return '<div class="fin"><div class="fk">'+esc(k)+'</div><div class="fd">'+fmtDate(top.date)+'の版</div>'+
+        return '<div class="fin"><div class="fk">'+esc(k)+(ds.some(function(d){ return isNew(d.upd); })?'<span class="nw">NEW</span>':'')+'</div><div class="fd">'+fmtDate(top.date)+'の版</div>'+
           memos.map(function(m){ return '<div class="fm">'+esc(m)+'</div>'; }).join("")+
           '<div class="files">'+tiles+'</div>'+
           (olds.length?'<details><summary>以前の版（'+olds.length+'件）</summary>'+olds.map(function(o){
@@ -239,7 +275,7 @@
     if(!ms.length) return '<div class="empty" style="margin-bottom:10px;">まだメッセージはありません。</div>';
     return '<div class="msgs">'+ms.map(function(m){
       var me = m.fromCustomer;
-      return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+msgTime(m.createdAt)+'</div>'+esc(m.content)+'</div>';
+      return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+msgTime(m.createdAt)+(me?'':nwTag(m.createdAt))+'</div>'+esc(m.content)+'</div>';
     }).join("")+'</div>';
   }
   function msgTime(iso){
@@ -356,6 +392,8 @@
     if(e.target.closest("[data-khelp]")){ e.preventDefault(); openHelp(); return; }
     if(e.target.closest("#rvToggle")){ setResvOpen(!rv.open); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
+    if(e.target.closest("[data-updok]")){ updDismissed = true; var ub = document.getElementById("updBox"); if(ub) ub.remove(); return; }
+    var ur = e.target.closest('.upd a.ur[href="#sec-resv"]'); if(ur) setResvOpen(true);
     if(e.target.closest('.jump a[href="#sec-resv"]')) setResvOpen(true);
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }
     var rdu = e.target.closest("[data-rvdur]"); if(rdu){ rv.dur = parseInt(rdu.dataset.rvdur,10); rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }

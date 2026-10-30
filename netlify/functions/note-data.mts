@@ -155,6 +155,11 @@ function imageOf(x: any) {
 
 // 打合せ記録の並び順用の時刻（UTCのISO文字列）。記録を書いた日が打合せ日と同じ（日本時間）なら、書いた時刻を使う。
 // 別の日の記録は、その日の正午（日本時間）とする。同じ日の図面（反映した時刻）と、書いた順に並ぶようにする。
+// お客様画面の「前回からの更新」用。新しく出た（反映された）時刻＝反映した時刻と作った時刻の新しいほう
+function updAt(...xs: any[]): string {
+  return xs.map((x) => String(x || "")).reduce((m, x) => (x > m ? x : m), "");
+}
+
 function noteAt(n: any): string {
   const created = n.createdAt ? new Date(n.createdAt) : null;
   const createdJst = created && !isNaN(created.getTime()) ? new Date(created.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10) : "";
@@ -423,6 +428,7 @@ export default async (req: Request, context: Context) => {
     push(noteCatFor(p.scope, p.category), {
       type: p.kind === "planboard" ? "planboard" : "photo",
       at: (srcTask && (srcTask.reflectedAt || srcTask.updatedAt)) || p.createdAt || "",
+      upd: updAt(srcTask && srcTask.reflectedAt, p.reflectedAt, p.createdAt),
       label: partLabel(project, p.scope, p.category, p.roomId),
       roomId: p.roomId || null,
       file: fileOf(p),
@@ -454,6 +460,7 @@ export default async (req: Request, context: Context) => {
       push(noteCatFor(vs.scope, vs.category), {
         type: "photo",
         at: t.reflectedAt || t.updatedAt || t.createdAt || "",
+        upd: updAt(t.reflectedAt, t.createdAt),
         label: partLabel(project, vs.scope, vs.category, vs.roomId),
         roomId: vs.roomId || null,
         file: fileOf(att),
@@ -481,6 +488,7 @@ export default async (req: Request, context: Context) => {
       // スタッフが書いた「お客様へのひとこと」（社内コメント staffMemo は出さない）
       msg: String(a.customerNote || "").slice(0, 500),
       at: a.reflectedAt || a.uploadedAt || "",
+      upd: updAt(a.reflectedAt, a.uploadedAt, a.createdAt),
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,
       file: fileOf(a),
@@ -499,6 +507,7 @@ export default async (req: Request, context: Context) => {
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,
       at: noteAt(n),
+      upd: updAt(n.reflectedAt, n.createdAt),
       date: n.date || (n.createdAt || "").slice(0, 10),
       title: n.title || "",
       decided: n.decided != null ? n.decided : n.content || "",
@@ -515,7 +524,7 @@ export default async (req: Request, context: Context) => {
   const plans = attachments
     .filter((a) => a.kind === "plan")
     .sort((a, b) => String(a.uploadedAt || "").localeCompare(String(b.uploadedAt || "")))
-    .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "" }));
+    .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "", upd: updAt(a.uploadedAt, a.createdAt) }));
 
   // カード1枚ごとの仮決定／決定（key が付いた記録・図面）。まだ選んでいないカードは「検討中」。
   const cardDecByKey: Record<string, any> = {};
@@ -621,11 +630,11 @@ export default async (req: Request, context: Context) => {
   // 「予約状況」カードから手動で追加した予約（nextBookings、旧おうちノート本体に保存）も
   // 合わせて表示する。重複を避けるため、日付+開始時刻が同じものは1件にまとめる。
   const okaiBookings = ((okaiCustomer && okaiCustomer.nextBookings) || []).map((b: any) => ({
-    type: b.service || "", date: b.date || "", startTime: b.time || "", endTime: b.endTime || "", staff: "",
+    type: b.service || "", date: b.date || "", startTime: b.time || "", endTime: b.endTime || "", staff: "", createdAt: b.createdAt || "",
   }));
   const seenResv = new Set<string>();
   const resv = reservations
-    .map((r) => ({ type: r.type, date: r.date, startTime: r.startTime, endTime: r.endTime, staff: r.staff || "" }))
+    .map((r) => ({ type: r.type, date: r.date, startTime: r.startTime, endTime: r.endTime, staff: r.staff || "", createdAt: r.createdAt || "" }))
     .concat(okaiBookings)
     .filter((r) => {
       const key = r.date + "|" + r.startTime;
@@ -649,6 +658,8 @@ export default async (req: Request, context: Context) => {
       .map((n) => ({
         date: n.date || (n.createdAt || "").slice(0, 10),
         createdAt: n.createdAt || "",
+        upd: updAt(n.reflectedAt, n.createdAt),
+        partName: n.specPart ? partLabel(project, n.specPart.scope, n.specPart.category, n.specPart.roomId) : "",
         title: n.title || "",
         decided: n.decided != null ? n.decided : n.content || "",
         open: n.open || "",

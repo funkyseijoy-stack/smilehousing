@@ -107,6 +107,14 @@
   .tag.pb{ background:#f3e6ec; color:#9a4f68; }
   .tag.ph{ background:var(--green); color:var(--green-ink); }
   .tag.new{ background:var(--rose); color:#fff; }
+  .tag.nw{ background:#d9534f; color:#fff; font-weight:700; }
+  .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:6px; }
+  .upd .ur{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:#fff; border:1px solid #f0e2c4; border-radius:12px; padding:10px 12px; margin-top:6px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
+  .upd .ur .ut{ flex:1; min-width:0; }
+  .upd .ur .ug{ color:var(--muted); }
+  .upd .uok{ display:block; margin:10px 0 0 auto; background:var(--brown); color:#fff; border:none; border-radius:999px; padding:8px 16px; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+  .cat .newn{ display:inline-block; margin-top:3px; background:#d9534f; color:#fff; font-size:.68rem; font-weight:700; border-radius:999px; padding:2px 8px; }
   .tlt{ font-weight:700; margin-bottom:6px; }
   .box{ border-radius:10px; padding:8px 10px; font-size:.86rem; white-space:pre-wrap; margin-bottom:6px; }
   .box .bl{ font-size:.68rem; font-weight:700; margin-bottom:2px; }
@@ -638,6 +646,7 @@
         return;
       }
       data = j;
+      initSeen();
       document.getElementById("nav").hidden = false;
       render();
     }catch(e){
@@ -758,6 +767,63 @@ function consItems(){
   });
   return out;
 }
+// ---------- 前回ご覧になってから更新されたこと ----------
+  // 「前回」はこの端末で最後に開いたとき（localStorage。ご家族それぞれの端末で別々に記録）。
+  // 初めて開いたときは何も出さない。30分以上たってから画面に戻ったときも、新しく開いたのと同じ扱いにする。
+  var seenSince = null, seenInitAt = 0;
+  function initSeen(){
+    if(seenInitAt && Date.now() - seenInitAt < 30*60*1000) return;
+    var key = "okaiLastSeen:"+P, prev = null;
+    try{ prev = localStorage.getItem(key); localStorage.setItem(key, new Date().toISOString()); }catch(e){}
+    seenSince = prev || null; seenInitAt = Date.now(); view.updDismissed = false;
+  }
+  function isNew(t){ return !!(seenSince && t && String(t) > seenSince); }
+  function nwTag(t){ return isNew(t) ? '<span class="tag nw">NEW</span>' : ''; }
+  function catAllItems(c){
+    var a = (c.items||[]).concat(c.roomMisc||[]);
+    (c.rooms||[]).forEach(function(r){ a = a.concat(r.items||[]); });
+    return a;
+  }
+  function catNewCount(c){ return catAllItems(c).filter(function(x){ return isNew(x.upd); }).length; }
+  function namesText(arr){ var u = []; arr.forEach(function(x){ if(x && u.indexOf(x)<0) u.push(x); }); return u.length ? '（'+u.slice(0,3).join("・")+(u.length>3?'ほか':'')+'）' : ''; }
+  function updatesRows(){
+    if(!seenSince) return [];
+    var rows = [];
+    var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && isNew(m.createdAt); });
+    if(msgs.length) rows.push({ ic:"💬", t:"メッセージ "+msgs.length+"件", a:'data-go="msg"' });
+    var notes = (data.notes||[]).filter(function(n){ return isNew(n.upd); });
+    if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録 "+notes.length+"件"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
+    var specCats = [], specN = 0;
+    (data.categories||[]).forEach(function(c){
+      var n = catAllItems(c).filter(function(x){ return x.type!=="note" && isNew(x.upd); }).length;
+      if(n){ specN += n; specCats.push(c); }
+    });
+    if(specN) rows.push({ ic:"📄", t:"写真・資料 "+specN+"件"+namesText(specCats.map(function(c){ return c.name; })),
+      a: 'data-updcat="'+(specCats.length===1 ? esc(specCats[0].id) : "")+'"' });
+    var plans = (data.plans||[]).filter(function(f){ return isNew(f.upd); });
+    if(plans.length) rows.push({ ic:"📐", t:"平面図 "+plans.length+"件", a:'data-openplans="1"' });
+    var album = (data.album||[]).filter(function(a){ return isNew(a.createdAt); });
+    if(album.length) rows.push({ ic:"📷", t:"アルバム "+album.length+"枚", a:'data-go="album"' });
+    var imgs = (data.images||[]).filter(function(x){ return x.by!=="customer" && isNew(x.createdAt); });
+    if(imgs.length) rows.push({ ic:"🖼", t:"お家のイメージ "+imgs.length+"枚", a:'data-go="image"' });
+    var ests = (data.estimates||[]).filter(function(x){ return isNew(x.createdAt); });
+    if(ests.length) rows.push({ ic:"🧾", t:"追加見積り "+ests.length+"件", a:'data-updjump="sec-est"' });
+    var resv = (data.reservations||[]).filter(function(r){ return r.date >= data.today && isNew(r.createdAt); });
+    if(resv.length) rows.push({ ic:"📅", t:"ご予約 "+resv.map(function(r){ return md(r.date)+" "+(r.startTime||""); }).slice(0,2).join("、")+(resv.length>2?" ほか":""), a:'data-go="resv"' });
+    var ntcs = (data.notices||[]).filter(function(n){ return n.kind!=="service" && isNew(n.createdAt); });
+    if(ntcs.length) rows.push({ ic:"📢", t:"お知らせ "+ntcs.length+"件", a:'data-updjump="sec-ntc"' });
+    return rows;
+  }
+  function updatesHtml(){
+    if(view.updDismissed) return "";
+    var rows = updatesRows();
+    if(!rows.length) return "";
+    var d = new Date(seenSince);
+    return '<div class="upd"><div class="uh">🆕 前回（'+(d.getMonth()+1)+'/'+d.getDate()+'）ご覧になってからの更新</div>'+
+      rows.map(function(r){ return '<button class="ur" '+r.a+'><span>'+r.ic+'</span><span class="ut">'+esc(r.t)+'</span><span class="ug">›</span></button>'; }).join("")+
+      '<button class="uok" data-updok="1">確認しました</button></div>';
+  }
+
 function homeHtml(){
     var h = new Date().getHours();
     var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
@@ -770,6 +836,7 @@ function homeHtml(){
     var out = '<div class="greet">'+greet+'、'+esc(name)+'様</div>'+
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
     // 初めての方への案内。「×」で閉じたら、この端末では出さない
+    out += updatesHtml();
     if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
     // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
     // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
@@ -878,7 +945,7 @@ function homeHtml(){
 
     // 追加見積り（住まいるアプリの「おうちノート連携」タブで登録。お客様の承認／見送りもここで受け付ける）
     if(data.estimates && data.estimates.length){
-      out += '<div class="sechd"><h3>追加見積り</h3></div><div class="catlist">'+data.estimates.map(function(x){
+      out += '<div class="sechd" id="sec-est"><h3>追加見積り</h3></div><div class="catlist">'+data.estimates.map(function(x){
         var r = x.customerResponse || "未回答";
         // スタッフが状態を選んでいればそれを優先（金額確認中は、金額が入っていても「金額確認中」と表示）
         var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
@@ -892,7 +959,7 @@ function homeHtml(){
             ? '<div style="display:flex; gap:8px; margin-top:10px;"><button class="btn dk" style="flex:1;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div>'
             : '<div style="margin-top:8px;"><button class="btn ol" style="padding:8px 14px; font-size:.8rem;" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
         }
-        return '<div class="rv" style="flex-wrap:wrap;"><div style="flex:1; min-width:0;"><div class="ty">'+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
+        return '<div class="rv" style="flex-wrap:wrap;"><div style="flex:1; min-width:0;"><div class="ty">'+nwTag(x.createdAt)+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
           (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
       }).join("")+'</div>'+estTotalHtml(data.estimates);
     }
@@ -921,7 +988,7 @@ function homeHtml(){
     }
 
     var ntcs = data.notices.filter(function(n){ return n.kind==="notice"; });
-    if(ntcs.length) out += '<div class="sechd"><h3>お知らせ・豆知識</h3></div><div class="ntc-grid">'+ntcs.map(noticeHtml).join("")+'</div>';
+    if(ntcs.length) out += '<div class="sechd" id="sec-ntc"><h3>お知らせ・豆知識</h3></div><div class="ntc-grid">'+ntcs.map(noticeHtml).join("")+'</div>';
     var procs = data.notices.filter(function(n){ return n.kind==="process"; });
     if(procs.length) out += '<div class="sechd"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
     return out;
@@ -1059,7 +1126,7 @@ function homeHtml(){
     var out = '<h2 class="big">メッセージ</h2><p class="sub">ご質問・ご相談・ご予約の変更などはこちらからどうぞ。</p>'+nmHtml();
     out += data.messages.length ? '<div class="msgs">'+data.messages.map(function(m){
       var me = m.fromCustomer;
-      return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+fmtD(m.createdAt)+'</div>'+esc(m.content)+'</div>';
+      return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+fmtD(m.createdAt)+(me?'':nwTag(m.createdAt))+'</div>'+esc(m.content)+'</div>';
     }).join("")+'</div>' : '<div class="empty">まだメッセージはありません。</div>';
     out += '<div id="msgEnd"></div><div class="composer"><textarea id="msgInput" rows="2" placeholder="メッセージを入力"></textarea><button id="msgSend">送信</button></div>';
     return out;
@@ -1168,7 +1235,7 @@ function homeHtml(){
         '<p class="sub">写真・プランボード・打合せの内容を、時系列で確認できます</p>';
       out += '<div class="catgrid">'+data.categories.map(function(c){
         return '<button class="cat" data-cat="'+esc(c.id)+'"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span>'+
-          '<span><div class="nm">'+esc(c.name)+'</div><div class="sb">'+esc(c.sub)+'</div>'+(c.count?'<div class="cnt">'+c.count+'件の記録</div>':'')+'</span>'+
+          '<span><div class="nm">'+esc(c.name)+'</div><div class="sb">'+esc(c.sub)+'</div>'+(c.count?'<div class="cnt">'+c.count+'件の記録</div>':'')+(catNewCount(c)?'<span class="newn">NEW '+catNewCount(c)+'件</span>':'')+'</span>'+
           '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></button>';
       }).join("")+'</div>';
     } else if(view.buildSeg==="notes"){
@@ -1197,7 +1264,7 @@ function homeHtml(){
     return out;
   }
   function noteBody(n, showPart){
-    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
+    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.talk?'<div class="box"><div class="bl">打合せの内容</div>'+esc(n.talk).replace(/\n/g,"<br>")+'</div>':'')+
       (n.decided?'<div class="box dec"><div class="bl">決定したこと</div>'+esc(n.decided)+'</div>':'')+
@@ -1271,9 +1338,10 @@ function homeHtml(){
     taskPdfs.forEach(function(x){
       var u = x.file && x.file.url; if(!u || seenPdf[u]) return; seenPdf[u] = true;
       var k = x.source.taskId;
-      if(!pdfGroups[k]) pdfGroups[k] = { at: x.at||"", snippet: x.source.noteSnippet||"", files: [], key: x.key||("t:"+k), cardStatus: x.cardStatus||"検討中", showDecide: false };
+      if(!pdfGroups[k]) pdfGroups[k] = { upd: "", at: x.at||"", snippet: x.source.noteSnippet||"", files: [], key: x.key||("t:"+k), cardStatus: x.cardStatus||"検討中", showDecide: false };
       if(x.showDecide) pdfGroups[k].showDecide = true;
       if(String(x.at||"") > String(pdfGroups[k].at)) pdfGroups[k].at = x.at;
+      if(String(x.upd||"") > String(pdfGroups[k].upd)) pdfGroups[k].upd = x.upd;
       pdfGroups[k].files.push(x.file);
     });
     var feed = [];
@@ -1302,7 +1370,7 @@ function homeHtml(){
           if(it.kind==="pdf"){
             var g = it.g;
             return '<div class="fcard'+(g.showDecide?' st-'+esc(g.cardStatus):'')+'">'+
-              '<div class="fhd"><span class="fd">'+fmtD(g.at)+'</span><span class="tag pdf">📄 変更後のPDF</span>'+newest+'</div>'+
+              '<div class="fhd"><span class="fd">'+fmtD(g.at)+'</span><span class="tag pdf">📄 変更後のPDF</span>'+newest+nwTag(g.upd)+'</div>'+
               (g.snippet ? '<div class="section-item-desc" style="font-size:.88rem;">'+esc(g.snippet)+'</div>' : '')+
               '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>'+
               cardDecHtml(g.key, g.cardStatus, g.snippet, g.showDecide)+'</div>';
@@ -1310,14 +1378,14 @@ function homeHtml(){
           if(it.kind==="spec"){
             var x = it.x;
             return '<div class="fcard'+(it.plain?'':' st-'+esc(x.cardStatus||"検討中"))+'">'+
-              '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>'+
+              '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+nwTag(x.upd)+'</div>'+
               (x.msg ? '<div class="section-item-desc" style="font-size:.9rem;"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>' : '')+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
               (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true))+'</div>';
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
-            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録</span>'+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
+            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
@@ -1544,6 +1612,9 @@ function homeHtml(){
   main.addEventListener("click", function(e){
     var img = e.target.closest("[data-img]");
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
+    if(e.target.closest("[data-updok]")){ view.updDismissed = true; render(); return; }
+    var uc = e.target.closest("[data-updcat]"); if(uc){ view.tab="build"; view.buildSeg="spec"; view.cat = uc.dataset.updcat || null; render(); window.scrollTo(0,0); return; }
+    var uj = e.target.closest("[data-updjump]"); if(uj){ var el = document.getElementById(uj.dataset.updjump); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
     if(e.target.closest("#nmSave")){ nmSave(false); return; }

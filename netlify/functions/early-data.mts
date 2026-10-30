@@ -22,6 +22,11 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// 「前回からの更新」用：作った時刻と直した時刻（お客様に見せる切り替えも含む）の新しいほう
+function updAt(...xs: any[]): string {
+  return xs.map((x) => String(x || "")).reduce((m, x) => (x > m ? x : m), "");
+}
+
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
   if (req.method !== "GET" && req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -70,6 +75,7 @@ export default async (req: Request, context: Context) => {
       date: String(r.date || ""),
       title: String(r.title || ""),
       memo: String(r.memo || ""),
+      upd: updAt(r.createdAt, r.updatedAt),
       files: (Array.isArray(r.files) ? r.files : [])
         .filter((f: any) => f && typeof f.url === "string" && f.url.startsWith("/api/get-photo?"))
         .map((f: any) => ({ url: f.url, contentType: String(f.contentType || ""), name: String(f.name || "") })),
@@ -84,6 +90,7 @@ export default async (req: Request, context: Context) => {
     .map((d: any) => ({
       kind: String(d.kind || "その他"),
       date: String(d.date || ""),
+      upd: updAt(d.createdAt, d.updatedAt),
       memo: String(d.memo || ""),
       file: { url: d.file.url, contentType: String(d.file.contentType || ""), name: String(d.file.name || "") },
     }));
@@ -100,6 +107,7 @@ export default async (req: Request, context: Context) => {
     .filter(([k]) => hs[k] === true && typeof hf[k] === "string" && hf[k].trim())
     .map(([k, label]) => ({ label, text: String(hf[k]).trim().slice(0, 3000) }));
   const hearingAt = hearing.length ? String((project.hearing && project.hearing.updatedAt) || "").slice(0, 10) : "";
+  const hearingUpd = hearing.length ? String((project.hearing && project.hearing.updatedAt) || "") : "";
 
   // この案件の今日以降の予約（ごみ箱に入れたものは除く）。日時と種類だけ返す
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -107,7 +115,7 @@ export default async (req: Request, context: Context) => {
   const resAll = await Promise.all(blobs.map((bl) => store.get(bl.key, { type: "json" }).catch(() => null)));
   const reservations = resAll
     .filter((r: any) => r && r.projectId === projectId && !r.deletedAt && String(r.date || "") >= today)
-    .map((r: any) => ({ type: String(r.type || ""), date: String(r.date || ""), startTime: String(r.startTime || ""), endTime: String(r.endTime || "") }))
+    .map((r: any) => ({ type: String(r.type || ""), date: String(r.date || ""), startTime: String(r.startTime || ""), endTime: String(r.endTime || ""), createdAt: String(r.createdAt || "") }))
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
   // メッセージ（おうちノートと同じやりとり。古い順）
@@ -135,6 +143,7 @@ export default async (req: Request, context: Context) => {
     financeDocs,
     hearing,
     hearingAt,
+    hearingUpd,
     reservations,
     messages,
     companyIntro,
