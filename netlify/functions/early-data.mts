@@ -62,6 +62,19 @@ export default async (req: Request, context: Context) => {
       file: { url: d.file.url, contentType: String(d.file.contentType || ""), name: String(d.file.name || "") },
     }));
 
+  // ヒアリング（「お客様に見せる」にチェックした項目だけ。並びと見出しは住まいるアプリの HEARING_FIELDS と同じ）
+  const HEARING_LABELS: [string, string][] = [
+    ["family", "家族構成・暮らし方"], ["mood", "どんな雰囲気の家にしたいか"], ["plan", "間取りの希望"],
+    ["material", "素材・設備のこだわり"], ["trouble", "今の住まいの不満・解決したいこと"], ["budget", "予算・資金計画"],
+    ["timing", "時期・土地"], ["other", "その他・メモ"],
+  ];
+  const hf = (project.hearing && project.hearing.fields) || {};
+  const hs = (project.hearing && project.hearing.shared) || {};
+  const hearing = HEARING_LABELS
+    .filter(([k]) => hs[k] === true && typeof hf[k] === "string" && hf[k].trim())
+    .map(([k, label]) => ({ label, text: String(hf[k]).trim().slice(0, 3000) }));
+  const hearingAt = hearing.length ? String((project.hearing && project.hearing.updatedAt) || "").slice(0, 10) : "";
+
   // この案件の今日以降の予約（ごみ箱に入れたものは除く）。日時と種類だけ返す
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const { blobs } = await store.list({ prefix: "reservations/" });
@@ -86,6 +99,8 @@ export default async (req: Request, context: Context) => {
     today,
     records,
     financeDocs,
+    hearing,
+    hearingAt,
     reservations,
     companyIntro,
     policy,

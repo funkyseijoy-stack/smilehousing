@@ -151,7 +151,8 @@
     if(name && !/様$/.test(name)) name += " 様";
     var html = '<h1>'+(name?esc(name):'お客様')+'</h1><p class="sub">住まいるハウジングとのお打合せの記録です。</p>';
     var fins = data.financeDocs || [];
-    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
+    var hear = data.hearing || [];
+    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
     html += '<div id="nextBox">'+nextHtml()+'</div>';
     html += '<h2 class="sec" id="sec-rec">お打合せの記録</h2><p class="secsub">新しいものから順に並んでいます。資料は押すと開きます。</p>';
     if(!data.records || !data.records.length){
@@ -170,6 +171,12 @@
           (files?'<div class="files">'+files+'</div>':'')+
         '</div>';
       }).join("");
+    }
+    if(hear.length){
+      html += '<h2 class="sec" id="sec-hear">ご要望のまとめ</h2><p class="secsub">お伺いしたご要望をまとめました'+(data.hearingAt?'（'+fmtDate(data.hearingAt)+'更新）':'')+'。違うところや付け足したいことがあれば、担当者にお知らせください。</p>'+
+        '<div class="rec">'+hear.map(function(h, i){
+          return '<div'+(i?' style="margin-top:12px; padding-top:12px; border-top:1px solid var(--line);"':'')+'><div class="title">'+esc(h.label)+'</div><div class="memo">'+esc(h.text)+'</div></div>';
+        }).join("")+'</div>';
     }
     if(fins.length){
       html += '<h2 class="sec" id="sec-fin">資金計画・お見積り</h2><p class="secsub">いちばん新しいものを上に出しています。押すと開きます。</p>';
@@ -333,6 +340,7 @@
       '<h3>📄 画面の見方</h3>'+
       '<ul>'+
         '<li><b>記録</b>：お打合せのメモをご覧いただけます。資料は押すと開きます</li>'+
+        ((data && data.hearing && data.hearing.length) ? '<li><b>ご要望のまとめ</b>：お伺いしたご要望を項目ごとにまとめています</li>' : '')+
         (fins.length ? '<li><b>資金計画・お見積り</b>：資金計画書やお見積りをご覧いただけます</li>' : '')+
         '<li><b>施工事例・イメージ集</b>：住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと「いいね」にまとまります</li>'+
         '<li><b>ご予約</b>：「📅 予約する」から、次回のご来店やご相談を予約できます</li>'+

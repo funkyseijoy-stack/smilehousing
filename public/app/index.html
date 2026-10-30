@@ -4375,10 +4375,14 @@
     if(wrap.dataset.pid===String(pid||"") && wrap.dataset.dirty==="1") return; // 入力中は上書きしない
     var h = (p && p.hearing) || {};
     var f = h.fields || {};
+    var sh = h.shared || {};
     wrap.dataset.pid = String(pid||"");
     wrap.dataset.dirty = "0";
+    // 項目ごとの「お客様に見せる」：チェックした項目だけ、お打合せの記録ページ（/kiroku/）の「ご要望のまとめ」に出る（最初は全部外れている）
     wrap.innerHTML = HEARING_FIELDS.map(function(d){
-      return '<label class="field" style="margin-block-end:12px; font-weight:700;">'+escapeHtml(d.label)+'<textarea rows="3" style="font-weight:400; margin-block-start:4px;" data-hfield="'+d.k+'" placeholder="'+escapeHtml(d.ph)+'">'+escapeHtml(f[d.k]||"")+'</textarea></label>';
+      return '<div style="margin-block-end:12px;"><div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">'+
+        '<b>'+escapeHtml(d.label)+'</b><label style="display:flex; align-items:center; gap:4px; font-size:.85rem; color:var(--muted); cursor:pointer;"><input type="checkbox" data-hshare="'+d.k+'"'+(sh[d.k]?" checked":"")+'> お客様に見せる</label></div>'+
+        '<textarea rows="3" style="width:100%; margin-block-start:4px;" data-hfield="'+d.k+'" placeholder="'+escapeHtml(d.ph)+'">'+escapeHtml(f[d.k]||"")+'</textarea></div>';
     }).join("");
     var st = document.getElementById("hearingStatus");
     if(st) st.textContent = h.updatedAt ? ("最終保存：" + String(h.updatedAt).slice(0,10) + (h.updatedBy?"（"+h.updatedBy+"）":"")) : "まだ保存されていません";
@@ -4390,7 +4394,9 @@
     if(!p || !wrap) return;
     var fields = {};
     wrap.querySelectorAll("[data-hfield]").forEach(function(el){ fields[el.dataset.hfield] = el.value.trim(); });
-    p.hearing = {fields:fields, updatedAt:nowIso(), updatedBy:state.currentUser||""};
+    var shared = {};
+    wrap.querySelectorAll("[data-hshare]").forEach(function(el){ if(el.checked) shared[el.dataset.hshare] = true; });
+    p.hearing = {fields:fields, shared:shared, updatedAt:nowIso(), updatedBy:state.currentUser||""};
     wrap.dataset.dirty = "0";
     var ok = await saveDoc("projects", p.id, p);
     if(ok===false){ toast("⚠ 保存できませんでした。もう一度押してください"); wrap.dataset.dirty="1"; return; }
