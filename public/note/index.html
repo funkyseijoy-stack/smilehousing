@@ -114,6 +114,7 @@
   .scom .st{ white-space:pre-wrap; line-height:1.7; font-size:.92rem; }
   .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
   .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:2px; }
+  .upd .nwb{ display:inline-block; background:#d9534f; color:#fff; font-size:.85rem; font-weight:700; letter-spacing:.06em; border-radius:999px; padding:3px 12px; }
   .upd .us{ font-size:.76rem; color:var(--muted); margin-bottom:8px; }
   .upd .ur{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:#fff; border:1px solid #f0e2c4; border-radius:12px; padding:10px 12px; margin-top:6px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
   .upd .ur .ut{ flex:1; min-width:0; }
@@ -795,28 +796,35 @@ function consItems(){
     if(!seenSince) return [];
     var rows = [];
     var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && isNew(m.createdAt); });
-    if(msgs.length) rows.push({ ic:"💬", t:"メッセージ "+msgs.length+"件", a:'data-go="msg"' });
-    var notes = (data.notes||[]).filter(function(n){ return isNew(n.upd); });
-    if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録 "+notes.length+"件"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
-    var specCats = [], specN = 0;
+    if(msgs.length) rows.push({ ic:"💬", t:"メッセージがあります", a:'data-go="msg"' });
+    // 設備仕様の写真・プランボード・資料（PDF・お見積り）は、種類ごとに分けて「どの項目か」を添える
+    var kinds = { photo:{ic:"📷", t:"写真の追加があります", cats:[]}, pb:{ic:"📐", t:"プランボードの追加があります", cats:[]}, doc:{ic:"📄", t:"資料の追加があります", cats:[]} };
     (data.categories||[]).forEach(function(c){
-      var n = catAllItems(c).filter(function(x){ return x.type!=="note" && isNew(x.upd); }).length;
-      if(n){ specN += n; specCats.push(c); }
+      catAllItems(c).forEach(function(x){
+        if(x.type==="note" || !isNew(x.upd)) return;
+        var ct = String(x.contentType || (x.file && x.file.contentType) || "");
+        var k = (x.type==="planboard" || (x.isQuote && x.quoteType!=="定価")) ? "pb" : ((x.isQuote || ct.indexOf("pdf")>=0) ? "doc" : "photo");
+        if(kinds[k].cats.indexOf(c)<0) kinds[k].cats.push(c);
+      });
     });
-    if(specN) rows.push({ ic:"📄", t:"写真・資料 "+specN+"件"+namesText(specCats.map(function(c){ return c.name; })),
-      a: 'data-updcat="'+(specCats.length===1 ? esc(specCats[0].id) : "")+'"' });
-    var plans = (data.plans||[]).filter(function(f){ return isNew(f.upd); });
-    if(plans.length) rows.push({ ic:"📐", t:"平面図 "+plans.length+"件", a:'data-openplans="1"' });
+    ["photo","pb","doc"].forEach(function(k){
+      var g = kinds[k];
+      if(g.cats.length) rows.push({ ic:g.ic, t:g.t+namesText(g.cats.map(function(c){ return c.name; })), a:'data-updcat="'+(g.cats.length===1 ? esc(g.cats[0].id) : "")+'"' });
+    });
     var album = (data.album||[]).filter(function(a){ return isNew(a.createdAt); });
-    if(album.length) rows.push({ ic:"📷", t:"アルバム "+album.length+"枚", a:'data-go="album"' });
+    if(album.length) rows.push({ ic:"📷", t:"アルバムに写真の追加があります", a:'data-go="album"' });
+    var notes = (data.notes||[]).filter(function(n){ return isNew(n.upd); });
+    if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録の追加があります"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
+    var plans = (data.plans||[]).filter(function(f){ return isNew(f.upd); });
+    if(plans.length) rows.push({ ic:"📐", t:"平面図の追加があります", a:'data-openplans="1"' });
     var imgs = (data.images||[]).filter(function(x){ return x.by!=="customer" && isNew(x.createdAt); });
-    if(imgs.length) rows.push({ ic:"🖼", t:"お家のイメージ "+imgs.length+"枚", a:'data-go="image"' });
+    if(imgs.length) rows.push({ ic:"🖼", t:"お家のイメージに写真の追加があります", a:'data-go="image"' });
     var ests = (data.estimates||[]).filter(function(x){ return isNew(x.createdAt); });
-    if(ests.length) rows.push({ ic:"🧾", t:"追加見積り "+ests.length+"件", a:'data-updjump="sec-est"' });
+    if(ests.length) rows.push({ ic:"🧾", t:"追加見積りがあります", a:'data-updjump="sec-est"' });
     var resv = (data.reservations||[]).filter(function(r){ return r.date >= data.today && isNew(r.createdAt); });
-    if(resv.length) rows.push({ ic:"📅", t:"ご予約 "+resv.map(function(r){ return md(r.date)+" "+(r.startTime||""); }).slice(0,2).join("、")+(resv.length>2?" ほか":""), a:'data-go="resv"' });
+    if(resv.length) rows.push({ ic:"📅", t:"ご予約が入りました（"+resv.map(function(r){ return md(r.date)+" "+(r.startTime||""); }).slice(0,2).join("、")+(resv.length>2?" ほか":"")+"）", a:'data-go="resv"' });
     var ntcs = (data.notices||[]).filter(function(n){ return n.kind!=="service" && isNew(n.createdAt); });
-    if(ntcs.length) rows.push({ ic:"📢", t:"お知らせ "+ntcs.length+"件", a:'data-updjump="sec-ntc"' });
+    if(ntcs.length) rows.push({ ic:"📢", t:"お知らせがあります", a:'data-updjump="sec-ntc"' });
     return rows;
   }
   // スタッフの「お客様へのひとこと」（住まいるアプリのヒアリングタブで書く）。ホームのいちばん上に出す
@@ -830,8 +838,7 @@ function consItems(){
     if(view.updDismissed) return "";
     var rows = updatesRows();
     if(!rows.length) return "";
-    var d = new Date(seenSince);
-    return '<div class="upd"><div class="uh">📢 新着のお知らせ</div><div class="us">前回（'+(d.getMonth()+1)+'/'+d.getDate()+'）ご覧になってから届いたもの</div>'+
+    return '<div class="upd"><div class="uh"><span class="nwb">NEW</span></div>'+
       rows.map(function(r){ return '<button class="ur" '+r.a+'><span>'+r.ic+'</span><span class="ut">'+esc(r.t)+'</span><span class="ug">›</span></button>'; }).join("")+
       '<button class="uok" data-updok="1">とじる</button></div>';
   }

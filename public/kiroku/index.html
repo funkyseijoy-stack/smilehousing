@@ -61,6 +61,7 @@
   .scom .st{ white-space:pre-wrap; line-height:1.7; font-size:.92rem; }
   .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
   .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:2px; }
+  .upd .nwb{ display:inline-block; background:#d9534f; color:#fff; font-size:.85rem; font-weight:700; letter-spacing:.06em; border-radius:999px; padding:3px 12px; }
   .upd .us{ font-size:.76rem; color:var(--muted); margin-bottom:8px; }
   .upd .ur{ display:flex; align-items:center; gap:8px; width:100%; box-sizing:border-box; text-align:left; text-decoration:none; background:#fff; border:1px solid #f0e2c4; border-radius:12px; padding:10px 12px; margin-top:6px; font-size:.9rem; color:var(--ink); }
   .upd .ur .ut{ flex:1; min-width:0; }
@@ -182,17 +183,16 @@
     if(!seenSince || updDismissed) return "";
     var rows = [];
     var recs = (data.records||[]).filter(function(r){ return isNew(r.upd); });
-    if(recs.length) rows.push(["🗒", "お打合せの記録 "+recs.length+"件", "sec-rec"]);
-    if((data.hearing||[]).length && isNew(data.hearingUpd)) rows.push(["📋", "ご要望のまとめ", "sec-hear"]);
+    if(recs.length) rows.push(["🗒", "打合せ記録の追加があります", "sec-rec"]);
+    if((data.hearing||[]).length && isNew(data.hearingUpd)) rows.push(["📋", "ご要望のまとめが更新されました", "sec-hear"]);
     var fins = (data.financeDocs||[]).filter(function(d){ return isNew(d.upd); });
-    if(fins.length) rows.push(["💰", "資金計画・お見積り "+fins.length+"件", "sec-fin"]);
+    if(fins.length) rows.push(["💰", "資金計画・お見積りの追加があります", "sec-fin"]);
     var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && isNew(m.createdAt); });
-    if(msgs.length) rows.push(["💬", "メッセージ "+msgs.length+"件", "sec-msg"]);
+    if(msgs.length) rows.push(["💬", "メッセージがあります", "sec-msg"]);
     var resv = (data.reservations||[]).filter(function(r){ return isNew(r.createdAt); });
-    if(resv.length) rows.push(["📅", "ご予約 "+resv.map(function(r){ var d = ymd(r.date); return (d ? (d.getMonth()+1)+"/"+d.getDate() : r.date)+" "+r.startTime; }).slice(0,2).join("、"), "sec-resv"]);
+    if(resv.length) rows.push(["📅", "ご予約が入りました（"+resv.map(function(r){ var d = ymd(r.date); return (d ? (d.getMonth()+1)+"/"+d.getDate() : r.date)+" "+r.startTime; }).slice(0,2).join("、")+"）", "sec-resv"]);
     if(!rows.length) return "";
-    var sd = new Date(seenSince);
-    return '<div class="upd" id="updBox"><div class="uh">📢 新着のお知らせ</div><div class="us">前回（'+(sd.getMonth()+1)+'/'+sd.getDate()+'）ご覧になってから届いたもの</div>'+
+    return '<div class="upd" id="updBox"><div class="uh"><span class="nwb">NEW</span></div>'+
       rows.map(function(r){ return '<a class="ur" href="#'+r[2]+'"><span>'+r[0]+'</span><span class="ut">'+esc(r[1])+'</span><span class="ug">›</span></a>'; }).join("")+
       '<button class="uok" type="button" data-updok="1">とじる</button></div>';
   }

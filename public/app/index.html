@@ -603,6 +603,13 @@
   .kancard .kc-more{ margin-block-start:6px; padding-block-start:6px; border-block-start:1px dashed var(--border); }
   .kancard .kc-state{ flex-wrap:wrap; }
   .kancard .kc-state b{ white-space:nowrap; }
+  .sendphotobar{ margin:0 0 12px; }
+  #sendPhotoModal .addform > *{ flex:0 0 auto; }
+  .sendphotobar .btn{ width:100%; font-size:1.05rem; padding-block:12px; }
+  .spsgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:6px; margin-block-start:8px; }
+  .spsgrid .t{ position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--surface-2); }
+  .spsgrid .t img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .spsgrid .t button{ position:absolute; top:3px; right:3px; width:26px; height:26px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; font-size:.85rem; cursor:pointer; padding:0; }
   .taskform-modal{ position:fixed; inset:0; background:rgba(20,16,12,.55); z-index:85; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; }
   .taskform-modal[hidden]{ display:none; }
   #cmCancelRow[hidden]{ display:none; }
@@ -926,6 +933,8 @@
 
   <!-- ========== HOME ========== -->
   <section class="panel active" id="panel-home">
+    <!-- お客様に写真を送る（アルバムに追加＋ひとこと＋LINEのお知らせを1回で。openSendPhoto） -->
+    <div class="sendphotobar"><button class="btn" id="btnSendPhotoHome" type="button">📷 お客様に写真を送る</button></div>
     <div class="card">
       <div class="row" style="justify-content:space-between; margin-block-end:8px;">
         <h2 style="margin:0;">社内タスク【最重要】</h2>
@@ -1079,6 +1088,7 @@
         <div id="finishedBanner" hidden style="margin-block-start:10px; padding:8px 12px; border-radius:8px; background:var(--gray-soft); font-weight:700;"></div>
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
+          <button class="btn small" id="btnSendPhotoProj" type="button">📷 写真を送る</button>
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
           <span class="muted" id="okaiNoteStatusLabel" style="font-size:.85rem;"></span>
         </div>
@@ -2082,6 +2092,38 @@
 </div>
 
 <!-- ========== 仕様履歴の編集 MODAL ========== -->
+<div class="taskform-modal" id="sendPhotoModal" hidden>
+  <div class="taskform-card">
+    <div class="row" style="justify-content:space-between; align-items:center; margin-block-end:6px;">
+      <h3 style="margin:0;">📷 お客様に写真を送る</h3>
+      <button class="btn secondary small" type="button" id="spsClose">✕ 閉じる</button>
+    </div>
+    <div class="addform" style="flex-direction:column; align-items:stretch; gap:10px;">
+      <label class="field">お客様（案件）<select id="spsProject"></select></label>
+      <div>
+        <label class="field" style="margin:0;">アルバムのカテゴリー<select id="spsCat"></select></label>
+        <div class="row" id="spsNewCatRow" hidden style="gap:6px; margin-block-start:6px;">
+          <input type="text" id="spsNewCat" placeholder="例：基礎工事" style="flex:1;" maxlength="30">
+          <button class="btn small" type="button" id="spsNewCatAdd">追加</button>
+        </div>
+      </div>
+      <div>
+        <div class="row" style="gap:8px;">
+          <button class="btn" type="button" id="spsShoot" style="flex:1;">📷 撮影する</button>
+          <button class="btn secondary" type="button" id="spsPick" style="flex:1;">🖼 写真を選ぶ</button>
+        </div>
+        <input type="file" id="spsShootInput" accept="image/*" capture="environment" hidden>
+        <input type="file" id="spsPickInput" accept="image/*" multiple hidden>
+        <div class="spsgrid" id="spsThumbs"></div>
+        <div class="muted" id="spsCount" style="font-size:.85rem;"></div>
+      </div>
+      <label class="field">ひとこと（任意。おうちノートのいちばん上の「スタッフより」に出ます）<textarea id="spsComment" rows="2" maxlength="500" placeholder="例：今日は基礎の配筋検査でした。"></textarea></label>
+      <label style="display:flex; gap:8px; align-items:flex-start;"><input type="checkbox" id="spsLine" style="margin-top:4px;"> <span id="spsLineLabel">お客様のLINEに「おうちノートが更新されました」を送る</span></label>
+      <button class="btn" type="button" id="spsSend" style="font-size:1.05rem; padding-block:12px;">送る</button>
+      <div class="muted" id="spsStatus" style="font-size:.85rem;"></div>
+    </div>
+  </div>
+</div>
 <div class="taskform-modal" id="spEditModal" hidden>
   <div class="taskform-card">
     <h3 style="margin:0 0 6px;">履歴を編集</h3>
@@ -9776,6 +9818,147 @@
     // 縮められて、元より小さければ縮めたものを使う。縮められなかったときは元のまま（大きすぎれば、送る時に理由を伝える）
     return (best && best.size < srcFile.size) ? best : srcFile;
   }
+  // ---- お客様に写真を送る（アルバムに追加＋ひとこと＋LINEのお知らせを1回で） ----
+  var sps = { files:[], urls:[], busy:false };
+  function spsProjects(){
+    // おうちノートのリンクがある案件を先に、その中は最近アルバムに写真を入れた順
+    var last = {};
+    state.albumPhotos.forEach(function(a){ if(!a.deletedAt && a.kind!=="reference" && String(a.createdAt||"") > String(last[a.projectId]||"")) last[a.projectId] = a.createdAt; });
+    return liveProjects().slice().sort(function(a,b){
+      var na = a.noteToken?0:1, nb = b.noteToken?0:1;
+      if(na!==nb) return na-nb;
+      return String(last[b.id]||"").localeCompare(String(last[a.id]||"")) || String(a.name||"").localeCompare(String(b.name||""), "ja");
+    });
+  }
+  function spsRenderCats(keep){
+    var sel = document.getElementById("spsCat");
+    var proj = projectById(document.getElementById("spsProject").value);
+    var cats = photoCategoriesFor(proj, "album");
+    var cur = keep != null ? keep : sel.value;
+    sel.innerHTML = '<option value="">（カテゴリーなし）</option>'+cats.map(function(c){ return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>'; }).join("")+'<option value="__new">＋ 新しいカテゴリーを追加…</option>';
+    sel.value = cats.some(function(c){ return c.id===cur; }) ? cur : "";
+    document.getElementById("spsNewCatRow").hidden = true;
+  }
+  function spsRenderLine(){
+    var proj = projectById(document.getElementById("spsProject").value);
+    var recips = prolineRecipients(proj);
+    var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
+    var can = !!(proj && recips.length && hasBeacon);
+    var cb = document.getElementById("spsLine");
+    cb.disabled = !can; cb.checked = can; // 送れるお客様は最初からチェック（送りたくない日だけ外す）
+    document.getElementById("spsLineLabel").textContent = can
+      ? "お客様のLINEに「おうちノートが更新されました」を送る（"+recips.map(function(r){ return r.name || r.uid; }).join("、")+"）"
+      : !hasBeacon ? "LINEのお知らせ：「業者・設定」でプロラインの発動用URLを保存すると使えます"
+      : "LINEのお知らせ：このお客様はプロラインIDが未登録です（「おうちノート連携」タブの「LINEでお知らせ」で登録）";
+  }
+  function spsRenderThumbs(){
+    sps.urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(e){} });
+    sps.urls = sps.files.map(function(f){ return URL.createObjectURL(f); });
+    document.getElementById("spsThumbs").innerHTML = sps.files.map(function(f, i){
+      return '<div class="t"><img src="'+sps.urls[i]+'" alt=""><button type="button" data-spsdel="'+i+'" aria-label="外す">✕</button></div>';
+    }).join("");
+    document.getElementById("spsCount").textContent = sps.files.length ? sps.files.length+"枚を送ります" : "まだ写真がありません";
+  }
+  function openSendPhoto(pid){
+    if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
+    var list = spsProjects();
+    if(!list.length){ toast("案件がありません"); return; }
+    var sel = document.getElementById("spsProject");
+    sel.innerHTML = list.map(function(p){ return '<option value="'+escapeHtml(p.id)+'">'+escapeHtml((p.customer ? String(p.customer).replace(/様$/,"")+"様（"+p.name+"）" : p.name)||"")+'</option>'; }).join("");
+    sel.value = (pid && list.some(function(p){ return p.id===pid; })) ? pid : list[0].id;
+    sps.files = []; spsRenderThumbs();
+    document.getElementById("spsComment").value = "";
+    document.getElementById("spsStatus").textContent = "";
+    spsRenderCats("");
+    spsRenderLine();
+    document.getElementById("sendPhotoModal").hidden = false;
+  }
+  function closeSendPhoto(){
+    if(sps.busy) return;
+    if(sps.files.length && !confirm("選んだ写真はまだ送っていません。閉じますか？")) return;
+    sps.files = []; spsRenderThumbs();
+    document.getElementById("sendPhotoModal").hidden = true;
+  }
+  async function spsAddCategory(){
+    var proj = projectById(document.getElementById("spsProject").value);
+    var inp = document.getElementById("spsNewCat");
+    var name = inp.value.trim();
+    if(!proj){ return; }
+    if(!name){ toast("カテゴリー名を入力してください"); return; }
+    var same = photoCategoriesFor(proj, "album").find(function(c){ return c.name===name; });
+    var id = same ? same.id : uid("pc");
+    if(!same){
+      proj.photoCategories = proj.photoCategories || {};
+      proj.photoCategories.album = (proj.photoCategories.album||[]).concat([{id:id, name:name}]);
+      var ok = await saveDoc("projects", proj.id, proj);
+      if(ok===false){ proj.photoCategories.album = proj.photoCategories.album.filter(function(c){ return c.id!==id; }); toast("⚠ カテゴリーを保存できませんでした"); return; }
+      logActivity("おうちアルバムのカテゴリー「"+name+"」を追加しました");
+    }
+    inp.value = "";
+    spsRenderCats(id);
+  }
+  async function sendPhotos(){
+    if(sps.busy) return;
+    var pid = document.getElementById("spsProject").value; // 送り先は押した時点の案件に固定する
+    var proj = projectById(pid);
+    if(!proj){ toast("お客様を選んでください"); return; }
+    if(!sps.files.length){ toast("写真を撮影するか、選んでください"); return; }
+    var catId = document.getElementById("spsCat").value;
+    if(catId==="__new"){ toast("カテゴリーの名前を入れて「追加」を押してください"); return; }
+    var comment = document.getElementById("spsComment").value.trim().slice(0,500);
+    var lineCb = document.getElementById("spsLine");
+    var lineOn = !!(lineCb.checked && !lineCb.disabled);
+    var st = document.getElementById("spsStatus");
+    var btn = document.getElementById("spsSend");
+    sps.busy = true; btn.disabled = true;
+    var files = sps.files.slice(), okCount = 0;
+    for(var i=0;i<files.length;i++){
+      st.textContent = "写真を送っています… "+(i+1)+" / "+files.length;
+      var f = files[i];
+      try{
+        var compressed = await compressImageFile(f);
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg", noClean: true});
+        var doc = { id: uid("al"), projectId: pid, kind: "album", categoryId: catId || null, assetId: res.id, url: res.url,
+          contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso(), by: state.currentUser||"", via: "sendPhoto" };
+        blobCache[res.id] = compressed;
+        state.albumPhotos.push(doc);
+        var saved = await saveDoc("albumPhotos", doc.id, doc);
+        if(saved===false) state.albumPhotos = state.albumPhotos.filter(function(x){ return x.id!==doc.id; });
+        else okCount++;
+      }catch(e){ uploadFailToast(f.name, e); }
+    }
+    var notes = [];
+    if(okCount && comment){
+      var prev = proj.staffComment || null;
+      proj.staffComment = {text:comment, at:nowIso(), by:state.currentUser||""};
+      var okc = await saveDoc("projects", proj.id, proj);
+      if(okc===false){ proj.staffComment = prev; notes.push("ひとことは保存できませんでした"); }
+    }
+    var lineDone = false;
+    if(okCount && lineOn){
+      st.textContent = "LINEでお知らせしています…";
+      try{
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo" }) });
+        var lj = await lres.json().catch(function(){ return {}; });
+        if(lres.ok && lj.ok){
+          lineDone = true;
+          proj.lineNotifiedAt = nowIso(); proj.lineNotifiedBy = state.currentUser || "";
+          saveDoc("projects", proj.id, proj);
+          if(lj.failed && lj.failed.length) notes.push("LINEが送れなかった人："+lj.failed.length+"人");
+        } else notes.push("LINEのお知らせは送れませんでした");
+      }catch(e){ notes.push("LINEのお知らせは送れませんでした"); }
+    }
+    sps.busy = false; btn.disabled = false; st.textContent = "";
+    if(!okCount){ toast("⚠ 写真を送れませんでした。電波の良いところでもう一度お試しください", 9000); return; }
+    logActivity((proj.customer||proj.name||"")+"のおうちアルバムに写真を"+okCount+"枚送りました"+(lineDone?"（LINEでお知らせ）":""));
+    sps.files = []; spsRenderThumbs();
+    document.getElementById("sendPhotoModal").hidden = true;
+    render();
+    var msg = "✅ "+okCount+"枚を送りました"+(lineDone?"・LINEでお知らせしました":"");
+    if(okCount < files.length) msg += "（"+(files.length-okCount)+"枚は送れていません）";
+    if(notes.length) msg += "（"+notes.join("／")+"）";
+    toast(msg, notes.length || okCount<files.length ? 9000 : undefined);
+  }
   async function uploadAlbumPhotos(kind, fileList, categoryId){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
@@ -14480,6 +14663,31 @@
     document.getElementById("homeReqProject").addEventListener("change", function(){ homeReqProject = this.value; renderHomeRequests(); });
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
+    document.getElementById("btnSendPhotoHome").addEventListener("click", function(){ openSendPhoto(null); });
+    document.getElementById("btnSendPhotoProj").addEventListener("click", function(){ openSendPhoto(state.currentProjectId); });
+    document.getElementById("spsClose").addEventListener("click", closeSendPhoto);
+    document.getElementById("spsProject").addEventListener("change", function(){ spsRenderCats(""); spsRenderLine(); });
+    document.getElementById("spsCat").addEventListener("change", function(e){
+      var nw = e.target.value==="__new";
+      document.getElementById("spsNewCatRow").hidden = !nw;
+      if(nw) setTimeout(function(){ document.getElementById("spsNewCat").focus(); }, 30);
+    });
+    document.getElementById("spsNewCatAdd").addEventListener("click", spsAddCategory);
+    document.getElementById("spsNewCat").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); spsAddCategory(); } });
+    document.getElementById("spsShoot").addEventListener("click", function(){ document.getElementById("spsShootInput").click(); });
+    document.getElementById("spsPick").addEventListener("click", function(){ document.getElementById("spsPickInput").click(); });
+    ["spsShootInput","spsPickInput"].forEach(function(id){
+      document.getElementById(id).addEventListener("change", function(e){
+        Array.prototype.forEach.call(e.target.files||[], function(f){ if(String(f.type||"").indexOf("image/")===0 || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name||"")) sps.files.push(f); });
+        e.target.value = "";
+        spsRenderThumbs();
+      });
+    });
+    document.getElementById("spsThumbs").addEventListener("click", function(e){
+      var d = e.target.closest("[data-spsdel]"); if(!d) return;
+      sps.files.splice(parseInt(d.dataset.spsdel,10), 1); spsRenderThumbs();
+    });
+    document.getElementById("spsSend").addEventListener("click", sendPhotos);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);
     document.getElementById("specLightboxClose").addEventListener("click", closeSpecPhotoLightbox);
     document.getElementById("specLightboxEdit").addEventListener("click", function(){
