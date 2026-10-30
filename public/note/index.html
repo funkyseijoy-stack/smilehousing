@@ -176,6 +176,8 @@
   .msgcta .t{ flex:1; } .msgcta b{ color:var(--brown2); }
   .chgrow{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
   .chgbtn{ background:var(--card); border:1.5px solid var(--brown2); color:var(--brown2); border-radius:999px; padding:8px 14px; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .consbtns{ display:flex; justify-content:flex-end; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .chgbtn.sub{ border-color:var(--line2); color:var(--ink2); font-weight:400; }
   .chgdone{ font-size:.75rem; color:#3c7a52; font-weight:700; }
   .askbox{ background:#fff; border:1.5px solid #e9c8c8; border-left:5px solid #c9575a; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
   .askbox .ah{ font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
@@ -541,7 +543,7 @@
 <div class="help" id="chgModal" hidden>
   <div class="help-card">
     <button class="x" id="chgX" aria-label="閉じる">×</button>
-    <h2>✏️ 変更したいところ</h2>
+    <h2 id="chgTitle">✏️ 変更したいところ</h2>
     <p class="help-lead" id="chgWhat"></p>
     <textarea id="chgInput" class="meminput" placeholder="例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい"></textarea>
     <button class="btn dk" id="chgSend" style="width:100%; margin-top:10px;">スタッフに送る</button>
@@ -968,7 +970,7 @@ function homeHtml(){
       var CONS_LIMIT = 5, consShow = view.consAll ? cons : cons.slice(0, CONS_LIMIT);
       out += '<div class="sechd"><h3>💭 ご検討いただきたいこと</h3><span style="font-size:.85rem;">'+cons.length+'件</span></div>'+
         '<div class="conslist">'+consShow.map(function(c){
-          return '<div class="cons"><div class="ct">'+esc(c.t)+'</div><div class="cm">'+fmtD(c.date)+(c.part?'・'+esc(c.part):(c.title?'・'+esc(c.title):''))+'</div></div>';
+          return '<div class="cons"><div class="ct">'+esc(c.t)+'</div><div class="cm">'+fmtD(c.date)+(c.part?'・'+esc(c.part):(c.title?'・'+esc(c.title):''))+'</div>'+consBtnsHtml(c.t, fmtD(c.date)+(c.part?'・'+c.part:(c.title?'・'+c.title:'')))+'</div>';
         }).join("")+
         (cons.length>CONS_LIMIT ? '<button class="consmore" data-consall="1">'+(view.consAll?'閉じる ▴':'ほか '+(cons.length-CONS_LIMIT)+'件を見る ▾')+'</button>' : '')+
         '</div>';
@@ -1301,6 +1303,13 @@ function homeHtml(){
   }
   // ---- 「変更したい」：お客様がカード（プランボードなど）を見て、変えたいところをその場でスタッフに送る（メッセージとして届く） ----
   var chgSent = {};
+  // 「ご検討いただきたいこと」への返事：決めたことを伝える／相談したい（メッセージとして届く）
+  function consBtnsHtml(text, ctx){
+    var k = "cons:"+text;
+    var a = ' data-ctext="'+esc(String(text).slice(0,200))+'" data-cctx="'+esc(ctx||"")+'"';
+    return '<div class="consbtns">'+(chgSent[k] ? '<span class="chgdone">✓ スタッフに送りました</span>' : '')+
+      '<button class="chgbtn" data-cons="decided"'+a+'>💬 決めたことを伝える</button><button class="chgbtn sub" data-cons="ask"'+a+'>❓ 相談したい</button></div>';
+  }
   function chgLabelOf(c, x){
     var kind = x.type==="note" ? "打合せ記録" : (x.type==="planboard" || (x.isQuote && x.quoteType!=="定価") ? "プランボード" : (x.isQuote ? "お見積り" : "写真・資料"));
     var d = new Date(x.at || x.date || "");
@@ -1328,7 +1337,7 @@ function homeHtml(){
     if(x.type==="note"){
       if(x.title) h += '<div class="section-item-title">'+esc(x.title)+'</div>';
       if(x.decided) h += '<div class="section-item-desc"><strong>決定：</strong>'+esc(x.decided)+'</div>';
-      if(x.open) h += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(x.open)+'</div>';
+      if(x.open) h += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(x.open)+'</div>'+consBtnsHtml(x.open, (c?c.name+'・':'')+(x.title||fmtD(e.at)));
       if(x.talk) h += '<div class="section-item-desc"><strong>内容：</strong>'+esc(x.talk)+'</div>';
       if(x.message) h += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(x.message)+'</div>';
       if(x.files && x.files.length) h += '<div class="section-thumbs">'+x.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
@@ -1560,7 +1569,7 @@ function homeHtml(){
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
-          if(n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>';
+          if(n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, c.name+'・'+(n.title||fmtD(n.date)));
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
           html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
@@ -1788,6 +1797,7 @@ function homeHtml(){
     var bc = e.target.closest("[data-bchip]"); if(bc){ view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bc.dataset.bchip || null; render(); window.scrollTo(0,0); return; }
     var bcat = e.target.closest("[data-buildcat]"); if(bcat){ view.tab="build"; view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bcat.dataset.buildcat; render(); window.scrollTo(0,0); return; }
     var chg = e.target.closest("[data-chg]"); if(chg){ chgOpen(chg.dataset.chg, chg.dataset.chgkey); return; }
+    var cns = e.target.closest("[data-cons]"); if(cns){ consOpen(cns.dataset.cons, cns.dataset.ctext, cns.dataset.cctx); return; }
     var fa = e.target.closest("[data-feedall]"); if(fa){ view.feedAll = true; render(); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ var el = document.getElementById(uj.dataset.updjump); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
@@ -1829,9 +1839,23 @@ function homeHtml(){
   function openSheet(id){ document.getElementById(id).hidden = false; }
   function closeSheet(id){ document.getElementById(id).hidden = true; }
   var chgCur = null;
+  function chgSheet(title, what, ph, btn){
+    document.getElementById("chgTitle").textContent = title;
+    document.getElementById("chgWhat").textContent = what;
+    document.getElementById("chgInput").placeholder = ph;
+    document.getElementById("chgSend").textContent = btn;
+  }
+  function consOpen(mode, text, ctx){
+    chgCur = {key:"cons:"+text, prefix: mode==="decided" ? "【決めました】" : "【ご相談】", label:"「"+text+"」（"+ctx+"）"};
+    if(mode==="decided") chgSheet("💬 決めたことを伝える", "「"+text+"」について、決めたことを書いてください。", "例：深型にします", "スタッフに伝える");
+    else chgSheet("❓ 相談したい", "「"+text+"」について、迷っていること・聞きたいことを書いてください。", "例：深型と浅型で、入る食器の量はどのくらい違いますか？", "スタッフに送る");
+    document.getElementById("chgInput").value = "";
+    openSheet("chgModal");
+    setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
+  }
   function chgOpen(label, key){
-    chgCur = {label:label, key:key};
-    document.getElementById("chgWhat").textContent = "「"+label+"」について、変えたいところを書いてください。";
+    chgCur = {label:label, key:key, prefix:"【変更のご依頼】"};
+    chgSheet("✏️ 変更したいところ", "「"+label+"」について、変えたいところを書いてください。", "例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい", "スタッフに送る");
     document.getElementById("chgInput").value = "";
     openSheet("chgModal");
     setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
@@ -1840,9 +1864,9 @@ function homeHtml(){
   document.getElementById("chgModal").addEventListener("click", function(e){ if(e.target.id==="chgModal") closeSheet("chgModal"); });
   document.getElementById("chgSend").addEventListener("click", async function(){
     var text = (document.getElementById("chgInput").value||"").trim();
-    if(!text || !chgCur){ toast("変えたいところを書いてください"); return; }
+    if(!text || !chgCur){ toast("内容を書いてください"); return; }
     var btn = this; btn.disabled = true;
-    var full = "【変更のご依頼】"+chgCur.label+"\n"+text;
+    var full = chgCur.prefix+chgCur.label+"\n"+text;
     try{
       var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full }) });
       var j = await res.json();
