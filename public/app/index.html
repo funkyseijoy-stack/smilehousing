@@ -1108,14 +1108,14 @@
         <!-- お客様とのメッセージ（おうちノートのメッセージと同じやりとり。お打合せの記録ページからも送れる） -->
         <div class="card" id="hearMsgCard">
           <h3 style="margin:0 0 6px;">💬 お客様とのメッセージ</h3>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">おうちノートの「メッセージ」と同じやりとりです（案件の「メッセージ」タブにも同じものが出ます）。お客様はおうちノートか、お打合せの記録ページから送れます。送信すると、プロラインIDを登録したお客様のLINEに「おうちノートが更新されました」が自動で届きます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">おうちノートの「メッセージ」と同じやりとりです（案件の「メッセージ」タブにも同じものが出ます）。お客様はおうちノートか、お打合せの記録ページから送れます。下のチェックを入れて送信すると、プロラインIDを登録したお客様のLINEに「おうちノートが更新されました」のお知らせも送れます。</p>
           <div class="notelist" id="hearMsgList" style="max-height:360px; overflow-y:auto;"></div>
           <div class="empty" id="hearMsgEmpty" hidden>まだメッセージがありません。</div>
           <div class="row" style="margin-block-start:10px;">
             <input type="text" id="hearMsgInput" placeholder="メッセージを入力" style="flex:1;">
             <button class="btn small" id="btnHearMsgSend">送信</button>
           </div>
-          <label class="field" id="hearMsgLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="hearMsgLine" checked><span id="hearMsgLineLabel" style="font-size:.85rem;"></span></label>
+          <label class="field" id="hearMsgLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="hearMsgLine"><span id="hearMsgLineLabel" style="font-size:.85rem;"></span></label>
         </div>
         <!-- 初期の打合せ記録（手書きメモをPDFで。お客様には専用の簡単なページで見せる） -->
         <div class="card" id="earlyCard">
@@ -1371,7 +1371,7 @@
       <div class="subpanel" id="sub-message">
         <div class="card">
           <h3>メッセージ</h3>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様のプロラインIDを「おうちノート連携」タブの「LINEでお知らせ」に登録していれば、送信するとお客様のLINEに「おうちノートが更新されました」が自動で届きます（下のチェックで止められます）。お知らせメールを登録しているお客様には、メールでも知らせられます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様のプロラインIDを「おうちノート連携」タブの「LINEでお知らせ」に登録していれば、下のチェックを入れて送信したときだけ、お客様のLINEに「おうちノートが更新されました」のお知らせも送ります（送ったらチェックは外れます）。お知らせメールを登録しているお客様には、メールでも知らせられます。</p>
           <div class="notelist" id="messageList"></div>
           <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
           <div class="row" style="margin-block-start:10px;">
@@ -1379,7 +1379,7 @@
             <button class="btn small" id="btnSendMessage">送信</button>
           </div>
           <label class="field" id="messageNotifyWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageNotify" checked><span id="messageNotifyLabel" style="font-size:.85rem;"></span></label>
-          <label class="field" id="messageLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageLine" checked><span id="messageLineLabel" style="font-size:.85rem;"></span></label>
+          <label class="field" id="messageLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageLine"><span id="messageLineLabel" style="font-size:.85rem;"></span></label>
         </div>
       </div>
 
@@ -6621,12 +6621,12 @@
     var recips = prolineRecipients(proj);
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
     var can = !!(proj && recips.length && hasBeacon);
-    if((wrap.dataset.pid || "") !== ((proj && proj.id) || "")){ cb.checked = true; wrap.dataset.pid = (proj && proj.id) || ""; }
+    if((wrap.dataset.pid || "") !== ((proj && proj.id) || "")){ cb.checked = false; wrap.dataset.pid = (proj && proj.id) || ""; }
     cb.disabled = !can;
     if(!can) cb.checked = false;
     lab.textContent = can ? "お客様のLINEに「おうちノートが更新されました」を送って知らせる（"+recips.map(function(r){ return r.name || r.uid; }).join("、")+"。メッセージの内容は送りません）"
       : !hasBeacon ? "LINEのお知らせ：「業者・設定」でプロラインの発動用URLを保存すると使えます"
-      : "LINEのお知らせ：「おうちノート連携」タブの「LINEでお知らせ」で、お客様のプロラインIDを登録すると自動で届きます";
+      : "LINEのお知らせ：「おうちノート連携」タブの「LINEでお知らせ」で、お客様のプロラインIDを登録すると、ここから送れるようになります";
   }
   async function refreshMessageNotify(){
     refreshMessageLine();
@@ -6663,6 +6663,7 @@
       try{
         var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message" }) });
         var lj = await lres.json().catch(function(){ return {}; });
+        if(lineCb) lineCb.checked = false;
         if(lres.ok && lj.ok){
           m.lineNotifiedAt = nowIso();
           saveDoc("messages", m.id, m);
