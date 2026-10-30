@@ -33,6 +33,11 @@
   .hd .ttl{ font-size:clamp(.54rem,2.3vw,.7rem); letter-spacing:.4em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; overflow:hidden; text-overflow:ellipsis; }
   .hd .hbtn{ width:33px; height:33px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.8rem; padding:0; }
   .hd .hbtn svg{ width:16px; height:16px; }
+  /* アイコンの下に名前（何のボタンか分かるように） */
+  .hd .hbtn{ width:auto; min-width:40px; height:auto; border:none; border-radius:10px; flex-direction:column; gap:3px; padding:4px 2px; }
+  .hd .hbtn svg, .hd .hbtn .q{ width:30px; height:30px; padding:6px; box-sizing:border-box; border:1px solid rgba(216,191,157,.6); border-radius:50%; }
+  .hd .hbtn .q{ display:flex; align-items:center; justify-content:center; font-size:.85rem; color:#d8bf9d; font-weight:400; }
+  .hd .hbtn .hl{ font-size:.58rem; color:#d8bf9d; letter-spacing:.02em; white-space:nowrap; line-height:1; }
   .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
   .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
   .band .st{ font-weight:700; margin-top:2px; }
@@ -161,6 +166,11 @@
   .bchips .cnew{ display:inline-block; background:#d9534f; color:#fff; font-size:.6rem; font-weight:700; border-radius:999px; padding:1px 6px; margin-left:3px; vertical-align:1px; }
   .fchip{ border:none; cursor:pointer; font-family:inherit; }
   .fdec{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:.8rem; }
+  .msgcta{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:12px 14px; margin:0 0 16px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
+  .msgcta .t{ flex:1; } .msgcta b{ color:var(--brown2); }
+  .chgrow{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .chgbtn{ background:var(--card); border:1.5px solid var(--brown2); color:var(--brown2); border-radius:999px; padding:8px 14px; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .chgdone{ font-size:.75rem; color:#3c7a52; font-weight:700; }
   .askbox{ background:#fff; border:1.5px solid #e9c8c8; border-left:5px solid #c9575a; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
   .askbox .ah{ font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
   .askbox .ah span{ font-size:.75rem; color:#c9575a; }
@@ -400,14 +410,14 @@
     </div>
     <button class="hbtn" id="btnOrder" aria-label="決める順番">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
-    </button>
+    <span class="hl">決める順</span></button>
     <button class="hbtn" id="btnMemo" aria-label="わたしのメモ">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
-    </button>
-    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法">？</button>
+    <span class="hl">メモ</span></button>
+    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法"><b class="q">？</b><span class="hl">使い方</span></button>
     <button class="hbtn" id="btnMail" aria-label="メッセージ">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
-    </button>
+    <span class="hl">メッセージ</span></button>
   </header>
   <div class="band">
     <div><div class="who" id="bandWho">お客様のおうち</div><div class="st" id="bandSt">家づくり進行中</div></div>
@@ -522,6 +532,16 @@
   </div>
 </div>
 
+<div class="help" id="chgModal" hidden>
+  <div class="help-card">
+    <button class="x" id="chgX" aria-label="閉じる">×</button>
+    <h2>✏️ 変更したいところ</h2>
+    <p class="help-lead" id="chgWhat"></p>
+    <textarea id="chgInput" class="meminput" placeholder="例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい"></textarea>
+    <button class="btn dk" id="chgSend" style="width:100%; margin-top:10px;">スタッフに送る</button>
+    <p class="help-lead" style="margin-top:8px;">メッセージとしてスタッフに届きます。お返事は「メッセージ」に届きます。</p>
+  </div>
+</div>
 <div class="help" id="memoModal" hidden>
   <div class="help-card">
     <button class="x" id="memoX" aria-label="閉じる">×</button>
@@ -867,6 +887,7 @@ function homeHtml(){
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
     // 初めての方への案内。「×」で閉じたら、この端末では出さない
     out += staffCommentHtml();
+    out += '<button class="msgcta" data-go="msg"><span>💬</span><span class="t">スタッフへのご連絡・ご質問は<b>こちらから</b></span><span class="ug">›</span></button>';
     out += updatesHtml();
     out += askHtml();
     if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
@@ -1272,6 +1293,19 @@ function homeHtml(){
     list.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
     return list;
   }
+  // ---- 「変更したい」：お客様がカード（プランボードなど）を見て、変えたいところをその場でスタッフに送る（メッセージとして届く） ----
+  var chgSent = {};
+  function chgLabelOf(c, x){
+    var kind = x.type==="note" ? "打合せ記録" : (x.type==="planboard" || (x.isQuote && x.quoteType!=="定価") ? "プランボード" : (x.isQuote ? "お見積り" : "写真・資料"));
+    var d = new Date(x.at || x.date || "");
+    return (c ? c.name+"・" : "")+kind+(isNaN(d) ? "" : "（"+(d.getMonth()+1)+"/"+d.getDate()+"）");
+  }
+  function chgBtnHtml(c, x){
+    var label = chgLabelOf(c, x);
+    var sent = chgSent[x.key || label];
+    return '<div class="chgrow">'+(sent ? '<span class="chgdone">✓ 変更のご依頼を送りました</span>' : '')+
+      '<button class="chgbtn" data-chg="'+esc(label)+'" data-chgkey="'+esc(x.key||label)+'">✏️ '+(sent?'ほかにも変更したい':'ここを変更したい')+'</button></div>';
+  }
   function feedKindTag(x){
     if(x.type==="note") return '<span class="tag note">💬 打合せ記録</span>';
     var ct = String(x.contentType || (x.file && x.file.contentType) || "");
@@ -1297,6 +1331,7 @@ function homeHtml(){
       if(x.msg) h += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>';
       if(x.file) h += '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>';
     }
+    if(x.type==="planboard" || x.isQuote || x.showDecide) h += chgBtnHtml(c, x);
     if(st) h += '<div class="fdec"><span>このカードの状態：<span class="status s-'+esc(st)+'" style="margin-left:0;">'+esc(st)+'</span></span>'+
       (c ? '<button class="linkbtn" data-bchip="'+esc(c.id)+'">'+(st==="検討中"?'「'+esc(c.name)+'」で決める ›':'「'+esc(c.name)+'」を見る ›')+'</button>' : '')+'</div>';
     return h+'</div>';
@@ -1335,7 +1370,7 @@ function homeHtml(){
   function askHtml(){
     var a = askItems();
     if(!a.length) return "";
-    return '<div class="askbox"><div class="ah">🙋 ご確認ください<span>'+a.length+'件</span></div><p>内容をご覧いただき、「仮決定」か「決定」をお選びください。</p>'+
+    return '<div class="askbox"><div class="ah">🙋 ご確認ください<span>'+a.length+'件</span></div><p>内容をご覧いただき、「変更したい」か「これで決定」をお選びください。</p>'+
       a.slice(0,5).map(function(e){
         var t = e.x.title || e.x.decided || e.x.open || (e.x.source && e.x.source.noteSnippet) || (e.x.type==="planboard"?"プランボード":"写真・資料");
         return '<button class="ai" data-buildcat="'+esc(e.c.id)+'"><span class="ptag">'+esc(e.c.name)+'</span><span class="at">'+esc(String(t).slice(0,40))+'</span><span class="ug">›</span></button>';
@@ -1461,12 +1496,15 @@ function homeHtml(){
     quotes.forEach(function(x){ feed.push({ at: x.at||"", kind:"spec", x:x, plain:true, quote:true }); });
     feed.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
     var roomIdOfTab = (String(tabKey).indexOf("rooms:")===0) ? String(tabKey).split(":")[1] : "";
-    function cardDecHtml(key, status, label, show){
+    function cardDecHtml(key, status, label, show, item){
       if(!key || !show) return "";
       var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(label||"").slice(0,40))+'" data-ccat="'+esc(roomIdOfTab ? "rooms" : c.id)+'"';
-      return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span></div>'+
-        '<div class="btns"><button class="btn ol" data-cdecide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
-        '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>決定する</button></div>'+
+      var cl = chgLabelOf(c, item || {key:key});
+      var sent = chgSent[key];
+      // 「仮決定」は押しにくいので、「変更したい（スタッフに送る）」と「これで決定」の2つにする
+      return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
+        '<div class="btns"><button class="btn ol" data-chg="'+esc(cl)+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
+        '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>✅ これで決定</button></div>'+
         ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
     }
     if(feed.length){
@@ -1488,7 +1526,8 @@ function homeHtml(){
               '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+nwTag(x.upd)+'</div>'+
               (x.msg ? '<div class="section-item-desc" style="font-size:.9rem;"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>' : '')+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
-              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true))+'</div>';
+              ((it.plain && (x.type==="planboard" || x.isQuote)) ? chgBtnHtml(c, x) : '')+
+              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true, x))+'</div>';
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
@@ -1723,6 +1762,7 @@ function homeHtml(){
     var uc = e.target.closest("[data-updcat]"); if(uc){ view.tab="build"; view.buildSeg="spec"; view.plansOnly=false; view.cat = null; view.buildCat = uc.dataset.updcat || null; render(); window.scrollTo(0,0); return; }
     var bc = e.target.closest("[data-bchip]"); if(bc){ view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bc.dataset.bchip || null; render(); window.scrollTo(0,0); return; }
     var bcat = e.target.closest("[data-buildcat]"); if(bcat){ view.tab="build"; view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bcat.dataset.buildcat; render(); window.scrollTo(0,0); return; }
+    var chg = e.target.closest("[data-chg]"); if(chg){ chgOpen(chg.dataset.chg, chg.dataset.chgkey); return; }
     var fa = e.target.closest("[data-feedall]"); if(fa){ view.feedAll = true; render(); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ var el = document.getElementById(uj.dataset.updjump); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
@@ -1763,6 +1803,31 @@ function homeHtml(){
   // いずれもホームの描画（render）とは無関係に、ページ読み込み時に一度だけ組み立てる。
   function openSheet(id){ document.getElementById(id).hidden = false; }
   function closeSheet(id){ document.getElementById(id).hidden = true; }
+  var chgCur = null;
+  function chgOpen(label, key){
+    chgCur = {label:label, key:key};
+    document.getElementById("chgWhat").textContent = "「"+label+"」について、変えたいところを書いてください。";
+    document.getElementById("chgInput").value = "";
+    openSheet("chgModal");
+    setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
+  }
+  document.getElementById("chgX").addEventListener("click", function(){ closeSheet("chgModal"); });
+  document.getElementById("chgModal").addEventListener("click", function(e){ if(e.target.id==="chgModal") closeSheet("chgModal"); });
+  document.getElementById("chgSend").addEventListener("click", async function(){
+    var text = (document.getElementById("chgInput").value||"").trim();
+    if(!text || !chgCur){ toast("変えたいところを書いてください"); return; }
+    var btn = this; btn.disabled = true;
+    var full = "【変更のご依頼】"+chgCur.label+"\n"+text;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.messages.push({ content:full, sender:"", fromCustomer:true, createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
+      chgSent[chgCur.key] = true;
+      closeSheet("chgModal"); render(); toast("スタッフに送りました");
+    }catch(e){ toast("送れませんでした。もう一度お試しください"); }
+    btn.disabled = false;
+  });
   [["btnHelp","help","helpX"],["btnOrder","orderModal","orderX"],["btnMemo","memoModal","memoX"]].forEach(function(t){
     var openBtn = t[0], sheetId = t[1], closeBtn = t[2];
     document.getElementById(openBtn).addEventListener("click", function(){ openSheet(sheetId); });
