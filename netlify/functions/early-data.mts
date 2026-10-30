@@ -1,14 +1,17 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
+import { sendNotifyMail } from "../lib/google.mts";
 
 // 初期の打合せ記録のお客様用ページ（/kiroku/）のAPI。読み取りだけ。
 // 案件ごとの earlyToken（住まいるアプリの「ヒアリング」タブで発行。おうちノートの noteToken とは別）で確認し、
 // 「お客様に見せる」にした記録（project.earlyMeetings の shared:true）と資金計画・お見積り（project.financeDocs）、この案件の今後の予約（日時・種類だけ）、
 // 会社紹介の文章（settings/main.companyIntro）を返す。社内の情報は返さない。予約の受付は note-calendar.mts（earlyToken でも可）。
+// メッセージ：おうちノートと同じ messages コレクションのやりとりを返し、POST {p,t,action:"message",text} でお客様から送れる
+// （fromCustomer:true で保存し、スタッフへ通知メール）。
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -21,17 +24,40 @@ function json(body: unknown, status = 200) {
 
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
-  if (req.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+  if (req.method !== "GET" && req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const url = new URL(req.url);
-  const projectId = String(url.searchParams.get("p") || "");
-  const token = String(url.searchParams.get("t") || "");
+  let body: any = null;
+  if (req.method === "POST") {
+    try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
+  }
+  const projectId = String((body ? body.p : url.searchParams.get("p")) || "");
+  const token = String((body ? body.t : url.searchParams.get("t")) || "");
   if (!projectId || !token || projectId.includes("/")) return json({ error: "missing_link" }, 400);
 
   const store = getStore("staffData");
   const project: any = await store.get(`projects/${projectId}`, { type: "json" });
   if (!project || project.deletedAt || !project.earlyToken || project.earlyToken !== token) {
     return json({ error: "invalid_link" }, 403);
+  }
+
+  if (body) {
+    if (body.action !== "message") return json({ error: "unknown_action" }, 400);
+    const text = String(body.text || "").trim().slice(0, 2000);
+    if (!text) return json({ error: "empty" }, 400);
+    const now = new Date().toISOString();
+    const id = "msg_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const doc = {
+      id, projectId, content: text, sender: (project.customer || "お客様") + "（お打合せの記録ページ）",
+      fromCustomer: true, createdAt: now, updatedAt: now,
+    };
+    await store.setJSON(`messages/${id}`, doc);
+    // スタッフへ通知メール（失敗してもメッセージ送信自体は成功扱い）
+    await sendNotifyMail(
+      `【打合せ記録ページ】${project.customer || "お客様"}様からメッセージが届きました`,
+      `${project.customer || "お客様"}様（${project.name || ""}）から、お打合せの記録ページでメッセージが届きました。\n\n${text}\n\n住まいるアプリの案件の「ヒアリング」タブ（または「メッセージ」タブ）から返信できます。`
+    ).catch(() => {});
+    return json({ ok: true, message: { content: doc.content, sender: doc.sender, fromCustomer: true, createdAt: now } });
   }
 
   const records = (Array.isArray(project.earlyMeetings) ? project.earlyMeetings : [])
@@ -84,6 +110,14 @@ export default async (req: Request, context: Context) => {
     .map((r: any) => ({ type: String(r.type || ""), date: String(r.date || ""), startTime: String(r.startTime || ""), endTime: String(r.endTime || "") }))
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
+  // メッセージ（おうちノートと同じやりとり。古い順）
+  const { blobs: mblobs } = await store.list({ prefix: "messages/" });
+  const msgAll = await Promise.all(mblobs.map((bl) => store.get(bl.key, { type: "json" }).catch(() => null)));
+  const messages = msgAll
+    .filter((m: any) => m && m.projectId === projectId && !m.deletedAt)
+    .map((m: any) => ({ content: String(m.content || ""), sender: String(m.sender || ""), fromCustomer: !!m.fromCustomer, createdAt: String(m.createdAt || "") }))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
   // 会社紹介（住まいるアプリの「業者・設定」で保存した文章。未保存なら出さない）
   const settings: any = await store.get("settings/main", { type: "json" }).catch(() => null);
   const ci = settings && settings.companyIntro;
@@ -102,6 +136,7 @@ export default async (req: Request, context: Context) => {
     hearing,
     hearingAt,
     reservations,
+    messages,
     companyIntro,
     policy,
   });

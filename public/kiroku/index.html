@@ -54,6 +54,15 @@
   .khelp-card .x{ position:absolute; top:10px; right:12px; width:36px; height:36px; border-radius:50%; border:none; background:var(--chip); font-size:1.3rem; color:var(--ink2); cursor:pointer; }
   .khelp-card .close2{ display:block; width:100%; margin-top:22px; padding:12px; border-radius:999px; border:none; background:var(--brown); color:#fff; font:inherit; font-weight:700; cursor:pointer; }
   h2.sec{ font-size:1.12rem; margin:30px 0 4px; scroll-margin-top:12px; }
+  .msgs{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+  .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.92rem; white-space:pre-wrap; line-height:1.55; word-break:break-word; }
+  .msg .mm{ font-size:.72rem; opacity:.7; margin-bottom:3px; }
+  .msg.staff{ background:var(--card); border:1.5px solid var(--line); align-self:flex-start; border-bottom-left-radius:4px; }
+  .msg.me{ background:var(--brown); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+  .composer{ display:flex; gap:8px; align-items:flex-end; }
+  .composer textarea{ flex:1; font:inherit; font-size:16px; padding:10px 12px; border:1.5px solid var(--line2); border-radius:14px; background:#fff; resize:vertical; min-height:48px; box-sizing:border-box; }
+  .composer button{ flex-shrink:0; padding:12px 18px; border:none; border-radius:999px; background:var(--brown); color:#fff; font:inherit; font-weight:700; cursor:pointer; }
+  .composer button:disabled{ opacity:.5; }
   .secsub{ color:var(--muted); font-size:.82rem; margin:0 0 12px; }
   .next{ background:var(--brown); color:#fff; border-radius:16px; padding:14px 16px; margin-bottom:18px; }
   .next .l{ font-size:.75rem; opacity:.8; letter-spacing:.08em; } .next .v{ font-weight:700; font-size:1.05rem; margin-top:2px; }
@@ -152,7 +161,7 @@
     var html = '<h1>'+(name?esc(name):'お客様')+'</h1><p class="sub">住まいるハウジングとのお打合せの記録です。</p>';
     var fins = data.financeDocs || [];
     var hear = data.hearing || [];
-    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
+    html += '<div class="jump"><a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
     html += '<div id="nextBox">'+nextHtml()+'</div>';
     html += '<h2 class="sec" id="sec-rec">お打合せの記録</h2><p class="secsub">新しいものから順に並んでいます。資料は押すと開きます。</p>';
     if(!data.records || !data.records.length){
@@ -203,6 +212,8 @@
         '</div>';
       }).join("");
     }
+    html += '<h2 class="sec" id="sec-msg">メッセージ</h2><p class="secsub">ご質問・ご相談などはこちらからどうぞ。担当者からのお返事もここに届きます。</p><div id="msgBox">'+msgListHtml()+'</div>'+
+      '<div class="composer"><textarea id="msgInput" rows="2" placeholder="メッセージを入力"></textarea><button type="button" id="msgSend">送信</button></div>';
     html += '<h2 class="sec" id="sec-gal">施工事例・イメージ集</h2><p class="secsub">住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと、「いいね」にまとまります。</p>'+
       '<a class="gal" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener"><span class="gi"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
       '<span class="gt"><b>イメージ集を見る</b><span>外観・LDK・水まわりなど</span></span><span class="ga">ひらく ›</span></a>';
@@ -220,6 +231,40 @@
     main.innerHTML = html;
     renderResv();
     drawPdfThumbs();
+  }
+
+  // ---------- メッセージ（おうちノートと同じやりとり。/api/early-data に POST） ----------
+  function msgListHtml(){
+    var ms = data.messages || [];
+    if(!ms.length) return '<div class="empty" style="margin-bottom:10px;">まだメッセージはありません。</div>';
+    return '<div class="msgs">'+ms.map(function(m){
+      var me = m.fromCustomer;
+      return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+msgTime(m.createdAt)+'</div>'+esc(m.content)+'</div>';
+    }).join("")+'</div>';
+  }
+  function msgTime(iso){
+    var d = new Date(iso||""); if(isNaN(d)) return "";
+    return (d.getMonth()+1)+"/"+d.getDate()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+  }
+  var msgSending = false;
+  function sendMsg(){
+    var ta = document.getElementById("msgInput");
+    var text = ((ta && ta.value)||"").trim();
+    if(!text || msgSending) return;
+    msgSending = true;
+    var btn = document.getElementById("msgSend"); if(btn) btn.disabled = true;
+    fetch("/api/early-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:text }) })
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+      .then(function(res){
+        if(!res.ok || !res.j.ok) throw new Error("ng");
+        data.messages = data.messages || [];
+        data.messages.push(res.j.message);
+        ta.value = "";
+        document.getElementById("msgBox").innerHTML = msgListHtml();
+        toast("送信しました");
+      })
+      .catch(function(){ toast("送信できませんでした。もう一度お試しください"); })
+      .then(function(){ msgSending = false; if(btn) btn.disabled = false; });
   }
 
   // ---------- 予約（おうちノートと同じ空き状況・カレンダー。/api/note-calendar を earlyToken で使う） ----------
@@ -310,6 +355,7 @@
   main.addEventListener("click", function(e){
     if(e.target.closest("[data-khelp]")){ e.preventDefault(); openHelp(); return; }
     if(e.target.closest("#rvToggle")){ setResvOpen(!rv.open); return; }
+    if(e.target.closest("#msgSend")){ sendMsg(); return; }
     if(e.target.closest('.jump a[href="#sec-resv"]')) setResvOpen(true);
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }
     var rdu = e.target.closest("[data-rvdur]"); if(rdu){ rv.dur = parseInt(rdu.dataset.rvdur,10); rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== needDur()) loadAvail(); else renderResv(); return; }
@@ -342,6 +388,7 @@
         '<li><b>記録</b>：お打合せのメモをご覧いただけます。資料は押すと開きます</li>'+
         ((data && data.hearing && data.hearing.length) ? '<li><b>ご要望のまとめ</b>：お伺いしたご要望を項目ごとにまとめています</li>' : '')+
         (fins.length ? '<li><b>資金計画・お見積り</b>：資金計画書やお見積りをご覧いただけます</li>' : '')+
+        '<li><b>メッセージ</b>：ご質問・ご相談を送れます。担当者からのお返事もここに届きます</li>'+
         '<li><b>施工事例・イメージ集</b>：住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと「いいね」にまとまります</li>'+
         '<li><b>ご予約</b>：「📅 予約する」から、次回のご来店やご相談を予約できます</li>'+
         (about ? '<li><b>会社について</b>：住まいるハウジングのご紹介です</li>' : '')+

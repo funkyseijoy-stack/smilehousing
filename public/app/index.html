@@ -1105,6 +1105,18 @@
       <div class="subpanel" id="sub-hearing">
         <!-- 次回のご予約（この案件の今日以降の予約。renderHearingNextRes） -->
         <div class="card" id="hearNextRes" style="padding-block:12px;"></div>
+        <!-- お客様とのメッセージ（おうちノートのメッセージと同じやりとり。お打合せの記録ページからも送れる） -->
+        <div class="card" id="hearMsgCard">
+          <h3 style="margin:0 0 6px;">💬 お客様とのメッセージ</h3>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">おうちノートの「メッセージ」と同じやりとりです（案件の「メッセージ」タブにも同じものが出ます）。お客様はおうちノートか、お打合せの記録ページから送れます。送信すると、プロラインIDを登録したお客様のLINEに「メッセージが届きました」が自動で届きます。</p>
+          <div class="notelist" id="hearMsgList" style="max-height:360px; overflow-y:auto;"></div>
+          <div class="empty" id="hearMsgEmpty" hidden>まだメッセージがありません。</div>
+          <div class="row" style="margin-block-start:10px;">
+            <input type="text" id="hearMsgInput" placeholder="メッセージを入力" style="flex:1;">
+            <button class="btn small" id="btnHearMsgSend">送信</button>
+          </div>
+          <label class="field" id="hearMsgLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="hearMsgLine" checked><span id="hearMsgLineLabel" style="font-size:.85rem;"></span></label>
+        </div>
         <!-- 初期の打合せ記録（手書きメモをPDFで。お客様には専用の簡単なページで見せる） -->
         <div class="card" id="earlyCard">
           <div class="row" style="justify-content:space-between; gap:8px; flex-wrap:wrap; margin-block-end:6px;">
@@ -6600,20 +6612,29 @@
   }
 
   function renderMessages(){
-    var wrap = document.getElementById("messageList");
-    var empty = document.getElementById("messageEmpty");
-    if(!wrap) return;
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
-    empty.hidden = rows.length !== 0;
-    wrap.innerHTML = rows.map(function(m){
-      return '<div class="noteitem"><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+escapeHtml(m.content)+'</div></div>';
+    var html = rows.map(function(m){
+      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+escapeHtml(m.content)+'</div></div>';
     }).join("");
+    // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
+    [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
+      var wrap = document.getElementById(ids[0]), empty = document.getElementById(ids[1]);
+      if(!wrap) return;
+      var stick = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
+      if(empty) empty.hidden = rows.length !== 0;
+      wrap.innerHTML = html;
+      if(stick) wrap.scrollTop = wrap.scrollHeight;
+    });
     refreshMessageLine();
   }
   // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
   // メッセージ送信時に、お客様のLINE（プロライン）へ自動で知らせるかのチェック
   function refreshMessageLine(){
-    var wrap = document.getElementById("messageLineWrap"), lab = document.getElementById("messageLineLabel"), cb = document.getElementById("messageLine");
+    refreshMessageLineOne("messageLineWrap","messageLineLabel","messageLine");
+    refreshMessageLineOne("hearMsgLineWrap","hearMsgLineLabel","hearMsgLine");
+  }
+  function refreshMessageLineOne(wid, lid, cid){
+    var wrap = document.getElementById(wid), lab = document.getElementById(lid), cb = document.getElementById(cid);
     if(!wrap || !lab || !cb) return;
     var proj = projectById(state.currentProjectId);
     var recips = prolineRecipients(proj);
@@ -6641,17 +6662,19 @@
     if(!email) cb.checked = false;
     lab.textContent = email ? "お客様にメールで知らせる（"+email+"。メッセージの内容は書かず、ノートのリンクだけ送ります）" : "お客様は、お知らせメールをまだ登録していません（おうちノートのメッセージ画面で、お客様が登録します）";
   }
-  async function sendMessage(){
-    var input = document.getElementById("messageInput");
+  // from:"hear" はヒアリングタブの送信欄（メールのお知らせは「メッセージ」タブだけ）
+  async function sendMessage(from){
+    var hear = from === "hear";
+    var input = document.getElementById(hear ? "hearMsgInput" : "messageInput");
     var content = input.value.trim();
     if(!content){ return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var m = { id:uid("msg"), projectId: state.currentProjectId, content:content, sender: state.currentUser||"", createdAt: nowIso() };
     state.messages.push(m);
     input.value = "";
-    var notifyOn = !!(document.getElementById("messageNotify") && document.getElementById("messageNotify").checked && !document.getElementById("messageNotify").disabled);
-    var lineCb = document.getElementById("messageLine");
-    var lineOn = !!(lineCb && lineCb.checked && !lineCb.disabled && (document.getElementById("messageLineWrap").dataset.pid||"") === m.projectId);
+    var notifyOn = !hear && !!(document.getElementById("messageNotify") && document.getElementById("messageNotify").checked && !document.getElementById("messageNotify").disabled);
+    var lineCb = document.getElementById(hear ? "hearMsgLine" : "messageLine");
+    var lineOn = !!(lineCb && lineCb.checked && !lineCb.disabled && (document.getElementById(hear ? "hearMsgLineWrap" : "messageLineWrap").dataset.pid||"") === m.projectId);
     render();
     var okMsg = await saveDoc("messages", m.id, m);
     if(okMsg===false){ toast("⚠ メッセージを保存できませんでした"); return; }
@@ -14760,7 +14783,9 @@
       if(!btn) return;
       if(confirm2()) deleteCustomerInfo(btn.dataset.delci);
     });
-    document.getElementById("btnSendMessage").addEventListener("click", sendMessage);
+    document.getElementById("btnSendMessage").addEventListener("click", function(){ sendMessage(); });
+    document.getElementById("btnHearMsgSend").addEventListener("click", function(){ sendMessage("hear"); });
+    document.getElementById("hearMsgInput").addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); sendMessage("hear"); } });
     document.getElementById("btnNewNoteIssue").addEventListener("click", issueNewNoteLink);
     document.getElementById("btnNewNoteCopy").addEventListener("click", copyNewNoteLink);
     document.getElementById("btnProlineUidSave").addEventListener("click", saveProlineUid);
