@@ -748,6 +748,7 @@
   .docedit .chk{ flex-direction:row; align-items:center; gap:6px; }
   .docedit .chk.off{ color:var(--muted); }
   .docedit .acts{ grid-column:1 / -1; display:flex; gap:6px; flex-wrap:wrap; }
+  .rcvdone{ display:block; margin-block-start:3px; color:var(--accent); font-weight:700; font-size:.9rem; }
   .rcvextra{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-block-start:4px; }
   .rcvextra input[type=text]{ flex:1 1 200px; min-width:0; }
   .fttile{ position:relative; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; min-width:0; }
@@ -11239,13 +11240,15 @@
         var isPdf = /pdf/i.test(it.mimeType||"") || /\.pdf$/i.test(it.filename||"");
         return '<div class="rcvitem'+(it.already?' done':'')+'"><label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-incheck="'+i+'"'+(it.already?' disabled':(it.checked?' checked':''))+'>'+
           '<span class="rcvthumb" data-rcvthumb="'+i+'"><span class="rcvic">'+(isPdf?"📄":(isImg?"🖼":"📎"))+'</span></span>'+
-          '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.local?'　パソコンから':(it.date?'　'+escapeHtml(rcvDate(it.date)):""))+(it.already?'　✓取り込み済み':'')+(it.subject?'　'+escapeHtml(String(it.subject).slice(0,40)):'')+'</small></span></label>'+
+          '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.local?'　パソコンから':(it.date?'　'+escapeHtml(rcvDate(it.date)):""))+(it.already?'　✓取り込み済み':'')+(it.subject?'　'+escapeHtml(String(it.subject).slice(0,40)):'')+'</small>'+
+            (it.doneInfo?'<span class="rcvdone">✓ 登録しました（'+escapeHtml(it.doneInfo)+'）</span>':'')+'</span></label>'+
           (it.already ? '' : '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button>'+inboxProjSel(i, it.pid)+
             '<select class="rcvtype" data-intype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+QUOTE_TYPES.map(function(q){ return '<option value="'+q+'"'+(it.qt===q?' selected':'')+'>'+q+'</option>'; }).join("")+'</select>'+
             inboxPartSel(i, it.part)+inboxVendorSel(i, it.vid||inbox.vendorId)+inboxReflHtml(i, it)+'</div>'+
             '<div class="rcvextra">'+inboxCatSel(i, it)+inboxRecHtml(i, it)+
             '<input type="text" data-inmemo="'+i+'" value="'+escapeHtml(it.memo||"")+'" placeholder="🔒 社内コメント（例：前回から照明2か所追加）" aria-label="社内コメント">'+
-            '<input type="text" data-incust="'+i+'" value="'+escapeHtml(it.cust||"")+'" placeholder="💬 お客様へのひとこと（おうちノートに出すときだけ）" aria-label="お客様へのひとこと"'+(inboxReflOn(it)?'':' disabled')+'></div>')+
+            '<input type="text" data-incust="'+i+'" value="'+escapeHtml(it.cust||"")+'" placeholder="💬 お客様へのひとこと（おうちノートに出すときだけ）" aria-label="お客様へのひとこと"'+(inboxReflOn(it)?'':' disabled')+'>'+
+            '<button type="button" class="btn small" data-inone="'+i+'">✅ この1件を登録</button></div>')+
         '</div>';
       }).join("")+'</div>';
     }
@@ -11281,7 +11284,7 @@
       it.pid = inboxGuessProject((it.filename||"")+" "+(it.subject||""));
       it.part = inboxGuessPart((it.filename||"")+" "+(it.subject||"")) || v.defaultPart || "";
       it.vid = inboxGuessVendor((it.filename||"")+" "+(it.subject||""), v.id);
-      it.checked = !it.already && !/^image\//.test(it.mimeType||"");
+      it.checked = false; // 最初はチェックしない（自分で選んだものだけ登録する）
       return it;
     });
     inbox.items = localKeep.concat(gm);
@@ -11289,22 +11292,28 @@
     inbox.msg = gm.length ? ("添付 "+gm.length+"件が見つかりました（✓取り込み済みのものは登録できません）") : "過去1年のあいだに、この業者さんから届いた添付は見つかりませんでした。";
     renderInbox();
   }
-  async function inboxRegister(){
+  var inboxBusyReg = false;
+  async function inboxRegister(onlyIdx){
     var v = vendorById(inbox.vendorId); if(!v) return;
+    if(inboxBusyReg){ toast("登録中です。少しお待ちください"); return; }
     var by = (document.getElementById("inboxBy")||{}).value || "";
     var body = document.getElementById("inboxBody");
     var chosen = [], missing = 0;
     body.querySelectorAll(".need").forEach(function(x){ x.classList.remove("need"); });
     inbox.items.forEach(function(it, i){
-      if(it.already || !it.checked) return;
+      if(it.already) return;
+      if(onlyIdx!=null ? i!==onlyIdx : !it.checked) return;
       var ok = true;
       if(!it.pid){ ok = false; var ps = body.querySelector('[data-inproj="'+i+'"]'); if(ps) ps.classList.add("need"); }
       if(!it.qt){ ok = false; var ts = body.querySelector('[data-intype="'+i+'"]'); if(ts) ts.classList.add("need"); }
       if(!ok) missing++; else chosen.push(it);
     });
-    if(missing){ toast("チェックした書類の「案件」と「種類」を選んでください（"+missing+"件が未選択）", 7000); return; }
-    if(!chosen.length){ toast("登録する書類にチェックを入れてください"); return; }
-    var btn = document.getElementById("inboxRegister"); if(btn){ btn.disabled = true; btn.textContent = "登録中…"; }
+    if(missing){ toast((onlyIdx!=null?"この書類の":"チェックした書類の")+"「案件」と「種類」を選んでください"+(onlyIdx!=null?"":"（"+missing+"件が未選択）"), 7000); return; }
+    if(!chosen.length){ toast("登録する書類にチェックを入れるか、各行の「この1件を登録」を押してください"); return; }
+    inboxBusyReg = true;
+    var btn = onlyIdx!=null ? document.querySelector('[data-inone="'+onlyIdx+'"]') : document.getElementById("inboxRegister");
+    if(btn){ btn.disabled = true; btn.textContent = "登録中…"; }
+    try{
     // 案件ごとの行き先の依頼：受け取り待ち → 未依頼 → 受領済み（最近）→ 無ければ「口頭」の依頼を作る
     var targets = {}, created = 0;
     function tkey(c){ return c.pid+"|"+(c.vid||v.id); }
@@ -11353,6 +11362,7 @@
           if(inboxReflOn(c)){ att.reflected = true; att.reflectedAt = nowIso(); touched = true; reflN++; }
           if(c.vid && c.vid!==v.id){ att.viaVendorId = v.id; touched = true; }
           if(touched) await saveDoc("attachments", att.id, att);
+          c.doneInfo = [(pj0&&pj0.name)||"", quoteTypeNorm(att.quoteType), docInRecord(att)?"記録に出しました":"", (att.reflected&&quoteSharable(att))?"おうちノートに出しました":""].filter(Boolean).join("・");
         }
       }catch(e){ failN++; }
     }
@@ -11373,6 +11383,7 @@
     if(names.length) logActivity(v.name+"の書類を登録しました（"+names.join("・")+"）");
     render(); renderInbox();
     toast(inbox.msg, 9000);
+    } finally { inboxBusyReg = false; }
   }
   function inboxInit(){
     var sel = document.getElementById("inboxVendor"); if(!sel) return;
@@ -11417,7 +11428,9 @@
         if(it.local){ window.open(URL.createObjectURL(it.file), "_blank"); return; }
         rcvOpenItem(it); return;
       }
-      if(e.target.closest("#inboxRegister")){ inboxRegister(); }
+      if(e.target.closest("#inboxRegister")){ inboxRegister(); return; }
+      var one = e.target.closest("[data-inone]");
+      if(one){ inboxRegister(+one.dataset.inone); }
     });
     // 依頼の行の「📥 届いた書類を見る」：業者さんを選んで探す
     document.addEventListener("click", function(e){
