@@ -9,8 +9,7 @@ import { getStore } from "@netlify/blobs";
 // - 発動用URLは、業者・設定タブで入力し settings/main.prolineBeaconUrl に保存（リポジトリには書かない）。
 // - 送る人のプロラインIDは、案件の「おうちノート連携」タブで入力し projects/<id>.prolineUids=[{uid,name}] に保存（複数可・全員に送る。以前の prolineUid も読む）。
 // - 文面はプロライン側のシナリオで設定する（このプログラムでは文面を持たない）。
-// - kind:"message"（スタッフがメッセージを送ったとき・自動）は「メッセージのお知らせ」用の発動用URL
-//   settings/main.prolineMsgBeaconUrl を使う（未保存なら prolineBeaconUrl＝おうちノート更新のお知らせで代用）。
+// - kind:"message" はスタッフがメッセージを送ったときの自動のお知らせ（文面は同じ「おうちノートが更新されました。」）。
 // 認証は他の機能と同じ合言葉（X-Staff-Token）。
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -50,8 +49,7 @@ export default async (req: Request, context: Context) => {
   if (uids.some((u) => !/^[A-Za-z0-9_-]{1,64}$/.test(u))) return json({ ok: false, error: "bad_uid" }, 400);
 
   const settings: any = await store.get("settings/main", { type: "json" });
-  const isMsg = body.kind === "message";
-  const beacon = String((settings && ((isMsg && settings.prolineMsgBeaconUrl) || settings.prolineBeaconUrl)) || "").trim();
+  const beacon = String((settings && settings.prolineBeaconUrl) || "").trim();
   if (!beacon) return json({ ok: false, error: "no_beacon" }, 400);
   if (!beacon.startsWith(BEACON_PREFIX) || !beacon.includes("[[uid]]")) return json({ ok: false, error: "bad_beacon" }, 400);
 
@@ -66,7 +64,7 @@ export default async (req: Request, context: Context) => {
   }
   const sent = uids.length - failed.length;
   if (!sent) return json({ ok: false, error: "proline_failed", failed }, 502);
-  return json({ ok: true, sent, failed, usedMsgBeacon: !!(isMsg && settings && settings.prolineMsgBeaconUrl) });
+  return json({ ok: true, sent, failed });
 };
 
 export const config: Config = {
