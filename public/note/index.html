@@ -910,6 +910,9 @@ function homeHtml(){
     out += '<button class="msgcta" data-go="msg"><span>💬</span><span class="t">スタッフへのご連絡・ご質問は<b>こちらから</b></span><span class="ug">›</span></button>';
     out += updatesHtml();
     out += askHtml();
+    // プランボードの移り変わりをホームにも（項目ごとに古い順→最新）
+    var pbh = latestPbHtml();
+    if(pbh) out += pbh.replace('<div class="sechd"><h3>📐 プランボードの移り変わり</h3></div>', '<div class="sechd"><h3>📐 プランボード</h3><button class="more" data-go="build">家づくりを見る →</button></div>');
     if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
     // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
     // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
