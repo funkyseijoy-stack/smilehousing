@@ -1359,7 +1359,7 @@
       <div class="subpanel" id="sub-message">
         <div class="card">
           <h3>メッセージ</h3>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様がお知らせメールを登録している場合は、下のチェックで、メールでも知らせられます。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様のプロラインIDを「おうちノート連携」タブの「LINEでお知らせ」に登録していれば、送信するとお客様のLINEに「メッセージが届きました」が自動で届きます（下のチェックで止められます）。お知らせメールを登録しているお客様には、メールでも知らせられます。</p>
           <div class="notelist" id="messageList"></div>
           <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
           <div class="row" style="margin-block-start:10px;">
@@ -1367,6 +1367,7 @@
             <button class="btn small" id="btnSendMessage">送信</button>
           </div>
           <label class="field" id="messageNotifyWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageNotify" checked><span id="messageNotifyLabel" style="font-size:.85rem;"></span></label>
+          <label class="field" id="messageLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageLine" checked><span id="messageLineLabel" style="font-size:.85rem;"></span></label>
         </div>
       </div>
 
@@ -1785,6 +1786,10 @@
       <p class="muted help" style="font-size:.85rem; margin:0 0 8px;">プロラインで作った「おうちノート更新のお知らせ」シナリオの「外部システム連携用タグ発動用URL」（https://autosns.jp/api/call-beacon/…/[[uid]]）をそのまま貼り付けて保存します。末尾の [[uid]] は書き換えずに残してください。</p>
       <div class="row" style="gap:6px; flex-wrap:wrap;"><input type="text" id="prolineBeaconInput" autocomplete="off" placeholder="https://autosns.jp/api/call-beacon/XXXX/[[uid]]" style="flex:1; min-width:240px;"><button class="btn secondary small" id="btnSaveProlineBeacon">保存</button></div>
       <div id="prolineBeaconStatus" class="muted" style="font-size:.85rem; margin-block-start:4px;"></div>
+      <h4 style="margin:14px 0 4px;">メッセージのお知らせ用（スタッフがメッセージを送ったとき・自動）</h4>
+      <p class="muted help" style="font-size:.85rem; margin:0 0 8px;">プロラインで「メッセージが届きました」の文面のシナリオを作り、その発動用URLを貼り付けます。案件の「メッセージ」で送信すると、「送る人」に登録したお客様のLINEへ自動で届きます（メッセージの内容は送りません。1人ごとに配信数を1通使います）。未保存のときは、上の「おうちノート更新のお知らせ」で代わりに送ります。</p>
+      <div class="row" style="gap:6px; flex-wrap:wrap;"><input type="text" id="prolineMsgBeaconInput" autocomplete="off" placeholder="https://autosns.jp/api/call-beacon/XXXX/[[uid]]" style="flex:1; min-width:240px;"><button class="btn secondary small" id="btnSaveProlineMsgBeacon">保存</button></div>
+      <div id="prolineMsgBeaconStatus" class="muted" style="font-size:.85rem; margin-block-start:4px;"></div>
     </div>
 
     <div class="card">
@@ -2848,6 +2853,7 @@
         if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
         if(s.staffWorksIds) state.settings.staffWorksIds = s.staffWorksIds;
         if(s.prolineBeaconUrl) state.settings.prolineBeaconUrl = s.prolineBeaconUrl;
+        if(s.prolineMsgBeaconUrl) state.settings.prolineMsgBeaconUrl = s.prolineMsgBeaconUrl;
         if(Array.isArray(s.projectFolders)) state.settings.projectFolders = s.projectFolders;
         if(s.pin) state.settings.pin = s.pin;
       } else {
@@ -3089,6 +3095,7 @@
         if(s.staffEmails) state.settings.staffEmails = s.staffEmails;
         if(s.staffWorksIds) state.settings.staffWorksIds = s.staffWorksIds;
         if(s.prolineBeaconUrl) state.settings.prolineBeaconUrl = s.prolineBeaconUrl;
+        if(s.prolineMsgBeaconUrl) state.settings.prolineMsgBeaconUrl = s.prolineMsgBeaconUrl;
         if(Array.isArray(s.projectFolders)) state.settings.projectFolders = s.projectFolders;
         if(s.pin) state.settings.pin = s.pin;
       }
@@ -3505,6 +3512,19 @@
     if(!inp) return;
     if(document.activeElement !== inp) inp.value = state.settings.prolineBeaconUrl || "";
     st.textContent = state.settings.prolineBeaconUrl ? "✓ 保存済み" : "まだ保存されていません";
+    var mi = document.getElementById("prolineMsgBeaconInput"), ms = document.getElementById("prolineMsgBeaconStatus");
+    if(mi){
+      if(document.activeElement !== mi) mi.value = state.settings.prolineMsgBeaconUrl || "";
+      ms.textContent = state.settings.prolineMsgBeaconUrl ? "✓ 保存済み" : (state.settings.prolineBeaconUrl ? "まだ保存されていません（いまは「おうちノートが更新されました」で代わりに送ります）" : "まだ保存されていません");
+    }
+  }
+  async function saveProlineMsgBeacon(){
+    var v = (document.getElementById("prolineMsgBeaconInput").value||"").trim();
+    if(v && (v.indexOf("https://autosns.jp/api/call-beacon/")!==0 || v.indexOf("[[uid]]")<0)){ toast("「https://autosns.jp/api/call-beacon/…/[[uid]]」の形のURLを貼ってください"); return; }
+    if(v) state.settings.prolineMsgBeaconUrl = v; else delete state.settings.prolineMsgBeaconUrl;
+    var ok = await saveDoc("settings","main", state.settings);
+    toast(ok===false ? "保存できませんでした" : (v ? "メッセージのお知らせ用URLを保存しました" : "メッセージのお知らせ用URLを消しました"));
+    renderProlineSetting();
   }
   async function saveProlineBeacon(){
     var v = (document.getElementById("prolineBeaconInput").value||"").trim();
@@ -6586,11 +6606,28 @@
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     empty.hidden = rows.length !== 0;
     wrap.innerHTML = rows.map(function(m){
-      return '<div class="noteitem"><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+'</div><div class="ntext">'+escapeHtml(m.content)+'</div></div>';
+      return '<div class="noteitem"><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+escapeHtml(m.content)+'</div></div>';
     }).join("");
+    refreshMessageLine();
   }
   // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
+  // メッセージ送信時に、お客様のLINE（プロライン）へ自動で知らせるかのチェック
+  function refreshMessageLine(){
+    var wrap = document.getElementById("messageLineWrap"), lab = document.getElementById("messageLineLabel"), cb = document.getElementById("messageLine");
+    if(!wrap || !lab || !cb) return;
+    var proj = projectById(state.currentProjectId);
+    var recips = prolineRecipients(proj);
+    var hasBeacon = !!(state.settings && (state.settings.prolineMsgBeaconUrl || state.settings.prolineBeaconUrl));
+    var can = !!(proj && recips.length && hasBeacon);
+    if((wrap.dataset.pid || "") !== ((proj && proj.id) || "")){ cb.checked = true; wrap.dataset.pid = (proj && proj.id) || ""; }
+    cb.disabled = !can;
+    if(!can) cb.checked = false;
+    lab.textContent = can ? "お客様のLINEに「メッセージが届きました」を知らせる（"+recips.map(function(r){ return r.name || r.uid; }).join("、")+"。内容は送りません）"
+      : !hasBeacon ? "LINEのお知らせ：「業者・設定」でプロラインの発動用URLを保存すると使えます"
+      : "LINEのお知らせ：「おうちノート連携」タブの「LINEでお知らせ」で、お客様のプロラインIDを登録すると自動で届きます";
+  }
   async function refreshMessageNotify(){
+    refreshMessageLine();
     var wrap = document.getElementById("messageNotifyWrap"), lab = document.getElementById("messageNotifyLabel"), cb = document.getElementById("messageNotify");
     if(!wrap || !lab || !state.currentProjectId) return;
     var pid = state.currentProjectId, email = "";
@@ -6613,8 +6650,24 @@
     state.messages.push(m);
     input.value = "";
     var notifyOn = !!(document.getElementById("messageNotify") && document.getElementById("messageNotify").checked && !document.getElementById("messageNotify").disabled);
+    var lineCb = document.getElementById("messageLine");
+    var lineOn = !!(lineCb && lineCb.checked && !lineCb.disabled && (document.getElementById("messageLineWrap").dataset.pid||"") === m.projectId);
     render();
     var okMsg = await saveDoc("messages", m.id, m);
+    if(okMsg===false){ toast("⚠ メッセージを保存できませんでした"); return; }
+    if(lineOn){
+      try{
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message" }) });
+        var lj = await lres.json().catch(function(){ return {}; });
+        if(lres.ok && lj.ok){
+          m.lineNotifiedAt = nowIso();
+          saveDoc("messages", m.id, m);
+          renderMessages();
+          toast("📱 お客様のLINEにお知らせしました" + (lj.failed && lj.failed.length ? "（送れなかった人："+lj.failed.length+"人）" : ""));
+          logActivity("メッセージを送り、LINEでお知らせしました（"+((projectById(m.projectId)||{}).customer||"")+"）");
+        } else toast("メッセージは保存しましたが、LINEのお知らせは送れませんでした");
+      }catch(e){ toast("メッセージは保存しましたが、LINEのお知らせは送れませんでした"); }
+    }
     if(okMsg!==false && notifyOn){
       try{
         var nres = await fetch('/api/note-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, by: state.currentUser||"" }) });
@@ -14718,6 +14771,7 @@
     document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
     document.getElementById("btnLineNotify").addEventListener("click", sendLineNotify);
     document.getElementById("btnSaveProlineBeacon").addEventListener("click", saveProlineBeacon);
+    document.getElementById("btnSaveProlineMsgBeacon").addEventListener("click", saveProlineMsgBeacon);
     document.getElementById("btnNewNoteOpen").addEventListener("click", function(){
       var proj = projectById(state.currentProjectId);
       if(proj && proj.noteToken) window.open(newNoteUrl(proj), "_blank", "noopener");
