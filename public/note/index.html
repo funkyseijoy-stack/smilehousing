@@ -167,11 +167,13 @@
   .fchip{ border:none; cursor:pointer; font-family:inherit; }
   .fdec{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:.8rem; }
   .pbstrip{ display:flex; gap:10px; overflow-x:auto; padding:2px 0 10px; margin-bottom:8px; -webkit-overflow-scrolling:touch; }
-  .pbstrip .pbc{ flex:none; width:44%; max-width:200px; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:8px; }
+  .pbstrip{ scroll-snap-type:x proximity; }
+  .pbstrip .pbc{ flex:none; width:38%; max-width:170px; scroll-snap-align:start; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:8px; }
   .pbstrip .pbc .th{ display:block; width:100%; margin:0; }
   .pbstrip .pbc img{ width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:10px; display:block; }
   .pbstrip .pbm{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; background:none; border:none; padding:6px 2px 0; font:inherit; cursor:pointer; text-align:left; color:var(--ink); }
   .pbstrip .pbm .nm{ font-weight:700; font-size:.85rem; } .pbstrip .pbm .dt{ font-size:.72rem; color:var(--muted); }
+  .pbstrip .pbchg{ width:100%; margin-top:6px; background:var(--card); border:1.5px solid var(--line2); color:var(--brown2); border-radius:999px; padding:6px 4px; font:inherit; font-size:.72rem; font-weight:700; cursor:pointer; }
   .msgcta{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:12px 14px; margin:0 0 16px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
   .msgcta .t{ flex:1; } .msgcta b{ color:var(--brown2); }
   .chgrow{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
@@ -1358,20 +1360,20 @@ function homeHtml(){
   }
   // ---- 最新のプランボード：項目ごとにいちばん新しいプランボードを、家づくりの記録のいちばん上に並べる ----
   function isPb(x){ return x.type==="planboard" || (x.isQuote && x.quoteType!=="定価"); }
-  function latestPbHtml(){
+  // プランボードのサムネイルを新しい順に横へ並べる（catId を渡すとその項目だけ）
+  function latestPbHtml(catId){
     var list = [];
     (data.categories||[]).forEach(function(c){
-      var pbs = catAllItems(c).filter(function(x){ return isPb(x) && x.file; });
-      if(!pbs.length) return;
-      pbs.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
-      list.push({c:c, x:pbs[0], n:pbs.length});
+      if(catId && c.id!==catId) return;
+      catAllItems(c).forEach(function(x){ if(isPb(x) && x.file) list.push({c:c, x:x}); });
     });
     if(!list.length) return "";
     list.sort(function(a,b){ return (Date.parse(b.x.at)||0) - (Date.parse(a.x.at)||0); });
-    return '<div class="sechd"><h3>📐 最新のプランボード</h3></div><div class="pbstrip">'+list.map(function(e){
+    return '<div class="sechd"><h3>📐 プランボード</h3><span class="countpill">'+list.length+'枚・横にスクロール</span></div><div class="pbstrip">'+list.map(function(e){
       var d = new Date(e.x.at);
       return '<div class="pbc">'+thumbHtml(e.x.file,"")+
-        '<button class="pbm" data-bchip="'+esc(e.c.id)+'"><span class="nm">'+esc(e.c.name)+nwTag(e.x.upd)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+(e.n>1?'・全'+e.n+'枚':'')+' ›</span></button></div>';
+        '<button class="pbm" data-bchip="'+esc(e.c.id)+'"><span class="nm">'+(catId ? '' : esc(e.c.name))+nwTag(e.x.upd)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+'</span></button>'+
+        '<button class="pbchg" data-chg="'+esc(chgLabelOf(e.c, e.x))+'" data-chgkey="'+esc(e.x.key||"")+'">✏️ 変更したい</button></div>';
     }).join("")+'</div>';
   }
   function buildFeedHtml(){
@@ -1380,7 +1382,7 @@ function homeHtml(){
     out += buildChipsHtml();
     if(view.buildCat){
       // 項目を選んだときは、これまでの項目の画面（仮決定／決定ボタンも）をその場に出す
-      return out + catDetailHtml(view.buildCat).replace('<button class="back" data-back="1">← 設備仕様の一覧へ</button>', '');
+      return out + latestPbHtml(view.buildCat) + catDetailHtml(view.buildCat).replace('<button class="back" data-back="1">← 設備仕様の一覧へ</button>', '');
     }
     out += latestPbHtml();
     out += '<div class="sechd"><h3>これまでの記録</h3><span class="countpill">新しい順</span></div>';
