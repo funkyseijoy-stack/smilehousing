@@ -167,7 +167,15 @@
   .fchip{ border:none; cursor:pointer; font-family:inherit; }
   .fdec{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:.8rem; }
   .pbstrip{ display:flex; gap:10px; overflow-x:auto; padding:2px 0 10px; margin-bottom:8px; -webkit-overflow-scrolling:touch; }
-  .pbstrip{ scroll-snap-type:x proximity; }
+  .pbstrip{ scroll-snap-type:x proximity; align-items:flex-start; }
+  .pbrow{ margin-bottom:6px; }
+  .pbrh{ display:flex; justify-content:space-between; align-items:center; width:100%; background:none; border:none; padding:4px 2px 6px; font:inherit; font-weight:700; font-size:.9rem; color:var(--ink); cursor:pointer; text-align:left; }
+  .pbrh span{ font-weight:400; font-size:.75rem; color:var(--muted); }
+  .pbstrip .pbno{ font-size:.7rem; font-weight:700; color:var(--muted); margin-bottom:4px; }
+  .pbstrip .pbc.latest{ border-color:var(--brown2); }
+  .pbstrip .pbc.latest .pbno{ color:#fff; background:var(--brown2); display:inline-block; border-radius:999px; padding:1px 8px; }
+  .pbstrip .pbarrow{ flex:none; align-self:center; color:var(--muted); font-size:.9rem; margin:0 -4px; }
+  .pbstrip .pbm{ flex-direction:row; align-items:center; gap:6px; }
   .pbstrip .pbc{ flex:none; width:38%; max-width:170px; scroll-snap-align:start; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:8px; }
   .pbstrip .pbc .th{ display:block; width:100%; margin:0; }
   .pbstrip .pbc img{ width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:10px; display:block; }
@@ -725,6 +733,8 @@
     main.innerHTML = '<div class="wrap">'+html+'</div>';
     var rdNew = main.querySelector('.rvdays'); if(rdNew && rdLeft) rdNew.scrollLeft = rdLeft;
     if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
+    // プランボードの列は、最新（いちばん右）が見える位置から
+    Array.prototype.forEach.call(document.querySelectorAll(".pbstrip"), function(el){ el.scrollLeft = el.scrollWidth; });
     if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
   }
 
@@ -1360,21 +1370,28 @@ function homeHtml(){
   }
   // ---- 最新のプランボード：項目ごとにいちばん新しいプランボードを、家づくりの記録のいちばん上に並べる ----
   function isPb(x){ return x.type==="planboard" || (x.isQuote && x.quoteType!=="定価"); }
-  // プランボードのサムネイルを新しい順に横へ並べる（catId を渡すとその項目だけ）
+  // プランボードの移り変わり：項目ごとに1列、古い順に左から右へ（いちばん右が最新。最初は最新が見える位置）
   function latestPbHtml(catId){
-    var list = [];
+    var rows = [];
     (data.categories||[]).forEach(function(c){
       if(catId && c.id!==catId) return;
-      catAllItems(c).forEach(function(x){ if(isPb(x) && x.file) list.push({c:c, x:x}); });
+      var pbs = catAllItems(c).filter(function(x){ return isPb(x) && x.file; });
+      if(!pbs.length) return;
+      pbs.sort(function(a,b){ return (Date.parse(a.at)||0) - (Date.parse(b.at)||0); });
+      rows.push({c:c, pbs:pbs, last:Date.parse(pbs[pbs.length-1].at)||0});
     });
-    if(!list.length) return "";
-    list.sort(function(a,b){ return (Date.parse(b.x.at)||0) - (Date.parse(a.x.at)||0); });
-    return '<div class="sechd"><h3>📐 プランボード</h3><span class="countpill">'+list.length+'枚・横にスクロール</span></div><div class="pbstrip">'+list.map(function(e){
-      var d = new Date(e.x.at);
-      return '<div class="pbc">'+thumbHtml(e.x.file,"")+
-        '<button class="pbm" data-bchip="'+esc(e.c.id)+'"><span class="nm">'+(catId ? '' : esc(e.c.name))+nwTag(e.x.upd)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+'</span></button>'+
-        '<button class="pbchg" data-chg="'+esc(chgLabelOf(e.c, e.x))+'" data-chgkey="'+esc(e.x.key||"")+'">✏️ 変更したい</button></div>';
-    }).join("")+'</div>';
+    if(!rows.length) return "";
+    rows.sort(function(a,b){ return b.last - a.last; }); // 最近プランボードが増えた項目を上に
+    return '<div class="sechd"><h3>📐 プランボードの移り変わり</h3></div>'+rows.map(function(r){
+      return '<div class="pbrow">'+(catId ? '' : '<button class="pbrh" data-bchip="'+esc(r.c.id)+'">'+esc(r.c.name)+'<span>'+r.pbs.length+'枚 ›</span></button>')+
+        '<div class="pbstrip">'+r.pbs.map(function(x, i){
+          var d = new Date(x.at), last = i===r.pbs.length-1;
+          return '<div class="pbc'+(last?' latest':'')+'"><div class="pbno">'+(last ? '最新' : (i+1)+'回目')+'</div>'+thumbHtml(x.file,"")+
+            '<div class="pbm"><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+'</span>'+nwTag(x.upd)+'</div>'+
+            (last ? '<button class="pbchg" data-chg="'+esc(chgLabelOf(r.c, x))+'" data-chgkey="'+esc(x.key||"")+'">✏️ 変更したい</button>' : '')+'</div>'+
+            (last ? '' : '<div class="pbarrow">→</div>');
+        }).join("")+'</div></div>';
+    }).join("");
   }
   function buildFeedHtml(){
     var out = '<h2 class="big" style="margin-bottom:4px;">家づくりの記録</h2>';
