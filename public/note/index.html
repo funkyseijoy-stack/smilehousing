@@ -182,6 +182,10 @@
   .pbstrip .pbm{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; background:none; border:none; padding:6px 2px 0; font:inherit; cursor:pointer; text-align:left; color:var(--ink); }
   .pbstrip .pbm .nm{ font-weight:700; font-size:.85rem; } .pbstrip .pbm .dt{ font-size:.72rem; color:var(--muted); }
   .pbstrip .pbchg{ width:100%; margin-top:6px; background:var(--card); border:1.5px solid var(--line2); color:var(--brown2); border-radius:999px; padding:6px 4px; font:inherit; font-size:.72rem; font-weight:700; cursor:pointer; }
+  .pbmini{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px; margin-bottom:12px; -webkit-overflow-scrolling:touch; }
+  .pbmini .pmi{ flex:none; width:28%; max-width:120px; display:flex; flex-direction:column; align-items:flex-start; gap:2px; background:none; border:none; padding:0; font:inherit; color:var(--ink); cursor:pointer; text-align:left; }
+  .pbmini .pmi img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; border:1.5px solid var(--line2); }
+  .pbmini .nm{ font-size:.78rem; font-weight:700; } .pbmini .dt{ font-size:.68rem; color:var(--muted); } .pbmini .dt b{ color:#d9534f; }
   .msgcta{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:12px 14px; margin:0 0 16px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
   .msgcta .t{ flex:1; } .msgcta b{ color:var(--brown2); }
   .chgrow{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
@@ -910,9 +914,7 @@ function homeHtml(){
     out += '<button class="msgcta" data-go="msg"><span>💬</span><span class="t">スタッフへのご連絡・ご質問は<b>こちらから</b></span><span class="ug">›</span></button>';
     out += updatesHtml();
     out += askHtml();
-    // プランボードの移り変わりをホームにも（項目ごとに古い順→最新）
-    var pbh = latestPbHtml();
-    if(pbh) out += pbh.replace('<div class="sechd"><h3>📐 プランボードの移り変わり</h3></div>', '<div class="sechd"><h3>📐 プランボード</h3><button class="more" data-go="build">家づくりを見る →</button></div>');
+    out += homePbHtml();
     if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
     // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
     // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
@@ -1395,6 +1397,22 @@ function homeHtml(){
             (last ? '' : '<div class="pbarrow">→</div>');
         }).join("")+'</div></div>';
     }).join("");
+  }
+  // ホームはすっきり：項目ごとの最新1枚だけを横に1列（押すとその項目の移り変わりへ）
+  function homePbHtml(){
+    var list = [];
+    (data.categories||[]).forEach(function(c){
+      var pbs = catAllItems(c).filter(function(x){ return isPb(x) && x.file; });
+      if(!pbs.length) return;
+      pbs.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
+      list.push({c:c, x:pbs[0]});
+    });
+    if(!list.length) return "";
+    list.sort(function(a,b){ return (Date.parse(b.x.at)||0) - (Date.parse(a.x.at)||0); });
+    return '<div class="sechd"><h3>📐 最新のプランボード</h3><button class="more" data-go="build">すべて見る →</button></div><div class="pbmini">'+list.map(function(e){
+      var d = new Date(e.x.at);
+      return '<button class="pmi" data-buildcat="'+esc(e.c.id)+'"><img loading="lazy" src="'+esc(e.x.file.url)+'" alt=""><span class="nm">'+esc(e.c.name)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+(isNew(e.x.upd)?' <b>NEW</b>':'')+'</span></button>';
+    }).join("")+'</div>';
   }
   function buildFeedHtml(){
     var out = '<h2 class="big" style="margin-bottom:4px;">家づくりの記録</h2>';
