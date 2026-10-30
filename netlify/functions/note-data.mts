@@ -651,6 +651,10 @@ export default async (req: Request, context: Context) => {
       progressTag: project.progressTag || "",
       exteriorSpecValues: project.exteriorSpecValues || {},
     },
+    // スタッフの「お客様へのひとこと」（住まいるアプリの案件「ヒアリング」タブで書く。空なら出さない）
+    staffComment: project.staffComment && String(project.staffComment.text || "").trim()
+      ? { text: String(project.staffComment.text).slice(0, 500), at: String(project.staffComment.at || "") }
+      : null,
     today,
     categories,
     plans,

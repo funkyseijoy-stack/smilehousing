@@ -1103,6 +1103,16 @@
 
       <!-- ヒアリング（どんな家にしたいか） subpanel -->
       <div class="subpanel" id="sub-hearing">
+        <!-- お客様へのひとこと（おうちノートのホームと、お打合せの記録ページのいちばん上に「スタッフより」で出る。project.staffComment） -->
+        <div class="card" id="staffCommentCard">
+          <h3 style="margin:0 0 6px;">💬 お客様へのひとこと</h3>
+          <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">保存すると、おうちノートのホームと、お打合せの記録ページのいちばん上に「スタッフより」として出ます。書き直すとお客様の画面で「NEW」になります。空にして保存すると消えます。</p>
+          <textarea id="staffCommentInput" rows="3" maxlength="500" style="width:100%;" placeholder="例：電気・あかりに、リビングのダウンライトの写真を入れました。色味をご確認ください。"></textarea>
+          <div class="row" style="margin-block-start:8px; align-items:center; gap:10px; flex-wrap:wrap;">
+            <button class="btn small" id="btnStaffCommentSave">保存</button>
+            <span class="muted" id="staffCommentStatus" style="font-size:.85rem;"></span>
+          </div>
+        </div>
         <!-- 次回のご予約（この案件の今日以降の予約。renderHearingNextRes） -->
         <div class="card" id="hearNextRes" style="padding-block:12px;"></div>
         <!-- お客様とのメッセージ（おうちノートのメッセージと同じやりとり。お打合せの記録ページからも送れる） -->
@@ -4378,7 +4388,37 @@
       '<div style="margin-top:6px; font-size:1.15rem; font-weight:700;">'+dl(n.date)+' '+escapeHtml(n.startTime||"")+(n.endTime?'〜'+escapeHtml(n.endTime):'')+'　'+escapeHtml(n.type||"")+'</div>'+
       (list.length>1 ? '<div class="muted" style="margin-top:4px;">その後の予約：'+list.slice(1,4).map(function(r){ return dl(r.date)+' '+escapeHtml(r.startTime||"")+' '+escapeHtml(r.type||""); }).join("／")+(list.length>4?' ほか'+(list.length-4)+'件':'')+'</div>' : '');
   }
+  // ---- お客様へのひとこと（project.staffComment={text,at,by}） ----
+  function renderStaffComment(){
+    var ta = document.getElementById("staffCommentInput");
+    if(!ta) return;
+    var pid = state.currentProjectId;
+    var p = projectById(pid);
+    if(ta.dataset.pid===String(pid||"") && ta.dataset.dirty==="1") return; // 入力中は上書きしない
+    var sc = (p && p.staffComment) || {};
+    ta.dataset.pid = String(pid||"");
+    ta.dataset.dirty = "0";
+    ta.value = sc.text || "";
+    var st = document.getElementById("staffCommentStatus");
+    if(st) st.textContent = sc.text && sc.at ? "お客様に表示中（"+String(sc.at).slice(5,10).replace("-","/")+(sc.by?"・"+sc.by:"")+"）" : "いまは表示していません";
+  }
+  async function saveStaffComment(){
+    var ta = document.getElementById("staffCommentInput");
+    var p = projectById(state.currentProjectId);
+    if(!p || !ta || ta.dataset.pid!==String(p.id)) return;
+    var text = ta.value.trim().slice(0,500);
+    var prev = p.staffComment || null;
+    if(text === ((prev && prev.text) || "")){ ta.dataset.dirty = "0"; toast("変更はありません"); return; }
+    p.staffComment = text ? {text:text, at:nowIso(), by:state.currentUser||""} : null;
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ p.staffComment = prev; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
+    ta.dataset.dirty = "0";
+    logActivity("案件「"+p.name+"」のお客様へのひとことを"+(text?"保存":"消去")+"しました");
+    toast(text ? "✓ 保存しました（お客様の画面に出ます）" : "✓ ひとことを消しました");
+    renderStaffComment();
+  }
   function renderProjectHearing(){
+    renderStaffComment();
     renderHearingNextRes();
     renderGalleryLikes();
     var wrap = document.getElementById("hearingForm");
@@ -14767,6 +14807,8 @@
     });
     document.getElementById("btnSendMessage").addEventListener("click", function(){ sendMessage(); });
     document.getElementById("btnHearMsgSend").addEventListener("click", function(){ sendMessage("hear"); });
+    document.getElementById("btnStaffCommentSave").addEventListener("click", saveStaffComment);
+    document.getElementById("staffCommentInput").addEventListener("input", function(e){ e.target.dataset.dirty = "1"; });
     document.getElementById("hearMsgInput").addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); sendMessage("hear"); } });
     document.getElementById("btnNewNoteIssue").addEventListener("click", issueNewNoteLink);
     document.getElementById("btnNewNoteCopy").addEventListener("click", copyNewNoteLink);

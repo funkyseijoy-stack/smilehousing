@@ -108,12 +108,17 @@
   .tag.ph{ background:var(--green); color:var(--green-ink); }
   .tag.new{ background:var(--rose); color:#fff; }
   .tag.nw{ background:#d9534f; color:#fff; font-weight:700; }
+  .scom{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .scom .sh{ font-weight:700; font-size:.9rem; color:var(--brown); margin-bottom:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .scom .sd{ font-weight:400; font-size:.76rem; color:var(--muted); }
+  .scom .st{ white-space:pre-wrap; line-height:1.7; font-size:.92rem; }
   .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
-  .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:6px; }
+  .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:2px; }
+  .upd .us{ font-size:.76rem; color:var(--muted); margin-bottom:8px; }
   .upd .ur{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:#fff; border:1px solid #f0e2c4; border-radius:12px; padding:10px 12px; margin-top:6px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
   .upd .ur .ut{ flex:1; min-width:0; }
   .upd .ur .ug{ color:var(--muted); }
-  .upd .uok{ display:block; margin:10px 0 0 auto; background:var(--brown); color:#fff; border:none; border-radius:999px; padding:8px 16px; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+  .upd .uok{ display:block; margin:10px 0 0 auto; background:transparent; color:var(--brown); border:1.5px solid var(--line); border-radius:999px; padding:8px 16px; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
   .cat .newn{ display:inline-block; margin-top:3px; background:#d9534f; color:#fff; font-size:.68rem; font-weight:700; border-radius:999px; padding:2px 8px; }
   .tlt{ font-weight:700; margin-bottom:6px; }
   .box{ border-radius:10px; padding:8px 10px; font-size:.86rem; white-space:pre-wrap; margin-bottom:6px; }
@@ -814,14 +819,21 @@ function consItems(){
     if(ntcs.length) rows.push({ ic:"📢", t:"お知らせ "+ntcs.length+"件", a:'data-updjump="sec-ntc"' });
     return rows;
   }
+  // スタッフの「お客様へのひとこと」（住まいるアプリのヒアリングタブで書く）。ホームのいちばん上に出す
+  function staffCommentHtml(){
+    var sc = data.staffComment;
+    if(!sc || !sc.text) return "";
+    var d = sc.at ? new Date(sc.at) : null;
+    return '<div class="scom"><div class="sh">💬 スタッフより'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div><div class="st">'+esc(sc.text)+'</div></div>';
+  }
   function updatesHtml(){
     if(view.updDismissed) return "";
     var rows = updatesRows();
     if(!rows.length) return "";
     var d = new Date(seenSince);
-    return '<div class="upd"><div class="uh">🆕 前回（'+(d.getMonth()+1)+'/'+d.getDate()+'）ご覧になってからの更新</div>'+
+    return '<div class="upd"><div class="uh">📢 新着のお知らせ</div><div class="us">前回（'+(d.getMonth()+1)+'/'+d.getDate()+'）ご覧になってから届いたもの</div>'+
       rows.map(function(r){ return '<button class="ur" '+r.a+'><span>'+r.ic+'</span><span class="ut">'+esc(r.t)+'</span><span class="ug">›</span></button>'; }).join("")+
-      '<button class="uok" data-updok="1">確認しました</button></div>';
+      '<button class="uok" data-updok="1">とじる</button></div>';
   }
 
 function homeHtml(){
@@ -836,6 +848,7 @@ function homeHtml(){
     var out = '<div class="greet">'+greet+'、'+esc(name)+'様</div>'+
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
     // 初めての方への案内。「×」で閉じたら、この端末では出さない
+    out += staffCommentHtml();
     out += updatesHtml();
     if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
     // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
