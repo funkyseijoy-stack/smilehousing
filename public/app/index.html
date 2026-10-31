@@ -1434,7 +1434,7 @@
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiProgOn"> お客様の画面に表示する</label>
           <div id="okaiProgRows" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="row" style="gap:6px; margin-block-start:10px; flex-wrap:wrap;">
-            <button class="btn secondary small" id="btnOkaiProgAdd">＋ 工程を追加</button>
+            <button class="btn secondary small" id="btnOkaiProgAdd">＋ いちばん下に工程を追加</button>
             <button class="btn small" id="btnOkaiProgSave">保存</button>
           </div>
         </div>
@@ -7826,7 +7826,7 @@
           toast("見積依頼とGmail下書きを作っています…");
           makeEstReqWithDrafts(proj, content, c.part, c.files, vs, "").then(function(r){
             mark(r.refs[0], r.refs);
-            toast("✅ "+r.msg);
+            if(r.draftIds && r.draftIds.length) offerOpenDrafts("✅ 見積依頼とGmail下書きを作りました", r.msg, r.draftIds); else toast("✅ "+r.msg);
           }).catch(function(){ toast("見積依頼を作れませんでした"); });
         });
         return;
@@ -8536,11 +8536,15 @@
     var box = document.getElementById("okaiProgRows"); if(!box) return;
     document.getElementById("okaiProgOn").checked = !!okaiProg.on;
     box.innerHTML = okaiProg.steps.map(function(st,i){
-      return '<div data-progrow="'+i+'" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">'+
+      return '<div data-progrow="'+i+'" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:6px 0 8px; border-bottom:1px dashed var(--border);">'+
         '<label style="display:flex; align-items:center; gap:4px; font-size:.85rem; white-space:nowrap;"><input type="radio" name="okaiProgCur" data-progcur value="'+i+'"'+(okaiProg.current===i?' checked':'')+'>現在</label>'+
         '<input type="text" data-progname value="'+escapeOkai(st.name)+'" placeholder="工程名" style="flex:1 1 9rem; min-width:7rem;">'+
         '<input type="text" data-progdate value="'+escapeOkai(st.date)+'" placeholder="予定日（例：10月10日ごろ）" style="flex:1 1 11rem; min-width:8rem;">'+
-        '<button class="btn danger-ghost small" data-progdel="'+i+'" title="削除">×</button></div>';
+        '<span style="display:flex; gap:4px;">'+
+        '<button class="btn secondary small" data-progmove="'+i+'" data-dir="-1" title="上へ"'+(i===0?' disabled':'')+'>▲</button>'+
+        '<button class="btn secondary small" data-progmove="'+i+'" data-dir="1" title="下へ"'+(i===okaiProg.steps.length-1?' disabled':'')+'>▼</button>'+
+        '<button class="btn secondary small" data-progins="'+i+'" title="この下に工程を入れる">＋下に追加</button>'+
+        '<button class="btn danger-ghost small" data-progdel="'+i+'" title="削除">×</button></span></div>';
     }).join("");
   }
   function okaiProgSave(){
@@ -9252,7 +9256,7 @@
       return { filename:f.name||"添付", mimeType:f.contentType||"application/octet-stream", url:f.url };
     });
     var subject = "【見積依頼】"+proj.name+(part&&part.label?"　"+part.label:"");
-    var ok = [], fail = [], noMail = [];
+    var ok = [], fail = [], noMail = [], draftIds = [];
     for(var k=0;k<reqs.length;k++){
       var v = reqs[k].vendor;
       var lines = ["お世話になっております。住まいるハウジングです。","",
@@ -9265,6 +9269,7 @@
         var res = await gmailCreateDraft({ to: v.email?[v.email]:[], subject: subject, body: lines.join("\n"), attachments: atts });
         var payload = (res && res.payload) || {};
         if(payload.threadId) reqs[k].req.gmailThreadId = payload.threadId;
+        if(payload.messageId) draftIds.push(payload.messageId);
         reqs[k].req.status = "依頼済み"; reqs[k].req.requestedAt = todayStr();
         ok.push(v.name);
       }catch(e){ fail.push(v.name); }
@@ -9273,12 +9278,12 @@
     var msg = "見積依頼＋Gmail下書き "+ok.length+"件"+(atts.length?"（添付"+atts.length+"件）":"");
     if(noMail.length) msg += "・メール未登録："+noMail.join("、");
     if(fail.length) msg += "・下書き失敗："+fail.join("、")+"（見積タブの「依頼する」からやり直せます）";
-    return { msg: msg, refs: reqs.map(function(x){ return x.req.id; }) };
+    return { msg: msg, refs: reqs.map(function(x){ return x.req.id; }), draftIds: draftIds };
   }
   // 打合せ記録の行ごとの「作るもの」を、記録を保存したあとに作る
   async function runNoteLineActs(note, acts){
     var proj = projectById(note.projectId); if(!proj) return;
-    var done = [], errs = [];
+    var done = [], errs = [], lineDraftIds = [];
     note.lineActs = note.lineActs || [];
     for(var i=0;i<acts.length;i++){
       var a = acts[i], text = a.text;
@@ -9304,6 +9309,7 @@
           if(!vs.length) continue;
           var r = await makeEstReqWithDrafts(proj, text, note.specPart||null, note.files||[], vs, note.id);
           note.lineActs.push({ t:text, type:"estreq", refs:r.refs, at:nowIso() });
+          (r.draftIds||[]).forEach(function(x){ lineDraftIds.push(x); });
           done.push(r.msg);
         }
       }catch(e){ errs.push(MN_ACT_LABEL[a.type]+"「"+text.slice(0,15)+"」"); }
@@ -9311,7 +9317,8 @@
     await saveDoc("meetingNotes", note.id, note);
     render();
     if(done.length) logActivity("打合せ記録の行から作成しました（"+done.join("・")+"）");
-    toast((done.length?"✅ 行から作りました："+done.join("／"):"")+(errs.length?"　⚠ 作れなかったもの："+errs.join("、"):""), 12000);
+    var lineMsg = (done.length?"✅ 行から作りました："+done.join("／"):"")+(errs.length?"　⚠ 作れなかったもの："+errs.join("、"):"");
+    if(lineDraftIds.length) offerOpenDrafts("行から作りました", lineMsg.replace(/^✅ 行から作りました：/,""), lineDraftIds); else toast(lineMsg, 12000);
   }
   async function createBundleFromNote(noteId){
     var proj = projectById(state.currentProjectId);
@@ -9368,7 +9375,7 @@
     });
     var attachedN = 0, linkedAll = [];
     var subject = "【見積依頼】"+proj.name+(part&&part.label?"　"+part.label:"");
-    var okNames = [], failNames = [], noMail = [];
+    var okNames = [], failNames = [], noMail = [], draftIds = [];
     for(var k=0;k<reqs.length;k++){
       var v = reqs[k].vendor;
       var lines = ["お世話になっております。住まいるハウジングです。","",
@@ -9382,6 +9389,7 @@
         var payload = (res && res.payload) || {};
         if(k===0){ attachedN = payload.attachmentCount||0; linkedAll = payload.linked||[]; }
         if(payload.threadId) reqs[k].req.gmailThreadId = payload.threadId;
+        if(payload.messageId) draftIds.push(payload.messageId);
         reqs[k].req.status = "依頼済み"; reqs[k].req.requestedAt = todayStr();
         okNames.push(v.name);
       }catch(e){ failNames.push(v.name); }
@@ -9395,7 +9403,7 @@
     if(failNames.length) msg += "。下書きに失敗："+failNames.join("、")+"（見積タブの「依頼する」からやり直せます）";
     if(atts.length) msg += "。添付"+attachedN+"件";
     if(linkedAll.length) msg += "。メールに付けられなかった資料"+linkedAll.length+"件（"+linkedAll.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は、本文にリンクを入れました";
-    toast(msg, 12000);
+    if(okNames.length) offerOpenDrafts("✅ 見積依頼とGmail下書きを作りました", msg.replace(/^✅ /,""), draftIds); else toast(msg, 12000);
   }
   async function createTaskFromNote(noteId, taskType){
     var proj = projectById(state.currentProjectId);
@@ -10921,7 +10929,34 @@
     if(res.status===401) throw new Error("ログインの有効期限が切れました。ログインし直してください");
     if(!res.ok) throw new Error("サーバーエラー（"+res.status+"）");
     var j = await res.json();
-    return { payload: { threadId: j.threadId || null, id: j.id || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[] } };
+    return { payload: { threadId: j.threadId || null, id: j.id || null, messageId: j.messageId || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[] } };
+  }
+  // 下書きを作ったあと、Gmailでその下書きを開けるようにする（連携しているアカウントで開く）
+  var gmailConnEmail = null;
+  async function gmailAccountEmail(){
+    if(gmailConnEmail!==null) return gmailConnEmail;
+    try{
+      var r = await fetch("/api/gmail-status", { headers: { "X-Staff-Token": getStaffToken()||"" } });
+      var d = r.ok ? await r.json() : {};
+      gmailConnEmail = d.email || "";
+    }catch(e){ gmailConnEmail = ""; }
+    return gmailConnEmail;
+  }
+  function gmailDraftUrl(messageId, email){
+    var base = email ? "https://mail.google.com/mail/?authuser="+encodeURIComponent(email) : "https://mail.google.com/mail/u/0/";
+    return base + (messageId ? "#drafts?compose="+encodeURIComponent(messageId) : "#drafts");
+  }
+  // 下書きができたら「Gmailで下書きを開く」を出す（押したときに開くので、ブラウザに止められない）
+  async function offerOpenDrafts(title, msg, messageIds){
+    var ids = (messageIds||[]).filter(Boolean);
+    var email = await gmailAccountEmail();
+    var choices = ids.length===1
+      ? [{label:"✉️ Gmailでこの下書きを開く", value:"one"}]
+      : [{label:"✉️ Gmailの下書きフォルダーを開く"+(ids.length?"（"+ids.length+"件）":""), value:"all"}];
+    askChoice(title, msg, choices, function(v){
+      if(!v) return;
+      window.open(gmailDraftUrl(v==="one"?ids[0]:"", email), "_blank");
+    }, {cancelLabel:"閉じる"});
   }
   async function sendGmailRequest(project, vendors){
     var subject = "【見積依頼】"+(project?project.name:"")+" 案件について";
@@ -10937,7 +10972,7 @@
       if(to.length) msg += "（宛先"+to.length+"件）";
       if(attachments.length) msg += "・添付"+attachments.length+"件";
       if(!to.length) msg += "（宛先未登録の業者がいます。下書きで宛先を追加してください）";
-      toast(msg);
+      offerOpenDrafts("✅ Gmail下書きを作成しました", msg+"\n送信はしていません。Gmailで確認して送ってください。", [payload.messageId]);
       logActivity("見積依頼のGmail下書きを作成しました");
       return { ok:true, threadId: payload.threadId||null };
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); return {ok:false, threadId:null}; }
@@ -12042,7 +12077,7 @@
       if(atts.length) msg += "・添付"+(dp.attachmentCount!=null ? dp.attachmentCount : atts.length)+"件";
       if(noEmail.length) msg += "。メール未登録："+noEmail.join("、");
       if(dp.linked && dp.linked.length) msg += "。付けられなかった資料"+dp.linked.length+"件（"+dp.linked.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は本文にリンクを入れました";
-      toast(msg, 9000);
+      offerOpenDrafts("✅ Gmail下書きを作成しました", msg.replace(/^✅ Gmail下書きを作成しました/,"").replace(/^（(.*?)）/,"$1")+"\n送信はしていません。Gmailで確認して送ってください。", [dp.messageId]);
       logActivity("タスクのGmail下書きを作成しました");
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
@@ -12267,7 +12302,7 @@
       render();
       await saveDoc("requests", r.id, r);
       logActivity("変更依頼のGmail下書きを作成しました");
-      toast("変更依頼のGmail下書きを作成しました"+(attachments.length?"（添付"+attachments.length+"件）":""));
+      offerOpenDrafts("✅ 変更依頼のGmail下書きを作成しました", (attachments.length?"添付"+attachments.length+"件。":"")+"送信はしていません。Gmailで確認して送ってください。", [payload.messageId]);
     }catch(e){ toast("変更依頼の下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
 
@@ -13739,7 +13774,7 @@
   }
 
   // ---- lightweight inline choice dialog (confirm() is inert here) ----
-  function askChoice(title, message, choices, callback){
+  function askChoice(title, message, choices, callback, opts){
     var overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
     var box = document.createElement("div");
@@ -13748,7 +13783,7 @@
       (message ? '<p class="muted" style="margin:0 0 14px; font-size:.85rem; white-space:pre-line;">'+escapeHtml(message)+'</p>' : '')+
       '<div style="display:flex; flex-direction:column; gap:8px;">'+
       choices.map(function(c,i){ return '<button class="btn'+(i===0?"":" secondary")+'" data-choiceval="'+i+'" style="width:100%;">'+escapeHtml(c.label)+'</button>'; }).join("")+
-      '<button class="btn secondary" data-choiceval="cancel" style="width:100%;">キャンセル</button>'+
+      '<button class="btn secondary" data-choiceval="cancel" style="width:100%;">'+escapeHtml((opts&&opts.cancelLabel)||"キャンセル")+'</button>'+
       '</div>';
     overlay.appendChild(box);
     document.body.appendChild(overlay);
@@ -14850,8 +14885,32 @@
     document.getElementById("btnOkaiNextMeetSave").addEventListener("click", okaiNextMeetSave);
     document.getElementById("btnOkaiChkSave").addEventListener("click", okaiChkSave);
     document.getElementById("okaiChkList").addEventListener("click", okaiChkClick);
-    document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); });
+    document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); var nms = document.querySelectorAll('#okaiProgRows [data-progname]'); if(nms.length) nms[nms.length-1].focus(); });
     document.getElementById("okaiProgRows").addEventListener("click", function(e){
+      var mv = e.target.closest("[data-progmove]");
+      if(mv){
+        okaiProgRead();
+        var a = parseInt(mv.dataset.progmove,10), b = a + parseInt(mv.dataset.dir,10);
+        if(b<0 || b>=okaiProg.steps.length) return;
+        var tmp = okaiProg.steps[a]; okaiProg.steps[a] = okaiProg.steps[b]; okaiProg.steps[b] = tmp;
+        // 「現在」は同じ工程についていくようにする
+        if(okaiProg.current===a) okaiProg.current=b; else if(okaiProg.current===b) okaiProg.current=a;
+        renderOkaiProg();
+        var row = document.querySelector('#okaiProgRows [data-progrow="'+b+'"] [data-progmove][data-dir="'+mv.dataset.dir+'"]');
+        if(row && !row.disabled) row.focus();
+        return;
+      }
+      var ins = e.target.closest("[data-progins]");
+      if(ins){
+        okaiProgRead();
+        var k = parseInt(ins.dataset.progins,10);
+        okaiProg.steps.splice(k+1, 0, {name:"",date:""});
+        if(okaiProg.current>k) okaiProg.current++;
+        renderOkaiProg();
+        var nm = document.querySelector('#okaiProgRows [data-progrow="'+(k+1)+'"] [data-progname]');
+        if(nm) nm.focus();
+        return;
+      }
       var d = e.target.closest("[data-progdel]"); if(!d) return;
       okaiProgRead(); var i = parseInt(d.dataset.progdel,10);
       okaiProg.steps.splice(i,1);
@@ -15880,7 +15939,8 @@
           if(/refresh_failed|invalid_grant/.test(errText)) throw new Error("Gmailとの連携が切れています。設定の「Gmailと連携する」からやり直してください");
           throw new Error("HTTP "+res.status+" "+errText);
         }
-        toast("Gmail下書きを作成しました（添付"+atts.length+"件"+(to.length?"・宛先 "+to.join(", "):"・宛先なし。Gmailで宛先を入れてください")+"）", 8000);
+        var pbj = {}; try{ pbj = await res.json(); }catch(e3){}
+        offerOpenDrafts("✅ Gmail下書きを作成しました", "添付"+atts.length+"件"+(to.length?"・宛先 "+to.join(", "):"・宛先なし。Gmailで宛先を入れてください")+"\n送信はしていません。Gmailで確認して送ってください。", [pbj.messageId]);
         logActivity("プランボードのGmail下書きを作成しました");
       }catch(e){ toast("Gmail下書きの作成に失敗しました："+(e && e.message ? e.message : "")); }
       finally{ sendBtn.disabled=false; sendBtn.textContent="この内容でGmail下書きを作成"; }
