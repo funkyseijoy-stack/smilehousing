@@ -240,6 +240,7 @@
   .cdec{ margin-top:12px; padding-top:10px; border-top:1px dashed rgba(0,0,0,.15); }
   .cdec .cnow{ font-size:.8rem; color:var(--ink2); margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .cdec .btn{ padding:12px 6px; font-size:.95rem; }
+  .cdec .cwait{ color:var(--ink2); font-weight:700; }
 
   /* home */
   .greet{ font-size:1.5rem; font-weight:700; margin:4px 0 6px; letter-spacing:.04em; }
@@ -1371,7 +1372,7 @@ function homeHtml(){
       feedKindTag(x)+nwTag(x.upd)+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>';
     if(x.type==="note"){
       if(x.title) h += '<div class="section-item-title">'+esc(x.title)+'</div>';
-      if(x.decided) h += '<div class="section-item-desc"><strong>決定：</strong>'+esc(x.decided)+'</div>';
+      if(x.decided) h += '<div class="section-item-desc"><strong>打合せで決まったこと：</strong>'+esc(x.decided)+'</div>';
       if(x.open) h += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(x.open)+'</div>'+consBtnsHtml(x.open, (c?c.name+'・':'')+(x.title||fmtD(e.at)));
       if(x.talk) h += '<div class="section-item-desc"><strong>内容：</strong>'+esc(x.talk)+'</div>';
       if(x.message) h += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(x.message)+'</div>';
@@ -1613,9 +1614,15 @@ function homeHtml(){
       var cl = chgLabelOf(c, item || {key:key});
       var sent = chgSent[key];
       // 「仮決定」は押しにくいので、「変更したい（スタッフに送る）」と「これで決定」の2つにする
-      return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
+      // 決まるまではどちらのボタンも枠線だけ（決定しているように見えないように）
+      var done = status==="決定";
+      var nowTxt = (status==="決定"||status==="仮決定")
+        ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'
+        : '<span class="cwait">まだお返事をいただいていません</span>';
+      return '<div class="cdec"><div class="cnow">このカードの状態：'+nowTxt+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
         '<div class="btns"><button class="btn ol" data-chg="'+esc(cl)+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
-        '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>✅ これで決定</button></div>'+
+        (done ? '<button class="btn dk" disabled>✅ 決定しました</button>'
+              : '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ これで決定</button>')+'</div>'+
         ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
     }
     if(feed.length){
@@ -1645,7 +1652,7 @@ function homeHtml(){
             '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
-          if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
+          if(n.decided) html += '<div class="section-item-desc"><strong>打合せで決まったこと：</strong>'+esc(n.decided)+'</div>';
           if(n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, c.name+'・'+(n.title||fmtD(n.date)));
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
