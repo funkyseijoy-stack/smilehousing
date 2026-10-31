@@ -13178,6 +13178,7 @@
       // 編集：既存の添付は残し、新しく選んだファイルだけ追加する。
       editTarget.attachments = editTarget.attachments || [];
       editTarget.attachmentAssetIds = editTarget.attachmentAssetIds || [];
+      var attCountBefore = editTarget.attachments.length;
       if(assets && files && files.length){
         for(var j=0;j<files.length;j++){
           try{
@@ -13217,6 +13218,8 @@
       logActivity("タスクを編集しました（"+content.slice(0,20)+"）");
       toast(jumpTo ? "タスクを保存しました（「"+jumpTo+"」へ移しました）" : "タスクを保存しました");
       if(jumpTo) goToTaskBoard(editTarget.id);
+      // 資料を足したら「次はどうしますか？」を聞く（タスクを動かし忘れないように）
+      else if(editTarget.attachments.length > attCountBefore && !editTarget.private) askAfterTaskAttach(editTarget.id);
       return;
     }
     if(assets && files && files.length){
@@ -13520,6 +13523,59 @@
       render();
       if(nSync) toast("✅ 「"+(t.vendorSpec.label||"")+"」の設備仕様・おうちノートにも反映しました");
     }
+    if(!t.private) askAfterTaskAttach(t.id);
+  }
+  // ---- 資料を付けたあとの「次はどうしますか？」（依頼者に送る／業者へメール下書き／お客様に出す／完了） ----
+  function askAfterTaskAttach(id){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var me = state.currentUser || "";
+    var req = staffInstructor(t) || t.creator || "";
+    if(req===me) req = "";
+    var forCustomer = t.instructor===CUSTOMER_INSTRUCTOR;
+    var choices = [];
+    var custOk = !!(t.projectId && !t.reflected);
+    if(forCustomer && custOk) choices.push({label:"🏠 お客様に出す（おうちノートに反映）", value:"customer"});
+    if(req) choices.push({label:"📨 依頼者（"+req+"さん）に送る", value:"requester"});
+    if(taskVendors(t).length) choices.push({label:"✉️ 業者へのメールの下書きを作る", value:"vendor"});
+    if(!forCustomer && custOk) choices.push({label:"🏠 お客様に出す（おうちノートに反映）", value:"customer"});
+    if((t.status||"未着手")!=="完了") choices.push({label:"✅ 完了にする", value:"done"});
+    var proj = projectById(t.projectId);
+    askChoice("📎 資料を付けました。次はどうしますか？", "「"+String(t.content||"").slice(0,40)+"」"+(proj ? "（"+(proj.customer ? String(proj.customer).replace(/様$/,"")+"様" : (proj.name||""))+"）" : "")+"\n※あとで決めるときは「キャンセル」"+"\nいまの進捗：「"+(t.status||"未着手")+"」", choices, async function(v){
+      if(!v || v==="later") return;
+      if(v==="requester") return sendTaskToRequester(id, req);
+      if(v==="vendor") return taskGmailDraft(id);
+      if(v==="customer") return toggleTaskReflect(id);
+      if(v==="done") return setTaskStatus(id, "完了");
+    });
+  }
+  // 依頼者へ送る：社長・朋子は「○○確認依頼中」へ移して確認者にする（承認・返信のボタンが出る）。ほかの人はコメントで知らせる（進捗はそのまま）
+  async function sendTaskToRequester(id, req){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t || !req) return;
+    var st = checkStatusFor(req);
+    var note = await askComment("📨 "+req+"さんに送る",
+      st ? "ひとこと（任意）。"+req+"さんに通知が届き、進捗は「"+st+"」になります。" : "ひとこと（任意）。"+req+"さんに通知が届きます（進捗は変わりません）。", false);
+    if(note===null) return;
+    t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var me = state.currentUser || "";
+    var text = note || "資料を付けました。ご確認ください。";
+    if(st){
+      // 確認者にして確認依頼の列へ（通知はサーバーが確認者として1回だけ送る）。ひとことはカードのやりとりに残す
+      t.checker = req;
+      t.status = st; t.completedAt = null; t.archivedAt = null;
+      var e1 = { result:"コメント", by: me || "（名前未選択）", to: "", note: text, at: nowIso() };
+      t.reviews = taskReviewList(t).concat([e1]); t.review = e1;
+    } else {
+      var e2 = { result:"コメント", by: me || "（名前未選択）", to: req, note: text, at: nowIso() };
+      t.reviews = taskReviewList(t).concat([e2]); t.review = e2;
+    }
+    t.updatedAt = nowIso();
+    state.taskOpen = state.taskOpen || {}; state.taskOpen[t.status] = true;
+    render();
+    var ok = await saveDoc("tasks", t.id, t);
+    if(ok===false){ toast("⚠ 保存できませんでした。もう一度お試しください"); return; }
+    logActivity("タスクを"+req+"さんに送りました（"+(t.content||"").slice(0,20)+"）");
+    toast(st ? req+"さんに送りました（「"+st+"」へ移しました）" : req+"さんに送りました");
+    if(st) goToTaskBoard(t.id);
   }
   async function toggleTaskReflect(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
