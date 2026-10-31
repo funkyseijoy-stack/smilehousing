@@ -13951,7 +13951,7 @@
       '<div style="max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-block-end:14px;">'+
       checks.map(function(p){
         return '<label style="display:flex; align-items:center; gap:8px; font-size:.85rem;">'+
-          '<input type="checkbox" class="ppcheck" value="'+p+'"'+(p===defaultPage?" checked":"")+'> ページ '+p+
+          '<input type="checkbox" class="ppcheck" value="'+p+'" checked> ページ '+p+(p===defaultPage?'（いま開いているページ）':'')+
           '</label>';
       }).join("")+
       '</div>'+

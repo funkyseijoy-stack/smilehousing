@@ -555,7 +555,9 @@ export default async (req: Request, context: Context) => {
       it.cardDecidedAt = d ? d.decidedAt : null;
       // 「仮決定／決定」ボタンを出すか：スタッフが出す設定にした記録・タスクだけ。
       // 初めは出さない。ただし、お客様がすでに選んでいるカードは（スタッフが明示的に外さない限り）出し続ける。
-      it.showDecide = it.askDecision === true || (it.askDecision !== false && !!d);
+      // ただし、お客様が一度押して「検討中に戻した」だけのカード（スタッフは出す設定にしていない）は出さない
+      // （ホームの「お願いしたいこと」に昔のカードが溜まって出ていたため。2026年10月31日）
+      it.showDecide = it.askDecision === true || (it.askDecision !== false && !!d && d.status !== "検討中");
       delete it.askDecision;
     }
   }
