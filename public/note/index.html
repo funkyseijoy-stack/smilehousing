@@ -535,7 +535,7 @@
     <ul>
       <li>ホームの「追加見積り」に金額が入ると、<b>「承認する」「見送る」</b>のボタンが出ます（金額が決まるまでは「金額確認中」です）</li>
       <li>押し間違えても、「回答をやり直す」で選び直せます</li>
-      <li>一覧の下の「追加見積りの合計」は、金額確認中と見送りを除いた合計です。「うち承認済み」は承認した分だけの合計です</li>
+      <li>金額はすべて税抜き表示です。一覧の下の「追加見積りの合計」は、金額確認中と見送りを除いた合計です。「うち承認済み」は承認した分だけの合計です</li>
     </ul>
 
     <h3>🏠 ご家族・家電・持ち込み品のご入力</h3>
@@ -795,9 +795,9 @@ function estTotalHtml(list){
   if(!n) return "";
   var yen=function(v){ return v.toLocaleString("ja-JP")+"円"; };
   return '<div class="rv" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:8px;">'+
-    '<div style="display:flex; justify-content:space-between;"><span class="ty">追加見積りの合計</span><span class="ty">'+yen(all)+'</span></div>'+
+    '<div style="display:flex; justify-content:space-between;"><span class="ty">追加見積りの合計（税抜き）</span><span class="ty">'+yen(all)+'</span></div>'+
     '<div style="display:flex; justify-content:space-between;"><span class="tm">うち承認済み</span><span class="tm">'+yen(ok)+'</span></div>'+
-    '<div class="tm">※金額確認中・見送りの項目は含みません'+(bad?'（金額を数字で読み取れない'+bad+'件も含みません）':'')+'</div></div>';
+    '<div class="tm">※金額はすべて税抜き表示です。金額確認中・見送りの項目は含みません'+(bad?'（金額を数字で読み取れない'+bad+'件も含みません）':'')+'</div></div>';
 }
 
 // ---------- ホームに出す写真（お客様が選ぶ） ----------
@@ -1034,7 +1034,7 @@ function homeHtml(){
 
     // 追加見積り（住まいるアプリの「おうちノート連携」タブで登録。お客様の承認／見送りもここで受け付ける）
     if(data.estimates && data.estimates.length){
-      out += '<div class="sechd" id="sec-est"><h3>追加見積り</h3></div><div class="catlist">'+data.estimates.map(function(x){
+      out += '<div class="sechd" id="sec-est"><h3>追加見積り</h3><span class="countpill">税抜き表示です</span></div><div class="catlist">'+data.estimates.map(function(x){
         var r = x.customerResponse || "未回答";
         // スタッフが状態を選んでいればそれを優先（金額確認中は、金額が入っていても「金額確認中」と表示）
         var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
