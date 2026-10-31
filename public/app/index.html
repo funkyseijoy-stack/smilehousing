@@ -14240,7 +14240,18 @@
     pb.history=[]; pb.historyIndex=-1; pbPushHistory();
     pb.items=[]; pb.zoom=1; pbApplyZoom();
     requestAnimationFrame(function(){ pb.zoom = pbComputeFitZoom(w); pbApplyZoom(); });
-    pbRenderSwatches(); pbPopulateSymbolSelects(); pbSetMode("view");
+    var keepMode = !!pb.pageSwitching && pb.tool && pb.tool !== "view"; pb.pageSwitching = false;
+    var rs = pb.pendingRestore; pb.pendingRestore = null;
+    if(rs){
+      pb.items = rs.items.slice(); pb.history = rs.history.slice(); pb.historyIndex = rs.historyIndex;
+      var rimg = new Image();
+      rimg.onload = function(){ pb.baseCtx.clearRect(0,0,w,h); pb.baseCtx.drawImage(rimg,0,0); pbUpdateHistoryButtons(); };
+      rimg.src = rs.base;
+      pbRenderItems();
+    }
+    pbRenderSwatches(); pbPopulateSymbolSelects();
+    // 複数ページのPDFでページを移ったときは、表示／編集の状態をそのままにする
+    if(!keepMode) pbSetMode("view");
     if(pb.startEdit){ pb.startEdit = false; pbSetMode("edit"); }
   }
   function pbSetupBlankCanvas(w, h){
@@ -14269,24 +14280,54 @@
     reader.onerror = function(){ toast("ファイルの読み込みに失敗しました"); };
     reader.readAsDataURL(file);
   }
+  // ページを移るときは、いまのページの書き込み（線・文字・記号・やり直しの履歴）を控えておき、
+  // 戻ってきたら元どおりにする（以前はページを移ると書き込みが消えていた）。書き出し用の画像も控える。
+  function pbPageDirty(){ return pb.historyIndex > 0 || (pb.items && pb.items.length > 0); }
+  async function pbStashPage(){
+    if(!pb.pdfDoc || !pb.baseCanvas) return;
+    if(pb.activeTextEditor) pbCommitTextEditor();
+    pb.pageStates = pb.pageStates || {};
+    if(!pbPageDirty()){ delete pb.pageStates[pb.pdfPage]; return; }
+    var blob = await pbCanvasToBlob("image/png");
+    pb.pageStates[pb.pdfPage] = { base: pb.baseCanvas.toDataURL("image/png"), items: (pb.items||[]).slice(), history: pb.history.slice(), historyIndex: pb.historyIndex, blob: blob };
+  }
+  var pbPageBusy = false;
+  async function pbGoPage(pageNum){
+    if(!pb.pdfDoc || pbPageBusy) return;
+    pageNum = Math.max(1, Math.min(pageNum, pb.pdfNumPages));
+    if(pageNum === pb.pdfPage) return;
+    pbPageBusy = true;
+    try{ await pbStashPage(); }catch(e){}
+    pbPageBusy = false;
+    pb.pageSwitching = true;
+    pbRenderPdfPage(pageNum);
+  }
   function pbRenderPdfPage(pageNum){
     if(!pb.pdfDoc) return;
     pageNum = Math.max(1, Math.min(pageNum, pb.pdfNumPages));
     pb.pdfPage = pageNum;
     pbUpdatePdfPageNav();
+    pb.pendingRestore = (pb.pageStates && pb.pageStates[pageNum]) || null;
+    if(pb.pdfNumPages > 1) toast(pageNum+"ページ目を開いています…", 1500);
     pb.pdfDoc.getPage(pageNum).then(function(page){
-      var scale = 2; var viewport = page.getViewport({scale:scale});
+      // 大きな図面でも重くならないよう、長い辺が約2000pxになる大きさで描く（画面の上限と同じ）
+      var vp1 = page.getViewport({scale:1});
+      var scale = Math.min(2, 2000/Math.max(vp1.width, vp1.height, 1)); var viewport = page.getViewport({scale:scale});
       var tmpCanvas = document.createElement("canvas");
       tmpCanvas.width = viewport.width; tmpCanvas.height = viewport.height;
       var tmpCtx = tmpCanvas.getContext("2d");
       return page.render({canvasContext:tmpCtx, viewport:viewport}).promise.then(function(){
         var img = new Image();
         img.onload = function(){ pbSetupCanvas(tmpCanvas.width, tmpCanvas.height, img); };
+        img.onerror = function(){ toast("⚠ "+pageNum+"ページ目を表示できませんでした"); };
         img.src = tmpCanvas.toDataURL("image/png");
       });
-    }).catch(function(){ toast("ページの読み込みに失敗しました"); });
+    }).catch(function(e){ toast("⚠ "+pageNum+"ページ目を読み込めませんでした（"+((e&&e.message)||"不明なエラー")+"）", 8000); });
   }
   function pbRenderPdfPageToBlob(pageNum){
+    // 書き込みを控えたページは、その書き込み入りの画像を使う
+    var st = pb.pageStates && pb.pageStates[pageNum];
+    if(st && st.blob) return Promise.resolve(st.blob);
     // 編集中のキャンバスには触れず、指定ページを単独でPNG化する（元図面のまま、書き込みなし）
     return pb.pdfDoc.getPage(pageNum).then(function(page){
       var scale = 2; var viewport = page.getViewport({scale:scale});
@@ -14318,6 +14359,7 @@
         loadingTask.promise.then(function(pdf){
           pb.pdfDoc = pdf;
           pb.pdfNumPages = pdf.numPages;
+          pb.pageStates = {};
           pbRenderPdfPage(1);
         }).catch(function(){ toast("PDFの読み込みに失敗しました"); });
       }catch(e){ toast("PDFの読み込みに失敗しました"); }
@@ -14377,12 +14419,17 @@
     editor.style.color = pb.color; editor.style.fontSize = fontPx+"px";
     document.getElementById("pbStageInner").appendChild(editor);
     editor.focus();
-    pb.activeTextEditor = {el:editor, x:x, y:y, scaleX:scaleX};
+    setTimeout(function(){ if(pb.activeTextEditor && pb.activeTextEditor.el===editor && document.activeElement!==editor) editor.focus(); }, 30);
+    pb.activeTextEditor = {el:editor, x:x, y:y, scaleX:scaleX, at:Date.now()};
     editor.addEventListener("keydown", function(ev){
       if(ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); pbCommitTextEditor(); }
       if(ev.key==="Escape"){ ev.preventDefault(); pbCancelTextEditor(); }
     });
-    editor.addEventListener("blur", function(){ pbCommitTextEditor(); });
+    editor.addEventListener("blur", function(){
+      // 出した直後のピント外れ（マウスの押し離し）では閉じない
+      if(pb.activeTextEditor && pb.activeTextEditor.el===editor && Date.now()-pb.activeTextEditor.at < 300){ setTimeout(function(){ editor.focus(); }, 0); return; }
+      pbCommitTextEditor();
+    });
   }
   function pbCommitTextEditor(){
     if(!pb.activeTextEditor) return;
@@ -15844,7 +15891,8 @@
         pbSetTool("pen");
         return;
       }
-      if(pb.tool==="text"){ pbStartTextEditor(e); return; }
+      // パソコンのマウスでは、押した直後に画面のピントが外れて入力欄がすぐ閉じていたので、既定の動きを止める
+      if(pb.tool==="text"){ e.preventDefault(); pbStartTextEditor(e); return; }
       try{ pb.overlayCanvas.setPointerCapture(e.pointerId); }catch(err){ /* ignore: drawing still proceeds without capture */ }
       pb.drawing = true; pb.drawPointerType = e.pointerType; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt;
       if(pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser"){
@@ -15925,8 +15973,8 @@
     });
     document.getElementById("pbZoomOut").addEventListener("click", function(){ pbZoomBy(-0.1); });
     document.getElementById("pbZoomIn").addEventListener("click", function(){ pbZoomBy(0.1); });
-    document.getElementById("pbPdfPrev").addEventListener("click", function(){ pbRenderPdfPage(pb.pdfPage-1); });
-    document.getElementById("pbPdfNext").addEventListener("click", function(){ pbRenderPdfPage(pb.pdfPage+1); });
+    document.getElementById("pbPdfPrev").addEventListener("click", function(){ pbGoPage(pb.pdfPage-1); });
+    document.getElementById("pbPdfNext").addEventListener("click", function(){ pbGoPage(pb.pdfPage+1); });
     document.getElementById("pbToggleActions").addEventListener("click", function(){
       var card = document.getElementById("pbActionsCard");
       card.hidden = !card.hidden;
