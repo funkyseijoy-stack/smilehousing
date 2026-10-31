@@ -382,8 +382,8 @@
   .swatch{ width:22px; height:22px; border-radius:999px; border:2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); cursor:pointer; flex-shrink:0; }
   .swatch.active{ box-shadow: 0 0 0 2px var(--ink); }
   select.sizeSelect{ font-family:inherit; font-size:.85rem; padding:6px 7px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
-  .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; justify-content:center; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
-  #pbStageInner{ position:relative; line-height:0; }
+  .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
+  #pbStageInner{ position:relative; line-height:0; margin-inline:auto; flex:0 0 auto; }
   #pbImageCanvas, #pbOverlayCanvas{ border-radius:8px; max-width:100%; height:auto; display:block; }
   #pbImageCanvas{ background:var(--canvas-bg); }
   #pbBaseCanvas{ position:absolute; inset:0; max-width:100%; height:auto; border-radius:8px; background:transparent; }
@@ -1930,6 +1930,7 @@
         </select>
       </div>
       <div class="tool-group">
+        <button class="tbtn" id="pbFingerToggle" type="button" title="指で書くか、指は動かす・拡大だけにするかを切り替え"><span class="ic">✋</span><span id="pbFingerLabel">指：書く</span></button>
         <button class="tbtn" id="pbZoomOut"><span class="ic">－</span></button>
         <span id="pbZoomLabel">100%</span>
         <button class="tbtn" id="pbZoomIn"><span class="ic">＋</span></button>
@@ -14139,8 +14140,17 @@
     if(lbl) lbl.textContent = Math.round(pb.zoom*100)+"%";
     pbRenderItems();
   }
+  // 拡大の上限（ピンチ・＋ボタン共通）
+  var PB_MAX_ZOOM = 6;
+  // ペン（Apple Pencil）を一度でも使った端末は「指は動かす・拡大だけ」にする（その端末に覚える）。
+  // ペンの無いスマホは今までどおり指で書ける。ツールバーの「✋」で切り替えられる。
+  function pbPenOnly(){ try{ return localStorage.getItem("sumairu_pb_penonly")==="1"; }catch(e){ return false; } }
+  function pbSetPenOnly(on){
+    try{ localStorage.setItem("sumairu_pb_penonly", on?"1":"0"); }catch(e){}
+    var l = document.getElementById("pbFingerLabel"); if(l) l.textContent = on ? "指：動かす・拡大" : "指：書く";
+  }
   function pbZoomBy(delta){
-    pb.zoom = Math.max(0.4, Math.min(3, Math.round((pb.zoom+delta)*100)/100));
+    pb.zoom = Math.max(0.4, Math.min(PB_MAX_ZOOM, Math.round((pb.zoom+delta)*100)/100));
     pbApplyZoom();
   }
   function pbComputeFitZoom(contentW){
@@ -14454,7 +14464,7 @@
     pb.baseCtx && pb.baseCtx.clearRect(0,0,pb.baseCanvas.width, pb.baseCanvas.height);
     pb.imageCtx && pb.imageCtx.clearRect(0,0,pb.imageCanvas.width, pb.imageCanvas.height);
     pb.items = []; pb.pendingItem = null;
-    pb.touches = {}; pb.pinchStartDist = null; pb.drawing = false;
+    pb.touches = {}; pb.pinchStartDist = null; pb.drawing = false; pb.panLast = null;
     var layer = document.getElementById("pbItemsLayer"); if(layer) layer.innerHTML = "";
   }
   async function pbSaveSpecOverwrite(target, blob){
@@ -15763,16 +15773,41 @@
       var a = pb.touches[ids[0]], b = pb.touches[ids[1]];
       return Math.hypot(b.x-a.x, b.y-a.y);
     }
+    function pbPinchMid(){
+      var ids = Object.keys(pb.touches);
+      if(ids.length < 2) return null;
+      var a = pb.touches[ids[0]], b = pb.touches[ids[1]];
+      return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    }
+    function pbStageEl(){ return document.querySelector("#pbModal .pbstage") || document.querySelector(".pbstage"); }
+    // 指で書きかけた線を取り消す（2本目の指が触れたとき＝ピンチの始まり）
+    function pbCancelFingerStroke(){
+      if(!pb.drawing || pb.drawPointerType!=="touch") return;
+      pb.drawing = false;
+      pb.overlayCtx.clearRect(0,0,pb.overlayCanvas.width, pb.overlayCanvas.height);
+      pbRestoreHistory(pb.historyIndex);
+    }
     pb.overlayCanvas.addEventListener("pointerdown", function(e){
+      if(e.pointerType === "pen" && !pbPenOnly()){
+        pbSetPenOnly(true);
+        toast("ペンを使ったので、指は「動かす・拡大」だけにしました（✋で切り替えできます）", 6000);
+      }
       if(e.pointerType === "touch"){
+        // ペンで書いている間の手のひら・指は無視する
+        if(pb.drawing && pb.drawPointerType==="pen") return;
         pb.touches[e.pointerId] = {x:e.clientX, y:e.clientY};
+        try{ pb.overlayCanvas.setPointerCapture(e.pointerId); }catch(err){}
         if(Object.keys(pb.touches).length >= 2){
-          if(pb.drawing){ pb.drawing = false; pbPushHistory(); }
+          pbCancelFingerStroke();
           if(pb.activeTextEditor) pbCancelTextEditor();
           pb.pinchStartDist = pbPinchDist();
           pb.pinchStartZoom = pb.zoom;
+          var mid = pbPinchMid(), inner = document.getElementById("pbStageInner").getBoundingClientRect();
+          pb.pinchAnchor = { px:(mid.x-inner.left)/pb.zoom, py:(mid.y-inner.top)/pb.zoom };
           return;
         }
+        // 1本指：ペン専用の端末・表示モードでは書かずに動かす
+        if(pbPenOnly() || pb.tool==="view"){ pb.panLast = {x:e.clientX, y:e.clientY}; return; }
       }
       if(pb.tool==="view") return;
       if(pb.tool==="item" && pb.pendingItem){
@@ -15785,7 +15820,7 @@
       }
       if(pb.tool==="text"){ pbStartTextEditor(e); return; }
       try{ pb.overlayCanvas.setPointerCapture(e.pointerId); }catch(err){ /* ignore: drawing still proceeds without capture */ }
-      pb.drawing = true; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt;
+      pb.drawing = true; pb.drawPointerType = e.pointerType; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt;
       if(pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser"){
         var style = pbStrokeStyleFor();
         pbDrawSegment(pb.baseCtx, pb.startPt, {x:pb.startPt.x+0.01, y:pb.startPt.y+0.01}, style);
@@ -15798,9 +15833,21 @@
           var dist = pbPinchDist();
           if(dist){
             var newZoom = pb.pinchStartZoom * (dist/pb.pinchStartDist);
-            pb.zoom = Math.max(0.4, Math.min(3, Math.round(newZoom*100)/100));
+            pb.zoom = Math.max(0.4, Math.min(PB_MAX_ZOOM, Math.round(newZoom*100)/100));
             pbApplyZoom();
+            // 指の間の点が指の下に残るように、表示位置を合わせる（2本指で動かすのにも対応）
+            var stg = pbStageEl(), mid = pbPinchMid(), inner = document.getElementById("pbStageInner").getBoundingClientRect();
+            if(stg && mid && pb.pinchAnchor){
+              stg.scrollLeft += (inner.left + pb.pinchAnchor.px*pb.zoom) - mid.x;
+              stg.scrollTop += (inner.top + pb.pinchAnchor.py*pb.zoom) - mid.y;
+            }
           }
+          return;
+        }
+        if(pb.panLast){
+          var st = pbStageEl();
+          if(st){ st.scrollLeft -= e.clientX - pb.panLast.x; st.scrollTop -= e.clientY - pb.panLast.y; }
+          pb.panLast = {x:e.clientX, y:e.clientY};
           return;
         }
       }
@@ -15811,8 +15858,13 @@
     });
     function pbEndStroke(e){
       if(e && e.pointerType === "touch"){
+        var wasTracked = !!pb.touches[e.pointerId];
         delete pb.touches[e.pointerId];
         if(Object.keys(pb.touches).length < 2) pb.pinchStartDist = null;
+        if(!Object.keys(pb.touches).length) pb.panLast = null;
+        // ペンで書いている途中に触れた指が離れても、ペンの線は終わらせない
+        if(pb.drawing && pb.drawPointerType==="pen") return;
+        if(!wasTracked && pb.drawPointerType!=="touch") return;
       }
       if(!pb.drawing) return;
       pb.drawing = false;
@@ -15839,6 +15891,11 @@
       var st = PB_STAMPS.find(function(s){ return s.key===key; });
       if(st){ var text = st.autoDate ? (st.label+"（"+todayStr()+"）") : st.label; pb.pendingItem = { kind:"stamp", text: text }; pbSetTool("item"); toast("配置したい場所をクリックしてください"); }
       e.target.value = "";
+    });
+    pbSetPenOnly(pbPenOnly());
+    document.getElementById("pbFingerToggle").addEventListener("click", function(){
+      var on = !pbPenOnly(); pbSetPenOnly(on);
+      toast(on ? "指は「動かす・拡大」だけにしました（書くのはペン）" : "指でも書けるようにしました（2本指で拡大・縮小）");
     });
     document.getElementById("pbZoomOut").addEventListener("click", function(){ pbZoomBy(-0.1); });
     document.getElementById("pbZoomIn").addEventListener("click", function(){ pbZoomBy(0.1); });
