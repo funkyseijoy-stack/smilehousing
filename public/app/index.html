@@ -3922,7 +3922,7 @@
         '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
         '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
-        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'＋ 追加見積りへ')+'</button>':'')+
+        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み（見る ›）':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
         (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
         '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
@@ -5332,6 +5332,26 @@
       (content ? '<div class="muted hrcontent">'+escapeHtml(content)+'</div>' : '')+
       (open && ra.length ? hrFilesListHtml(ra) : '')+
     '</div>';
+  }
+  // 案件の「おうちノート連携」タブの「追加見積り」を開き、その項目へ移動して光らせる（金額の欄にカーソル）
+  function openEstimatesOfProject(pid, estId){
+    if(!projectById(pid)){ toast("案件が見つかりません"); return; }
+    switchTab("projects"); openProjectDetail(pid);
+    var b = document.querySelector('.sub-btn[data-sub="okainote"]'); if(b) b.click();
+    var tries = 0;
+    (function look(){
+      if(state.currentProjectId!==pid) return;
+      var el = estId ? document.querySelector('[data-estcard="'+(window.CSS && CSS.escape ? CSS.escape(estId) : estId)+'"]') : null;
+      var target = el || (tries>=24 ? document.getElementById("okaiEstimateList") : null);
+      if(!target){ tries++; setTimeout(look, 250); return; }
+      target.scrollIntoView({behavior:"smooth", block:"center"});
+      if(el){
+        el.style.transition = "box-shadow .3s"; el.style.boxShadow = "0 0 0 3px var(--accent)";
+        setTimeout(function(){ el.style.boxShadow = ""; }, 2600);
+        var inp = el.querySelector("[data-okai-amount-for]");
+        if(inp && !String(inp.value||"").trim()) setTimeout(function(){ try{ inp.focus({preventScroll:true}); }catch(e){} }, 500);
+      }
+    })();
   }
   function openRequestsOfProject(pid){
     switchTab("projects"); openProjectDetail(pid);
@@ -8276,7 +8296,7 @@
     list.innerHTML = items.map(function(it){
       var hasAmount = !!String(it.amount||"").trim();
       var estState = okaiEstimateState(it);
-      return '<div class="card" style="padding:8px 10px;">'+
+      return '<div class="card" style="padding:8px 10px;" data-estcard="'+escapeOkai(it.id)+'">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
         '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '')+'　<span class="pill '+(estState==="承認済み"?"estimate-承認":(estState==="見送り"?"estimate-見送り":"tag"))+'">'+escapeOkai(estState)+'</span></div>'+
         '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
@@ -11966,7 +11986,7 @@
     if(!t) return;
     var proj = projectById(t.projectId);
     if(!proj){ toast("案件が見つかりません"); return; }
-    if(t.estimateRef){ toast("すでに追加見積りに載せています（「おうちノート」タブで金額を入力できます）"); return; }
+    if(t.estimateRef){ openEstimatesOfProject(t.projectId, t.estimateRef.id); return; }
     var content = String(t.content||"").trim();
     if(!content){ toast("内容が空のため載せられません"); return; }
     var firstLine = content.split("\n")[0].trim();
@@ -11989,7 +12009,8 @@
       saveDoc("tasks", t.id, t);
       if(state.currentProjectId===pid) renderOkaiEstimates(cust);
       logActivity("タスクから追加見積り「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
-      toast("✅ 追加見積りに載せました。\n金額は、この案件の「おうちノート連携」タブ →「追加見積り」の「金額を入力」欄から入れます。\n空欄のままだと、お客様には「金額確認中」と表示されます。", 12000);
+      toast("✅ 追加見積りに載せました。金額を入れてください（空欄のままだと、お客様には「金額確認中」と表示されます）", 6000);
+      openEstimatesOfProject(pid, estId);
     });
   }
   async function taskGmailDraft(id){
