@@ -33,6 +33,11 @@
   .hd .ttl{ font-size:clamp(.54rem,2.3vw,.7rem); letter-spacing:.4em; font-weight:400; color:#cdb9a0; white-space:nowrap; line-height:1; overflow:hidden; text-overflow:ellipsis; }
   .hd .hbtn{ width:33px; height:33px; border-radius:50%; background:transparent; border:1px solid rgba(216,191,157,.6); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:#d8bf9d; font-weight:700; font-size:.8rem; padding:0; }
   .hd .hbtn svg{ width:16px; height:16px; }
+  /* アイコンの下に名前（何のボタンか分かるように） */
+  .hd .hbtn{ width:auto; min-width:40px; height:auto; border:none; border-radius:10px; flex-direction:column; gap:3px; padding:4px 2px; }
+  .hd .hbtn svg, .hd .hbtn .q{ width:30px; height:30px; padding:6px; box-sizing:border-box; border:1px solid rgba(216,191,157,.6); border-radius:50%; }
+  .hd .hbtn .q{ display:flex; align-items:center; justify-content:center; font-size:.85rem; color:#d8bf9d; font-weight:400; }
+  .hd .hbtn .hl{ font-size:.58rem; color:#d8bf9d; letter-spacing:.02em; white-space:nowrap; line-height:1; }
   .band{ background:var(--brown); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; }
   .band .who{ font-size:.74rem; opacity:.75; letter-spacing:.08em; }
   .band .st{ font-weight:700; margin-top:2px; }
@@ -108,12 +113,28 @@
   .tag.ph{ background:var(--green); color:var(--green-ink); }
   .tag.new{ background:var(--rose); color:#fff; }
   .tag.nw{ background:#d9534f; color:#fff; font-weight:700; }
+  .scom{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .scom .sh{ font-weight:700; font-size:.9rem; color:var(--brown); margin-bottom:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .scom .sd{ font-weight:400; font-size:.76rem; color:var(--muted); }
+  .scom .st{ white-space:pre-wrap; line-height:1.7; font-size:.92rem; }
+  .scom .sttap{ display:block; width:100%; text-align:left; background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer; }
+  .scom .scph{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; width:100%; margin-top:10px; background:none; border:0; padding:0; cursor:pointer; }
+  .scom .scth{ position:relative; display:block; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--line); }
+  .scom .scth img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .scom .scmore{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:700; font-size:1.1rem; }
+  .scom .srep{ display:flex; justify-content:flex-end; gap:14px; flex-wrap:wrap; }
+  .scphotos{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 18px; }
+  .scphotos h3{ margin:0 0 4px; font-size:1rem; color:var(--brown); }
+  .scphotos .scnote{ font-size:.85rem; color:var(--muted); margin:0 0 10px; white-space:pre-wrap; }
+  .tli.focus{ outline:3px solid #d9a441; outline-offset:2px; border-radius:12px; transition:outline-color 1.5s; }
   .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
-  .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:6px; }
+  .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:2px; }
+  .upd .nwb{ display:inline-block; background:#d9534f; color:#fff; font-size:.85rem; font-weight:700; letter-spacing:.06em; border-radius:999px; padding:3px 12px; }
+  .upd .us{ font-size:.76rem; color:var(--muted); margin-bottom:8px; }
   .upd .ur{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:#fff; border:1px solid #f0e2c4; border-radius:12px; padding:10px 12px; margin-top:6px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
   .upd .ur .ut{ flex:1; min-width:0; }
   .upd .ur .ug{ color:var(--muted); }
-  .upd .uok{ display:block; margin:10px 0 0 auto; background:var(--brown); color:#fff; border:none; border-radius:999px; padding:8px 16px; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+  .upd .uok{ display:block; margin:10px 0 0 auto; background:transparent; color:var(--brown); border:1.5px solid var(--line); border-radius:999px; padding:8px 16px; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
   .cat .newn{ display:inline-block; margin-top:3px; background:#d9534f; color:#fff; font-size:.68rem; font-weight:700; border-radius:999px; padding:2px 8px; }
   .tlt{ font-weight:700; margin-bottom:6px; }
   .box{ border-radius:10px; padding:8px 10px; font-size:.86rem; white-space:pre-wrap; margin-bottom:6px; }
@@ -151,6 +172,61 @@
   .linkbtn{ background:none; border:none; color:var(--brown2); text-decoration:underline; cursor:pointer; font-size:.8rem; padding:0; margin-top:8px; }
 
   /* 時系列のカード（打ち合わせ記録・変更後の図面） */
+  .bchips{ padding-top:6px; }
+  .bchips .cnew{ display:inline-block; background:#d9534f; color:#fff; font-size:.6rem; font-weight:700; border-radius:999px; padding:1px 6px; margin-left:3px; vertical-align:1px; }
+  .fchip{ border:none; cursor:pointer; font-family:inherit; }
+  .fdec{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:.8rem; }
+  .pbstrip{ display:flex; gap:10px; overflow-x:auto; padding:2px 0 10px; margin-bottom:8px; -webkit-overflow-scrolling:touch; }
+  .pbstrip{ scroll-snap-type:x proximity; align-items:flex-start; }
+  .pbrow{ margin-bottom:6px; }
+  .pbrh{ display:flex; justify-content:space-between; align-items:center; width:100%; background:none; border:none; padding:4px 2px 6px; font:inherit; font-weight:700; font-size:.9rem; color:var(--ink); cursor:pointer; text-align:left; }
+  .pbrh span{ font-weight:400; font-size:.75rem; color:var(--muted); }
+  .pbstrip .pbno{ font-size:.7rem; font-weight:700; color:var(--muted); margin-bottom:4px; }
+  .pbstrip .pbc.latest{ border-color:var(--brown2); }
+  .pbstrip .pbc.latest .pbno{ color:#fff; background:var(--brown2); display:inline-block; border-radius:999px; padding:1px 8px; }
+  .pbstrip .pbarrow{ flex:none; align-self:center; color:var(--muted); font-size:.9rem; margin:0 -4px; }
+  .pbstrip .pbm{ flex-direction:row; align-items:center; gap:6px; }
+  .pbstrip .pbc{ flex:none; width:38%; max-width:170px; scroll-snap-align:start; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:8px; }
+  .pbstrip .pbc .th{ display:block; width:100%; margin:0; }
+  .pbstrip .pbc img{ width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:10px; display:block; }
+  .pbstrip .pbm{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; background:none; border:none; padding:6px 2px 0; font:inherit; cursor:pointer; text-align:left; color:var(--ink); }
+  .pbstrip .pbm .nm{ font-weight:700; font-size:.85rem; } .pbstrip .pbm .dt{ font-size:.72rem; color:var(--muted); }
+  .pbstrip .pbchg{ width:100%; margin-top:6px; background:var(--card); border:1.5px solid var(--line2); color:var(--brown2); border-radius:999px; padding:6px 4px; font:inherit; font-size:.72rem; font-weight:700; cursor:pointer; }
+  .pbmini{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px; margin-bottom:12px; -webkit-overflow-scrolling:touch; }
+  .pbmini .pmi{ flex:none; width:28%; max-width:120px; display:flex; flex-direction:column; align-items:flex-start; gap:2px; background:none; border:none; padding:0; font:inherit; color:var(--ink); cursor:pointer; text-align:left; }
+  .pbmini .pmi img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; border:1.5px solid var(--line2); }
+  .pbmini .nm{ font-size:.78rem; font-weight:700; } .pbmini .dt{ font-size:.68rem; color:var(--muted); } .pbmini .dt b{ color:#d9534f; }
+  .srep{ text-align:right; margin-top:2px; } .srep .linkbtn{ margin-top:4px; font-size:.82rem; font-weight:700; }
+  .todobox{ background:var(--card); border:1.5px solid #e9c8c8; border-left:5px solid #c9575a; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .todobox .ah{ font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .todobox .ah span{ font-size:.75rem; color:#c9575a; }
+  .todobox .td{ border-top:1px solid var(--line); padding:10px 0 4px; }
+  .todobox .tdh{ display:flex; align-items:center; gap:6px; } .todobox .tk{ font-size:.72rem; color:var(--muted); }
+  .todobox .tt{ font-weight:700; font-size:.9rem; line-height:1.5; margin-top:4px; }
+  .todobox .tttap{ display:block; width:100%; text-align:left; background:none; border:0; padding:0; font-family:inherit; color:inherit; cursor:pointer; }
+  .todobox .ttlink{ display:block; font-weight:700; font-size:.8rem; color:var(--brown); text-decoration:underline; margin-top:4px; }
+  .qbox{ background:var(--card); border:1.5px solid var(--line2); border-radius:16px; margin:0 0 16px; overflow:hidden; }
+  .qrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none; border:none; padding:12px 14px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
+  .qrow + .qrow, .qdetail + .qrow{ border-top:1px solid var(--line); }
+  .qrow .qt{ flex:1; min-width:0; } .qrow .nx{ display:block; font-size:.75rem; color:var(--muted); margin-top:2px; } .qrow .lnk{ color:var(--brown2); }
+  .qdetail{ padding:0 14px 12px; } .qdetail .stg{ margin-top:0; }
+  .qdetail .sub2{ border-top:1px solid var(--line); margin-top:10px; padding-top:4px; } .qdetail .bar{ background:var(--line); } .qdetail .r{ display:flex; justify-content:space-between; font-size:.75rem; color:var(--muted); }
+  .othersep{ display:flex; align-items:center; gap:10px; margin:22px 0 6px; color:var(--muted); font-size:.78rem; letter-spacing:.1em; }
+  .othersep::before, .othersep::after{ content:""; flex:1; border-top:1px solid var(--line2); }
+  .msgcta{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:var(--card); border:1.5px solid var(--line2); border-radius:14px; padding:12px 14px; margin:0 0 16px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
+  .msgcta .t{ flex:1; } .msgcta b{ color:var(--brown2); }
+  .chgrow{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .chgbtn{ background:var(--card); border:1.5px solid var(--brown2); color:var(--brown2); border-radius:999px; padding:8px 14px; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .consbtns{ display:flex; justify-content:flex-end; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .chgbtn.sub{ border-color:var(--line2); color:var(--ink2); font-weight:400; }
+  .chgdone{ font-size:.75rem; color:#3c7a52; font-weight:700; }
+  .askbox{ background:#fff; border:1.5px solid #e9c8c8; border-left:5px solid #c9575a; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .askbox .ah{ font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
+  .askbox .ah span{ font-size:.75rem; color:#c9575a; }
+  .askbox p{ font-size:.78rem; color:var(--muted); margin:2px 0 8px; }
+  .askbox .ai{ display:flex; align-items:center; gap:6px; width:100%; text-align:left; background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:6px; font:inherit; font-size:.85rem; color:var(--ink); cursor:pointer; }
+  .askbox .ai .at{ flex:1; min-width:0; }
+  .askbox .am{ font-size:.75rem; color:var(--muted); margin-top:6px; text-align:right; }
   .feed{ position:relative; margin:4px 0 20px 8px; padding-left:16px; border-left:3px solid var(--line2); }
   .fcard{ position:relative; border:1.5px solid var(--line2); border-left-width:6px; border-radius:14px; background:#fff; padding:12px 14px; margin-bottom:14px; }
   .fcard::before{ content:""; position:absolute; left:-27px; top:18px; width:14px; height:14px; border-radius:50%; background:var(--line2); border:3px solid var(--page); }
@@ -383,14 +459,14 @@
     </div>
     <button class="hbtn" id="btnOrder" aria-label="決める順番">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
-    </button>
+    <span class="hl">決める順</span></button>
     <button class="hbtn" id="btnMemo" aria-label="わたしのメモ">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
-    </button>
-    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法">？</button>
+    <span class="hl">メモ</span></button>
+    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法"><b class="q">？</b><span class="hl">使い方</span></button>
     <button class="hbtn" id="btnMail" aria-label="メッセージ">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
-    </button>
+    <span class="hl">メッセージ</span></button>
   </header>
   <div class="band">
     <div><div class="who" id="bandWho">お客様のおうち</div><div class="st" id="bandSt">家づくり進行中</div></div>
@@ -447,12 +523,12 @@
       <li><b>わたしのメモ</b>：気になったことを自由に書き留められます（この端末にのみ保存されます）</li>
     </ul>
 
-    <h3>✅ 仮決定・決定ボタン</h3>
+    <h3>✏️ 変更したい・✅ これで決定</h3>
     <ul>
-      <li>「家づくり」の各項目にある打合せ記録や図面のカードに、<b>「仮決定にする」「決定する」</b>のボタンが出ることがあります（スタッフが必要なカードにだけ表示します）</li>
-      <li><b>検討中</b>（白）→ <b>仮決定</b>（黄）→ <b>決定</b>（緑）と、カードの色が変わります</li>
-      <li>迷っているときは「仮決定」でも大丈夫です。あとから「検討中に戻す」で変更できます</li>
-      <li>押した内容は住まいるハウジングにも共有されます</li>
+      <li>プランボードには<b>「✏️ 変更したい」</b>ボタンがあります。押して変えたいところを書くと、どのプランボードの話かが分かる形でスタッフに届きます</li>
+      <li>スタッフが確認をお願いしたカードには<b>「✅ これで決定」</b>も出ます。決めたカードは緑色になります（あとから「検討中に戻す」もできます）</li>
+      <li>ホームの<b>「🙋 お願いしたいこと」</b>に、ご確認・ご検討をお願いしたいことがまとまっています。「決めたことを伝える」「相談したい」からスタッフに送れます</li>
+      <li>送った内容は「メッセージ」に残り、お返事もそこに届きます</li>
     </ul>
 
     <h3>📄 追加見積りの承認・見送り</h3>
@@ -505,6 +581,16 @@
   </div>
 </div>
 
+<div class="help" id="chgModal" hidden>
+  <div class="help-card">
+    <button class="x" id="chgX" aria-label="閉じる">×</button>
+    <h2 id="chgTitle">✏️ 変更したいところ</h2>
+    <p class="help-lead" id="chgWhat"></p>
+    <textarea id="chgInput" class="meminput" placeholder="例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい"></textarea>
+    <button class="btn dk" id="chgSend" style="width:100%; margin-top:10px;">スタッフに送る</button>
+    <p class="help-lead" style="margin-top:8px;">メッセージとしてスタッフに届きます。お返事は「メッセージ」に届きます。</p>
+  </div>
+</div>
 <div class="help" id="memoModal" hidden>
   <div class="help-card">
     <button class="x" id="memoX" aria-label="閉じる">×</button>
@@ -678,6 +764,8 @@
     main.innerHTML = '<div class="wrap">'+html+'</div>';
     var rdNew = main.querySelector('.rvdays'); if(rdNew && rdLeft) rdNew.scrollLeft = rdLeft;
     if(view.tab==="msg"){ var m = document.getElementById("msgEnd"); if(m) m.scrollIntoView(); }
+    // プランボードの列は、最新（いちばん右）が見える位置から
+    Array.prototype.forEach.call(document.querySelectorAll(".pbstrip"), function(el){ el.scrollLeft = el.scrollWidth; });
     if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
   }
 
@@ -762,7 +850,7 @@ function consItems(){
   notes.forEach(function(n){
     String(n.open||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean).forEach(function(t){
       if(seen[t]) return; seen[t] = 1;
-      out.push({ t:t, date:n.date, part:n.part||"", title:n.title||"" });
+      out.push({ t:t, date:n.date, part:n.partName||n.part||"", title:n.title||"", id:n.id||"" });
     });
   });
   return out;
@@ -790,38 +878,62 @@ function consItems(){
     if(!seenSince) return [];
     var rows = [];
     var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && isNew(m.createdAt); });
-    if(msgs.length) rows.push({ ic:"💬", t:"メッセージ "+msgs.length+"件", a:'data-go="msg"' });
-    var notes = (data.notes||[]).filter(function(n){ return isNew(n.upd); });
-    if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録 "+notes.length+"件"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
-    var specCats = [], specN = 0;
+    if(msgs.length) rows.push({ ic:"💬", t:"メッセージがあります", a:'data-go="msg"' });
+    // 設備仕様の写真・プランボード・資料（PDF・お見積り）は、種類ごとに分けて「どの項目か」を添える
+    var kinds = { photo:{ic:"📷", t:"写真の追加があります", cats:[]}, pb:{ic:"📐", t:"プランボードの追加があります", cats:[]}, doc:{ic:"📄", t:"資料の追加があります", cats:[]} };
     (data.categories||[]).forEach(function(c){
-      var n = catAllItems(c).filter(function(x){ return x.type!=="note" && isNew(x.upd); }).length;
-      if(n){ specN += n; specCats.push(c); }
+      catAllItems(c).forEach(function(x){
+        if(x.type==="note" || !isNew(x.upd)) return;
+        var ct = String(x.contentType || (x.file && x.file.contentType) || "");
+        var k = (x.type==="planboard" || (x.isQuote && x.quoteType!=="定価")) ? "pb" : ((x.isQuote || ct.indexOf("pdf")>=0) ? "doc" : "photo");
+        if(kinds[k].cats.indexOf(c)<0) kinds[k].cats.push(c);
+      });
     });
-    if(specN) rows.push({ ic:"📄", t:"写真・資料 "+specN+"件"+namesText(specCats.map(function(c){ return c.name; })),
-      a: 'data-updcat="'+(specCats.length===1 ? esc(specCats[0].id) : "")+'"' });
-    var plans = (data.plans||[]).filter(function(f){ return isNew(f.upd); });
-    if(plans.length) rows.push({ ic:"📐", t:"平面図 "+plans.length+"件", a:'data-openplans="1"' });
+    ["photo","pb","doc"].forEach(function(k){
+      var g = kinds[k];
+      if(g.cats.length) rows.push({ ic:g.ic, t:g.t+namesText(g.cats.map(function(c){ return c.name; })), a:'data-updcat="'+(g.cats.length===1 ? esc(g.cats[0].id) : "")+'"' });
+    });
     var album = (data.album||[]).filter(function(a){ return isNew(a.createdAt); });
-    if(album.length) rows.push({ ic:"📷", t:"アルバム "+album.length+"枚", a:'data-go="album"' });
+    if(album.length) rows.push({ ic:"📷", t:"アルバムに写真の追加があります", a:'data-go="album"' });
+    var notes = (data.notes||[]).filter(function(n){ return isNew(n.upd); });
+    if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録の追加があります"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
+    var plans = (data.plans||[]).filter(function(f){ return isNew(f.upd); });
+    if(plans.length) rows.push({ ic:"📐", t:"平面図の追加があります", a:'data-openplans="1"' });
     var imgs = (data.images||[]).filter(function(x){ return x.by!=="customer" && isNew(x.createdAt); });
-    if(imgs.length) rows.push({ ic:"🖼", t:"お家のイメージ "+imgs.length+"枚", a:'data-go="image"' });
+    if(imgs.length) rows.push({ ic:"🖼", t:"お家のイメージに写真の追加があります", a:'data-go="image"' });
     var ests = (data.estimates||[]).filter(function(x){ return isNew(x.createdAt); });
-    if(ests.length) rows.push({ ic:"🧾", t:"追加見積り "+ests.length+"件", a:'data-updjump="sec-est"' });
+    if(ests.length) rows.push({ ic:"🧾", t:"追加見積りがあります", a:'data-updjump="sec-est"' });
     var resv = (data.reservations||[]).filter(function(r){ return r.date >= data.today && isNew(r.createdAt); });
-    if(resv.length) rows.push({ ic:"📅", t:"ご予約 "+resv.map(function(r){ return md(r.date)+" "+(r.startTime||""); }).slice(0,2).join("、")+(resv.length>2?" ほか":""), a:'data-go="resv"' });
+    if(resv.length) rows.push({ ic:"📅", t:"ご予約が入りました（"+resv.map(function(r){ return md(r.date)+" "+(r.startTime||""); }).slice(0,2).join("、")+(resv.length>2?" ほか":"")+"）", a:'data-go="resv"' });
     var ntcs = (data.notices||[]).filter(function(n){ return n.kind!=="service" && isNew(n.createdAt); });
-    if(ntcs.length) rows.push({ ic:"📢", t:"お知らせ "+ntcs.length+"件", a:'data-updjump="sec-ntc"' });
+    if(ntcs.length) rows.push({ ic:"📢", t:"お知らせがあります", a:'data-updjump="sec-ntc"' });
     return rows;
+  }
+  // スタッフの「お客様へのひとこと」（住まいるアプリのヒアリングタブで書く）。ホームのいちばん上に出す
+  function staffCommentHtml(){
+    var sc = data.staffComment;
+    if(!sc || !sc.text) return "";
+    var d = sc.at ? new Date(sc.at) : null;
+    var ph = (sc.photos||[]).filter(isImg);
+    var phHtml = "";
+    if(ph.length){
+      var SHOW = 4;
+      phHtml = '<button class="scph" data-scphotos="1" aria-label="お送りした写真を見る">'+ph.slice(0, SHOW).map(function(f, i){
+        var more = (i===SHOW-1 && ph.length>SHOW) ? '<span class="scmore">+'+(ph.length-SHOW)+'</span>' : '';
+        return '<span class="scth"><img loading="lazy" src="'+esc(f.url)+'" alt="">'+more+'</span>';
+      }).join("")+'</button>';
+    }
+    return '<div class="scom"><div class="sh">💬 スタッフより'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div>'+
+      (ph.length ? '<button class="st sttap" data-scphotos="1">'+esc(sc.text)+'</button>' : '<div class="st">'+esc(sc.text)+'</div>')+phHtml+
+      '<div class="srep">'+(ph.length ? '<button class="linkbtn" data-scphotos="1">📷 写真を見る（'+ph.length+'枚） ›</button>' : '')+'<button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
   }
   function updatesHtml(){
     if(view.updDismissed) return "";
     var rows = updatesRows();
     if(!rows.length) return "";
-    var d = new Date(seenSince);
-    return '<div class="upd"><div class="uh">🆕 前回（'+(d.getMonth()+1)+'/'+d.getDate()+'）ご覧になってからの更新</div>'+
+    return '<div class="upd"><div class="uh"><span class="nwb">NEW</span></div>'+
       rows.map(function(r){ return '<button class="ur" '+r.a+'><span>'+r.ic+'</span><span class="ut">'+esc(r.t)+'</span><span class="ug">›</span></button>'; }).join("")+
-      '<button class="uok" data-updok="1">確認しました</button></div>';
+      '<button class="uok" data-updok="1">とじる</button></div>';
   }
 
 function homeHtml(){
@@ -835,41 +947,38 @@ function homeHtml(){
     var pg = progress();
     var out = '<div class="greet">'+greet+'、'+esc(name)+'様</div>'+
       '<p class="sub">わが家の現在と、次に決めることを確認できます。</p>';
-    // 初めての方への案内。「×」で閉じたら、この端末では出さない
+    // ホームは「何が新しい？」「何をすればいい？」「次はいつ？」に絞る。ほかは下の「そのほか」へ
+    out += staffCommentHtml();
     out += updatesHtml();
-    if(!hintClosed()) out += '<div class="hintbar"><b>？</b><span>使い方は、右上の「？」ボタンをご覧ください。</span><button class="hx" data-hintx="1" aria-label="この案内を閉じる">×</button></div>';
-    // 「家づくりの進み具合」はわが家の状況をひと目で把握できる要約なので、
-    // 挨拶の直後に置く（以前はアルバム・平面図の下だった）。
+    out += todoHtml();
+    // 進み具合と次回のご予約を2行で（押すと工程の詳細が開く）
     var hp = data.houseProgress;
     var specBar = '<div class="bar"><i style="width:'+pg.pct+'%"></i></div>'+
-      '<div class="r"><span>現在 '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div>';
+      '<div class="r"><span>仕様のお打合せ '+pg.pct+'%</span><span>'+(pg.total ? ('決定 '+pg.done+' / '+pg.total+' 項目') : 'これから登録します')+'</span></div>';
+    var progLine = "", progDetail = "";
     if(hp && hp.steps && hp.steps.length){
-      var cur = hp.current, now = cur>=0 ? hp.steps[cur] : null;
-      out += '<div class="prog"><div class="l">家づくりの進み具合</div>'+
-        '<div class="t">'+(now ? '現在：'+esc(now.name) : '工程のご案内')+'</div>'+
-        '<ul class="stg">'+hp.steps.map(function(st,i){
+      var cur = hp.current, now = cur>=0 ? hp.steps[cur] : null, nx = cur>=0 ? hp.steps[cur+1] : hp.steps[0];
+      progLine = (now ? '現在：<b>'+esc(now.name)+'</b>' : '工程のご案内')+(nx ? '<span class="nx">次は'+esc(nx.name)+(nx.date?'・'+esc(nx.date):'')+'</span>' : '');
+      progDetail = '<ul class="stg">'+hp.steps.map(function(st,i){
           var cls = cur<0 ? "todo" : (i<cur ? "done" : (i===cur ? "now" : "todo"));
           return '<li class="'+cls+'"><span class="mk">'+(cls==="done" ? '✓' : '')+'</span><div><div class="nm">'+esc(st.name)+(cls==="now" ? '<span class="tg">いま</span>' : '')+'</div>'+
             (st.date ? '<div class="dt">'+esc(st.date)+(cls==="done" ? '' : ' 予定')+'</div>' : '')+'</div></li>';
-        }).join("")+'</ul>'+
-        '<div class="sub2"><div class="sl">仕様のお打合せ（決定・仮決定した内容を項目ごとに確認できます）</div>'+specBar+'</div></div>';
+        }).join("")+'</ul>';
     } else {
-      out += '<div class="prog"><div class="l">家づくりの進み具合</div><div class="t">仕様のお打合せ</div>'+
-        '<div class="d">決定・仮決定した内容を、項目ごとに確認できます。</div>'+specBar+'</div>';
+      progLine = '仕様のお打合せ：<b>'+(pg.total ? '決定 '+pg.done+' / '+pg.total+' 項目' : 'これから')+'</b>';
     }
-
-    // 次回のご予約。以前はヘッダーの小さな文字だけだったが、情報量が少なく
-    // 寂しい印象だったので、ホームにもカードとして表示する。
+    progDetail += '<div class="sub2">'+specBar+'</div>';
+    var rvLine;
     if(data.nextReservation){
       var nr = data.nextReservation, ndt = new Date(nr.date+"T00:00:00");
-      out += '<div class="sechd"><h3>📅 次回のご予約</h3><button class="more" data-go="resv">すべて見る →</button></div>';
-      out += '<div class="rv"><div class="dt"><div class="m">'+(ndt.getMonth()+1)+'月</div><div class="dd">'+ndt.getDate()+'</div><div class="w">'+WD[ndt.getDay()]+'曜日</div></div>'+
-        '<div><div class="ty">'+esc(nr.type||"お打合せ")+'</div><div class="tm">'+esc(nr.startTime||"")+(nr.endTime?"〜"+esc(nr.endTime):"")+(nr.staff?"　担当："+esc(nr.staff):"")+'</div></div></div>';
+      rvLine = '<button class="qrow" data-go="resv"><span class="qi">📅</span><span class="qt">次回のご予約：<b>'+(ndt.getMonth()+1)+'/'+ndt.getDate()+'（'+WD[ndt.getDay()]+'）'+esc(nr.startTime||"")+'</b> '+esc(nr.type||"")+'</span><span class="ug">›</span></button>';
     } else {
-      out += '<div class="sechd"><h3>📅 ご予約予定</h3><button class="more" data-go="resv">予約を見る →</button></div>'+
-        '<div class="rv" style="flex-direction:column; align-items:stretch; gap:10px;"><div><div class="ty">次回予約はありません</div><div class="tm">空いている日時から予約できます</div></div>'+
-        '<button class="btn dk" data-go="resv">予約する</button></div>';
+      rvLine = '<button class="qrow" data-go="resv"><span class="qi">📅</span><span class="qt">次回のご予約はありません　<b class="lnk">予約する</b></span><span class="ug">›</span></button>';
     }
+    out += '<div class="qbox"><button class="qrow" data-progtoggle="1"><span class="qi">🏠</span><span class="qt">'+progLine+'</span><span class="ug">'+(view.progOpen?'▴':'▾')+'</span></button>'+
+      (view.progOpen ? '<div class="qdetail">'+progDetail+'</div>' : '')+rvLine+'</div>';
+    out += homePbHtml();
+    out += '<div class="othersep"><span>そのほか</span></div>';
 
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
@@ -900,26 +1009,6 @@ function homeHtml(){
                 (it.decided ? '<span style="font-size:.8em; font-weight:700; color:#2f6b3f; background:#e4f1e6; border-radius:999px; padding:1px 10px;">✓ 決まった</span>' : '')+'</div>';
             }).join("")+'</div>';
         }).join("")+'</div>';
-    }
-
-    // 💭 ご検討いただきたいこと：反映済みの打合せ記録の「ご検討いただきたいこと」（open）を1行ずつ集めて、新しい順に一覧にする。
-    // スタッフが記録を編集して💭の印を外す（✅にする・印なしにする）と、ここから消える。
-    var cons = consItems();
-    if(cons.length){
-      var CONS_LIMIT = 5, consShow = view.consAll ? cons : cons.slice(0, CONS_LIMIT);
-      out += '<div class="sechd"><h3>💭 ご検討いただきたいこと</h3><span style="font-size:.85rem;">'+cons.length+'件</span></div>'+
-        '<div class="conslist">'+consShow.map(function(c){
-          return '<div class="cons"><div class="ct">'+esc(c.t)+'</div><div class="cm">'+fmtD(c.date)+(c.part?'・'+esc(c.part):(c.title?'・'+esc(c.title):''))+'</div></div>';
-        }).join("")+
-        (cons.length>CONS_LIMIT ? '<button class="consmore" data-consall="1">'+(view.consAll?'閉じる ▴':'ほか '+(cons.length-CONS_LIMIT)+'件を見る ▾')+'</button>' : '')+
-        '</div>';
-    }
-
-    // 最近のお打合せ記録（2件）。決定事項・確認事項が見える具体的な内容なので、
-    // ホームの情報量を増やすのにちょうどよい。
-    if(data.notes.length){
-      out += '<div class="sechd"><h3>🗒 最近のお打合せ記録</h3><button class="more" data-opennotes="1">すべて見る →</button></div>';
-      out += '<div class="catlist">'+data.notes.slice(0,2).map(function(n){ return '<div class="tli flat">'+noteBody(n,true)+'</div>'; }).join("")+'</div>';
     }
 
     // 平面図は「暮らしの写真」とは毛色が違う資料なので、アルバムの直後ではなく、
@@ -1092,6 +1181,13 @@ function homeHtml(){
     var mine = album.filter(function(a){ return a.kind!=="reference"; });
     var ref = album.filter(function(a){ return a.kind==="reference"; });
     var out = '<h2 class="big">わが家のアルバム</h2><p class="sub">住まいるハウジングからお届けした写真です。タップで大きく表示します。</p>';
+    var sc = data.staffComment, scph = sc ? (sc.photos||[]).filter(isImg) : [];
+    if(view.scPhotos && scph.length){
+      var sd = sc.at ? new Date(sc.at) : null;
+      out += '<div class="scphotos" id="scPhotosSec"><h3>📷 '+(sd && !isNaN(sd) ? (sd.getMonth()+1)+'/'+sd.getDate()+' ' : '')+'お送りした写真（'+scph.length+'枚）</h3>'+
+        '<p class="scnote">'+esc(sc.text||"")+'</p><div class="agrid">'+scph.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div></div>'+
+        (mine.length ? '<div class="sechd"><h3>アルバムのすべての写真</h3></div>' : '');
+    }
     out += mine.length ? '<div class="agrid">'+mine.map(function(a){ return thumbHtml(a, fmtD(a.createdAt)); }).join("")+'</div>' : '<div class="empty">まだ写真はありません。</div>';
     if(ref.length) out += '<div class="sechd"><h3>家づくりの参考写真</h3></div><div class="agrid">'+ref.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div>';
     return out;
@@ -1228,16 +1324,173 @@ function homeHtml(){
   }
 
   // ---------- 家づくり ----------
+  // ---- 家づくりの記録：全部の項目の写真・プランボード・打合せ記録・資料を、新しい順に1列で（上の項目ボタンで絞り込み） ----
+  function catHasContent(c){ return catAllItems(c).length>0; }
+  function feedEntries(){
+    var list = [];
+    (data.categories||[]).forEach(function(c){
+      catAllItems(c).forEach(function(x){ list.push({ c:c, x:x, at: String(x.at || x.date || x.createdAt || "") }); });
+    });
+    // 部位を決めていない打合せ記録（どの項目にも入らないもの）
+    (data.notes||[]).forEach(function(n){ if(!n.partName && !n.part) list.push({ c:null, x:Object.assign({type:"note"}, n), at: String(n.date || n.createdAt || "") }); });
+    list.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
+    return list;
+  }
+  // ---- 「変更したい」：お客様がカード（プランボードなど）を見て、変えたいところをその場でスタッフに送る（メッセージとして届く） ----
+  var chgSent = {};
+  // 「ご検討いただきたいこと」への返事：決めたことを伝える／相談したい（メッセージとして届く）
+  function consBtnsHtml(text, ctx){
+    var k = "cons:"+text;
+    var a = ' data-ctext="'+esc(String(text).slice(0,200))+'" data-cctx="'+esc(ctx||"")+'"';
+    return '<div class="consbtns">'+(chgSent[k] ? '<span class="chgdone">✓ スタッフに送りました</span>' : '')+
+      '<button class="chgbtn" data-cons="decided"'+a+'>💬 決めたことを伝える</button><button class="chgbtn sub" data-cons="ask"'+a+'>❓ 相談したい</button></div>';
+  }
+  function chgLabelOf(c, x){
+    var kind = x.type==="note" ? "打合せ記録" : (x.type==="planboard" || (x.isQuote && x.quoteType!=="定価") ? "プランボード" : (x.isQuote ? "お見積り" : "写真・資料"));
+    var d = new Date(x.at || x.date || "");
+    return (c ? c.name+"・" : "")+kind+(isNaN(d) ? "" : "（"+(d.getMonth()+1)+"/"+d.getDate()+"）");
+  }
+  function chgBtnHtml(c, x){
+    var label = chgLabelOf(c, x);
+    var sent = chgSent[x.key || label];
+    return '<div class="chgrow">'+(sent ? '<span class="chgdone">✓ 変更のご依頼を送りました</span>' : '')+
+      '<button class="chgbtn" data-chg="'+esc(label)+'" data-chgkey="'+esc(x.key||label)+'">✏️ 変更したい</button></div>';
+  }
+  function feedKindTag(x){
+    if(x.type==="note") return '<span class="tag note">💬 打合せ記録</span>';
+    var ct = String(x.contentType || (x.file && x.file.contentType) || "");
+    if(x.type==="planboard" || (x.isQuote && x.quoteType!=="定価")) return '<span class="tag pdf">📐 プランボード</span>';
+    if(x.isQuote || ct.indexOf("pdf")>=0) return '<span class="tag pdf">📄 資料</span>';
+    return '<span class="tag pdf">📷 写真</span>';
+  }
+  function feedCardHtml(e){
+    var x = e.x, c = e.c;
+    var st = x.showDecide ? (x.cardStatus || "検討中") : "";
+    var h = '<div class="fcard'+(st?' st-'+esc(st):'')+'"><div class="fhd"><span class="fd">'+fmtD(e.at)+'</span>'+
+      (c ? '<button class="ptag fchip" data-bchip="'+esc(c.id)+'">'+esc(c.name)+'</button>' : '<span class="ptag">その他</span>')+
+      feedKindTag(x)+nwTag(x.upd)+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>';
+    if(x.type==="note"){
+      if(x.title) h += '<div class="section-item-title">'+esc(x.title)+'</div>';
+      if(x.decided) h += '<div class="section-item-desc"><strong>決定：</strong>'+esc(x.decided)+'</div>';
+      if(x.open) h += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(x.open)+'</div>'+consBtnsHtml(x.open, (c?c.name+'・':'')+(x.title||fmtD(e.at)));
+      if(x.talk) h += '<div class="section-item-desc"><strong>内容：</strong>'+esc(x.talk)+'</div>';
+      if(x.message) h += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(x.message)+'</div>';
+      if(x.files && x.files.length) h += '<div class="section-thumbs">'+x.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
+    } else {
+      if(x.source && x.source.noteSnippet) h += '<div class="section-item-desc">'+esc(x.source.noteSnippet)+'</div>';
+      if(x.msg) h += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>';
+      if(x.file) h += '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>';
+    }
+    if(x.type==="planboard" || x.isQuote || x.showDecide) h += chgBtnHtml(c, x);
+    if(st) h += '<div class="fdec"><span>このカードの状態：<span class="status s-'+esc(st)+'" style="margin-left:0;">'+esc(st)+'</span></span>'+
+      (c ? '<button class="linkbtn" data-bchip="'+esc(c.id)+'">'+(st==="検討中"?'「'+esc(c.name)+'」で決める ›':'「'+esc(c.name)+'」を見る ›')+'</button>' : '')+'</div>';
+    return h+'</div>';
+  }
+  function buildChipsHtml(){
+    var cats = (data.categories||[]).filter(catHasContent);
+    return '<div class="chips bchips"><button class="chipf'+(!view.buildCat?' on':'')+'" data-bchip="">すべて</button>'+
+      cats.map(function(c){ var n = catNewCount(c); return '<button class="chipf'+(view.buildCat===c.id?' on':'')+'" data-bchip="'+esc(c.id)+'">'+esc(c.name)+(n?' <span class="cnew">NEW</span>':'')+'</button>'; }).join("")+'</div>';
+  }
+  // ---- 最新のプランボード：項目ごとにいちばん新しいプランボードを、家づくりの記録のいちばん上に並べる ----
+  function isPb(x){ return x.type==="planboard" || (x.isQuote && x.quoteType!=="定価"); }
+  // プランボードの移り変わり：項目ごとに1列、古い順に左から右へ（いちばん右が最新。最初は最新が見える位置）
+  function latestPbHtml(catId){
+    var rows = [];
+    (data.categories||[]).forEach(function(c){
+      if(catId && c.id!==catId) return;
+      var pbs = catAllItems(c).filter(function(x){ return isPb(x) && x.file; });
+      if(!pbs.length) return;
+      pbs.sort(function(a,b){ return (Date.parse(a.at)||0) - (Date.parse(b.at)||0); });
+      rows.push({c:c, pbs:pbs, last:Date.parse(pbs[pbs.length-1].at)||0});
+    });
+    if(!rows.length) return "";
+    rows.sort(function(a,b){ return b.last - a.last; }); // 最近プランボードが増えた項目を上に
+    return '<div class="sechd"><h3>📐 プランボードの移り変わり</h3></div>'+rows.map(function(r){
+      return '<div class="pbrow">'+(catId ? '' : '<button class="pbrh" data-bchip="'+esc(r.c.id)+'">'+esc(r.c.name)+'<span>'+r.pbs.length+'枚 ›</span></button>')+
+        '<div class="pbstrip">'+r.pbs.map(function(x, i){
+          var d = new Date(x.at), last = i===r.pbs.length-1;
+          return '<div class="pbc'+(last?' latest':'')+'"><div class="pbno">'+(last ? '最新' : (i+1)+'回目')+'</div>'+thumbHtml(x.file,"")+
+            '<div class="pbm"><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+'</span>'+nwTag(x.upd)+'</div>'+
+            (last ? '<button class="pbchg" data-chg="'+esc(chgLabelOf(r.c, x))+'" data-chgkey="'+esc(x.key||"")+'">✏️ 変更したい</button>' : '')+'</div>'+
+            (last ? '' : '<div class="pbarrow">→</div>');
+        }).join("")+'</div></div>';
+    }).join("");
+  }
+  // ホームはすっきり：項目ごとの最新1枚だけを横に1列（押すとその項目の移り変わりへ）
+  function homePbHtml(){
+    var list = [];
+    (data.categories||[]).forEach(function(c){
+      var pbs = catAllItems(c).filter(function(x){ return isPb(x) && x.file; });
+      if(!pbs.length) return;
+      pbs.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
+      list.push({c:c, x:pbs[0]});
+    });
+    if(!list.length) return "";
+    list.sort(function(a,b){ return (Date.parse(b.x.at)||0) - (Date.parse(a.x.at)||0); });
+    return '<div class="sechd"><h3>📐 最新のプランボード</h3><button class="more" data-go="build">すべて見る →</button></div><div class="pbmini">'+list.map(function(e){
+      var d = new Date(e.x.at);
+      return '<button class="pmi" data-buildcat="'+esc(e.c.id)+'"><img loading="lazy" src="'+esc(e.x.file.url)+'" alt=""><span class="nm">'+esc(e.c.name)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+(isNew(e.x.upd)?' <b>NEW</b>':'')+'</span></button>';
+    }).join("")+'</div>';
+  }
+  function buildFeedHtml(){
+    var out = '<h2 class="big" style="margin-bottom:4px;">家づくりの記録</h2>';
+    if(view.buildCat && !(data.categories||[]).some(function(c){ return c.id===view.buildCat; })) view.buildCat = null;
+    out += buildChipsHtml();
+    if(view.buildCat){
+      // 項目を選んだときは、これまでの項目の画面（仮決定／決定ボタンも）をその場に出す
+      return out + latestPbHtml(view.buildCat) + catDetailHtml(view.buildCat).replace('<button class="back" data-back="1">← 設備仕様の一覧へ</button>', '');
+    }
+    out += latestPbHtml();
+    out += '<div class="sechd"><h3>これまでの記録</h3><span class="countpill">新しい順</span></div>';
+    var list = feedEntries();
+    if(!list.length) return out + '<div class="empty">打合せが進むと、写真やプランボード・記録がここに新しい順に並びます。</div>';
+    var lim = view.feedAll ? list.length : 20;
+    out += '<div class="feed">'+list.slice(0, lim).map(feedCardHtml).join("")+'</div>';
+    if(list.length > lim) out += '<button class="btn ol" style="width:100%;" data-feedall="1">ほか '+(list.length-lim)+'件を見る</button>';
+    out += '<div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;"><button class="linkbtn" data-seg="notes">✅ 決まったことのまとめ</button><button class="linkbtn" data-seg="docs">📄 資料・平面図をまとめて見る</button></div>';
+    return out;
+  }
+  // ---- ホームの「ご確認ください」：決定ボタンを出しているカードのうち、まだ検討中のもの ----
+  function askItems(){
+    var a = [];
+    (data.categories||[]).forEach(function(c){
+      catAllItems(c).forEach(function(x){ if(x.showDecide && (x.cardStatus||"検討中")==="検討中") a.push({c:c, x:x, at:String(x.at||x.date||"")}); });
+    });
+    a.sort(function(p,q){ return (Date.parse(q.at)||0) - (Date.parse(p.at)||0); });
+    return a;
+  }
+  function todoHtml(){
+    var asks = askItems(), cons = consItems();
+    var total = asks.length + cons.length;
+    if(!total) return "";
+    var LIM = 4, rows = [];
+    asks.forEach(function(e){
+      var t = e.x.title || e.x.decided || e.x.open || (e.x.source && e.x.source.noteSnippet) || (e.x.type==="planboard"?"プランボード":"写真・資料");
+      rows.push('<div class="td"><div class="tdh"><span class="ptag">'+esc(e.c.name)+'</span><span class="tk">内容をご確認ください</span></div><div class="tt">'+esc(String(t).slice(0,60))+'</div>'+
+        '<div class="consbtns"><button class="chgbtn" data-buildcat="'+esc(e.c.id)+'">見て決める ›</button></div></div>');
+    });
+    cons.forEach(function(c){
+      rows.push('<div class="td"><div class="tdh"><span class="ptag">'+esc(c.part||c.title||"打合せ")+'</span><span class="tk">ご検討ください</span></div>'+
+        (c.id ? '<button class="tt tttap" data-opennote="'+esc(c.id)+'">'+esc(c.t)+'<span class="ttlink">打合せ記録を見る ›</span></button>' : '<div class="tt">'+esc(c.t)+'</div>')+
+        consBtnsHtml(c.t, fmtD(c.date)+(c.part?'・'+c.part:(c.title?'・'+c.title:'')))+'</div>');
+    });
+    var show = view.consAll ? rows : rows.slice(0, LIM);
+    return '<div class="todobox"><div class="ah">🙋 お願いしたいこと<span>'+total+'件</span></div>'+show.join("")+
+      (rows.length>LIM ? '<button class="consmore" data-consall="1">'+(view.consAll?'閉じる ▴':'ほか '+(rows.length-LIM)+'件を見る ▾')+'</button>' : '')+'</div>';
+  }
+  function askHtml(){
+    var a = askItems();
+    if(!a.length) return "";
+    return '<div class="askbox"><div class="ah">🙋 ご確認ください<span>'+a.length+'件</span></div><p>内容をご覧いただき、「変更したい」か「これで決定」をお選びください。</p>'+
+      a.slice(0,5).map(function(e){
+        var t = e.x.title || e.x.decided || e.x.open || (e.x.source && e.x.source.noteSnippet) || (e.x.type==="planboard"?"プランボード":"写真・資料");
+        return '<button class="ai" data-buildcat="'+esc(e.c.id)+'"><span class="ptag">'+esc(e.c.name)+'</span><span class="at">'+esc(String(t).slice(0,40))+'</span><span class="ug">›</span></button>';
+      }).join("")+(a.length>5?'<div class="am">ほか '+(a.length-5)+'件</div>':'')+'</div>';
+  }
   function buildHtml(){
-    var out = '<div class="seg"><button data-seg="spec" class="'+(view.buildSeg==="spec"?"on":"")+'">🔧 設備仕様</button><button data-seg="notes" class="'+(view.buildSeg==="notes"?"on":"")+'">🗒 打合せ記録</button><button data-seg="docs" class="'+(view.buildSeg==="docs"?"on":"")+'">📄 資料</button></div>';
-    if(view.buildSeg==="spec"){
-      out += '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;"><h2 class="big">わが家の設備仕様</h2><span class="countpill" style="margin-top:10px;">'+data.categories.length+'項目</span></div>'+
-        '<p class="sub">写真・プランボード・打合せの内容を、時系列で確認できます</p>';
-      out += '<div class="catgrid">'+data.categories.map(function(c){
-        return '<button class="cat" data-cat="'+esc(c.id)+'"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span>'+
-          '<span><div class="nm">'+esc(c.name)+'</div><div class="sb">'+esc(c.sub)+'</div>'+(c.count?'<div class="cnt">'+c.count+'件の記録</div>':'')+(catNewCount(c)?'<span class="newn">NEW '+catNewCount(c)+'件</span>':'')+'</span>'+
-          '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></button>';
-      }).join("")+'</div>';
+    var out = '<button class="back" data-seg="spec">← 家づくりの記録へ</button>';
+    if(view.buildSeg==="spec" && !view.plansOnly){
+      return buildFeedHtml();
     } else if(view.buildSeg==="notes"){
       out += '<h2 class="big">打合せ記録</h2><p class="sub">お打合せで決まったこと・ご検討いただきたいことの記録です（新しい順）。</p>';
       var decNotes = data.notes.filter(function(n){ return (n.decided||"").trim(); });
@@ -1247,7 +1500,7 @@ function homeHtml(){
         }).join("")+'</div>';
       }
       out += data.notes.length ? '<div class="catlist">'+data.notes.map(function(n){
-        return '<div class="tli flat">'+noteBody(n, true)+'</div>';
+        return '<div class="tli flat'+(view.noteFocus && n.id===view.noteFocus ? ' focus' : '')+'"'+(n.id ? ' data-noteid="'+esc(n.id)+'"' : '')+'>'+noteBody(n, true)+'</div>';
       }).join("")+'</div>' : '<div class="empty">まだ記録はありません。</div>';
     } else if(view.plansOnly){
       // ホームの「わが家の平面図」から開いたときは、平面図だけを出す（他の資料は「資料をすべて見る」から）
@@ -1354,12 +1607,15 @@ function homeHtml(){
     quotes.forEach(function(x){ feed.push({ at: x.at||"", kind:"spec", x:x, plain:true, quote:true }); });
     feed.sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
     var roomIdOfTab = (String(tabKey).indexOf("rooms:")===0) ? String(tabKey).split(":")[1] : "";
-    function cardDecHtml(key, status, label, show){
+    function cardDecHtml(key, status, label, show, item){
       if(!key || !show) return "";
       var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(label||"").slice(0,40))+'" data-ccat="'+esc(roomIdOfTab ? "rooms" : c.id)+'"';
-      return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span></div>'+
-        '<div class="btns"><button class="btn ol" data-cdecide="仮決定"'+ra+(status==="仮決定"?" disabled":"")+'>仮決定にする</button>'+
-        '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>決定する</button></div>'+
+      var cl = chgLabelOf(c, item || {key:key});
+      var sent = chgSent[key];
+      // 「仮決定」は押しにくいので、「変更したい（スタッフに送る）」と「これで決定」の2つにする
+      return '<div class="cdec"><div class="cnow">このカードの状態：<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
+        '<div class="btns"><button class="btn ol" data-chg="'+esc(cl)+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
+        '<button class="btn dk" data-cdecide="決定"'+ra+(status==="決定"?" disabled":"")+'>✅ これで決定</button></div>'+
         ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
     }
     if(feed.length){
@@ -1381,7 +1637,8 @@ function homeHtml(){
               '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+nwTag(x.upd)+'</div>'+
               (x.msg ? '<div class="section-item-desc" style="font-size:.9rem;"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>' : '')+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
-              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true))+'</div>';
+              ((it.plain && (x.type==="planboard" || x.isQuote)) ? chgBtnHtml(c, x) : '')+
+              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true, x))+'</div>';
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
@@ -1389,7 +1646,7 @@ function homeHtml(){
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>決定：</strong>'+esc(n.decided)+'</div>';
-          if(n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>';
+          if(n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, c.name+'・'+(n.title||fmtD(n.date)));
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
           html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
@@ -1556,7 +1813,7 @@ function homeHtml(){
     return "検討中";
   }
   async function decide(status, roomId){
-    var c = data.categories.find(function(x){ return x.id===view.cat; });
+    var c = data.categories.find(function(x){ return x.id===(view.cat || view.buildCat); });
     if(!c) return;
     var room = roomId ? (c.rooms||[]).find(function(r){ return r.id===roomId; }) : null;
     if(roomId && !room) return;
@@ -1605,7 +1862,7 @@ function homeHtml(){
   // ---------- イベント ----------
   document.getElementById("nav").addEventListener("click", function(e){
     var b = e.target.closest("button[data-tab]"); if(!b) return;
-    view.tab = b.dataset.tab; if(view.tab!=="build") view.cat = null;
+    view.tab = b.dataset.tab; if(view.tab!=="build") view.cat = null; view.scPhotos = false;
     render(); window.scrollTo(0,0);
   });
   document.getElementById("btnMail").addEventListener("click", function(){ if(!data) return; view.tab="msg"; render(); });
@@ -1613,20 +1870,41 @@ function homeHtml(){
     var img = e.target.closest("[data-img]");
     if(img){ document.getElementById("lbImg").src = img.dataset.img; document.getElementById("lb").hidden = false; return; }
     if(e.target.closest("[data-updok]")){ view.updDismissed = true; render(); return; }
-    var uc = e.target.closest("[data-updcat]"); if(uc){ view.tab="build"; view.buildSeg="spec"; view.cat = uc.dataset.updcat || null; render(); window.scrollTo(0,0); return; }
+    var uc = e.target.closest("[data-updcat]"); if(uc){ view.tab="build"; view.buildSeg="spec"; view.plansOnly=false; view.cat = null; view.buildCat = uc.dataset.updcat || null; render(); window.scrollTo(0,0); return; }
+    var bc = e.target.closest("[data-bchip]"); if(bc){ view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bc.dataset.bchip || null; render(); window.scrollTo(0,0); return; }
+    var bcat = e.target.closest("[data-buildcat]"); if(bcat){ view.tab="build"; view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bcat.dataset.buildcat; render(); window.scrollTo(0,0); return; }
+    var chg = e.target.closest("[data-chg]"); if(chg){ chgOpen(chg.dataset.chg, chg.dataset.chgkey); return; }
+    var cns = e.target.closest("[data-cons]"); if(cns){ consOpen(cns.dataset.cons, cns.dataset.ctext, cns.dataset.cctx); return; }
+    var pt = e.target.closest("[data-progtoggle]"); if(pt){ view.progOpen = !view.progOpen; render(); return; }
+    var fa = e.target.closest("[data-feedall]"); if(fa){ view.feedAll = true; render(); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ var el = document.getElementById(uj.dataset.updjump); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
-    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
+    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; view.scPhotos=false; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
     if(e.target.closest("#nmSave")){ nmSave(false); return; }
     if(e.target.closest("#nmClear")){ nmSave(true); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
     var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
     var consall = e.target.closest("[data-consall]"); if(consall){ view.consAll = !view.consAll; render(); return; }
+    var onote = e.target.closest("[data-opennote]");
+    if(onote){
+      var nid = onote.dataset.opennote;
+      view.tab="build"; view.buildSeg="notes"; view.plansOnly=false; view.cat=null; view.noteFocus = nid; render();
+      var tgt = document.querySelector('[data-noteid="'+(window.CSS && CSS.escape ? CSS.escape(nid) : nid)+'"]');
+      if(tgt) tgt.scrollIntoView({block:"start"}); else window.scrollTo(0,0);
+      setTimeout(function(){ view.noteFocus = null; var f = document.querySelector('.tli.focus'); if(f) f.classList.remove("focus"); }, 4000);
+      return;
+    }
+    var scp = e.target.closest("[data-scphotos]");
+    if(scp){
+      view.tab="album"; view.scPhotos = true; render();
+      var sec = document.getElementById("scPhotosSec"); if(sec) sec.scrollIntoView({block:"start"}); else window.scrollTo(0,0);
+      return;
+    }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var imf = e.target.closest("[data-imgfilter]"); if(imf){ view.imgFilter = imf.dataset.imgfilter; render(); return; }
     var imd = e.target.closest("[data-imgdel]"); if(imd){ deleteImage(imd.dataset.imgdel); return; }
     var stb = e.target.closest("[data-spectab]"); if(stb){ var sp = stb.dataset.spectab.split("|"); view.specTab[sp[0]] = sp[1]; render(); return; }
-    var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; view.plansOnly = false; render(); return; }
+    var seg = e.target.closest("[data-seg]"); if(seg){ view.buildSeg = seg.dataset.seg; view.plansOnly = false; view.cat = null; render(); window.scrollTo(0,0); return; }
     var cat = e.target.closest("[data-cat]"); if(cat){ view.cat = cat.dataset.cat; render(); window.scrollTo(0,0); return; }
     var back = e.target.closest("[data-back]"); if(back){ view.cat = null; render(); window.scrollTo(0,0); return; }
     if(e.target.closest("[data-famopen]")){ famOpen(); return; }
@@ -1653,6 +1931,45 @@ function homeHtml(){
   // いずれもホームの描画（render）とは無関係に、ページ読み込み時に一度だけ組み立てる。
   function openSheet(id){ document.getElementById(id).hidden = false; }
   function closeSheet(id){ document.getElementById(id).hidden = true; }
+  var chgCur = null;
+  function chgSheet(title, what, ph, btn){
+    document.getElementById("chgTitle").textContent = title;
+    document.getElementById("chgWhat").textContent = what;
+    document.getElementById("chgInput").placeholder = ph;
+    document.getElementById("chgSend").textContent = btn;
+  }
+  function consOpen(mode, text, ctx){
+    chgCur = {key:"cons:"+text, prefix: mode==="decided" ? "【決めました】" : "【ご相談】", label:"「"+text+"」（"+ctx+"）"};
+    if(mode==="decided") chgSheet("💬 決めたことを伝える", "「"+text+"」について、決めたことを書いてください。", "例：深型にします", "スタッフに伝える");
+    else chgSheet("❓ 相談したい", "「"+text+"」について、迷っていること・聞きたいことを書いてください。", "例：深型と浅型で、入る食器の量はどのくらい違いますか？", "スタッフに送る");
+    document.getElementById("chgInput").value = "";
+    openSheet("chgModal");
+    setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
+  }
+  function chgOpen(label, key){
+    chgCur = {label:label, key:key, prefix:"【変更のご依頼】"};
+    chgSheet("✏️ 変更したいところ", "「"+label+"」について、変えたいところを書いてください。", "例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい", "スタッフに送る");
+    document.getElementById("chgInput").value = "";
+    openSheet("chgModal");
+    setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
+  }
+  document.getElementById("chgX").addEventListener("click", function(){ closeSheet("chgModal"); });
+  document.getElementById("chgModal").addEventListener("click", function(e){ if(e.target.id==="chgModal") closeSheet("chgModal"); });
+  document.getElementById("chgSend").addEventListener("click", async function(){
+    var text = (document.getElementById("chgInput").value||"").trim();
+    if(!text || !chgCur){ toast("内容を書いてください"); return; }
+    var btn = this; btn.disabled = true;
+    var full = chgCur.prefix+chgCur.label+"\n"+text;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.messages.push({ content:full, sender:"", fromCustomer:true, createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
+      chgSent[chgCur.key] = true;
+      closeSheet("chgModal"); render(); toast("スタッフに送りました");
+    }catch(e){ toast("送れませんでした。もう一度お試しください"); }
+    btn.disabled = false;
+  });
   [["btnHelp","help","helpX"],["btnOrder","orderModal","orderX"],["btnMemo","memoModal","memoX"]].forEach(function(t){
     var openBtn = t[0], sheetId = t[1], closeBtn = t[2];
     document.getElementById(openBtn).addEventListener("click", function(){ openSheet(sheetId); });

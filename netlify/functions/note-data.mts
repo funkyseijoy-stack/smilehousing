@@ -179,6 +179,24 @@ function swatchOf(sw: any) {
   return { name: String(sw.name || "").slice(0, 40), color };
 }
 
+// 「お客様に写真を送る」で一緒に送った写真（ひとことのカードを押すと見られるように）。
+// photoIds があればそれ、無い（この機能より前に送った）ときは、ひとことの時刻の前後10分に「写真を送る」で入れたアルバムの写真。
+function staffCommentPhotos(sc: any, album: any[]) {
+  const live = (album || []).filter((a) => a && a.url && a.kind !== "reference");
+  let picked: any[] = [];
+  if (Array.isArray(sc.photoIds) && sc.photoIds.length) {
+    const ids = new Set(sc.photoIds.map(String));
+    picked = live.filter((a) => ids.has(String(a.id)));
+  } else {
+    const t = Date.parse(sc.at || "");
+    if (!isNaN(t)) picked = live.filter((a) => a.via === "sendPhoto" && Math.abs(Date.parse(a.createdAt || "") - t) <= 10 * 60 * 1000);
+  }
+  return picked
+    .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")))
+    .slice(0, 30)
+    .map((a) => ({ ...fileOf(a), createdAt: a.createdAt || "" }));
+}
+
 function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
@@ -651,11 +669,16 @@ export default async (req: Request, context: Context) => {
       progressTag: project.progressTag || "",
       exteriorSpecValues: project.exteriorSpecValues || {},
     },
+    // スタッフの「お客様へのひとこと」（住まいるアプリの案件「ヒアリング」タブで書く。空なら出さない）
+    staffComment: project.staffComment && String(project.staffComment.text || "").trim()
+      ? { text: String(project.staffComment.text).slice(0, 500), at: String(project.staffComment.at || ""), photos: staffCommentPhotos(project.staffComment, album) }
+      : null,
     today,
     categories,
     plans,
     notes: reflectedNotes
       .map((n) => ({
+        id: n.id || "",
         date: n.date || (n.createdAt || "").slice(0, 10),
         createdAt: n.createdAt || "",
         upd: updAt(n.reflectedAt, n.createdAt),

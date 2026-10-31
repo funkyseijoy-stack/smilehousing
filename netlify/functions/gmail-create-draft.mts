@@ -211,7 +211,7 @@ export default async (req: Request, context: Context) => {
       return jsonResponse({ error: "gmail_api_error", detail: draftData }, 502);
     }
     return jsonResponse({
-      ok: true, id: draftData.id, threadId: draftData.message?.threadId || null,
+      ok: true, id: draftData.id, messageId: draftData.message?.id || null, threadId: draftData.message?.threadId || null,
       attachmentCount: attachments.length, attachedBytes: totalRaw, linked,
     });
   } catch (e: any) {

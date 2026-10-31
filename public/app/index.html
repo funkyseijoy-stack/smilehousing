@@ -343,6 +343,8 @@
   .decsum .dsd{ font-size:.85rem; color:var(--muted); }
   .noteitem .nbox.open{ background:var(--orange-soft); }
   .noteitem .nbox.open .nboxlabel{ color:var(--orange); }
+  .noteitem .nbox.markhl{ box-shadow:0 0 0 2px var(--orange) inset; }
+  .noteitem .nbox.decided.markhl{ box-shadow:0 0 0 2px var(--accent) inset; }
   .noteitem .nbtnrow{ display:flex; gap:6px; flex-wrap:wrap; padding-block-start:8px; }
   .noteitem .nbtnrow + .nbtnrow{ margin-block-start:6px; border-block-start:1px dashed var(--border); padding-block-start:8px; }
   .noteitem .nbtnrow:first-of-type{ border-block-start:1px dashed var(--border); padding-block-start:8px; margin-block-start:4px; }
@@ -380,8 +382,8 @@
   .swatch{ width:22px; height:22px; border-radius:999px; border:2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); cursor:pointer; flex-shrink:0; }
   .swatch.active{ box-shadow: 0 0 0 2px var(--ink); }
   select.sizeSelect{ font-family:inherit; font-size:.85rem; padding:6px 7px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
-  .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; justify-content:center; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
-  #pbStageInner{ position:relative; line-height:0; }
+  .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
+  #pbStageInner{ position:relative; line-height:0; margin-inline:auto; flex:0 0 auto; }
   #pbImageCanvas, #pbOverlayCanvas{ border-radius:8px; max-width:100%; height:auto; display:block; }
   #pbImageCanvas{ background:var(--canvas-bg); }
   #pbBaseCanvas{ position:absolute; inset:0; max-width:100%; height:auto; border-radius:8px; background:transparent; }
@@ -605,6 +607,13 @@
   .kancard .kc-more{ margin-block-start:6px; padding-block-start:6px; border-block-start:1px dashed var(--border); }
   .kancard .kc-state{ flex-wrap:wrap; }
   .kancard .kc-state b{ white-space:nowrap; }
+  .sendphotobar{ margin:0 0 12px; }
+  #sendPhotoModal .addform > *{ flex:0 0 auto; }
+  .sendphotobar .btn{ width:100%; font-size:1.05rem; padding-block:12px; }
+  .spsgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:6px; margin-block-start:8px; }
+  .spsgrid .t{ position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--surface-2); }
+  .spsgrid .t img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .spsgrid .t button{ position:absolute; top:3px; right:3px; width:26px; height:26px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; font-size:.85rem; cursor:pointer; padding:0; }
   .taskform-modal{ position:fixed; inset:0; background:rgba(20,16,12,.55); z-index:85; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; }
   .taskform-modal[hidden]{ display:none; }
   #cmCancelRow[hidden]{ display:none; }
@@ -928,6 +937,8 @@
 
   <!-- ========== HOME ========== -->
   <section class="panel active" id="panel-home">
+    <!-- お客様に写真を送る（アルバムに追加＋ひとこと＋LINEのお知らせを1回で。openSendPhoto） -->
+    <div class="sendphotobar"><button class="btn" id="btnSendPhotoHome" type="button">📷 お客様に写真を送る</button></div>
     <div class="card">
       <div class="row" style="justify-content:space-between; margin-block-end:8px;">
         <h2 style="margin:0;">社内タスク【最重要】</h2>
@@ -1081,6 +1092,7 @@
         <div id="finishedBanner" hidden style="margin-block-start:10px; padding:8px 12px; border-radius:8px; background:var(--gray-soft); font-weight:700;"></div>
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
+          <button class="btn small" id="btnSendPhotoProj" type="button">📷 写真を送る</button>
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
           <span class="muted" id="okaiNoteStatusLabel" style="font-size:.85rem;"></span>
         </div>
@@ -1105,6 +1117,16 @@
 
       <!-- ヒアリング（どんな家にしたいか） subpanel -->
       <div class="subpanel" id="sub-hearing">
+        <!-- お客様へのひとこと（おうちノートのホームと、お打合せの記録ページのいちばん上に「スタッフより」で出る。project.staffComment） -->
+        <div class="card" id="staffCommentCard">
+          <h3 style="margin:0 0 6px;">💬 お客様へのひとこと</h3>
+          <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">保存すると、おうちノートのホームと、お打合せの記録ページのいちばん上に「スタッフより」として出ます。書き直すとお客様の画面で「NEW」になります。空にして保存すると消えます。</p>
+          <textarea id="staffCommentInput" rows="3" maxlength="500" style="width:100%;" placeholder="例：電気・あかりに、リビングのダウンライトの写真を入れました。色味をご確認ください。"></textarea>
+          <div class="row" style="margin-block-start:8px; align-items:center; gap:10px; flex-wrap:wrap;">
+            <button class="btn small" id="btnStaffCommentSave">保存</button>
+            <span class="muted" id="staffCommentStatus" style="font-size:.85rem;"></span>
+          </div>
+        </div>
         <!-- 次回のご予約（この案件の今日以降の予約。renderHearingNextRes） -->
         <div class="card" id="hearNextRes" style="padding-block:12px;"></div>
         <!-- お客様とのメッセージ（おうちノートのメッセージと同じやりとり。お打合せの記録ページからも送れる） -->
@@ -1416,7 +1438,7 @@
           <label class="row" style="gap:6px; align-items:center; margin-block-end:8px;"><input type="checkbox" id="okaiProgOn"> お客様の画面に表示する</label>
           <div id="okaiProgRows" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="row" style="gap:6px; margin-block-start:10px; flex-wrap:wrap;">
-            <button class="btn secondary small" id="btnOkaiProgAdd">＋ 工程を追加</button>
+            <button class="btn secondary small" id="btnOkaiProgAdd">＋ いちばん下に工程を追加</button>
             <button class="btn small" id="btnOkaiProgSave">保存</button>
           </div>
         </div>
@@ -1910,6 +1932,7 @@
         </select>
       </div>
       <div class="tool-group">
+        <button class="tbtn" id="pbFingerToggle" type="button" title="指で書くか、指は動かす・拡大だけにするかを切り替え"><span class="ic">✋</span><span id="pbFingerLabel">指：書く</span></button>
         <button class="tbtn" id="pbZoomOut"><span class="ic">－</span></button>
         <span id="pbZoomLabel">100%</span>
         <button class="tbtn" id="pbZoomIn"><span class="ic">＋</span></button>
@@ -2074,6 +2097,38 @@
 </div>
 
 <!-- ========== 仕様履歴の編集 MODAL ========== -->
+<div class="taskform-modal" id="sendPhotoModal" hidden>
+  <div class="taskform-card">
+    <div class="row" style="justify-content:space-between; align-items:center; margin-block-end:6px;">
+      <h3 style="margin:0;">📷 お客様に写真を送る</h3>
+      <button class="btn secondary small" type="button" id="spsClose">✕ 閉じる</button>
+    </div>
+    <div class="addform" style="flex-direction:column; align-items:stretch; gap:10px;">
+      <label class="field">お客様（案件）<select id="spsProject"></select></label>
+      <div>
+        <label class="field" style="margin:0;">アルバムのカテゴリー<select id="spsCat"></select></label>
+        <div class="row" id="spsNewCatRow" hidden style="gap:6px; margin-block-start:6px;">
+          <input type="text" id="spsNewCat" placeholder="例：基礎工事" style="flex:1;" maxlength="30">
+          <button class="btn small" type="button" id="spsNewCatAdd">追加</button>
+        </div>
+      </div>
+      <div>
+        <div class="row" style="gap:8px;">
+          <button class="btn" type="button" id="spsShoot" style="flex:1;">📷 撮影する</button>
+          <button class="btn secondary" type="button" id="spsPick" style="flex:1;">🖼 写真を選ぶ</button>
+        </div>
+        <input type="file" id="spsShootInput" accept="image/*" capture="environment" hidden>
+        <input type="file" id="spsPickInput" accept="image/*" multiple hidden>
+        <div class="spsgrid" id="spsThumbs"></div>
+        <div class="muted" id="spsCount" style="font-size:.85rem;"></div>
+      </div>
+      <label class="field">ひとこと（任意。おうちノートのいちばん上の「スタッフより」に出ます）<textarea id="spsComment" rows="2" maxlength="500" placeholder="例：今日は基礎の配筋検査でした。"></textarea></label>
+      <label style="display:flex; gap:8px; align-items:flex-start;"><input type="checkbox" id="spsLine" style="margin-top:4px;"> <span id="spsLineLabel">お客様のLINEに「おうちノートが更新されました」を送る</span></label>
+      <button class="btn" type="button" id="spsSend" style="font-size:1.05rem; padding-block:12px;">送る</button>
+      <div class="muted" id="spsStatus" style="font-size:.85rem;"></div>
+    </div>
+  </div>
+</div>
 <div class="taskform-modal" id="spEditModal" hidden>
   <div class="taskform-card">
     <h3 style="margin:0 0 6px;">履歴を編集</h3>
@@ -3872,7 +3927,7 @@
         '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
         '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
-        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み':'＋ 追加見積りへ')+'</button>':'')+
+        (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み（見る ›）':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
         (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
         '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
@@ -4380,7 +4435,37 @@
       '<div style="margin-top:6px; font-size:1.15rem; font-weight:700;">'+dl(n.date)+' '+escapeHtml(n.startTime||"")+(n.endTime?'〜'+escapeHtml(n.endTime):'')+'　'+escapeHtml(n.type||"")+'</div>'+
       (list.length>1 ? '<div class="muted" style="margin-top:4px;">その後の予約：'+list.slice(1,4).map(function(r){ return dl(r.date)+' '+escapeHtml(r.startTime||"")+' '+escapeHtml(r.type||""); }).join("／")+(list.length>4?' ほか'+(list.length-4)+'件':'')+'</div>' : '');
   }
+  // ---- お客様へのひとこと（project.staffComment={text,at,by}） ----
+  function renderStaffComment(){
+    var ta = document.getElementById("staffCommentInput");
+    if(!ta) return;
+    var pid = state.currentProjectId;
+    var p = projectById(pid);
+    if(ta.dataset.pid===String(pid||"") && ta.dataset.dirty==="1") return; // 入力中は上書きしない
+    var sc = (p && p.staffComment) || {};
+    ta.dataset.pid = String(pid||"");
+    ta.dataset.dirty = "0";
+    ta.value = sc.text || "";
+    var st = document.getElementById("staffCommentStatus");
+    if(st) st.textContent = sc.text && sc.at ? "お客様に表示中（"+String(sc.at).slice(5,10).replace("-","/")+(sc.by?"・"+sc.by:"")+"）" : "いまは表示していません";
+  }
+  async function saveStaffComment(){
+    var ta = document.getElementById("staffCommentInput");
+    var p = projectById(state.currentProjectId);
+    if(!p || !ta || ta.dataset.pid!==String(p.id)) return;
+    var text = ta.value.trim().slice(0,500);
+    var prev = p.staffComment || null;
+    if(text === ((prev && prev.text) || "")){ ta.dataset.dirty = "0"; toast("変更はありません"); return; }
+    p.staffComment = text ? {text:text, at:nowIso(), by:state.currentUser||""} : null;
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ p.staffComment = prev; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
+    ta.dataset.dirty = "0";
+    logActivity("案件「"+p.name+"」のお客様へのひとことを"+(text?"保存":"消去")+"しました");
+    toast(text ? "✓ 保存しました（お客様の画面に出ます）" : "✓ ひとことを消しました");
+    renderStaffComment();
+  }
   function renderProjectHearing(){
+    renderStaffComment();
     renderHearingNextRes();
     renderGalleryLikes();
     var wrap = document.getElementById("hearingForm");
@@ -5023,7 +5108,7 @@
     state.currentProjectId = id;
     state.editingProject = false;
     state.noteSpecFilter = null;
-    state.recFilter = {big:"", sub:""};
+    state.recFilter = {big:"", sub:""}; state.recMark = "";
     document.getElementById("projectListView").hidden = true;
     document.getElementById("projectDetailView").hidden = false;
     renderProjectDetail();
@@ -5252,6 +5337,12 @@
       (content ? '<div class="muted hrcontent">'+escapeHtml(content)+'</div>' : '')+
       (open && ra.length ? hrFilesListHtml(ra) : '')+
     '</div>';
+  }
+  // 案件の「おうちノート連携」タブの「追加見積り」を開き、その項目へ移動して光らせる（金額の欄にカーソル）
+  // 追加見積りの欄へ移動（中身は goToOkaiEstimates に一本化。描き直しても項目を光らせる）
+  function openEstimatesOfProject(pid, estId){
+    if(!projectById(pid)){ toast("案件が見つかりません"); return; }
+    goToOkaiEstimates(pid, estId);
   }
   function openRequestsOfProject(pid){
     switchTab("projects"); openProjectDetail(pid);
@@ -6028,6 +6119,13 @@
     }
     return null;
   }
+  // 記録の行の印（✅決定したこと／💭お客様に検討いただくこと）で絞る。"" = すべて
+  function noteMarkText(n, mark){
+    if(mark==="open") return String(n.open||"").trim();
+    if(mark==="decided") return String(n.decided!=null ? n.decided : (n.content||"")).trim();
+    return "";
+  }
+  function noteHasMark(n, mark){ return !mark || !!noteMarkText(n, mark); }
   function renderNoteSpecFilterBar(){
     var bar = document.getElementById("noteSpecFilterBar");
     if(!bar) return;
@@ -6053,7 +6151,13 @@
       html += '<button type="button" class="btn secondary small" data-customrename="'+escapeHtml(f.big.slice(3))+'">部位の名前を変える</button>'+
         '<button type="button" class="btn secondary small" data-customdel="'+escapeHtml(f.big.slice(3))+'">この部位を削除</button>';
     }
-    if(f.big) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
+    var mk = state.recMark || "";
+    var pnotes = liveNotes().filter(function(n){ return n.projectId===state.currentProjectId && recMatch(n.specPart, f); });
+    var mcount = function(m){ return pnotes.filter(function(n){ return noteHasMark(n, m); }).length; };
+    html += '<label class="field recsel">検討・決定<select data-recmark>'+opt("", "すべて", !mk)+
+      opt("open", "💭 検討いただくこと（"+mcount("open")+"件）", mk==="open")+
+      opt("decided", "✅ 決定したこと（"+mcount("decided")+"件）", mk==="decided")+'</select></label>';
+    if(f.big || mk) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
     bar.innerHTML = html;
   }
   function setRecFilter(big, sub){
@@ -6318,6 +6422,7 @@
     var filter = state.recFilter || {big:"", sub:""};
     var rows = liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; })
       .filter(function(n){ return recMatch(n.specPart, filter); })
+      .filter(function(n){ return noteHasMark(n, state.recMark||""); })
       .slice()
       .sort(function(a,b){
         // 絞り込みの有無に関わらず、常に最新が上に来るようにする。
@@ -6339,7 +6444,7 @@
       var open = n.open!=null ? n.open : "";
       var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（'+(n.talkPublic?'お客様にも表示':'社内メモ・お客様には出ません')+'）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
       var msgHtml = n.message ? '<div class="nbox msg"><div class="nboxlabel">お客様へのメッセージ</div><div class="ntext">'+escapeHtml(n.message)+'</div></div>' : "";
-      var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">💭 お客様に検討いただくこと</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
+      var openHtml = open ? '<div class="nbox open'+(state.recMark==="open"?" markhl":"")+'"><div class="nboxlabel">💭 お客様に検討いただくこと</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
       var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
@@ -6376,7 +6481,7 @@
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
         talkHtml+
-        (decided ? '<div class="nbox decided"><div class="nboxlabel">決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
+        (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
         msgHtml+
         filesHtml+
@@ -6393,12 +6498,12 @@
       return { t:"n", n:n, key: day+"T"+(localKey(n.noteAt||n.createdAt).slice(11)||"00:00:00") };
     });
     liveSpecPhotos().forEach(function(p){
-      if(p.projectId!==pid || p.kind==="note") return;
+      if(p.projectId!==pid || p.kind==="note" || state.recMark) return;
       if(!recMatch({scope:p.scope, category:p.category, roomId:p.roomId, side:p.side}, filter)) return;
       items.push({ t:"s", p:p, key: localKey(p.createdAt) });
     });
     liveAttachments().forEach(function(a){
-      if(a.projectId!==pid || !isTimelineQuote(a) || !a.specPart) return;
+      if(a.projectId!==pid || !isTimelineQuote(a) || !a.specPart || state.recMark) return;
       if(!recMatch(a.specPart, filter)) return;
       var k = a.receivedAt || a.createdAt || a.uploadedAt || "";
       items.push({ t:"a", a:a, key: /^\d{4}-\d{2}-\d{2}$/.test(k) ? k+"T00:00:00" : localKey(k) });
@@ -6598,7 +6703,7 @@
   function renderMessages(){
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     var html = rows.map(function(m){
-      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+escapeHtml(m.content)+'</div></div>';
+      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+msgTagged(m)+'</div></div>';
     }).join("");
     // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
@@ -6613,6 +6718,17 @@
   }
   // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
   // メッセージ送信時に、お客様のLINE（プロライン）へ自動で知らせるかのチェック
+  // お客様がおうちノートのボタンから送ったメッセージ（【変更のご依頼】【決めました】【ご相談】）は、先頭を色付きの印にして目立たせる
+  var MSG_TAGS = {"【変更のご依頼】":"#c9575a", "【決めました】":"#2f7a4a", "【ご相談】":"#b07a1a"};
+  function msgTagged(m){
+    var c = String(m.content||"");
+    if(m.fromCustomer){
+      for(var k in MSG_TAGS){ if(c.indexOf(k)===0){
+        return '<span style="display:inline-block; background:'+MSG_TAGS[k]+'; color:#fff; font-weight:700; border-radius:999px; padding:1px 10px; margin-inline-end:6px;">'+escapeHtml(k.replace(/[【】]/g,""))+'</span>'+escapeHtml(c.slice(k.length));
+      } }
+    }
+    return escapeHtml(c);
+  }
   function refreshMessageLine(){
     refreshMessageLineOne("messageLineWrap","messageLineLabel","messageLine");
     refreshMessageLineOne("hearMsgLineWrap","hearMsgLineLabel","hearMsgLine");
@@ -7716,7 +7832,7 @@
           toast("見積依頼とGmail下書きを作っています…");
           makeEstReqWithDrafts(proj, content, c.part, c.files, vs, "").then(function(r){
             mark(r.refs[0], r.refs);
-            toast("✅ "+r.msg);
+            if(r.draftIds && r.draftIds.length) offerOpenDrafts("✅ 見積依頼とGmail下書きを作りました", r.msg, r.draftIds); else toast("✅ "+r.msg);
           }).catch(function(){ toast("見積依頼を作れませんでした"); });
         });
         return;
@@ -8187,7 +8303,7 @@
       var hasAmount = !!String(it.amount||"").trim();
       var estState = okaiEstimateState(it);
       var fl = okaiFlash && okaiFlash.id===it.id && Date.now() < okaiFlash.until;
-      return '<div class="card'+(fl?' okai-flash':'')+'" style="padding:8px 10px;">'+
+      return '<div class="card'+(fl?' okai-flash':'')+'" style="padding:8px 10px;" data-estcard="'+escapeOkai(it.id)+'">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
         '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '')+'　<span class="pill '+(estState==="承認済み"?"estimate-承認":(estState==="見送り"?"estimate-見送り":"tag"))+'">'+escapeOkai(estState)+'</span></div>'+
         '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
@@ -8427,11 +8543,15 @@
     var box = document.getElementById("okaiProgRows"); if(!box) return;
     document.getElementById("okaiProgOn").checked = !!okaiProg.on;
     box.innerHTML = okaiProg.steps.map(function(st,i){
-      return '<div data-progrow="'+i+'" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">'+
+      return '<div data-progrow="'+i+'" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:6px 0 8px; border-bottom:1px dashed var(--border);">'+
         '<label style="display:flex; align-items:center; gap:4px; font-size:.85rem; white-space:nowrap;"><input type="radio" name="okaiProgCur" data-progcur value="'+i+'"'+(okaiProg.current===i?' checked':'')+'>現在</label>'+
         '<input type="text" data-progname value="'+escapeOkai(st.name)+'" placeholder="工程名" style="flex:1 1 9rem; min-width:7rem;">'+
         '<input type="text" data-progdate value="'+escapeOkai(st.date)+'" placeholder="予定日（例：10月10日ごろ）" style="flex:1 1 11rem; min-width:8rem;">'+
-        '<button class="btn danger-ghost small" data-progdel="'+i+'" title="削除">×</button></div>';
+        '<span style="display:flex; gap:4px;">'+
+        '<button class="btn secondary small" data-progmove="'+i+'" data-dir="-1" title="上へ"'+(i===0?' disabled':'')+'>▲</button>'+
+        '<button class="btn secondary small" data-progmove="'+i+'" data-dir="1" title="下へ"'+(i===okaiProg.steps.length-1?' disabled':'')+'>▼</button>'+
+        '<button class="btn secondary small" data-progins="'+i+'" title="この下に工程を入れる">＋下に追加</button>'+
+        '<button class="btn danger-ghost small" data-progdel="'+i+'" title="削除">×</button></span></div>';
     }).join("");
   }
   function okaiProgSave(){
@@ -9143,7 +9263,7 @@
       return { filename:f.name||"添付", mimeType:f.contentType||"application/octet-stream", url:f.url };
     });
     var subject = "【見積依頼】"+proj.name+(part&&part.label?"　"+part.label:"");
-    var ok = [], fail = [], noMail = [];
+    var ok = [], fail = [], noMail = [], draftIds = [];
     for(var k=0;k<reqs.length;k++){
       var v = reqs[k].vendor;
       var lines = ["お世話になっております。住まいるハウジングです。","",
@@ -9156,6 +9276,7 @@
         var res = await gmailCreateDraft({ to: v.email?[v.email]:[], subject: subject, body: lines.join("\n"), attachments: atts });
         var payload = (res && res.payload) || {};
         if(payload.threadId) reqs[k].req.gmailThreadId = payload.threadId;
+        if(payload.messageId) draftIds.push(payload.messageId);
         reqs[k].req.status = "依頼済み"; reqs[k].req.requestedAt = todayStr();
         ok.push(v.name);
       }catch(e){ fail.push(v.name); }
@@ -9164,12 +9285,12 @@
     var msg = "見積依頼＋Gmail下書き "+ok.length+"件"+(atts.length?"（添付"+atts.length+"件）":"");
     if(noMail.length) msg += "・メール未登録："+noMail.join("、");
     if(fail.length) msg += "・下書き失敗："+fail.join("、")+"（見積タブの「依頼する」からやり直せます）";
-    return { msg: msg, refs: reqs.map(function(x){ return x.req.id; }) };
+    return { msg: msg, refs: reqs.map(function(x){ return x.req.id; }), draftIds: draftIds };
   }
   // 打合せ記録の行ごとの「作るもの」を、記録を保存したあとに作る
   async function runNoteLineActs(note, acts){
     var proj = projectById(note.projectId); if(!proj) return;
-    var done = [], errs = [];
+    var done = [], errs = [], lineDraftIds = [];
     note.lineActs = note.lineActs || [];
     for(var i=0;i<acts.length;i++){
       var a = acts[i], text = a.text;
@@ -9195,6 +9316,7 @@
           if(!vs.length) continue;
           var r = await makeEstReqWithDrafts(proj, text, note.specPart||null, note.files||[], vs, note.id);
           note.lineActs.push({ t:text, type:"estreq", refs:r.refs, at:nowIso() });
+          (r.draftIds||[]).forEach(function(x){ lineDraftIds.push(x); });
           done.push(r.msg);
         }
       }catch(e){ errs.push(MN_ACT_LABEL[a.type]+"「"+text.slice(0,15)+"」"); }
@@ -9202,7 +9324,8 @@
     await saveDoc("meetingNotes", note.id, note);
     render();
     if(done.length) logActivity("打合せ記録の行から作成しました（"+done.join("・")+"）");
-    toast((done.length?"✅ 行から作りました："+done.join("／"):"")+(errs.length?"　⚠ 作れなかったもの："+errs.join("、"):""), 12000);
+    var lineMsg = (done.length?"✅ 行から作りました："+done.join("／"):"")+(errs.length?"　⚠ 作れなかったもの："+errs.join("、"):"");
+    if(lineDraftIds.length) offerOpenDrafts("行から作りました", lineMsg.replace(/^✅ 行から作りました：/,""), lineDraftIds); else toast(lineMsg, 12000);
   }
   async function createBundleFromNote(noteId){
     var proj = projectById(state.currentProjectId);
@@ -9259,7 +9382,7 @@
     });
     var attachedN = 0, linkedAll = [];
     var subject = "【見積依頼】"+proj.name+(part&&part.label?"　"+part.label:"");
-    var okNames = [], failNames = [], noMail = [];
+    var okNames = [], failNames = [], noMail = [], draftIds = [];
     for(var k=0;k<reqs.length;k++){
       var v = reqs[k].vendor;
       var lines = ["お世話になっております。住まいるハウジングです。","",
@@ -9273,6 +9396,7 @@
         var payload = (res && res.payload) || {};
         if(k===0){ attachedN = payload.attachmentCount||0; linkedAll = payload.linked||[]; }
         if(payload.threadId) reqs[k].req.gmailThreadId = payload.threadId;
+        if(payload.messageId) draftIds.push(payload.messageId);
         reqs[k].req.status = "依頼済み"; reqs[k].req.requestedAt = todayStr();
         okNames.push(v.name);
       }catch(e){ failNames.push(v.name); }
@@ -9286,7 +9410,7 @@
     if(failNames.length) msg += "。下書きに失敗："+failNames.join("、")+"（見積タブの「依頼する」からやり直せます）";
     if(atts.length) msg += "。添付"+attachedN+"件";
     if(linkedAll.length) msg += "。メールに付けられなかった資料"+linkedAll.length+"件（"+linkedAll.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は、本文にリンクを入れました";
-    toast(msg, 12000);
+    if(okNames.length) offerOpenDrafts("✅ 見積依頼とGmail下書きを作りました", msg.replace(/^✅ /,""), draftIds); else toast(msg, 12000);
   }
   async function createTaskFromNote(noteId, taskType){
     var proj = projectById(state.currentProjectId);
@@ -9748,6 +9872,148 @@
     }
     // 縮められて、元より小さければ縮めたものを使う。縮められなかったときは元のまま（大きすぎれば、送る時に理由を伝える）
     return (best && best.size < srcFile.size) ? best : srcFile;
+  }
+  // ---- お客様に写真を送る（アルバムに追加＋ひとこと＋LINEのお知らせを1回で） ----
+  var sps = { files:[], urls:[], busy:false };
+  function spsProjects(){
+    // おうちノートのリンクがある案件を先に、その中は最近アルバムに写真を入れた順
+    var last = {};
+    state.albumPhotos.forEach(function(a){ if(!a.deletedAt && a.kind!=="reference" && String(a.createdAt||"") > String(last[a.projectId]||"")) last[a.projectId] = a.createdAt; });
+    return liveProjects().slice().sort(function(a,b){
+      var na = a.noteToken?0:1, nb = b.noteToken?0:1;
+      if(na!==nb) return na-nb;
+      return String(last[b.id]||"").localeCompare(String(last[a.id]||"")) || String(a.name||"").localeCompare(String(b.name||""), "ja");
+    });
+  }
+  function spsRenderCats(keep){
+    var sel = document.getElementById("spsCat");
+    var proj = projectById(document.getElementById("spsProject").value);
+    var cats = photoCategoriesFor(proj, "album");
+    var cur = keep != null ? keep : sel.value;
+    sel.innerHTML = '<option value="">（カテゴリーなし）</option>'+cats.map(function(c){ return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>'; }).join("")+'<option value="__new">＋ 新しいカテゴリーを追加…</option>';
+    sel.value = cats.some(function(c){ return c.id===cur; }) ? cur : "";
+    document.getElementById("spsNewCatRow").hidden = true;
+  }
+  function spsRenderLine(){
+    var proj = projectById(document.getElementById("spsProject").value);
+    var recips = prolineRecipients(proj);
+    var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
+    var can = !!(proj && recips.length && hasBeacon);
+    var cb = document.getElementById("spsLine");
+    cb.disabled = !can; cb.checked = can; // 送れるお客様は最初からチェック（送りたくない日だけ外す）
+    document.getElementById("spsLineLabel").textContent = can
+      ? "お客様のLINEに「おうちノートが更新されました」を送る（"+recips.map(function(r){ return r.name || r.uid; }).join("、")+"）"
+      : !hasBeacon ? "LINEのお知らせ：「業者・設定」でプロラインの発動用URLを保存すると使えます"
+      : "LINEのお知らせ：このお客様はプロラインIDが未登録です（「おうちノート連携」タブの「LINEでお知らせ」で登録）";
+  }
+  function spsRenderThumbs(){
+    sps.urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(e){} });
+    sps.urls = sps.files.map(function(f){ return URL.createObjectURL(f); });
+    document.getElementById("spsThumbs").innerHTML = sps.files.map(function(f, i){
+      return '<div class="t"><img src="'+sps.urls[i]+'" alt=""><button type="button" data-spsdel="'+i+'" aria-label="外す">✕</button></div>';
+    }).join("");
+    document.getElementById("spsCount").textContent = sps.files.length ? sps.files.length+"枚を送ります" : "まだ写真がありません";
+  }
+  function openSendPhoto(pid){
+    if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
+    var list = spsProjects();
+    if(!list.length){ toast("案件がありません"); return; }
+    var sel = document.getElementById("spsProject");
+    sel.innerHTML = list.map(function(p){ return '<option value="'+escapeHtml(p.id)+'">'+escapeHtml((p.customer ? String(p.customer).replace(/様$/,"")+"様（"+p.name+"）" : p.name)||"")+'</option>'; }).join("");
+    sel.value = (pid && list.some(function(p){ return p.id===pid; })) ? pid : list[0].id;
+    sps.files = []; spsRenderThumbs();
+    document.getElementById("spsComment").value = "";
+    document.getElementById("spsStatus").textContent = "";
+    spsRenderCats("");
+    spsRenderLine();
+    document.getElementById("sendPhotoModal").hidden = false;
+  }
+  function closeSendPhoto(){
+    if(sps.busy) return;
+    if(sps.files.length && !confirm("選んだ写真はまだ送っていません。閉じますか？")) return;
+    sps.files = []; spsRenderThumbs();
+    document.getElementById("sendPhotoModal").hidden = true;
+  }
+  async function spsAddCategory(){
+    var proj = projectById(document.getElementById("spsProject").value);
+    var inp = document.getElementById("spsNewCat");
+    var name = inp.value.trim();
+    if(!proj){ return; }
+    if(!name){ toast("カテゴリー名を入力してください"); return; }
+    var same = photoCategoriesFor(proj, "album").find(function(c){ return c.name===name; });
+    var id = same ? same.id : uid("pc");
+    if(!same){
+      proj.photoCategories = proj.photoCategories || {};
+      proj.photoCategories.album = (proj.photoCategories.album||[]).concat([{id:id, name:name}]);
+      var ok = await saveDoc("projects", proj.id, proj);
+      if(ok===false){ proj.photoCategories.album = proj.photoCategories.album.filter(function(c){ return c.id!==id; }); toast("⚠ カテゴリーを保存できませんでした"); return; }
+      logActivity("おうちアルバムのカテゴリー「"+name+"」を追加しました");
+    }
+    inp.value = "";
+    spsRenderCats(id);
+  }
+  async function sendPhotos(){
+    if(sps.busy) return;
+    var pid = document.getElementById("spsProject").value; // 送り先は押した時点の案件に固定する
+    var proj = projectById(pid);
+    if(!proj){ toast("お客様を選んでください"); return; }
+    if(!sps.files.length){ toast("写真を撮影するか、選んでください"); return; }
+    var catId = document.getElementById("spsCat").value;
+    if(catId==="__new"){ toast("カテゴリーの名前を入れて「追加」を押してください"); return; }
+    var comment = document.getElementById("spsComment").value.trim().slice(0,500);
+    var lineCb = document.getElementById("spsLine");
+    var lineOn = !!(lineCb.checked && !lineCb.disabled);
+    var st = document.getElementById("spsStatus");
+    var btn = document.getElementById("spsSend");
+    sps.busy = true; btn.disabled = true;
+    var files = sps.files.slice(), okCount = 0, okIds = [];
+    for(var i=0;i<files.length;i++){
+      st.textContent = "写真を送っています… "+(i+1)+" / "+files.length;
+      var f = files[i];
+      try{
+        var compressed = await compressImageFile(f);
+        var res = await assets.upload(compressed, {type: compressed.type || f.type || "image/jpeg", noClean: true});
+        var doc = { id: uid("al"), projectId: pid, kind: "album", categoryId: catId || null, assetId: res.id, url: res.url,
+          contentType: res.contentType || compressed.type || f.type, fileName: f.name, createdAt: nowIso(), by: state.currentUser||"", via: "sendPhoto" };
+        blobCache[res.id] = compressed;
+        state.albumPhotos.push(doc);
+        var saved = await saveDoc("albumPhotos", doc.id, doc);
+        if(saved===false) state.albumPhotos = state.albumPhotos.filter(function(x){ return x.id!==doc.id; });
+        else { okCount++; okIds.push(doc.id); }
+      }catch(e){ uploadFailToast(f.name, e); }
+    }
+    var notes = [];
+    if(okCount && comment){
+      var prev = proj.staffComment || null;
+      // 一緒に送った写真を覚えておく（お客様がひとことのカードを押すと、この写真が見られる）
+      proj.staffComment = {text:comment, at:nowIso(), by:state.currentUser||"", photoIds: okIds.slice()};
+      var okc = await saveDoc("projects", proj.id, proj);
+      if(okc===false){ proj.staffComment = prev; notes.push("ひとことは保存できませんでした"); }
+    }
+    var lineDone = false;
+    if(okCount && lineOn){
+      st.textContent = "LINEでお知らせしています…";
+      try{
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo" }) });
+        var lj = await lres.json().catch(function(){ return {}; });
+        if(lres.ok && lj.ok){
+          lineDone = true;
+          proj.lineNotifiedAt = nowIso(); proj.lineNotifiedBy = state.currentUser || "";
+          saveDoc("projects", proj.id, proj);
+          if(lj.failed && lj.failed.length) notes.push("LINEが送れなかった人："+lj.failed.length+"人");
+        } else notes.push("LINEのお知らせは送れませんでした");
+      }catch(e){ notes.push("LINEのお知らせは送れませんでした"); }
+    }
+    sps.busy = false; btn.disabled = false; st.textContent = "";
+    if(!okCount){ toast("⚠ 写真を送れませんでした。電波の良いところでもう一度お試しください", 9000); return; }
+    logActivity((proj.customer||proj.name||"")+"のおうちアルバムに写真を"+okCount+"枚送りました"+(lineDone?"（LINEでお知らせ）":""));
+    sps.files = []; spsRenderThumbs();
+    document.getElementById("sendPhotoModal").hidden = true;
+    render();
+    var msg = "✅ "+okCount+"枚を送りました"+(lineDone?"・LINEでお知らせしました":"");
+    if(okCount < files.length) msg += "（"+(files.length-okCount)+"枚は送れていません）";
+    if(notes.length) msg += "（"+notes.join("／")+"）";
+    toast(msg, notes.length || okCount<files.length ? 9000 : undefined);
   }
   async function uploadAlbumPhotos(kind, fileList, categoryId){
     if(!assets){ toast("この画面では写真の登録が利用できません"); return; }
@@ -10680,7 +10946,34 @@
     if(res.status===401) throw new Error("ログインの有効期限が切れました。ログインし直してください");
     if(!res.ok) throw new Error("サーバーエラー（"+res.status+"）");
     var j = await res.json();
-    return { payload: { threadId: j.threadId || null, id: j.id || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[] } };
+    return { payload: { threadId: j.threadId || null, id: j.id || null, messageId: j.messageId || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[] } };
+  }
+  // 下書きを作ったあと、Gmailでその下書きを開けるようにする（連携しているアカウントで開く）
+  var gmailConnEmail = null;
+  async function gmailAccountEmail(){
+    if(gmailConnEmail!==null) return gmailConnEmail;
+    try{
+      var r = await fetch("/api/gmail-status", { headers: { "X-Staff-Token": getStaffToken()||"" } });
+      var d = r.ok ? await r.json() : {};
+      gmailConnEmail = d.email || "";
+    }catch(e){ gmailConnEmail = ""; }
+    return gmailConnEmail;
+  }
+  function gmailDraftUrl(messageId, email){
+    var base = email ? "https://mail.google.com/mail/?authuser="+encodeURIComponent(email) : "https://mail.google.com/mail/u/0/";
+    return base + (messageId ? "#drafts?compose="+encodeURIComponent(messageId) : "#drafts");
+  }
+  // 下書きができたら「Gmailで下書きを開く」を出す（押したときに開くので、ブラウザに止められない）
+  async function offerOpenDrafts(title, msg, messageIds){
+    var ids = (messageIds||[]).filter(Boolean);
+    var email = await gmailAccountEmail();
+    var choices = ids.length===1
+      ? [{label:"✉️ Gmailでこの下書きを開く", value:"one"}]
+      : [{label:"✉️ Gmailの下書きフォルダーを開く"+(ids.length?"（"+ids.length+"件）":""), value:"all"}];
+    askChoice(title, msg, choices, function(v){
+      if(!v) return;
+      window.open(gmailDraftUrl(v==="one"?ids[0]:"", email), "_blank");
+    }, {cancelLabel:"閉じる"});
   }
   async function sendGmailRequest(project, vendors){
     var subject = "【見積依頼】"+(project?project.name:"")+" 案件について";
@@ -10696,7 +10989,7 @@
       if(to.length) msg += "（宛先"+to.length+"件）";
       if(attachments.length) msg += "・添付"+attachments.length+"件";
       if(!to.length) msg += "（宛先未登録の業者がいます。下書きで宛先を追加してください）";
-      toast(msg);
+      offerOpenDrafts("✅ Gmail下書きを作成しました", msg+"\n送信はしていません。Gmailで確認して送ってください。", [payload.messageId]);
       logActivity("見積依頼のGmail下書きを作成しました");
       return { ok:true, threadId: payload.threadId||null };
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); return {ok:false, threadId:null}; }
@@ -11767,7 +12060,7 @@
     if(!t) return;
     var proj = projectById(t.projectId);
     if(!proj){ toast("案件が見つかりません"); return; }
-    if(t.estimateRef){ goToOkaiEstimates(proj.id, t.estimateRef.id||""); return; }
+    if(t.estimateRef){ openEstimatesOfProject(t.projectId, t.estimateRef.id); return; }
     var content = String(t.content||"").trim();
     if(!content){ toast("内容が空のため載せられません"); return; }
     var firstLine = content.split("\n")[0].trim();
@@ -11790,8 +12083,8 @@
       saveDoc("tasks", t.id, t);
       if(state.currentProjectId===pid) renderOkaiEstimates(cust);
       logActivity("タスクから追加見積り「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
-      toast("✅ 追加見積りに載せました。金額を入れる欄へ移動します（空欄のままだとお客様には「金額確認中」と表示）", 8000);
-      goToOkaiEstimates(pid, estId);
+      toast("✅ 追加見積りに載せました。金額を入れてください（空欄のままだと、お客様には「金額確認中」と表示されます）", 6000);
+      openEstimatesOfProject(pid, estId);
     });
   }
   async function taskGmailDraft(id){
@@ -11823,7 +12116,7 @@
       if(atts.length) msg += "・添付"+(dp.attachmentCount!=null ? dp.attachmentCount : atts.length)+"件";
       if(noEmail.length) msg += "。メール未登録："+noEmail.join("、");
       if(dp.linked && dp.linked.length) msg += "。付けられなかった資料"+dp.linked.length+"件（"+dp.linked.map(function(x){ return x.name+"："+x.why; }).join("、")+"）は本文にリンクを入れました";
-      toast(msg, 9000);
+      offerOpenDrafts("✅ Gmail下書きを作成しました", msg.replace(/^✅ Gmail下書きを作成しました/,"").replace(/^（(.*?)）/,"$1")+"\n送信はしていません。Gmailで確認して送ってください。", [dp.messageId]);
       logActivity("タスクのGmail下書きを作成しました");
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
@@ -12048,7 +12341,7 @@
       render();
       await saveDoc("requests", r.id, r);
       logActivity("変更依頼のGmail下書きを作成しました");
-      toast("変更依頼のGmail下書きを作成しました"+(attachments.length?"（添付"+attachments.length+"件）":""));
+      offerOpenDrafts("✅ 変更依頼のGmail下書きを作成しました", (attachments.length?"添付"+attachments.length+"件。":"")+"送信はしていません。Gmailで確認して送ってください。", [payload.messageId]);
     }catch(e){ toast("変更依頼の下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
 
@@ -12980,6 +13273,7 @@
       // 編集：既存の添付は残し、新しく選んだファイルだけ追加する。
       editTarget.attachments = editTarget.attachments || [];
       editTarget.attachmentAssetIds = editTarget.attachmentAssetIds || [];
+      var attCountBefore = editTarget.attachments.length;
       if(assets && files && files.length){
         for(var j=0;j<files.length;j++){
           try{
@@ -13019,6 +13313,8 @@
       logActivity("タスクを編集しました（"+content.slice(0,20)+"）");
       toast(jumpTo ? "タスクを保存しました（「"+jumpTo+"」へ移しました）" : "タスクを保存しました");
       if(jumpTo) goToTaskBoard(editTarget.id);
+      // 資料を足したら「次はどうしますか？」を聞く（タスクを動かし忘れないように）
+      else if(editTarget.attachments.length > attCountBefore && !editTarget.private) askAfterTaskAttach(editTarget.id);
       return;
     }
     if(assets && files && files.length){
@@ -13322,6 +13618,59 @@
       render();
       if(nSync) toast("✅ 「"+(t.vendorSpec.label||"")+"」の設備仕様・おうちノートにも反映しました");
     }
+    if(!t.private) askAfterTaskAttach(t.id);
+  }
+  // ---- 資料を付けたあとの「次はどうしますか？」（依頼者に送る／業者へメール下書き／お客様に出す／完了） ----
+  function askAfterTaskAttach(id){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var me = state.currentUser || "";
+    var req = staffInstructor(t) || t.creator || "";
+    if(req===me) req = "";
+    var forCustomer = t.instructor===CUSTOMER_INSTRUCTOR;
+    var choices = [];
+    var custOk = !!(t.projectId && !t.reflected);
+    if(forCustomer && custOk) choices.push({label:"🏠 お客様に出す（おうちノートに反映）", value:"customer"});
+    if(req) choices.push({label:"📨 依頼者（"+req+"さん）に送る", value:"requester"});
+    if(taskVendors(t).length) choices.push({label:"✉️ 業者へのメールの下書きを作る", value:"vendor"});
+    if(!forCustomer && custOk) choices.push({label:"🏠 お客様に出す（おうちノートに反映）", value:"customer"});
+    if((t.status||"未着手")!=="完了") choices.push({label:"✅ 完了にする", value:"done"});
+    var proj = projectById(t.projectId);
+    askChoice("📎 資料を付けました。次はどうしますか？", "「"+String(t.content||"").slice(0,40)+"」"+(proj ? "（"+(proj.customer ? String(proj.customer).replace(/様$/,"")+"様" : (proj.name||""))+"）" : "")+"\n※あとで決めるときは「キャンセル」"+"\nいまの進捗：「"+(t.status||"未着手")+"」", choices, async function(v){
+      if(!v || v==="later") return;
+      if(v==="requester") return sendTaskToRequester(id, req);
+      if(v==="vendor") return taskGmailDraft(id);
+      if(v==="customer") return toggleTaskReflect(id);
+      if(v==="done") return setTaskStatus(id, "完了");
+    });
+  }
+  // 依頼者へ送る：社長・朋子は「○○確認依頼中」へ移して確認者にする（承認・返信のボタンが出る）。ほかの人はコメントで知らせる（進捗はそのまま）
+  async function sendTaskToRequester(id, req){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t || !req) return;
+    var st = checkStatusFor(req);
+    var note = await askComment("📨 "+req+"さんに送る",
+      st ? "ひとこと（任意）。"+req+"さんに通知が届き、進捗は「"+st+"」になります。" : "ひとこと（任意）。"+req+"さんに通知が届きます（進捗は変わりません）。", false);
+    if(note===null) return;
+    t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var me = state.currentUser || "";
+    var text = note || "資料を付けました。ご確認ください。";
+    if(st){
+      // 確認者にして確認依頼の列へ（通知はサーバーが確認者として1回だけ送る）。ひとことはカードのやりとりに残す
+      t.checker = req;
+      t.status = st; t.completedAt = null; t.archivedAt = null;
+      var e1 = { result:"コメント", by: me || "（名前未選択）", to: "", note: text, at: nowIso() };
+      t.reviews = taskReviewList(t).concat([e1]); t.review = e1;
+    } else {
+      var e2 = { result:"コメント", by: me || "（名前未選択）", to: req, note: text, at: nowIso() };
+      t.reviews = taskReviewList(t).concat([e2]); t.review = e2;
+    }
+    t.updatedAt = nowIso();
+    state.taskOpen = state.taskOpen || {}; state.taskOpen[t.status] = true;
+    render();
+    var ok = await saveDoc("tasks", t.id, t);
+    if(ok===false){ toast("⚠ 保存できませんでした。もう一度お試しください"); return; }
+    logActivity("タスクを"+req+"さんに送りました（"+(t.content||"").slice(0,20)+"）");
+    toast(st ? req+"さんに送りました（「"+st+"」へ移しました）" : req+"さんに送りました");
+    if(st) goToTaskBoard(t.id);
   }
   async function toggleTaskReflect(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
@@ -13464,7 +13813,7 @@
   }
 
   // ---- lightweight inline choice dialog (confirm() is inert here) ----
-  function askChoice(title, message, choices, callback){
+  function askChoice(title, message, choices, callback, opts){
     var overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
     var box = document.createElement("div");
@@ -13473,7 +13822,7 @@
       (message ? '<p class="muted" style="margin:0 0 14px; font-size:.85rem; white-space:pre-line;">'+escapeHtml(message)+'</p>' : '')+
       '<div style="display:flex; flex-direction:column; gap:8px;">'+
       choices.map(function(c,i){ return '<button class="btn'+(i===0?"":" secondary")+'" data-choiceval="'+i+'" style="width:100%;">'+escapeHtml(c.label)+'</button>'; }).join("")+
-      '<button class="btn secondary" data-choiceval="cancel" style="width:100%;">キャンセル</button>'+
+      '<button class="btn secondary" data-choiceval="cancel" style="width:100%;">'+escapeHtml((opts&&opts.cancelLabel)||"キャンセル")+'</button>'+
       '</div>';
     overlay.appendChild(box);
     document.body.appendChild(overlay);
@@ -13812,8 +14161,17 @@
     if(lbl) lbl.textContent = Math.round(pb.zoom*100)+"%";
     pbRenderItems();
   }
+  // 拡大の上限（ピンチ・＋ボタン共通）
+  var PB_MAX_ZOOM = 6;
+  // ペン（Apple Pencil）を一度でも使った端末は「指は動かす・拡大だけ」にする（その端末に覚える）。
+  // ペンの無いスマホは今までどおり指で書ける。ツールバーの「✋」で切り替えられる。
+  function pbPenOnly(){ try{ return localStorage.getItem("sumairu_pb_penonly")==="1"; }catch(e){ return false; } }
+  function pbSetPenOnly(on){
+    try{ localStorage.setItem("sumairu_pb_penonly", on?"1":"0"); }catch(e){}
+    var l = document.getElementById("pbFingerLabel"); if(l) l.textContent = on ? "指：動かす・拡大" : "指：書く";
+  }
   function pbZoomBy(delta){
-    pb.zoom = Math.max(0.4, Math.min(3, Math.round((pb.zoom+delta)*100)/100));
+    pb.zoom = Math.max(0.4, Math.min(PB_MAX_ZOOM, Math.round((pb.zoom+delta)*100)/100));
     pbApplyZoom();
   }
   function pbComputeFitZoom(contentW){
@@ -14127,7 +14485,7 @@
     pb.baseCtx && pb.baseCtx.clearRect(0,0,pb.baseCanvas.width, pb.baseCanvas.height);
     pb.imageCtx && pb.imageCtx.clearRect(0,0,pb.imageCanvas.width, pb.imageCanvas.height);
     pb.items = []; pb.pendingItem = null;
-    pb.touches = {}; pb.pinchStartDist = null; pb.drawing = false;
+    pb.touches = {}; pb.pinchStartDist = null; pb.drawing = false; pb.panLast = null;
     var layer = document.getElementById("pbItemsLayer"); if(layer) layer.innerHTML = "";
   }
   async function pbSaveSpecOverwrite(target, blob){
@@ -14481,6 +14839,31 @@
     document.getElementById("homeReqProject").addEventListener("change", function(){ homeReqProject = this.value; renderHomeRequests(); });
     document.getElementById("btnCopyOkaiNoteLink").addEventListener("click", copyOkaiNoteLink);
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
+    document.getElementById("btnSendPhotoHome").addEventListener("click", function(){ openSendPhoto(null); });
+    document.getElementById("btnSendPhotoProj").addEventListener("click", function(){ openSendPhoto(state.currentProjectId); });
+    document.getElementById("spsClose").addEventListener("click", closeSendPhoto);
+    document.getElementById("spsProject").addEventListener("change", function(){ spsRenderCats(""); spsRenderLine(); });
+    document.getElementById("spsCat").addEventListener("change", function(e){
+      var nw = e.target.value==="__new";
+      document.getElementById("spsNewCatRow").hidden = !nw;
+      if(nw) setTimeout(function(){ document.getElementById("spsNewCat").focus(); }, 30);
+    });
+    document.getElementById("spsNewCatAdd").addEventListener("click", spsAddCategory);
+    document.getElementById("spsNewCat").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); spsAddCategory(); } });
+    document.getElementById("spsShoot").addEventListener("click", function(){ document.getElementById("spsShootInput").click(); });
+    document.getElementById("spsPick").addEventListener("click", function(){ document.getElementById("spsPickInput").click(); });
+    ["spsShootInput","spsPickInput"].forEach(function(id){
+      document.getElementById(id).addEventListener("change", function(e){
+        Array.prototype.forEach.call(e.target.files||[], function(f){ if(String(f.type||"").indexOf("image/")===0 || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name||"")) sps.files.push(f); });
+        e.target.value = "";
+        spsRenderThumbs();
+      });
+    });
+    document.getElementById("spsThumbs").addEventListener("click", function(e){
+      var d = e.target.closest("[data-spsdel]"); if(!d) return;
+      sps.files.splice(parseInt(d.dataset.spsdel,10), 1); spsRenderThumbs();
+    });
+    document.getElementById("spsSend").addEventListener("click", sendPhotos);
     document.getElementById("okaiNoteViewClose").addEventListener("click", closeOkaiNoteView);
     document.getElementById("specLightboxClose").addEventListener("click", closeSpecPhotoLightbox);
     document.getElementById("specLightboxEdit").addEventListener("click", function(){
@@ -14555,8 +14938,32 @@
     document.getElementById("btnOkaiNextMeetSave").addEventListener("click", okaiNextMeetSave);
     document.getElementById("btnOkaiChkSave").addEventListener("click", okaiChkSave);
     document.getElementById("okaiChkList").addEventListener("click", okaiChkClick);
-    document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); });
+    document.getElementById("btnOkaiProgAdd").addEventListener("click", function(){ okaiProgRead(); okaiProg.steps.push({name:"",date:""}); renderOkaiProg(); var nms = document.querySelectorAll('#okaiProgRows [data-progname]'); if(nms.length) nms[nms.length-1].focus(); });
     document.getElementById("okaiProgRows").addEventListener("click", function(e){
+      var mv = e.target.closest("[data-progmove]");
+      if(mv){
+        okaiProgRead();
+        var a = parseInt(mv.dataset.progmove,10), b = a + parseInt(mv.dataset.dir,10);
+        if(b<0 || b>=okaiProg.steps.length) return;
+        var tmp = okaiProg.steps[a]; okaiProg.steps[a] = okaiProg.steps[b]; okaiProg.steps[b] = tmp;
+        // 「現在」は同じ工程についていくようにする
+        if(okaiProg.current===a) okaiProg.current=b; else if(okaiProg.current===b) okaiProg.current=a;
+        renderOkaiProg();
+        var row = document.querySelector('#okaiProgRows [data-progrow="'+b+'"] [data-progmove][data-dir="'+mv.dataset.dir+'"]');
+        if(row && !row.disabled) row.focus();
+        return;
+      }
+      var ins = e.target.closest("[data-progins]");
+      if(ins){
+        okaiProgRead();
+        var k = parseInt(ins.dataset.progins,10);
+        okaiProg.steps.splice(k+1, 0, {name:"",date:""});
+        if(okaiProg.current>k) okaiProg.current++;
+        renderOkaiProg();
+        var nm = document.querySelector('#okaiProgRows [data-progrow="'+(k+1)+'"] [data-progname]');
+        if(nm) nm.focus();
+        return;
+      }
       var d = e.target.closest("[data-progdel]"); if(!d) return;
       okaiProgRead(); var i = parseInt(d.dataset.progdel,10);
       okaiProg.steps.splice(i,1);
@@ -14808,6 +15215,8 @@
     });
     document.getElementById("btnSendMessage").addEventListener("click", function(){ sendMessage(); });
     document.getElementById("btnHearMsgSend").addEventListener("click", function(){ sendMessage("hear"); });
+    document.getElementById("btnStaffCommentSave").addEventListener("click", saveStaffComment);
+    document.getElementById("staffCommentInput").addEventListener("input", function(e){ e.target.dataset.dirty = "1"; });
     document.getElementById("hearMsgInput").addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); sendMessage("hear"); } });
     document.getElementById("btnNewNoteIssue").addEventListener("click", issueNewNoteLink);
     document.getElementById("btnNewNoteCopy").addEventListener("click", copyNewNoteLink);
@@ -15252,6 +15661,8 @@
           if(big.value==="__addpart"){ renderNoteSpecFilterBar(); addCustomPart(); return; }
           setRecFilter(big.value, ""); return;
         }
+        var mkSel = e.target.closest("[data-recmark]");
+        if(mkSel){ state.recMark = mkSel.value || ""; renderMeetingNotes(); return; }
         var sub = e.target.closest("[data-recsub]");
         if(sub){
           if(sub.value==="__addroom"){ recAddRoom(); return; }
@@ -15259,7 +15670,7 @@
         }
       });
       noteSpecFilterBarEl.addEventListener("click", function(e){
-        if(e.target.closest("[data-recclear]")){ setRecFilter("", ""); return; }
+        if(e.target.closest("[data-recclear]")){ state.recMark = ""; setRecFilter("", ""); return; }
         var rr = e.target.closest("[data-recroomrename]"); if(rr){ recRenameRoom(rr.dataset.recroomrename); return; }
         var rd = e.target.closest("[data-recroomdel]"); if(rd){ recDeleteRoom(rd.dataset.recroomdel); return; }
         var cr = e.target.closest("[data-customrename]"); if(cr){ renameCustomPart(cr.dataset.customrename); return; }
@@ -15388,16 +15799,41 @@
       var a = pb.touches[ids[0]], b = pb.touches[ids[1]];
       return Math.hypot(b.x-a.x, b.y-a.y);
     }
+    function pbPinchMid(){
+      var ids = Object.keys(pb.touches);
+      if(ids.length < 2) return null;
+      var a = pb.touches[ids[0]], b = pb.touches[ids[1]];
+      return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    }
+    function pbStageEl(){ return document.querySelector("#pbModal .pbstage") || document.querySelector(".pbstage"); }
+    // 指で書きかけた線を取り消す（2本目の指が触れたとき＝ピンチの始まり）
+    function pbCancelFingerStroke(){
+      if(!pb.drawing || pb.drawPointerType!=="touch") return;
+      pb.drawing = false;
+      pb.overlayCtx.clearRect(0,0,pb.overlayCanvas.width, pb.overlayCanvas.height);
+      pbRestoreHistory(pb.historyIndex);
+    }
     pb.overlayCanvas.addEventListener("pointerdown", function(e){
+      if(e.pointerType === "pen" && !pbPenOnly()){
+        pbSetPenOnly(true);
+        toast("ペンを使ったので、指は「動かす・拡大」だけにしました（✋で切り替えできます）", 6000);
+      }
       if(e.pointerType === "touch"){
+        // ペンで書いている間の手のひら・指は無視する
+        if(pb.drawing && pb.drawPointerType==="pen") return;
         pb.touches[e.pointerId] = {x:e.clientX, y:e.clientY};
+        try{ pb.overlayCanvas.setPointerCapture(e.pointerId); }catch(err){}
         if(Object.keys(pb.touches).length >= 2){
-          if(pb.drawing){ pb.drawing = false; pbPushHistory(); }
+          pbCancelFingerStroke();
           if(pb.activeTextEditor) pbCancelTextEditor();
           pb.pinchStartDist = pbPinchDist();
           pb.pinchStartZoom = pb.zoom;
+          var mid = pbPinchMid(), inner = document.getElementById("pbStageInner").getBoundingClientRect();
+          pb.pinchAnchor = { px:(mid.x-inner.left)/pb.zoom, py:(mid.y-inner.top)/pb.zoom };
           return;
         }
+        // 1本指：ペン専用の端末・表示モードでは書かずに動かす
+        if(pbPenOnly() || pb.tool==="view"){ pb.panLast = {x:e.clientX, y:e.clientY}; return; }
       }
       if(pb.tool==="view") return;
       if(pb.tool==="item" && pb.pendingItem){
@@ -15410,7 +15846,7 @@
       }
       if(pb.tool==="text"){ pbStartTextEditor(e); return; }
       try{ pb.overlayCanvas.setPointerCapture(e.pointerId); }catch(err){ /* ignore: drawing still proceeds without capture */ }
-      pb.drawing = true; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt;
+      pb.drawing = true; pb.drawPointerType = e.pointerType; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt;
       if(pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser"){
         var style = pbStrokeStyleFor();
         pbDrawSegment(pb.baseCtx, pb.startPt, {x:pb.startPt.x+0.01, y:pb.startPt.y+0.01}, style);
@@ -15423,9 +15859,21 @@
           var dist = pbPinchDist();
           if(dist){
             var newZoom = pb.pinchStartZoom * (dist/pb.pinchStartDist);
-            pb.zoom = Math.max(0.4, Math.min(3, Math.round(newZoom*100)/100));
+            pb.zoom = Math.max(0.4, Math.min(PB_MAX_ZOOM, Math.round(newZoom*100)/100));
             pbApplyZoom();
+            // 指の間の点が指の下に残るように、表示位置を合わせる（2本指で動かすのにも対応）
+            var stg = pbStageEl(), mid = pbPinchMid(), inner = document.getElementById("pbStageInner").getBoundingClientRect();
+            if(stg && mid && pb.pinchAnchor){
+              stg.scrollLeft += (inner.left + pb.pinchAnchor.px*pb.zoom) - mid.x;
+              stg.scrollTop += (inner.top + pb.pinchAnchor.py*pb.zoom) - mid.y;
+            }
           }
+          return;
+        }
+        if(pb.panLast){
+          var st = pbStageEl();
+          if(st){ st.scrollLeft -= e.clientX - pb.panLast.x; st.scrollTop -= e.clientY - pb.panLast.y; }
+          pb.panLast = {x:e.clientX, y:e.clientY};
           return;
         }
       }
@@ -15436,8 +15884,13 @@
     });
     function pbEndStroke(e){
       if(e && e.pointerType === "touch"){
+        var wasTracked = !!pb.touches[e.pointerId];
         delete pb.touches[e.pointerId];
         if(Object.keys(pb.touches).length < 2) pb.pinchStartDist = null;
+        if(!Object.keys(pb.touches).length) pb.panLast = null;
+        // ペンで書いている途中に触れた指が離れても、ペンの線は終わらせない
+        if(pb.drawing && pb.drawPointerType==="pen") return;
+        if(!wasTracked && pb.drawPointerType!=="touch") return;
       }
       if(!pb.drawing) return;
       pb.drawing = false;
@@ -15464,6 +15917,11 @@
       var st = PB_STAMPS.find(function(s){ return s.key===key; });
       if(st){ var text = st.autoDate ? (st.label+"（"+todayStr()+"）") : st.label; pb.pendingItem = { kind:"stamp", text: text }; pbSetTool("item"); toast("配置したい場所をクリックしてください"); }
       e.target.value = "";
+    });
+    pbSetPenOnly(pbPenOnly());
+    document.getElementById("pbFingerToggle").addEventListener("click", function(){
+      var on = !pbPenOnly(); pbSetPenOnly(on);
+      toast(on ? "指は「動かす・拡大」だけにしました（書くのはペン）" : "指でも書けるようにしました（2本指で拡大・縮小）");
     });
     document.getElementById("pbZoomOut").addEventListener("click", function(){ pbZoomBy(-0.1); });
     document.getElementById("pbZoomIn").addEventListener("click", function(){ pbZoomBy(0.1); });
@@ -15583,7 +16041,8 @@
           if(/refresh_failed|invalid_grant/.test(errText)) throw new Error("Gmailとの連携が切れています。設定の「Gmailと連携する」からやり直してください");
           throw new Error("HTTP "+res.status+" "+errText);
         }
-        toast("Gmail下書きを作成しました（添付"+atts.length+"件"+(to.length?"・宛先 "+to.join(", "):"・宛先なし。Gmailで宛先を入れてください")+"）", 8000);
+        var pbj = {}; try{ pbj = await res.json(); }catch(e3){}
+        offerOpenDrafts("✅ Gmail下書きを作成しました", "添付"+atts.length+"件"+(to.length?"・宛先 "+to.join(", "):"・宛先なし。Gmailで宛先を入れてください")+"\n送信はしていません。Gmailで確認して送ってください。", [pbj.messageId]);
         logActivity("プランボードのGmail下書きを作成しました");
       }catch(e){ toast("Gmail下書きの作成に失敗しました："+(e && e.message ? e.message : "")); }
       finally{ sendBtn.disabled=false; sendBtn.textContent="この内容でGmail下書きを作成"; }
