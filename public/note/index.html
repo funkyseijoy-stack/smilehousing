@@ -117,6 +117,16 @@
   .scom .sh{ font-weight:700; font-size:.9rem; color:var(--brown); margin-bottom:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .scom .sd{ font-weight:400; font-size:.76rem; color:var(--muted); }
   .scom .st{ white-space:pre-wrap; line-height:1.7; font-size:.92rem; }
+  .scom .sttap{ display:block; width:100%; text-align:left; background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer; }
+  .scom .scph{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; width:100%; margin-top:10px; background:none; border:0; padding:0; cursor:pointer; }
+  .scom .scth{ position:relative; display:block; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--line); }
+  .scom .scth img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .scom .scmore{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:700; font-size:1.1rem; }
+  .scom .srep{ display:flex; justify-content:flex-end; gap:14px; flex-wrap:wrap; }
+  .scphotos{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 18px; }
+  .scphotos h3{ margin:0 0 4px; font-size:1rem; color:var(--brown); }
+  .scphotos .scnote{ font-size:.85rem; color:var(--muted); margin:0 0 10px; white-space:pre-wrap; }
+  .tli.focus{ outline:3px solid #d9a441; outline-offset:2px; border-radius:12px; transition:outline-color 1.5s; }
   .upd{ background:#fff8ec; border:1.5px solid #f0d9a8; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
   .upd .uh{ font-weight:700; font-size:.95rem; margin-bottom:2px; }
   .upd .nwb{ display:inline-block; background:#d9534f; color:#fff; font-size:.85rem; font-weight:700; letter-spacing:.06em; border-radius:999px; padding:3px 12px; }
@@ -193,6 +203,8 @@
   .todobox .td{ border-top:1px solid var(--line); padding:10px 0 4px; }
   .todobox .tdh{ display:flex; align-items:center; gap:6px; } .todobox .tk{ font-size:.72rem; color:var(--muted); }
   .todobox .tt{ font-weight:700; font-size:.9rem; line-height:1.5; margin-top:4px; }
+  .todobox .tttap{ display:block; width:100%; text-align:left; background:none; border:0; padding:0; font-family:inherit; color:inherit; cursor:pointer; }
+  .todobox .ttlink{ display:block; font-weight:700; font-size:.8rem; color:var(--brown); text-decoration:underline; margin-top:4px; }
   .qbox{ background:var(--card); border:1.5px solid var(--line2); border-radius:16px; margin:0 0 16px; overflow:hidden; }
   .qrow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none; border:none; padding:12px 14px; font:inherit; font-size:.88rem; color:var(--ink); cursor:pointer; }
   .qrow + .qrow, .qdetail + .qrow{ border-top:1px solid var(--line); }
@@ -838,7 +850,7 @@ function consItems(){
   notes.forEach(function(n){
     String(n.open||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean).forEach(function(t){
       if(seen[t]) return; seen[t] = 1;
-      out.push({ t:t, date:n.date, part:n.partName||n.part||"", title:n.title||"" });
+      out.push({ t:t, date:n.date, part:n.partName||n.part||"", title:n.title||"", id:n.id||"" });
     });
   });
   return out;
@@ -902,8 +914,18 @@ function consItems(){
     var sc = data.staffComment;
     if(!sc || !sc.text) return "";
     var d = sc.at ? new Date(sc.at) : null;
-    return '<div class="scom"><div class="sh">💬 スタッフより'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div><div class="st">'+esc(sc.text)+'</div>'+
-      '<div class="srep"><button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
+    var ph = (sc.photos||[]).filter(isImg);
+    var phHtml = "";
+    if(ph.length){
+      var SHOW = 4;
+      phHtml = '<button class="scph" data-scphotos="1" aria-label="お送りした写真を見る">'+ph.slice(0, SHOW).map(function(f, i){
+        var more = (i===SHOW-1 && ph.length>SHOW) ? '<span class="scmore">+'+(ph.length-SHOW)+'</span>' : '';
+        return '<span class="scth"><img loading="lazy" src="'+esc(f.url)+'" alt="">'+more+'</span>';
+      }).join("")+'</button>';
+    }
+    return '<div class="scom"><div class="sh">💬 スタッフより'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div>'+
+      (ph.length ? '<button class="st sttap" data-scphotos="1">'+esc(sc.text)+'</button>' : '<div class="st">'+esc(sc.text)+'</div>')+phHtml+
+      '<div class="srep">'+(ph.length ? '<button class="linkbtn" data-scphotos="1">📷 写真を見る（'+ph.length+'枚） ›</button>' : '')+'<button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
   }
   function updatesHtml(){
     if(view.updDismissed) return "";
@@ -1159,6 +1181,13 @@ function homeHtml(){
     var mine = album.filter(function(a){ return a.kind!=="reference"; });
     var ref = album.filter(function(a){ return a.kind==="reference"; });
     var out = '<h2 class="big">わが家のアルバム</h2><p class="sub">住まいるハウジングからお届けした写真です。タップで大きく表示します。</p>';
+    var sc = data.staffComment, scph = sc ? (sc.photos||[]).filter(isImg) : [];
+    if(view.scPhotos && scph.length){
+      var sd = sc.at ? new Date(sc.at) : null;
+      out += '<div class="scphotos" id="scPhotosSec"><h3>📷 '+(sd && !isNaN(sd) ? (sd.getMonth()+1)+'/'+sd.getDate()+' ' : '')+'お送りした写真（'+scph.length+'枚）</h3>'+
+        '<p class="scnote">'+esc(sc.text||"")+'</p><div class="agrid">'+scph.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div></div>'+
+        (mine.length ? '<div class="sechd"><h3>アルバムのすべての写真</h3></div>' : '');
+    }
     out += mine.length ? '<div class="agrid">'+mine.map(function(a){ return thumbHtml(a, fmtD(a.createdAt)); }).join("")+'</div>' : '<div class="empty">まだ写真はありません。</div>';
     if(ref.length) out += '<div class="sechd"><h3>家づくりの参考写真</h3></div><div class="agrid">'+ref.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div>';
     return out;
@@ -1441,7 +1470,8 @@ function homeHtml(){
         '<div class="consbtns"><button class="chgbtn" data-buildcat="'+esc(e.c.id)+'">見て決める ›</button></div></div>');
     });
     cons.forEach(function(c){
-      rows.push('<div class="td"><div class="tdh"><span class="ptag">'+esc(c.part||c.title||"打合せ")+'</span><span class="tk">ご検討ください</span></div><div class="tt">'+esc(c.t)+'</div>'+
+      rows.push('<div class="td"><div class="tdh"><span class="ptag">'+esc(c.part||c.title||"打合せ")+'</span><span class="tk">ご検討ください</span></div>'+
+        (c.id ? '<button class="tt tttap" data-opennote="'+esc(c.id)+'">'+esc(c.t)+'<span class="ttlink">打合せ記録を見る ›</span></button>' : '<div class="tt">'+esc(c.t)+'</div>')+
         consBtnsHtml(c.t, fmtD(c.date)+(c.part?'・'+c.part:(c.title?'・'+c.title:'')))+'</div>');
     });
     var show = view.consAll ? rows : rows.slice(0, LIM);
@@ -1470,7 +1500,7 @@ function homeHtml(){
         }).join("")+'</div>';
       }
       out += data.notes.length ? '<div class="catlist">'+data.notes.map(function(n){
-        return '<div class="tli flat">'+noteBody(n, true)+'</div>';
+        return '<div class="tli flat'+(view.noteFocus && n.id===view.noteFocus ? ' focus' : '')+'"'+(n.id ? ' data-noteid="'+esc(n.id)+'"' : '')+'>'+noteBody(n, true)+'</div>';
       }).join("")+'</div>' : '<div class="empty">まだ記録はありません。</div>';
     } else if(view.plansOnly){
       // ホームの「わが家の平面図」から開いたときは、平面図だけを出す（他の資料は「資料をすべて見る」から）
@@ -1832,7 +1862,7 @@ function homeHtml(){
   // ---------- イベント ----------
   document.getElementById("nav").addEventListener("click", function(e){
     var b = e.target.closest("button[data-tab]"); if(!b) return;
-    view.tab = b.dataset.tab; if(view.tab!=="build") view.cat = null;
+    view.tab = b.dataset.tab; if(view.tab!=="build") view.cat = null; view.scPhotos = false;
     render(); window.scrollTo(0,0);
   });
   document.getElementById("btnMail").addEventListener("click", function(){ if(!data) return; view.tab="msg"; render(); });
@@ -1848,13 +1878,28 @@ function homeHtml(){
     var pt = e.target.closest("[data-progtoggle]"); if(pt){ view.progOpen = !view.progOpen; render(); return; }
     var fa = e.target.closest("[data-feedall]"); if(fa){ view.feedAll = true; render(); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ var el = document.getElementById(uj.dataset.updjump); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
-    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; render(); window.scrollTo(0,0); return; }
+    var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; view.scPhotos=false; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
     if(e.target.closest("#nmSave")){ nmSave(false); return; }
     if(e.target.closest("#nmClear")){ nmSave(true); return; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
     var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
     var consall = e.target.closest("[data-consall]"); if(consall){ view.consAll = !view.consAll; render(); return; }
+    var onote = e.target.closest("[data-opennote]");
+    if(onote){
+      var nid = onote.dataset.opennote;
+      view.tab="build"; view.buildSeg="notes"; view.plansOnly=false; view.cat=null; view.noteFocus = nid; render();
+      var tgt = document.querySelector('[data-noteid="'+(window.CSS && CSS.escape ? CSS.escape(nid) : nid)+'"]');
+      if(tgt) tgt.scrollIntoView({block:"start"}); else window.scrollTo(0,0);
+      setTimeout(function(){ view.noteFocus = null; var f = document.querySelector('.tli.focus'); if(f) f.classList.remove("focus"); }, 4000);
+      return;
+    }
+    var scp = e.target.closest("[data-scphotos]");
+    if(scp){
+      view.tab="album"; view.scPhotos = true; render();
+      var sec = document.getElementById("scPhotosSec"); if(sec) sec.scrollIntoView({block:"start"}); else window.scrollTo(0,0);
+      return;
+    }
     var opennotes = e.target.closest("[data-opennotes]"); if(opennotes){ view.tab="build"; view.buildSeg="notes"; render(); window.scrollTo(0,0); return; }
     var imf = e.target.closest("[data-imgfilter]"); if(imf){ view.imgFilter = imf.dataset.imgfilter; render(); return; }
     var imd = e.target.closest("[data-imgdel]"); if(imd){ deleteImage(imd.dataset.imgdel); return; }
