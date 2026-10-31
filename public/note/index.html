@@ -203,6 +203,18 @@
   .todobox .td{ border-top:1px solid var(--line); padding:10px 0 4px; }
   .todobox.hsec{ border-left-width:1.5px; border-color:var(--line); } .todobox.hsec .td:first-child{ border-top:0; padding-top:2px; }
   .homelink{ margin:-6px 2px 16px; text-align:right; }
+  .dlist{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:4px 12px; margin:0 0 16px; }
+  .dlist .dl{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:0; border-top:1px solid var(--line); padding:12px 0; font-family:inherit; color:inherit; cursor:pointer; }
+  .dlist .dl:first-child{ border-top:0; }
+  .hd .hbtn[hidden]{ display:none; }
+  .dlist .dl .ptag{ flex-shrink:0; width:6.2em; text-align:center; box-sizing:border-box; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dlist .dl .dt{ flex:1; min-width:0; } .dlist .dl .dt b{ display:block; font-size:.92rem; line-height:1.45; }
+  .dlist .dl .dt small{ display:block; font-size:.74rem; color:var(--muted); margin-top:2px; }
+  .dlist .dl .ug{ color:var(--brown); font-weight:700; }
+  .jflash{ outline:3px solid #e0b25a; outline-offset:3px; border-radius:12px; transition:outline-color .4s; }
+  .menulist .mh{ font-size:.75rem; color:var(--muted); font-weight:700; margin:14px 2px 4px; letter-spacing:.06em; }
+  .menulist .mi{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin:0 0 6px; font-family:inherit; font-weight:700; font-size:.95rem; color:inherit; cursor:pointer; }
+  .menulist .mi .mic{ width:1.6em; text-align:center; } .menulist .mi .ug{ margin-left:auto; color:var(--brown); }
   .homemorebtn{ display:block; width:100%; margin:18px 0 10px; padding:14px; border:1.5px solid var(--line); border-radius:14px; background:var(--card); font-family:inherit; font-weight:700; font-size:.95rem; color:inherit; cursor:pointer; }
   .homemorebtn span{ display:block; font-weight:400; font-size:.75rem; color:var(--muted); margin-top:3px; }
   .todobox .tdh{ display:flex; align-items:center; gap:6px; } .todobox .tk{ font-size:.72rem; color:var(--muted); }
@@ -462,16 +474,19 @@
       <div class="rule"></div>
       <div class="ttl">おうちノート</div>
     </div>
-    <button class="hbtn" id="btnOrder" aria-label="決める順番">
+    <button class="hbtn" id="btnOrder" aria-label="決める順番" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
     <span class="hl">決める順</span></button>
-    <button class="hbtn" id="btnMemo" aria-label="わたしのメモ">
+    <button class="hbtn" id="btnMemo" aria-label="わたしのメモ" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
     <span class="hl">メモ</span></button>
-    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法"><b class="q">？</b><span class="hl">使い方</span></button>
+    <button class="hbtn" id="btnHelp" aria-label="使い方・追加方法" hidden><b class="q">？</b><span class="hl">使い方</span></button>
     <button class="hbtn" id="btnMail" aria-label="メッセージ">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
     <span class="hl">メッセージ</span></button>
+    <button class="hbtn" id="btnMenu" aria-label="メニュー">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.7" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
+    <span class="hl">メニュー</span></button>
   </header>
   <div class="band">
     <div><div class="who" id="bandWho">お客様のおうち</div><div class="st" id="bandSt">家づくり進行中</div></div>
@@ -594,6 +609,13 @@
     <textarea id="chgInput" class="meminput" placeholder="例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい"></textarea>
     <button class="btn dk" id="chgSend" style="width:100%; margin-top:10px;">スタッフに送る</button>
     <p class="help-lead" style="margin-top:8px;">メッセージとしてスタッフに届きます。お返事は「メッセージ」に届きます。</p>
+  </div>
+</div>
+<div class="help" id="menuModal" hidden>
+  <div class="help-card">
+    <button class="x" id="menuX" aria-label="閉じる">×</button>
+    <h2>メニュー</h2>
+    <div id="menuList" class="menulist"></div>
   </div>
 </div>
 <div class="help" id="memoModal" hidden>
@@ -759,6 +781,7 @@
     Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function(b){ b.classList.toggle("on", b.dataset.tab===view.tab); });
     var html = "";
     if(view.tab==="home") html = homeHtml();
+    else if(view.tab==="info") html = infoHtml();
     else if(view.tab==="album") html = albumHtml();
     else if(view.tab==="msg") html = msgHtml();
     else if(view.tab==="resv") html = resvHtml();
@@ -772,6 +795,19 @@
     // プランボードの列は、最新（いちばん右）が見える位置から
     Array.prototype.forEach.call(document.querySelectorAll(".pbstrip"), function(el){ el.scrollLeft = el.scrollWidth; });
     if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
+    if(view.infoJump){ var jid = view.infoJump; view.infoJump = null; setTimeout(function(){ flashTo(jid); }, 50); }
+  }
+  // その場所までスクロールして少し光らせる
+  function flashTo(id){
+    var el = document.getElementById(id); if(!el) return false;
+    el.scrollIntoView({behavior:"smooth", block:"start"});
+    el.classList.add("jflash"); setTimeout(function(){ el.classList.remove("jflash"); }, 2200);
+    return true;
+  }
+  // ホームに無い欄は「わが家の情報」を開いてから移動
+  function jumpTo(id){
+    if(document.getElementById(id)) { flashTo(id); return; }
+    view.tab = "info"; view.cat = null; view.infoJump = id; render(); window.scrollTo(0,0);
   }
 
   // ---------- ホーム ----------
@@ -941,7 +977,12 @@ function consItems(){
       '<button class="uok" data-updok="1">とじる</button></div>';
   }
 
-function homeHtml(){
+function homeHtml(){ return homeParts().main; }
+  // ≡メニューから開く「わが家の情報」（ホームから外した欄をまとめて出す）
+  function infoHtml(){
+    return '<button class="back" data-go="home">← ホームへ</button><h2 class="big">わが家の情報</h2>'+homeParts().rest;
+  }
+  function homeParts(){
     var h = new Date().getHours();
     var greet = h<10 ? "おはようございます" : (h<17 ? "こんにちは" : "こんばんは");
     var name = (data.project.customer || "お客様").replace(/様$/, "");
@@ -995,15 +1036,14 @@ function homeHtml(){
     out += updatesHtml();
     out += staffCommentHtml();
     out += latestNotesHtml();
-    out += homeConsHtml();
-    out += approvalHtml();
+    out += decideListHtml();
     // ここから下は「そのほかの情報」にまとめる
     var mainOut = out; out = "";
     out += homePbHtml();
 
     // 次回の打合せの予定（スタッフが入力した文章）
     if(data.nextMeeting && data.nextMeeting.text){
-      out += '<div class="sechd"><h3>📝 打合せの予定</h3></div>'+
+      out += '<div class="sechd" id="sec-nextmeet"><h3>📝 打合せの予定</h3></div>'+
         '<div class="rv" style="display:block;"><div class="tm" style="white-space:pre-wrap; line-height:1.7; color:var(--ink,inherit);">'+esc(data.nextMeeting.text)+'</div></div>';
     }
 
@@ -1011,7 +1051,7 @@ function homeHtml(){
     if(data.meetingChecklist && data.meetingChecklist.items && data.meetingChecklist.items.length){
       var mcItems = data.meetingChecklist.items, mcGroups = [], mcDone = 0;
       mcItems.forEach(function(it){ if(mcGroups.indexOf(it.group)<0) mcGroups.push(it.group); if(it.decided) mcDone++; });
-      out += '<div class="sechd"><h3>✅ 決めることの一覧</h3><span style="font-size:.85rem;">決まった '+mcDone+' / '+mcItems.length+'</span></div>'+
+      out += '<div class="sechd" id="sec-chk"><h3>✅ 決めることの一覧</h3><span style="font-size:.85rem;">決まった '+mcDone+' / '+mcItems.length+'</span></div>'+
         '<div class="rv" style="display:block; line-height:1.7;">'+mcGroups.map(function(g){
           return '<div style="margin:0 0 8px;"><div style="font-weight:700;">'+esc(g)+'</div>'+
             mcItems.filter(function(it){ return it.group===g; }).map(function(it){
@@ -1023,7 +1063,7 @@ function homeHtml(){
 
     // 平面図は「暮らしの写真」とは毛色が違う資料なので、アルバムの直後ではなく、
     // サービス・資料系のまとまりの先頭にコンパクトな1行カードとして置く。
-    out += '<div class="sechd"><h3>📐 わが家の平面図</h3>'+(data.plans.length?'<button class="more" data-openplans="1">ひらく →</button>':'')+'</div>';
+    out += '<div class="sechd" id="sec-plan"><h3>📐 わが家の平面図</h3>'+(data.plans.length?'<button class="more" data-openplans="1">ひらく →</button>':'')+'</div>';
     if(data.plans.length){
       var pf = data.plans[0];
       out += '<div class="planrow" data-openplans="1"><div class="pth">'+thumbInner(pf)+'</div>'+
@@ -1036,7 +1076,7 @@ function homeHtml(){
     var svcs = data.notices.filter(function(n){ return n.kind==="service"; }).slice();
     if(data.ace3dUrl) svcs.unshift({ title:"A's 3Dで見る", linkUrl:data.ace3dUrl });
     if(svcs.length){
-      out += '<div class="sechd"><h3>ご利用中のサービス</h3></div><div class="svcs">'+svcs.map(function(s){
+      out += '<div class="sechd" id="sec-svc"><h3>ご利用中のサービス</h3></div><div class="svcs">'+svcs.map(function(s){
         var ic = /ポイント/.test(s.title) ? ICONS.card : (/3D|3d/i.test(s.title) ? ICONS.house : ICONS.link);
         return '<a class="svc" '+(s.linkUrl?'href="'+esc(s.linkUrl)+'" target="_blank" rel="noopener"':'')+'><span class="si">'+ic+'</span>'+esc(s.title)+'</a>';
       }).join("")+'</div>';
@@ -1058,14 +1098,14 @@ function homeHtml(){
             ? '<div style="display:flex; gap:8px; margin-top:10px;"><button class="btn dk" style="flex:1;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div>'
             : '<div style="margin-top:8px;"><button class="btn ol" style="padding:8px 14px; font-size:.8rem;" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
         }
-        return '<div class="rv" style="flex-wrap:wrap;"><div style="flex:1; min-width:0;"><div class="ty">'+nwTag(x.createdAt)+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
+        return '<div class="rv" style="flex-wrap:wrap;"'+(x.id?' id="est-'+esc(x.id)+'"':'')+'><div style="flex:1; min-width:0;"><div class="ty">'+nwTag(x.createdAt)+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
           (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
       }).join("")+'</div>'+estTotalHtml(data.estimates);
     }
 
     // 家づくりリスト（打合せ記録からスタッフが反映した検討事項）
     if(data.considerations && data.considerations.length){
-      out += '<div class="sechd"><h3>家づくりリスト</h3></div><div class="catlist">'+data.considerations.map(function(x){
+      out += '<div class="sechd" id="sec-list"><h3>家づくりリスト</h3></div><div class="catlist">'+data.considerations.map(function(x){
         return '<div class="rv"><div style="flex:1;"><div class="ty">'+esc(x.title)+'</div>'+
           (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+'</div><span class="status">'+esc(x.status)+'</span></div>';
       }).join("")+'</div>';
@@ -1075,7 +1115,7 @@ function homeHtml(){
     var fp = data.familyProfile || {familyMembers:[],appliances:[],bringIns:[]};
     var fpHas = fp.familyMembers.length || fp.appliances.length || fp.bringIns.length;
     var restOut = out; out = "";
-    out += '<div class="sechd"><h3>ご家族・家電・持ち込み品</h3><button class="famedit" data-famopen="1">'+(fpHas?'入力・変更する':'入力する')+'</button></div>';
+    out += '<div class="sechd" id="sec-fam"><h3>ご家族・家電・持ち込み品</h3><button class="famedit" data-famopen="1">'+(fpHas?'入力・変更する':'入力する')+'</button></div>';
     out += '<div class="tm" style="margin:-4px 2px 10px; line-height:1.7;"><b>ご家族・家電・持ち込み品は、必ずご入力ください。</b><br>工事の際に参考にしますので、<b>洗濯機と冷蔵庫のサイズ</b>は、必ずご入力ください。</div>';
     if(fpHas){
       out += '<div class="speclist">'+
@@ -1092,9 +1132,8 @@ function homeHtml(){
     var ntcs = data.notices.filter(function(n){ return n.kind==="notice"; });
     if(ntcs.length) out += '<div class="sechd" id="sec-ntc"><h3>お知らせ・豆知識</h3></div><div class="ntc-grid">'+ntcs.map(noticeHtml).join("")+'</div>';
     var procs = data.notices.filter(function(n){ return n.kind==="process"; });
-    if(procs.length) out += '<div class="sechd"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
-    return mainOut + '<button class="homemorebtn" data-homemore="1">'+(view.homeMore ? '▴ そのほかの情報を閉じる' : '▾ そのほかの情報を見る<span>プランボード・平面図・追加見積り・お知らせなど</span>')+'</button>'+
-      (view.homeMore ? '<div class="homemore">'+out+'</div>' : '');
+    if(procs.length) out += '<div class="sechd" id="sec-proc"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
+    return { main: mainOut, rest: out };
   }
   function noticeHtml(n){
     return '<div class="ntc-wrap">'+(n.tag?'<span class="ntag'+(n.kind==="process"?" proc":"")+'">'+esc(n.tag)+'</span>':'')+
@@ -1441,7 +1480,7 @@ function homeHtml(){
     });
     if(!list.length) return "";
     list.sort(function(a,b){ return (Date.parse(b.x.at)||0) - (Date.parse(a.x.at)||0); });
-    return '<div class="sechd"><h3>📐 最新のプランボード</h3><button class="more" data-go="build">すべて見る →</button></div><div class="pbmini">'+list.map(function(e){
+    return '<div class="sechd" id="sec-pb"><h3>📐 最新のプランボード</h3><button class="more" data-go="build">すべて見る →</button></div><div class="pbmini">'+list.map(function(e){
       var d = new Date(e.x.at);
       return '<button class="pmi" data-buildcat="'+esc(e.c.id)+'"><img loading="lazy" src="'+esc(e.x.file.url)+'" alt=""><span class="nm">'+esc(e.c.name)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+(isNew(e.x.upd)?' <b>NEW</b>':'')+'</span></button>';
     }).join("")+'</div>';
@@ -1484,6 +1523,29 @@ function homeHtml(){
         return '<div class="tli flat">'+noteBody(n, true)+'</div>';
       }).join("")+'</div>'+
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
+  }
+  // 決めていただきたいこと：承認待ちの追加見積り・決定ボタンのカード・打合せ記録の💭を1行ずつ。押すとその場所へ移動
+  function decideListHtml(){
+    var rows = [], LIM = 6;
+    (data.estimates||[]).forEach(function(x){
+      var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
+      if(pendingAmt || !x.id || (x.customerResponse||"未回答")!=="未回答") return;
+      rows.push({ tag:"追加見積り", t:(x.title||"")+"　"+(x.amount||""), sub:"承認・見送りをお選びください", a:'data-jump="est-'+esc(x.id)+'"' });
+    });
+    askItems().forEach(function(e){
+      var t = e.x.title || e.x.decided || e.x.open || (e.x.source && e.x.source.noteSnippet) || (e.x.type==="planboard"?"プランボード":"写真・資料");
+      rows.push({ tag:e.c.name, t:String(t).slice(0,50), sub:"「変更したい」か「これで決定」をお選びください", a:'data-buildcat="'+esc(e.c.id)+'"' });
+    });
+    consItems().forEach(function(c){
+      rows.push({ tag:c.part||c.title||"打合せ", t:c.t, sub:"ご検討ください（"+fmtD(c.date)+"の打合せ）", a:(c.id ? 'data-opennote="'+esc(c.id)+'"' : 'data-opennotes="1"') });
+    });
+    var out = '<div class="sechd"><h3>🙋 決めていただきたいこと</h3>'+(rows.length?'<span class="countpill">'+rows.length+'件</span>':'')+'</div>';
+    if(!rows.length) return out+'<div class="empty">いまはありません。</div>';
+    var show = view.apprAll ? rows : rows.slice(0, LIM);
+    return out+'<div class="dlist">'+show.map(function(r){
+        return '<button class="dl" '+r.a+'><span class="ptag">'+esc(r.tag)+'</span><span class="dt"><b>'+esc(r.t)+'</b><small>'+esc(r.sub)+'</small></span><span class="ug">›</span></button>';
+      }).join("")+
+      (rows.length>LIM ? '<button class="consmore" data-apprall="1">'+(view.apprAll?'閉じる ▴':'ほか '+(rows.length-LIM)+'件を見る ▾')+'</button>' : '')+'</div>';
   }
   // ③ ご検討いただきたいこと：打合せ記録の💭（反映済みの記録から）
   function homeConsHtml(){
@@ -1582,7 +1644,7 @@ function homeHtml(){
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.talk?'<div class="box"><div class="bl">打合せの内容</div>'+esc(n.talk).replace(/\n/g,"<br>")+'</div>':'')+
       (n.decided?'<div class="box dec"><div class="bl">打合せで決まったこと</div>'+esc(n.decided)+'</div>':'')+
-      (n.open?'<div class="box opn"><div class="bl">ご検討いただきたいこと</div>'+esc(n.open)+'</div>':'')+
+      (n.open?'<div class="box opn"><div class="bl">ご検討いただきたいこと</div>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:''))):'')+
       (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
   }
@@ -1944,8 +2006,8 @@ function homeHtml(){
     var cns = e.target.closest("[data-cons]"); if(cns){ consOpen(cns.dataset.cons, cns.dataset.ctext, cns.dataset.cctx); return; }
     var pt = e.target.closest("[data-progtoggle]"); if(pt){ view.progOpen = !view.progOpen; render(); return; }
     var fa = e.target.closest("[data-feedall]"); if(fa){ view.feedAll = true; render(); return; }
-    var hm = e.target.closest("[data-homemore]"); if(hm){ view.homeMore = !view.homeMore; render(); return; }
-    var uj = e.target.closest("[data-updjump]"); if(uj){ if(!view.homeMore){ view.homeMore = true; render(); } var el = document.getElementById(uj.dataset.updjump); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
+    var jp = e.target.closest("[data-jump]"); if(jp){ jumpTo(jp.dataset.jump); return; }
+    var uj = e.target.closest("[data-updjump]"); if(uj){ jumpTo(uj.dataset.updjump); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; view.scPhotos=false; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
     if(e.target.closest("#nmSave")){ nmSave(false); return; }
@@ -2038,6 +2100,33 @@ function homeHtml(){
       closeSheet("chgModal"); render(); toast("スタッフに送りました");
     }catch(e){ toast("送れませんでした。もう一度お試しください"); }
     btn.disabled = false;
+  });
+  // ≡メニュー：ホームに出さない欄（わが家の情報）と、決める順番・メモ・使い方
+  function menuRows(){
+    var r = [];
+    var info = homeParts().rest;
+    function has(id){ return info.indexOf('id="'+id+'"')>=0; }
+    [["sec-pb","📐","最新のプランボード"],["sec-nextmeet","📝","打合せの予定"],["sec-chk","✅","決めることの一覧"],["sec-plan","📐","わが家の平面図"],
+     ["sec-est","🧾","追加見積り"],["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電・持ち込み品"],["sec-svc","🔗","ご利用中のサービス"],
+     ["sec-ntc","📢","お知らせ・豆知識"],["sec-proc","📘","契約後に知っておきたいこと"]].forEach(function(m){
+      // ご家族（未入力）はホームに出ているので、ホームへ移動する
+      if(has(m[0]) || m[0]==="sec-fam") r.push('<button class="mi" data-menujump="'+m[0]+'"><span class="mic">'+m[1]+'</span>'+m[2]+'<span class="ug">›</span></button>');
+    });
+    var tools = '<button class="mi" data-menusheet="orderModal"><span class="mic">📋</span>決める順番<span class="ug">›</span></button>'+
+      '<button class="mi" data-menusheet="memoModal"><span class="mic">✏️</span>わたしのメモ<span class="ug">›</span></button>'+
+      '<button class="mi" data-menusheet="help"><span class="mic">❔</span>使い方<span class="ug">›</span></button>';
+    return (r.length ? '<div class="mh">わが家の情報</div>'+r.join("") : '')+'<div class="mh">そのほか</div>'+tools;
+  }
+  document.getElementById("btnMenu").addEventListener("click", function(){
+    if(!data) return;
+    document.getElementById("menuList").innerHTML = menuRows();
+    openSheet("menuModal");
+  });
+  document.getElementById("menuX").addEventListener("click", function(){ closeSheet("menuModal"); });
+  document.getElementById("menuModal").addEventListener("click", function(e){
+    if(e.target.id==="menuModal"){ closeSheet("menuModal"); return; }
+    var mj = e.target.closest("[data-menujump]"); if(mj){ closeSheet("menuModal"); view.tab = homeParts().rest.indexOf('id="'+mj.dataset.menujump+'"')>=0 ? "info" : "home"; view.cat=null; view.infoJump = mj.dataset.menujump; render(); window.scrollTo(0,0); return; }
+    var ms = e.target.closest("[data-menusheet]"); if(ms){ closeSheet("menuModal"); openSheet(ms.dataset.menusheet); }
   });
   [["btnHelp","help","helpX"],["btnOrder","orderModal","orderX"],["btnMemo","memoModal","memoX"]].forEach(function(t){
     var openBtn = t[0], sheetId = t[1], closeBtn = t[2];
