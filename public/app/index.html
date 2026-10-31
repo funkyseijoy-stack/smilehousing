@@ -596,6 +596,8 @@
   .kancard.exp .kc-proj{ white-space:normal; }
   @keyframes kcflash{ 0%,100%{ box-shadow:0 0 0 0 transparent; } 30%{ box-shadow:0 0 0 5px var(--orange); } }
   .kancard.kc-flash{ animation:kcflash 1s ease-in-out 3; }
+  .okai-flash{ animation:kcflash 1s ease-in-out 3; }
+  .nsentbadge[data-goest]{ cursor:pointer; text-decoration:underline; }
   .kancard .kc-meta{ display:flex; flex-wrap:wrap; gap:4px; margin-block-end:6px; font-size:.85rem; color:var(--muted); }
   .kancard .kc-meta span{ background:var(--surface-2); border-radius:999px; padding:1px 7px; }
   .kancard .kc-meta span.due-soon{ background:var(--orange-soft); color:var(--orange); font-weight:700; }
@@ -6361,6 +6363,7 @@
         noteSendButtonHtml(n, sent, "estimate")+
         '</div>';
       var sentBadgeHtml = NOTE_SEND_TYPES.filter(function(t){ return sent[t.type]; }).map(function(t){
+        if(t.type==="estimate") return '<span class="nsentbadge" data-goest="'+escapeHtml(n.projectId+"|"+((sent.estimate&&sent.estimate.ref)||""))+'" title="押すと追加見積りの欄へ移動します">✓ '+t.badge+' ›</span>';
         return '<span class="nsentbadge">✓ '+t.badge+'</span>';
       }).join("");
       return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
@@ -8183,7 +8186,8 @@
     list.innerHTML = items.map(function(it){
       var hasAmount = !!String(it.amount||"").trim();
       var estState = okaiEstimateState(it);
-      return '<div class="card" style="padding:8px 10px;">'+
+      var fl = okaiFlash && okaiFlash.id===it.id && Date.now() < okaiFlash.until;
+      return '<div class="card'+(fl?' okai-flash':'')+'" style="padding:8px 10px;">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
         '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '')+'　<span class="pill '+(estState==="承認済み"?"estimate-承認":(estState==="見送り"?"estimate-見送り":"tag"))+'">'+escapeOkai(estState)+'</span></div>'+
         '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
@@ -9303,11 +9307,19 @@
       else if((note.files||[]).length) content = "添付資料（打合せ記録より）";
     }
     if(!content){ toast("記録に何も入っていないため作成できません（タイトル・内容・添付のどれかを入れてください）"); return; }
-    if(noteSentInfo(note)[taskType]){ toast("すでに登録済みです"); return; }
+    if(noteSentInfo(note)[taskType]){
+      if(taskType==="estimate"){ goToOkaiEstimates(proj.id, (noteSentInfo(note).estimate||{}).ref||""); return; }
+      toast("すでに登録済みです"); return;
+    }
 
     if(taskType === "estimate"){
-      var firstLine = content.split("\n")[0].trim();
-      var estTitle = (note.title||"").trim() || (firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine);
+      // 件名は「記録の題名（部位名のことが多い）：中身の1行目」。以前は題名だけになり「脱衣室」など部屋名しか出なかった
+      var estBody = [note.content, note.open, note.decided, note.talk, note.message].map(function(x){ return String(x||"").trim(); }).filter(Boolean).join("\n") || content;
+      var firstLine = estBody.split("\n")[0].trim();
+      var nTitle = (note.title||"").trim();
+      var head = (nTitle && nTitle !== firstLine) ? nTitle+"：" : "";
+      var estTitle = head + (firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine);
+      content = estBody;
       var estId = uid("est");
       var estCustomer;
       try{
@@ -9320,7 +9332,8 @@
       renderOkaiEstimates(estCustomer);
       markNoteSent(note, "estimate", estId);
       logActivity("打合せ記録から追加見積もり「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
-      toast("✅ 追加見積もりに追加しました（お客様には「金額確認中」と表示されます）");
+      toast("✅ 追加見積もりに追加しました。金額を入れる欄へ移動します（空欄のままだとお客様には「金額確認中」と表示）");
+      goToOkaiEstimates(proj.id, estId);
       return;
     }
 
@@ -11726,13 +11739,35 @@
     });
   }
   // ---- タスクからGmail下書き ----
+  // 案件の「おうちノート連携」タブの「追加見積り」へ移動し、その項目（estId）を光らせて金額欄に合わせる
+  var okaiFlash = null; // 移動してきた追加見積りの項目（描き直しても光らせる）
+  function goToOkaiEstimates(pid, estId){
+    if(!pid) return;
+    okaiFlash = estId ? { id: estId, until: Date.now() + 4000 } : null;
+    var onDetail = !document.getElementById("projectDetailView").hidden && document.querySelector('.tab-btn.active[data-tab="projects"]');
+    if(state.currentProjectId !== pid || !onDetail){ switchTab("projects"); openProjectDetail(pid); }
+    var b = document.querySelector('.sub-btn[data-sub="okainote"]'); if(b) b.click();
+    var tries = 0;
+    (function look(){
+      if(state.currentProjectId !== pid) return;
+      var del = estId ? document.querySelector('[data-okai-del-estimate="'+(window.CSS&&CSS.escape?CSS.escape(estId):estId)+'"]') : null;
+      var card = del ? del.closest(".card") : null;
+      var target = card || (tries > 25 ? document.getElementById("okaiEstimateList") : null);
+      if(!target){ if(tries++ < 40) setTimeout(look, 200); return; }
+      target.scrollIntoView({behavior:"smooth", block:"center"});
+      if(card){
+        card.classList.add("okai-flash");
+        var inp = card.querySelector(".okai-est-amount-input"); if(inp && !inp.value) setTimeout(function(){ try{ inp.focus({preventScroll:true}); }catch(e){} }, 600);
+      }
+    })();
+  }
   // タスク → お客様のおうちノートの「追加見積り」へ（金額なし＝お客様には「金額確認中」と表示。金額は「おうちノート」タブで入力）
   function taskToEstimate(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t) return;
     var proj = projectById(t.projectId);
     if(!proj){ toast("案件が見つかりません"); return; }
-    if(t.estimateRef){ toast("すでに追加見積りに載せています（「おうちノート」タブで金額を入力できます）"); return; }
+    if(t.estimateRef){ goToOkaiEstimates(proj.id, t.estimateRef.id||""); return; }
     var content = String(t.content||"").trim();
     if(!content){ toast("内容が空のため載せられません"); return; }
     var firstLine = content.split("\n")[0].trim();
@@ -11755,7 +11790,8 @@
       saveDoc("tasks", t.id, t);
       if(state.currentProjectId===pid) renderOkaiEstimates(cust);
       logActivity("タスクから追加見積り「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
-      toast("✅ 追加見積りに載せました。\n金額は、この案件の「おうちノート連携」タブ →「追加見積り」の「金額を入力」欄から入れます。\n空欄のままだと、お客様には「金額確認中」と表示されます。", 12000);
+      toast("✅ 追加見積りに載せました。金額を入れる欄へ移動します（空欄のままだとお客様には「金額確認中」と表示）", 8000);
+      goToOkaiEstimates(pid, estId);
     });
   }
   async function taskGmailDraft(id){
@@ -14375,6 +14411,11 @@
     });
     mnRender();
     // 記録の部位カードの「見積依頼 n件 ›」「タスク n件 ›」：その案件のタブへ移る
+    document.addEventListener("click", function(e){
+      var ge = e.target.closest("[data-goest]"); if(!ge) return;
+      var parts = String(ge.dataset.goest||"").split("|");
+      goToOkaiEstimates(parts[0], parts[1]||"");
+    });
     document.addEventListener("click", function(e){
       var g = e.target.closest("[data-gosub]"); if(!g) return;
       var b = document.querySelector('.sub-btn[data-sub="'+g.dataset.gosub+'"]'); if(b){ b.click(); window.scrollTo({top:0, behavior:"smooth"}); }
