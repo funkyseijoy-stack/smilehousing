@@ -343,6 +343,8 @@
   .decsum .dsd{ font-size:.85rem; color:var(--muted); }
   .noteitem .nbox.open{ background:var(--orange-soft); }
   .noteitem .nbox.open .nboxlabel{ color:var(--orange); }
+  .noteitem .nbox.markhl{ box-shadow:0 0 0 2px var(--orange) inset; }
+  .noteitem .nbox.decided.markhl{ box-shadow:0 0 0 2px var(--accent) inset; }
   .noteitem .nbtnrow{ display:flex; gap:6px; flex-wrap:wrap; padding-block-start:8px; }
   .noteitem .nbtnrow + .nbtnrow{ margin-block-start:6px; border-block-start:1px dashed var(--border); padding-block-start:8px; }
   .noteitem .nbtnrow:first-of-type{ border-block-start:1px dashed var(--border); padding-block-start:8px; margin-block-start:4px; }
@@ -5103,7 +5105,7 @@
     state.currentProjectId = id;
     state.editingProject = false;
     state.noteSpecFilter = null;
-    state.recFilter = {big:"", sub:""};
+    state.recFilter = {big:"", sub:""}; state.recMark = "";
     document.getElementById("projectListView").hidden = true;
     document.getElementById("projectDetailView").hidden = false;
     renderProjectDetail();
@@ -6128,6 +6130,13 @@
     }
     return null;
   }
+  // 記録の行の印（✅決定したこと／💭お客様に検討いただくこと）で絞る。"" = すべて
+  function noteMarkText(n, mark){
+    if(mark==="open") return String(n.open||"").trim();
+    if(mark==="decided") return String(n.decided!=null ? n.decided : (n.content||"")).trim();
+    return "";
+  }
+  function noteHasMark(n, mark){ return !mark || !!noteMarkText(n, mark); }
   function renderNoteSpecFilterBar(){
     var bar = document.getElementById("noteSpecFilterBar");
     if(!bar) return;
@@ -6153,7 +6162,13 @@
       html += '<button type="button" class="btn secondary small" data-customrename="'+escapeHtml(f.big.slice(3))+'">部位の名前を変える</button>'+
         '<button type="button" class="btn secondary small" data-customdel="'+escapeHtml(f.big.slice(3))+'">この部位を削除</button>';
     }
-    if(f.big) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
+    var mk = state.recMark || "";
+    var pnotes = liveNotes().filter(function(n){ return n.projectId===state.currentProjectId && recMatch(n.specPart, f); });
+    var mcount = function(m){ return pnotes.filter(function(n){ return noteHasMark(n, m); }).length; };
+    html += '<label class="field recsel">検討・決定<select data-recmark>'+opt("", "すべて", !mk)+
+      opt("open", "💭 検討いただくこと（"+mcount("open")+"件）", mk==="open")+
+      opt("decided", "✅ 決定したこと（"+mcount("decided")+"件）", mk==="decided")+'</select></label>';
+    if(f.big || mk) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
     bar.innerHTML = html;
   }
   function setRecFilter(big, sub){
@@ -6418,6 +6433,7 @@
     var filter = state.recFilter || {big:"", sub:""};
     var rows = liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; })
       .filter(function(n){ return recMatch(n.specPart, filter); })
+      .filter(function(n){ return noteHasMark(n, state.recMark||""); })
       .slice()
       .sort(function(a,b){
         // 絞り込みの有無に関わらず、常に最新が上に来るようにする。
@@ -6439,7 +6455,7 @@
       var open = n.open!=null ? n.open : "";
       var talkHtml = n.talk ? '<div class="nbox talk"><div class="nboxlabel">打合せ内容（'+(n.talkPublic?'お客様にも表示':'社内メモ・お客様には出ません')+'）</div><div class="ntext">'+escapeHtml(n.talk)+'</div></div>' : "";
       var msgHtml = n.message ? '<div class="nbox msg"><div class="nboxlabel">お客様へのメッセージ</div><div class="ntext">'+escapeHtml(n.message)+'</div></div>' : "";
-      var openHtml = open ? '<div class="nbox open"><div class="nboxlabel">💭 お客様に検討いただくこと</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
+      var openHtml = open ? '<div class="nbox open'+(state.recMark==="open"?" markhl":"")+'"><div class="nboxlabel">💭 お客様に検討いただくこと</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
       var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
@@ -6475,7 +6491,7 @@
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
         talkHtml+
-        (decided ? '<div class="nbox decided"><div class="nboxlabel">決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
+        (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
         msgHtml+
         filesHtml+
@@ -6492,12 +6508,12 @@
       return { t:"n", n:n, key: day+"T"+(localKey(n.noteAt||n.createdAt).slice(11)||"00:00:00") };
     });
     liveSpecPhotos().forEach(function(p){
-      if(p.projectId!==pid || p.kind==="note") return;
+      if(p.projectId!==pid || p.kind==="note" || state.recMark) return;
       if(!recMatch({scope:p.scope, category:p.category, roomId:p.roomId, side:p.side}, filter)) return;
       items.push({ t:"s", p:p, key: localKey(p.createdAt) });
     });
     liveAttachments().forEach(function(a){
-      if(a.projectId!==pid || !isTimelineQuote(a) || !a.specPart) return;
+      if(a.projectId!==pid || !isTimelineQuote(a) || !a.specPart || state.recMark) return;
       if(!recMatch(a.specPart, filter)) return;
       var k = a.receivedAt || a.createdAt || a.uploadedAt || "";
       items.push({ t:"a", a:a, key: /^\d{4}-\d{2}-\d{2}$/.test(k) ? k+"T00:00:00" : localKey(k) });
@@ -15608,6 +15624,8 @@
           if(big.value==="__addpart"){ renderNoteSpecFilterBar(); addCustomPart(); return; }
           setRecFilter(big.value, ""); return;
         }
+        var mkSel = e.target.closest("[data-recmark]");
+        if(mkSel){ state.recMark = mkSel.value || ""; renderMeetingNotes(); return; }
         var sub = e.target.closest("[data-recsub]");
         if(sub){
           if(sub.value==="__addroom"){ recAddRoom(); return; }
@@ -15615,7 +15633,7 @@
         }
       });
       noteSpecFilterBarEl.addEventListener("click", function(e){
-        if(e.target.closest("[data-recclear]")){ setRecFilter("", ""); return; }
+        if(e.target.closest("[data-recclear]")){ state.recMark = ""; setRecFilter("", ""); return; }
         var rr = e.target.closest("[data-recroomrename]"); if(rr){ recRenameRoom(rr.dataset.recroomrename); return; }
         var rd = e.target.closest("[data-recroomdel]"); if(rd){ recDeleteRoom(rd.dataset.recroomdel); return; }
         var cr = e.target.closest("[data-customrename]"); if(cr){ renameCustomPart(cr.dataset.customrename); return; }
