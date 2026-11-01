@@ -498,6 +498,16 @@
   .mnline .mntext{ flex:1; min-width:0; word-break:break-word; }
   .mnline.m-d{ background:var(--accent-soft); border-color:var(--accent); }
   .mnline.m-o{ background:var(--gold-soft); border-color:var(--gold); }
+  .mnline.m-c{ background:#eef0f7; border-color:#6b74a8; }
+  .noteitem .nbox.chk{ background:#eef0f7; }
+  .noteitem .nbox.chk .nboxlabel{ color:#4a5290; }
+  .noteitem .nbox.chk.markhl{ box-shadow:0 0 0 2px #6b74a8 inset; }
+  .chkline{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:5px 0; border-top:1px dashed var(--border); }
+  .chkline:first-of-type{ border-top:none; }
+  .chkline .chkt{ flex:1 1 220px; min-width:0; white-space:pre-wrap; word-break:break-word; }
+  .chkline.done .chkt{ color:var(--muted); text-decoration:line-through; }
+  .chkline .chkst{ font-size:.85rem; font-weight:700; border-radius:999px; padding:2px 10px; background:#fbe9d6; color:#a8581c; }
+  .chkline.done .chkst{ background:var(--accent-soft); color:var(--accent-ink); }
   details.mnmore{ margin-block:6px; border:1px solid var(--border); border-radius:10px; padding:6px 10px; background:var(--surface-2); }
   details.mnmore > summary{ cursor:pointer; font-size:.85rem; font-weight:700; color:var(--muted); padding:4px 0; }
   details.mnmore[open] > summary{ margin-block-end:6px; }
@@ -1636,11 +1646,11 @@
             <div class="field mnfield">
               <span>打合せ内容（LINEで来た内容もここに。1行に1つずつ）</span>
               <textarea id="mnBody" rows="5" placeholder="例）キッチンはリシェルSI、色はホワイトに決定&#10;食洗機の有無は次回までにご検討いただく&#10;吊戸棚の高さは現場で確認"></textarea>
-              <div class="mnhint">書いたら下の行を押して印を付けます：<b>✅ 決定したこと</b> → <b>💭 お客様に検討いただくこと</b> → 印なし</div>
+              <div class="mnhint">書いたら下の行を押して印を付けます：<b>✅ 決定したこと</b> → <b>💭 お客様に検討いただくこと</b> → <b>🔒 社内で確認</b>（お客様には出ません） → 印なし</div>
               <div id="mnLines" class="mnlines"></div>
             </div>
             <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 印のない行（打合せの内容）もお客様に見せる（✅・💭の行は「反映する」とお客様に出ます）</label>
-            <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea>
+            <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea><textarea id="meetingNoteInternal" hidden></textarea>
             <div id="meetingNoteExistingFiles" hidden></div>
             <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
             <div class="row" style="gap:8px; flex-wrap:wrap; margin-block:-2px 6px;"><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 この案件の図面から選ぶ</button></div>
@@ -6189,7 +6199,60 @@
     if(mark==="decided") return String(n.decided!=null ? n.decided : (n.content||"")).trim();
     return "";
   }
-  function noteHasMark(n, mark){ return !mark || !!noteMarkText(n, mark); }
+  function noteHasMark(n, mark){
+    if(!mark) return true;
+    if(mark==="check") return noteCheckItems(n).length>0;
+    if(mark==="checkopen") return noteCheckItems(n).some(function(x){ return !x.done; });
+    return !!noteMarkText(n, mark);
+  }
+  // 🔒 社内で確認の行（noteLines の m="c"）。確認済みは note.checkDone[行の文]、
+  // 行から作った社内タスク（note.lineActs の type:"task"）が完了なら確認済み扱い。お客様には出さない。
+  function noteCheckItems(n){
+    var done = n.checkDone || {};
+    return (n.noteLines||[]).filter(function(l){ return l && l.m==="c" && String(l.t||"").trim(); }).map(function(l){
+      var t = String(l.t).trim();
+      var act = (n.lineActs||[]).filter(function(a){ return a.type==="task" && a.t===t && a.ref; }).slice(-1)[0];
+      var task = act ? state.tasks.find(function(x){ return x.id===act.ref && !x.deletedAt; }) : null;
+      var d = done[t] || null;
+      var taskDone = !!(task && task.status==="完了");
+      return { t:t, mark:d, task:task, done: !!d || taskDone, taskDone:taskDone };
+    });
+  }
+  function noteCheckHtml(n){
+    var items = noteCheckItems(n);
+    if(!items.length) return "";
+    var hl = (state.recMark==="check"||state.recMark==="checkopen") ? " markhl" : "";
+    return '<div class="nbox chk'+hl+'"><div class="nboxlabel">🔒 社内で確認（お客様には出ません）</div>'+items.map(function(x, i){
+      var st = x.mark ? "✓ 確認済み（"+escapeHtml(x.mark.by||"")+" "+escapeHtml(fmtTs(x.mark.at))+"）" : x.taskDone ? "✓ 確認済み（タスク完了）" : "未確認";
+      var taskBtn = x.task ? '<button class="btn ghost small" data-act="chkgotask" data-id="'+n.id+'" data-i="'+i+'">📋 タスク：'+escapeHtml(x.task.assignee||"担当未設定")+'・'+escapeHtml(x.task.status||"")+' ›</button>'
+        : '<button class="btn secondary small" data-act="chktask" data-id="'+n.id+'" data-i="'+i+'">→ 社内タスクへ</button>';
+      return '<div class="chkline'+(x.done?" done":"")+'"><span class="chkt">'+escapeHtml(x.t)+'</span><span class="chkst">'+st+'</span>'+
+        (x.mark ? '<button class="btn ghost small" data-act="chkdone" data-id="'+n.id+'" data-i="'+i+'">未確認に戻す</button>'
+          : x.taskDone ? '' : '<button class="btn small" data-act="chkdone" data-id="'+n.id+'" data-i="'+i+'">✓ 確認済みにする</button>')+
+        taskBtn+'</div>';
+    }).join("")+'</div>';
+  }
+  async function toggleNoteCheck(noteId, i){
+    var n = state.meetingNotes.find(function(x){ return x.id===noteId; }); if(!n) return;
+    var it = noteCheckItems(n)[i]; if(!it) return;
+    var before = Object.assign({}, n.checkDone||{});
+    n.checkDone = Object.assign({}, before);
+    if(n.checkDone[it.t]) delete n.checkDone[it.t];
+    else n.checkDone[it.t] = { by: state.currentUser||"", at: nowIso() };
+    renderMeetingNotes();
+    var ok = await saveDoc("meetingNotes", n.id, n);
+    if(ok===false){ n.checkDone = before; renderMeetingNotes(); toast("保存できませんでした"); return; }
+    toast(n.checkDone[it.t] ? "確認済みにしました" : "未確認に戻しました");
+  }
+  function noteCheckToTask(noteId, i){
+    var n = state.meetingNotes.find(function(x){ return x.id===noteId; }); if(!n) return;
+    var it = noteCheckItems(n)[i]; if(!it) return;
+    if(it.task){ goToTaskBoard(it.task.id); return; }
+    askAssignee(function(who){
+      if(who===null) return;
+      runNoteLineActs(n, [{ type:"task", text:it.t, assignee:who }]);
+    });
+  }
   function renderNoteSpecFilterBar(){
     var bar = document.getElementById("noteSpecFilterBar");
     if(!bar) return;
@@ -6220,7 +6283,9 @@
     var mcount = function(m){ return pnotes.filter(function(n){ return noteHasMark(n, m); }).length; };
     html += '<label class="field recsel">検討・決定<select data-recmark>'+opt("", "すべて", !mk)+
       opt("open", "💭 検討いただくこと（"+mcount("open")+"件）", mk==="open")+
-      opt("decided", "✅ 決定したこと（"+mcount("decided")+"件）", mk==="decided")+'</select></label>';
+      opt("decided", "✅ 決定したこと（"+mcount("decided")+"件）", mk==="decided")+
+      opt("checkopen", "🔒 社内で確認・未確認（"+mcount("checkopen")+"件）", mk==="checkopen")+
+      opt("check", "🔒 社内で確認・すべて（"+mcount("check")+"件）", mk==="check")+'</select></label>';
     if(f.big || mk) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
     bar.innerHTML = html;
   }
@@ -6506,7 +6571,7 @@
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         '<span class="pill tag small">打合せ記録の一部</span>'+(n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small" data-act="editnote" data-id="'+n.id+'" title="記録全体を開いて行の部位を直す">✏️ 記録を開く</button></div>'+
-        grp("", "打合せ内容", "talk")+grp("d", "✅ 決定事項", "decided")+grp("o", "💭 お客様に検討いただくこと", "open")+
+        grp("", "打合せ内容", "talk")+grp("d", "✅ 決定事項", "decided")+grp("o", "💭 お客様に検討いただくこと", "open")+grp("c", "🔒 社内で確認（お客様には出ません）", "chk")+
         '</div>';
     };
     var cardOf = function(n){
@@ -6563,6 +6628,7 @@
         talkHtml+
         (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
+        noteCheckHtml(n)+
         msgHtml+
         filesHtml+
         menuHtml+
@@ -12481,7 +12547,7 @@
     box.innerHTML = lines.map(function(t, i){
       var m = mnMarks[t] || "";
       var acts = mnLineActs[t] || [];
-      return '<div class="mnlrow"><div class="mnlmain"><button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>'+
+      return '<div class="mnlrow"><div class="mnlmain"><button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":m==="c"?"🔒":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>'+
         '<button type="button" class="mnlpart'+(mnLineParts[t]?" on":"")+'" data-mnlpart="'+i+'" title="この行の部位">'+(mnLineParts[t] ? escapeHtml(partText(mnLineParts[t])) : "📍 部位")+'</button>'+
         '<button type="button" class="mnlact" data-mnlact="'+i+'" title="この行から作る" aria-label="この行から作る">⋯</button></div>'+
         (acts.length ? '<div class="mnlacts">'+acts.map(function(a, k){
@@ -12494,8 +12560,10 @@
     mnSync();
   }
   function mnSync(){
-    var lines = mnLines(), d = [], o = [], t = [];
-    lines.forEach(function(x){ var m = mnMarks[x]; if(m==="d") d.push(x); else if(m==="o") o.push(x); else t.push(x); });
+    var lines = mnLines(), d = [], o = [], t = [], c = [];
+    // 🔒 社内で確認（m="c"）の行は talk に入れない＝お客様には出ない
+    lines.forEach(function(x){ var m = mnMarks[x]; if(m==="d") d.push(x); else if(m==="o") o.push(x); else if(m==="c") c.push(x); else t.push(x); });
+    document.getElementById("meetingNoteInternal").value = c.join("\n");
     document.getElementById("meetingNoteTalk").value = t.join("\n");
     document.getElementById("meetingNoteDecided").value = d.join("\n");
     document.getElementById("meetingNoteOpen").value = o.join("\n");
@@ -12528,6 +12596,7 @@
     var decided = (decidedInput && decidedInput.value || "").trim();
     var open = (openInput && openInput.value || "").trim();
     var talk = (document.getElementById("meetingNoteTalk").value || "").trim();
+    var internal = (document.getElementById("meetingNoteInternal").value || "").trim();
     var message = (document.getElementById("meetingNoteMessage").value || "").trim();
     var channel = document.getElementById("meetingNoteChannel").value || "打合せ";
     var talkPublic = !!document.getElementById("meetingNoteTalkShow").checked;
@@ -12538,7 +12607,7 @@
       var ex0 = state.meetingNotes.find(function(x){ return x.id===editingMeetingNoteId; });
       editingHasFiles = !!(ex0 && ex0.files && ex0.files.length) && editNoteFiles.some(function(e){ return !e.removed; });
     }
-    if(!decided && !open && !talk && !message && !hasFilePicked && !editingHasFiles){ toast("打合せ内容・決定事項・未決事項などを入力するか、資料を添付してください"); return; }
+    if(!decided && !open && !talk && !internal && !message && !hasFilePicked && !editingHasFiles){ toast("打合せ内容・決定事項・未決事項などを入力するか、資料を添付してください"); return; }
     if(!state.currentProjectId){ toast("案件を選択してください"); return; }
     var dateInput = document.getElementById("meetingNoteDate");
     var noteDate = (dateInput && dateInput.value) ? dateInput.value : todayStr();
@@ -12598,6 +12667,7 @@
       existing.open = open;
       existing.talk = talk;
       existing.talkPublic = talkPublic;
+      existing.internal = internal;
       existing.noteLines = mnNoteLines();
       if(!existing.specPart && mnHasLineParts()) existing.specPart = recLeafPart("general", "", projectById(existing.projectId));
       existing.channel = channel;
@@ -12637,7 +12707,7 @@
     }
 
     if(exFail) toast("書き込んだ図面のうち "+exFail+" 件を保存できませんでした");
-    var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, noteLines:mnNoteLines(), channel:channel, message:message,
+    var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, internal:internal, noteLines:mnNoteLines(), channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || (mnHasLineParts() ? recLeafPart("general", "", projectById(pidNote)) : null), badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
@@ -14945,7 +15015,7 @@
       var b = e.target.closest("[data-mnline]"); if(!b) return;
       var t = mnLines()[parseInt(b.dataset.mnline,10)]; if(!t) return;
       var cur = mnMarks[t] || "";
-      var next = cur==="" ? "d" : cur==="d" ? "o" : "";
+      var next = cur==="" ? "d" : cur==="d" ? "o" : cur==="o" ? "c" : "";
       if(next) mnMarks[t] = next; else delete mnMarks[t];
       mnRender();
     });
@@ -15911,6 +15981,8 @@
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
       else if(act==="togglenoteask"){ toggleMeetingAskDecision(id); }
+      else if(act==="chkdone"){ toggleNoteCheck(id, +btn.dataset.i); }
+      else if(act==="chktask" || act==="chkgotask"){ noteCheckToTask(id, +btn.dataset.i); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
       else if(act==="notebundle"){ createBundleFromNote(id); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
