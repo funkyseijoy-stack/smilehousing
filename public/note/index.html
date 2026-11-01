@@ -1576,10 +1576,40 @@ function homeHtml(){ return homeParts().main; }
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
     var list = notes.filter(function(n){ return String(n.date||"")===last; });
+    // 同じ日の部位ごとの記録で「決定ボタン」を出しているものは、ホームにも並べて決定できるようにする
+    (data.notes||[]).forEach(function(n){
+      if(String(n.date||"")!==last || list.indexOf(n)>=0) return;
+      var f = noteDecItem(n); if(f && f.x.showDecide) list.push(n);
+    });
     return hd+'<span class="countpill">'+fmtD(last)+'</span></div><div class="catlist">'+list.map(function(n){
-        return '<div class="tli flat">'+noteBody(n, true, true)+'</div>';
+        var f = noteDecItem(n);
+        var isGen = n.scope==="general" || !n.scope;
+        var link = (!isGen && f) ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
+        return '<div class="tli flat">'+noteBody(n, true, true)+homeDecHtml(n, f)+link+'</div>';
       }).join("")+'</div>'+
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
+  }
+  // 打合せ記録が入っている項目と、その項目の中のカード（決定ボタンの状態）を探す
+  function noteDecItem(n){
+    var key = "n:"+n.id, hit = null;
+    (data.categories||[]).some(function(c){
+      var inRoom = (c.rooms||[]).some(function(r){ return (r.items||[]).some(function(x){ if(x.key===key && !x.partial){ hit = {c:c, x:x, room:r.id||x.roomId||""}; return true; } return false; }); });
+      if(inRoom) return true;
+      return catAllItems(c).some(function(x){ if(x.key===key && !x.partial){ hit = {c:c, x:x, room:""}; return true; } return false; });
+    });
+    return hit;
+  }
+  // ホームの記録カードにも「✏️ 変更したい／✅ これで決定」（家づくりの項目の中と同じボタン・同じ保存先）
+  function homeDecHtml(n, f){
+    if(!f || !f.x.showDecide) return "";
+    var status = f.x.cardStatus || "検討中", key = f.x.key;
+    var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(f.room)+'" data-clabel="'+esc(String(n.title||n.decided||n.open||"").slice(0,40))+'" data-ccat="'+esc(f.room ? "rooms" : f.c.id)+'"';
+    var done = status==="決定";
+    var nowTxt = (status==="決定"||status==="仮決定") ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>' : '<span class="cwait">まだお返事をいただいていません</span>';
+    return '<div class="cdec"><div class="cnow">このカードの状態：'+nowTxt+(chgSent[key]?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
+      '<div class="btns"><button class="btn ol" data-chg="'+esc(chgLabelOf(f.c, f.x))+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
+      (done ? '<button class="btn dk" disabled>✅ 決定しました</button>' : '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ これで決定</button>')+'</div>'+
+      ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
   }
   // 決めていただきたいこと：承認待ちの追加見積り・決定ボタンのカード・打合せ記録の💭を1行ずつ。押すとその場所へ移動
   function decideListHtml(){
