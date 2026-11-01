@@ -670,6 +670,7 @@
     plug:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>',
     light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>',
     room:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M4 21h16M14.5 12h.01"/></svg>',
+    storage:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M4 9h16M4 15h16M11 6h2M11 12h2M11 18h2"/></svg>',
     sofa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 11V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/><path d="M4 11a2 2 0 0 1 2 2v1h12v-1a2 2 0 1 1 2 2v3H4v-3a2 2 0 0 1 0-4zM6 18v2M18 18v2"/></svg>',
     card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M6 15h5"/><path d="m16.5 13 .8 1.6 1.7.2-1.3 1.2.4 1.7-1.6-.9-1.6.9.4-1.7-1.3-1.2 1.7-.2z"/></svg>',
     link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg>'
@@ -1874,10 +1875,10 @@ function homeHtml(){ return homeParts().main; }
       // インテリア＝メイン（家全体）＋部屋別。それぞれ中身がある分だけ見出しつきで並べる
       var rms = c.rooms || [];
       var mainHtml = (c.items||[]).length ? itemsSectionsHtml(c, c.items, c.id) : "";
-      if(mainHtml) out += '<div class="roomhd" style="margin-top:14px;"><div class="rn">メインインテリア</div>'+(c.mainStatus && c.mainStatus!=="準備中" ? '<span class="status s-'+esc(c.mainStatus)+'">'+esc(c.mainStatus)+'</span>' : '')+'</div>'+mainHtml;
+      if(mainHtml) out += '<div class="roomhd" style="margin-top:14px;"><div class="rn">家全体（基本色）</div>'+(c.mainStatus && c.mainStatus!=="準備中" ? '<span class="status s-'+esc(c.mainStatus)+'">'+esc(c.mainStatus)+'</span>' : '')+'</div>'+mainHtml;
       var misc = c.roomMisc || [];
       if(rms.length || misc.length){
-        out += '<div class="sechd" style="margin-top:22px;"><h3>部屋別インテリア</h3>'+(rms.length ? '<span class="countpill">'+rms.length+'部屋</span>' : '')+'</div>';
+        out += '<div class="sechd" style="margin-top:22px;"><h3>お部屋ごと</h3>'+(rms.length ? '<span class="countpill">'+rms.length+'部屋</span>' : '')+'</div>';
         if(misc.length) out += '<div class="roomhd"><div class="rn">部屋別（まとめ）</div></div>'+itemsSectionsHtml(c, misc, c.id);
         out += rms.map(function(r){
           return '<div class="roomhd"><div class="rn">'+esc(r.name)+'</div><span class="status s-'+esc(r.status)+'">'+esc(r.status)+'</span></div>'+

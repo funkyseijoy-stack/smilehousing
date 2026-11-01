@@ -34,13 +34,15 @@ const NOTE_CATS = [
   { id: "kitchen", name: "キッチン", sub: "プランボード・設備仕様", icon: "kitchen" },
   { id: "bath", name: "お風呂", sub: "プランボード・設備仕様", icon: "bath" },
   { id: "wash", name: "洗面", sub: "洗面台・ミラー・収納", icon: "wash" },
-  { id: "dressing", name: "脱衣室", sub: "ランドリーバー・収納", icon: "wash" },
+  // 「脱衣室」は2026年11月から「各部屋」の部屋（脱衣室）に移した（住まいるアプリが起動時に移す）
   { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
   { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
   { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
   { id: "interior", name: "インテリア（メイン）", sub: "床・建具・クロス・配色", icon: "sofa" },
   // 部屋別インテリア。部屋ごとに分けて表示し、「仮決定／決定」も部屋単位で受け付ける
   { id: "rooms", name: "インテリア（部屋別）", sub: "天井・壁・アクセント", icon: "room" },
+  // 収納（パントリー・クローゼットなど。部位「収納」）
+  { id: "storage", name: "収納", sub: "パントリー・クローゼット・棚など", icon: "storage" },
   // 外部散水栓・インターホン親機・給湯リモコン・床下点検口（打合せで確認する項目）
   { id: "other", name: "その他の確認", sub: "散水栓・インターホン・給湯リモコン・床下点検口", icon: "house" },
 ];
@@ -75,6 +77,7 @@ function partLabel(project: any, scope?: string, category?: string | null, roomI
     return c ? c.name : "追加した部位";
   }
   if (scope === "interiorColor" && !category) return "インテリア全体";
+  if (scope === "storage") return "収納";
   return category || "";
 }
 
@@ -113,7 +116,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
     if (category === "キッチン") return "kitchen";
     if (category === "お風呂") return "bath";
     if (category === "洗面") return "wash";
-    if (category === "脱衣室" || category === "ランドリーバー") return "dressing";
+    if (category === "脱衣室" || category === "ランドリーバー") return null; // 各部屋の「脱衣室」に移した（移る前の分は出さない）
     if (category === "トイレ" || category === "1階トイレ" || category === "2階トイレ") return "toilet";
     return null;
   }
@@ -129,6 +132,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   }
   if (scope === "room") return "rooms";
   if (scope === "siteCheck") return "other";
+  if (scope === "storage") return "storage";
   // 案件ごとに追加した部位は、1つずつ別の項目（id は cp_<部位ID>）として出す
   if (scope === "custom") return category ? "cp_" + category : null;
   return null;
@@ -471,7 +475,7 @@ export default async (req: Request, context: Context) => {
     const vs = t.vendorSpec || {};
     // 外部仕様（項目を選ばず「外部仕様」だけ）・インテリア全体（項目を選ばない）・部屋そのもの（項目を限定しない）は category が空でも出す
     if (!vs.scope) continue;
-    if (!vs.category && vs.scope !== "general" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
+    if (!vs.category && vs.scope !== "general" && vs.scope !== "storage" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
     for (const att of t.attachments || []) {
       if (!att || !att.url || shownUrls.has(att.url)) continue;
       shownUrls.add(att.url);
@@ -498,7 +502,7 @@ export default async (req: Request, context: Context) => {
     if (a.kind !== "quote" || (qt !== "プランボード" && qt !== "定価") || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;
-    if (!sp.category && sp.scope !== "general" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
+    if (!sp.category && sp.scope !== "general" && sp.scope !== "storage" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
     push(noteCatFor(sp.scope, sp.category), {
       type: "photo",
       isQuote: true,
@@ -670,8 +674,8 @@ export default async (req: Request, context: Context) => {
     if (c.id === "interior" && roomsRaw) {
       categories.push({
         ...c,
-        name: "インテリア",
-        sub: "床・建具・クロス、部屋ごとの配色",
+        name: "各部屋",
+        sub: "家全体の基本色と、部屋ごとの内装",
         mainStatus: c.status,
         mainCount: c.count,
         rooms: roomsRaw.rooms || [],

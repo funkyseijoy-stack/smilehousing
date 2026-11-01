@@ -2302,7 +2302,9 @@
     {key:"consider", label:"お客様に検討してもらうこと", cls:"b-consider", group:"next"}
   ];
   var BADGE_AUTO_KEYS = ["companytask","vendortask","confirm","consider"]; // 自動登録を伴うバッジ
-  var FACILITY_CATS = ["キッチン","お風呂","洗面","トイレ","脱衣室"];
+  var FACILITY_CATS = ["キッチン","お風呂","洗面","トイレ"]; // 脱衣室は「各部屋」の部屋に移した（2026年11月）
+  // 「各部屋」で最初から選べる部屋（案件に無ければ、選んだときにその案件の部屋として作る）
+  var DEFAULT_ROOMS = ["リビング","玄関","脱衣室"];
   var EQUIPMENT_CATS = ["暖房設備","換気設備","電気配線","あかりプラン"];
   var SITECHECK_CATS = ["外部散水栓（水道）","インターホン親機","給湯リモコン","床下点検口"];
   // 上の4項目は、打合せ記録のサブタブにそれぞれ別のタブとして出す（タブのキー）
@@ -2340,13 +2342,14 @@
     {label:"外部散水栓・インターホンなど", value:"siteCheck"},
     {label:"インテリア：メイン（家全体の基本色）", value:"interiorColor"},
     {label:"インテリア：部屋別", value:"room"},
+    {label:"収納", value:"storage"},
     {label:"社内だけ（基礎・足場など。お客様に出さない）", value:"internal"}
   ];
   // 部位の見せ方：大きなまとまり（外部／暖房設備／換気設備／電気配線／あかりプラン／水まわり／インテリア…）を印で、
   // 文字は中の項目名だけ（例：「🚿 キッチン」「🔥 暖房設備」）。保存している scope／category は変えない。
   var PART_BIG = {
     exterior:{name:"外部", icon:"🏠"}, facility:{name:"水まわり", icon:"🚿"},
-    interiorColor:{name:"インテリア", icon:"🎨"}, room:{name:"インテリア（部屋別）", icon:"🎨"},
+    interiorColor:{name:"各部屋（家全体）", icon:"🎨"}, room:{name:"各部屋", icon:"🎨"}, storage:{name:"収納", icon:"🗄"},
     siteCheck:{name:"その他の確認", icon:"🔧"}, internal:{name:"社内だけ", icon:"🔒"},
     general:{name:"総合", icon:"📋"}, custom:{name:"追加した部位", icon:"📌"}
   };
@@ -2945,6 +2948,7 @@
     migrateSiteCheckMoves();
     migrateToiletMerge();
     migrateLaundryMerge();
+    migrateDressingToRoom();
     migratePlanboardPartRemoval();
     migrateExteriorNoteEntries();
     migrateAttachmentFolderParts();
@@ -3021,6 +3025,57 @@
         saveDoc("projects", pr.id, pr);
       });
     }catch(e){ console.warn("laundry merge failed", e); }
+  }
+  // 案件の部屋を名前で探し、無ければ作って保存する
+  function ensureProjectRoom(proj, name){
+    var rooms = recRoomsOf(proj);
+    var hit = rooms.find(function(r){ return r.name===name; });
+    if(!hit){
+      hit = {id:uid("room"), name:name, accentNote:""};
+      proj.rooms = rooms.concat([hit]);
+      saveDoc("projects", proj.id, proj);
+    }
+    return hit;
+  }
+  // 水まわりの「脱衣室」（とランドリーバー）は、各部屋の「脱衣室」へ。部位を各部屋の形に直す
+  function isOldDressPart(sp){ return !!(sp && sp.scope==="facility" && (sp.category==="脱衣室" || sp.category==="ランドリーバー")); }
+  function dressRoomPart(pid){
+    var proj = projectById(pid); if(!proj) return null;
+    var rm = ensureProjectRoom(proj, "脱衣室");
+    return {scope:"room", category:null, roomId:rm.id, side:null, label:"脱衣室"};
+  }
+  // 写真・記録・タスク・書類・見積依頼・記録の行の部位と、脱衣室のメモを移す（何度動かしても同じ結果）
+  function migrateDressingToRoom(){
+    try{
+      state.specPhotos.forEach(function(p){
+        if(!p || p.deletedAt || !isOldDressPart(p)) return;
+        var np = dressRoomPart(p.projectId); if(!np) return;
+        p.scope = "room"; p.category = null; p.roomId = np.roomId; p.side = null; saveDoc("specPhotos", p.id, p);
+      });
+      state.meetingNotes.forEach(function(n){
+        if(!n) return;
+        var ch = false;
+        if(isOldDressPart(n.specPart)){ var np = dressRoomPart(n.projectId); if(np){ n.specPart = np; ch = true; } }
+        (n.noteLines||[]).forEach(function(l){ if(l && isOldDressPart(l.p)){ var lp = dressRoomPart(n.projectId); if(lp){ l.p = lp; ch = true; } } });
+        if(ch) saveDoc("meetingNotes", n.id, n);
+      });
+      state.tasks.forEach(function(t){
+        if(t && isOldDressPart(t.vendorSpec)){ var np = dressRoomPart(t.projectId); if(np){ t.vendorSpec = np; saveDoc("tasks", t.id, t); } }
+      });
+      state.attachments.forEach(function(a){
+        if(a && isOldDressPart(a.specPart)){ var np = dressRoomPart(a.projectId); if(np){ a.specPart = np; saveDoc("attachments", a.id, a); } }
+      });
+      state.requests.forEach(function(r){
+        if(r && isOldDressPart(r.part)){ var np = dressRoomPart(r.projectId); if(np){ r.part = np; saveDoc("requests", r.id, r); } }
+      });
+      state.projects.forEach(function(pr){
+        var fn = pr && pr.facilityNotes; if(!fn || fn["脱衣室"]==null) return;
+        var rm = ensureProjectRoom(pr, "脱衣室");
+        if(fn["脱衣室"]) rm.accentNote = (rm.accentNote ? rm.accentNote+"\n" : "") + fn["脱衣室"];
+        delete fn["脱衣室"];
+        saveDoc("projects", pr.id, pr);
+      });
+    }catch(e){ console.warn("dressing move failed", e); }
   }
   function migrateToiletMerge(){
     try{
@@ -3377,16 +3432,17 @@
   function noteCatIdFor(scope, category){
     if(scope==="general") return "general"; // 総合（note-data.mts の noteCatFor と同じ）
     if(scope==="exterior") return "exterior";
-    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"dressing","ランドリーバー":"dressing","トイレ":"toilet","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
+    if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"rooms","ランドリーバー":"rooms","トイレ":"toilet","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "rooms";
+    if(scope==="storage") return "storage";
     if(scope==="siteCheck") return "other"; // 外部散水栓・インターホン親機・給湯リモコン・床下点検口
     if(scope==="custom") return category ? "cp_"+category : null; // 追加した部位は1つずつ別の項目（note-data.mts の noteCatFor と同じ）
     return null;
   }
   var NOTE_CAT_NAMES = { general:"総合", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", dressing:"脱衣室", toilet:"トイレ",
-    climate:"暖房・換気", electric:"電気・あかり", interior:"インテリア（メイン）", rooms:"インテリア（部屋別）", other:"その他の確認", planboard:"プランボード" };
+    climate:"暖房・換気", electric:"電気・あかり", interior:"各部屋（家全体）", rooms:"各部屋", storage:"収納", other:"その他の確認", planboard:"プランボード" };
   // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
   var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
   function noteDecisionFor(catId, roomId){
@@ -5408,12 +5464,13 @@
     fx_9:{scope:"interiorColor", category:"ドア"}, fx_11:{scope:"interiorColor", category:"メインクロス"},
     fx_10:{scope:"facility", category:null},
     fx_13:{scope:"facility", category:"キッチン"}, fx_14:{scope:"facility", category:"お風呂"}, fx_15:{scope:"facility", category:"洗面"},
-    fx_16:{scope:"facility", category:"トイレ"}, fx_17:{scope:"facility", category:"脱衣室"}
+    fx_16:{scope:"facility", category:"トイレ"}, fx_17:{scope:"room", roomName:"脱衣室"}
   };
   function attFolderPart(proj, folderId){
     var cur = folderId ? attFolderById(proj, folderId) : null, n = 0;
     while(cur && n<10){
       var m = ATT_FOLDER_PARTS[cur.id];
+      if(m && m.roomName){ var rr = ensureProjectRoom(proj, m.roomName); return {scope:"room", category:null, roomId:rr.id, side:null, label:m.roomName}; }
       if(m) return {scope:m.scope, category:m.category, roomId:null, side:null, label: m.category ? specPartGroupLabel(m.scope)+"・"+m.category : specPartGroupLabel(m.scope)};
       cur = cur.parentId ? attFolderById(proj, cur.parentId) : null; n++;
     }
@@ -5423,7 +5480,7 @@
   function attApplyFolderPart(a, proj){
     if(a.specPart && !a.specPartAuto) return false;
     var fp = attFolderPart(proj, a.folderId);
-    if(fp){ if(a.specPart && a.specPart.scope===fp.scope && a.specPart.category===fp.category) return false; a.specPart = fp; a.specPartAuto = true; return true; }
+    if(fp){ if(a.specPart && a.specPart.scope===fp.scope && a.specPart.category===fp.category && (a.specPart.roomId||null)===(fp.roomId||null)) return false; a.specPart = fp; a.specPartAuto = true; return true; }
     if(a.specPartAuto && a.specPart && !a.reflected){ a.specPart = null; delete a.specPartAuto; return true; }
     return false;
   }
@@ -6049,18 +6106,19 @@
   // sub：項目名、外部の「_none」（外部全体）、インテリアの「main」（メイン）・「r:<部屋ID>」（部屋）・「r:」（部屋未設定）
   function recRoomsOf(proj){ return (proj && proj.rooms) || []; }
   function recBigs(proj){
-    var list = [{ key:"ext", label:"🏠 外部", subs: EXTERIOR_CATS.map(function(c){ return {key:c, label:c}; }).concat([{key:"_none", label:"外部全体（項目なし）"}]) }];
+    var list = [{ key:"general", label:"📋 総合", subs:[] }];
+    list.push({ key:"ext", label:"🏠 外部", subs: EXTERIOR_CATS.map(function(c){ return {key:c, label:c}; }).concat([{key:"_none", label:"外部全体（項目なし）"}]) });
     EQUIPMENT_CATS.forEach(function(c){ list.push({ key:"eq:"+c, label:(EQUIP_ICON[c]||"🔌")+" "+c, subs:[] }); });
     list.push({ key:"water", label:"🚿 水まわり", subs: FACILITY_CATS.map(function(c){ return {key:c, label:PART_ITEM_ALIAS[c]||c}; }) });
-    var intSubs = [{key:"main", label:"メイン（家全体の基本色）"}].concat(recRoomsOf(proj).map(function(r){ return {key:"r:"+r.id, label:r.name}; }));
+    var intSubs = [{key:"main", label:"家全体（基本色）"}].concat(recRoomsOf(proj).map(function(r){ return {key:"r:"+r.id, label:r.name}; }));
     var pid = proj && proj.id;
     var noRoom = liveSpecPhotos().some(function(p){ return p.projectId===pid && p.scope==="room" && !p.roomId; }) ||
       liveNotes().some(function(n){ return n.projectId===pid && n.specPart && n.specPart.scope==="room" && !n.specPart.roomId; });
     if(noRoom) intSubs.push({key:"r:", label:"部屋未設定"});
-    list.push({ key:"int", label:"🎨 インテリア", subs: intSubs });
+    list.push({ key:"int", label:"🎨 各部屋", subs: intSubs });
+    list.push({ key:"storage", label:"🗄 収納", subs:[] });
     list.push({ key:"other", label:"🔧 その他の確認", subs: SITECHECK_CATS.map(function(c){ return {key:c, label:c}; }) });
     customPartsOf(proj).forEach(function(c){ list.push({ key:"cp:"+c.id, label:"📌 "+c.name, subs:[] }); });
-    list.push({ key:"general", label:"📋 総合", subs:[] });
     list.push({ key:"internal", label:"🔒 社内だけ", subs: INTERNAL_CATS.map(function(c){ return {key:c, label:c}; }) });
     return list;
   }
@@ -6081,6 +6139,7 @@
     if(f.big==="other") return sc==="siteCheck" && (!sub || cat===sub);
     if(f.big.indexOf("cp:")===0) return sc==="custom" && cat===f.big.slice(3);
     if(f.big==="general") return sc==="general";
+    if(f.big==="storage") return sc==="storage";
     if(f.big==="internal") return sc==="internal" && (!sub || cat===sub);
     return false;
   }
@@ -6091,6 +6150,7 @@
     if(big.indexOf("eq:")===0) return P("equipment", big.slice(3));
     if(big.indexOf("cp:")===0) return P("custom", big.slice(3));
     if(big==="general") return P("general", null);
+    if(big==="storage") return P("storage", null);
     if(!sub) return null;
     if(big==="ext") return P("exterior", sub==="_none" ? null : sub);
     if(big==="water") return P("facility", sub);
@@ -6310,7 +6370,8 @@
           if(!res.ok){ tip.textContent = res.status===501 ? "（AIの設定がないため自動判定はできません）" : ""; if(res.status===501||res.status===401) return; continue; }
           var m = j.part && MN_AI_PARTS[j.part];
           if(!m){ tip.textContent = "🤖 部位は判定できませんでした"; continue; }
-          var val = m.scope==="exterior" ? "ext||_none" : (m.scope==="equipment" ? "eq:"+m.category+"||" : "water||"+m.category);
+          var val = m.roomName ? (function(){ var pj = projectById(state.currentProjectId); return pj ? "int||r:"+ensureProjectRoom(pj, m.roomName).id : ""; })()
+            : m.scope==="exterior" ? "ext||_none" : (m.scope==="equipment" ? "eq:"+m.category+"||" : "water||"+m.category);
           var sel = sh.box.querySelector('[data-ripart="'+i+'"]');
           if(sel && !touched[i]){ sel.value = val; }
           tip.textContent = "🤖 AIの候補：「"+m.label+"」"+(touched[i]?"（選び直した部位のまま）":"（違えば選び直してください）");
@@ -6648,7 +6709,7 @@
   function upsertNoteSpecEntry(note){
     var existing = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===note.id; });
     var part = note.specPart;
-    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || part.scope==="room");
+    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || part.scope==="storage" || part.scope==="room");
     if(!usable){
       if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
       return;
@@ -11521,7 +11582,7 @@
   ];
   var INBOX_PART_WORDS = [
     [/浴室|お風呂|風呂|ユニットバス|UB|バスルーム/i,"facility","お風呂"], [/キッチン|台所/,"facility","キッチン"], [/洗面/,"facility","洗面"],
-    [/トイレ|便器/,"facility","トイレ"], [/脱衣|ランドリー/,"facility","脱衣室"],
+    [/トイレ|便器/,"facility","トイレ"],
     [/暖房|ヒーター|床暖/,"equipment","暖房設備"], [/換気|換気扇|ダクト/,"equipment","換気設備"],
     [/照明|あかり|ライティング/,"equipment","あかりプラン"], [/電気|配線|コンセント|スイッチ/,"equipment","電気配線"],
     [/玄関ドア/,"exterior","玄関ドア"], [/外壁|サイディング/,"exterior","外壁"], [/屋根|板金/,"exterior","屋根"],
@@ -12786,7 +12847,7 @@
     "お風呂":{scope:"facility", category:"お風呂", label:"お風呂"},
     "洗面":{scope:"facility", category:"洗面", label:"洗面"},
     "トイレ":{scope:"facility", category:"トイレ", label:"トイレ"},
-    "脱衣室":{scope:"facility", category:"脱衣室", label:"脱衣室"}
+    "脱衣室":{scope:"room", roomName:"脱衣室", label:"脱衣室"} // 各部屋の「脱衣室」（案件に無ければ作る）
   };
   var mnAiSeq = 0;
   async function mnAiAnalyze(){
@@ -12819,7 +12880,7 @@
     results.forEach(function(r){ if(r.part){ count[r.part] = (count[r.part]||0)+1; if(!best || count[r.part]>count[best]) best = r.part; } });
     var note = [];
     if(best && !newMeetingNoteSpecPart && !editingMeetingNoteId && MN_AI_PARTS[best]){
-      newMeetingNoteSpecPart = Object.assign({roomId:null, side:null}, MN_AI_PARTS[best]);
+      newMeetingNoteSpecPart = MN_AI_PARTS[best].roomName ? dressRoomPart(editingMeetingNoteProjectId()) : Object.assign({roomId:null, side:null}, MN_AI_PARTS[best]);
       updateMeetingNoteSpecPartLabel();
       var ti = document.getElementById("meetingNoteTitle");
       if(ti && (!ti.value.trim() || ti.value === lastAutoFilledMeetingNoteTitle)){ ti.value = MN_AI_PARTS[best].label; lastAutoFilledMeetingNoteTitle = ti.value; }
@@ -13605,7 +13666,7 @@
     if(!vs || !vs.scope) return false;
     if(vs.scope==="internal") return false; // 社内だけの部位はお客様に出さない
     if(vs.category) return true;
-    if(vs.scope==="general" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
+    if(vs.scope==="general" || vs.scope==="storage" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
     if(vs.scope==="room" && vs.roomId) return true;
     return false;
   }
@@ -13906,7 +13967,11 @@
     var proj = projectById(projectId || state.currentProjectId);
     var bigs = recBigs(proj).map(function(b){
       if(b.key!=="int") return b;
-      return {key:b.key, label:b.label, subs:b.subs.filter(function(x){ return x.key!=="r:"; })};
+      var subs = b.subs.filter(function(x){ return x.key!=="r:"; });
+      // リビング・玄関・脱衣室は、案件にまだ無くても最初から選べる（選んだときに作る）
+      var have = recRoomsOf(proj).map(function(r){ return r.name; });
+      var defs = DEFAULT_ROOMS.filter(function(n){ return have.indexOf(n)<0; }).map(function(n){ return {key:"nr:"+n, label:n}; });
+      return {key:b.key, label:b.label, subs:[subs[0]].concat(defs, subs.slice(1))};
     });
     var overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(20,16,12,.55);z-index:95;display:flex;align-items:center;justify-content:center;padding:16px;";
@@ -13952,6 +14017,12 @@
       var t = e.target;
       if(t.matches("[data-spbig]")){ st.big = t.value; st.sub = ""; st.item = ""; draw(); return; }
       if(t.matches("[data-spsub]")){
+        if(t.value.indexOf("nr:")===0 && proj){
+          var nr = ensureProjectRoom(proj, t.value.slice(3));
+          var ib0 = cur();
+          if(ib0){ ib0.subs = ib0.subs.map(function(x){ return x.key===t.value ? {key:"r:"+nr.id, label:nr.name} : x; }); }
+          st.sub = "r:"+nr.id; st.item = ""; draw(); return;
+        }
         if(t.value==="__addroom"){
           var name = (prompt("追加する部屋の名前（例：LDK、寝室、子ども部屋、和室）")||"").trim();
           if(name && proj){
