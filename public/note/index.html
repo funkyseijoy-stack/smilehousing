@@ -123,6 +123,14 @@
   .scom .scth img{ width:100%; height:100%; object-fit:cover; display:block; }
   .scom .scmore{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:700; font-size:1.1rem; }
   .scom .srep{ display:flex; justify-content:flex-end; gap:14px; flex-wrap:wrap; }
+  .nph{ background:var(--card); border:1.5px solid #f0d9a8; border-left:5px solid #d9534f; border-radius:16px; padding:12px 14px; margin:0 0 16px; }
+  .nph .nh{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:700; font-size:.95rem; color:var(--brown); margin-bottom:8px; }
+  .nph .nh .sd{ font-weight:400; font-size:.76rem; color:var(--muted); }
+  .nph .ngrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .nph .ngrid button{ position:relative; display:block; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--line); border:0; padding:0; cursor:pointer; }
+  .nph .ngrid img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .nph .scmore{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:700; font-size:1.1rem; }
+  .nph .srep{ display:flex; justify-content:flex-end; gap:14px; flex-wrap:wrap; margin-top:8px; }
   .scphotos{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 18px; }
   .scphotos h3{ margin:0 0 4px; font-size:1rem; color:var(--brown); }
   .scphotos .scnote{ font-size:.85rem; color:var(--muted); margin:0 0 10px; white-space:pre-wrap; }
@@ -985,18 +993,25 @@ function consItems(){
     var sc = data.staffComment;
     if(!sc || !sc.text) return "";
     var d = sc.at ? new Date(sc.at) : null;
-    var ph = (sc.photos||[]).filter(isImg);
-    var phHtml = "";
-    if(ph.length){
-      var SHOW = 4;
-      phHtml = '<button class="scph" data-scphotos="1" aria-label="お送りした写真を見る">'+ph.slice(0, SHOW).map(function(f, i){
-        var more = (i===SHOW-1 && ph.length>SHOW) ? '<span class="scmore">+'+(ph.length-SHOW)+'</span>' : '';
-        return '<span class="scth"><img loading="lazy" src="'+esc(f.url)+'" alt="">'+more+'</span>';
-      }).join("")+'</button>';
-    }
-    return '<div class="scom"><div class="sh">💬 スタッフより'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div>'+
-      (ph.length ? '<button class="st sttap" data-scphotos="1">'+esc(sc.text)+'</button>' : '<div class="st">'+esc(sc.text)+'</div>')+phHtml+
-      '<div class="srep">'+(ph.length ? '<button class="linkbtn" data-scphotos="1">📷 写真を見る（'+ph.length+'枚） ›</button>' : '')+'<button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
+    // 一緒に送った写真は上の「🆕 新しい写真」に出すので、ここは文章だけ
+    return '<div class="scom"><div class="sh">💬 スタッフから'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div>'+
+      '<div class="st">'+esc(sc.text)+'</div>'+
+      '<div class="srep"><button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
+  }
+  // ホームのいちばん上「🆕 新しい写真」＝スタッフが「お客様に写真を送る」で最後に送った写真（次に送るまで出す）
+  function newPhotosHtml(){
+    var sc = data.staffComment;
+    var ph = sc ? (sc.photos||[]).filter(isImg) : [];
+    if(!ph.length) return "";
+    var d = sc.at ? new Date(sc.at) : null;
+    var SHOW = 6;
+    return '<div class="nph"><div class="nh">🆕 新しい写真'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'・'+ph.length+'枚</span>' : '')+nwTag(sc.at)+'</div>'+
+      '<div class="ngrid">'+ph.slice(0, SHOW).map(function(f, i){
+        var more = (i===SHOW-1 && ph.length>SHOW);
+        return more ? '<button data-scphotos="1" aria-label="すべて見る"><img loading="lazy" src="'+esc(f.url)+'" alt=""><span class="scmore">+'+(ph.length-SHOW+1)+'</span></button>'
+          : '<button data-img="'+esc(f.url)+'"><img loading="lazy" src="'+esc(f.url)+'" alt=""></button>';
+      }).join("")+'</div>'+
+      '<div class="srep"><button class="linkbtn" data-scphotos="1">📷 すべて見る（'+ph.length+'枚） ›</button><button class="linkbtn" data-go="album">アルバムをひらく ›</button></div></div>';
   }
   function updatesHtml(){
     if(view.updDismissed) return "";
@@ -1057,18 +1072,10 @@ function homeHtml(){ return homeParts().main; }
       (nmText ? '<div class="qdetail nmtext">📝 '+esc(nmText)+'</div>' : '')+'</div>';
     // ホームの上から：スタッフより → NEW → わが家のアルバム → 最新の打合せ記録 → 次の打合せ → 家づくりの進行状況 → ご検討いただく事
     out += a2hsBannerHtml();
+    // 写真が重ならないよう、ホームの写真は「🆕 新しい写真」（最後に送った写真）だけ。アルバムは下のタブから
+    out += newPhotosHtml();
     out += staffCommentHtml();
     out += updatesHtml();
-    out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
-    if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
-    var homeShown = homeChosen(album);
-    if(hpCandidates().length) out += '<div style="margin:0 0 8px;"><button class="hpedit" data-hpopen="1">📷 ホームに出す写真を選ぶ'+(homeShown.chosen ? '（選択中）' : '')+'</button></div>';
-    if(album.length){
-      out += '<div class="polas">'+homeShown.list.map(function(a){
-        // キャプションはファイル名・部位名ではなく、日付と「アルバムの写真」だけにする
-        return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt)+'<br>'+(a.kind==="reference"?"参考写真":"アルバムの写真")+'</div></button>';
-      }).join("")+'</div>';
-    } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
     out += latestNotesHtml();
     out += nextBox;
     out += progBox;
