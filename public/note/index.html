@@ -1009,20 +1009,23 @@ function consItems(){
       '<div class="srep"><button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
   }
   // ホームのいちばん上「🆕 新しい写真」＝スタッフが「お客様に写真を送る」で最後に送った写真（次に送るまで出す）
+  // ホームの「🆕 新しい写真」＝スタッフが「お客様に写真を送る」で最後に送った写真（次に送るまで出す）。
+  // 形は以前のアルバムと同じポラロイド風の3枚。送った写真が無いときはアルバムの新しい3枚
   function newPhotosHtml(){
     var sc = data.staffComment;
     var ph = sc ? (sc.photos||[]).filter(isImg) : [];
-    if(!ph.length) return "";
-    var d = sc.at ? new Date(sc.at) : null;
-    var SHOW = 6;
-    return '<div class="nph"><div class="nh">🆕 新しい写真'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'・'+ph.length+'枚</span>' : '')+nwTag(sc.at)+'</div>'+
-      '<div class="ngrid">'+ph.slice(0, SHOW).map(function(f, i){
-        var more = (i===SHOW-1 && ph.length>SHOW);
-        return more ? '<button data-scphotos="1" aria-label="すべて見る"><img loading="lazy" src="'+esc(f.url)+'" alt=""><span class="scmore">+'+(ph.length-SHOW+1)+'</span></button>'
-          : '<button data-img="'+esc(f.url)+'"><img loading="lazy" src="'+esc(f.url)+'" alt=""></button>';
-      }).join("")+'</div>'+
-      '<div class="srep"><button class="linkbtn" data-scphotos="1">📷 すべて見る（'+ph.length+'枚） ›</button><button class="linkbtn" data-go="album">アルバムをひらく ›</button></div></div>';
+    var sent = ph.length > 0;
+    if(!sent) ph = homeChosen(data.album.filter(function(a){ return isImg(a) && a.kind!=="reference"; })).list;
+    var out = '<div class="sechd"><h3>'+(sent ? '🆕 新しい写真' : '🌷 わが家のアルバム')+'</h3><button class="more" data-go="album">ひらく →</button></div>';
+    if(!ph.length) return out+'<div class="empty">写真が届くと、ここに表示されます。</div>';
+    var when = sent && sc.at ? sc.at : null;
+    out += '<div class="polas">'+ph.slice(0,3).map(function(a){
+      return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt || when)+'<br>'+(sent ? 'お送りした写真' : 'アルバムの写真')+'</div></button>';
+    }).join("")+'</div>';
+    if(sent && ph.length>3) out += '<div style="text-align:right;margin:6px 0 14px;"><button class="linkbtn" data-scphotos="1">📷 すべて見る（'+ph.length+'枚） ›</button></div>';
+    return out;
   }
+
   function updatesHtml(){
     if(view.updDismissed) return "";
     var rows = updatesRows();
@@ -1697,7 +1700,6 @@ function homeHtml(){ return homeParts().main; }
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.talk?'<div class="box"><div class="bl">打合せの内容</div>'+esc(n.talk).replace(/\n/g,"<br>")+'</div>':'')+
       (n.decided?'<div class="box dec"><div class="bl">打合せで決まったこと</div>'+esc(n.decided)+'</div>':'')+
-      (n.open && noOpen?'<div class="tm" style="margin-top:6px;">💭 ご検討いただく事は、下の「ご検討いただく事」にまとめています</div>':'')+
       (n.open && !noOpen?'<div class="box opn"><div class="bl">ご検討いただきたいこと</div>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:''))):'')+
       (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
@@ -2063,7 +2065,7 @@ function homeHtml(){ return homeParts().main; }
     var jp = e.target.closest("[data-jump]"); if(jp){ jumpTo(jp.dataset.jump); return; }
     var mjp = e.target.closest("[data-menujump]"); if(mjp){ view.tab = homeParts().rest.indexOf('id="'+mjp.dataset.menujump+'"')>=0 ? "info" : "home"; view.cat=null; view.infoJump = mjp.dataset.menujump; render(); window.scrollTo(0,0); return; }
     var msh = e.target.closest("[data-menusheet]"); if(msh){ openSheet(msh.dataset.menusheet); return; }
-    var a2 = e.target.closest("[data-a2hsok]"); if(a2){ try{ localStorage.setItem("okaiA2hsOk","1"); }catch(er){} render(); return; }
+    var a2 = e.target.closest("[data-a2hsok]"); if(a2){ try{ localStorage.setItem("okaiA2hsOk2","1"); }catch(er){} render(); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ jumpTo(uj.dataset.updjump); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; view.scPhotos=false; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
@@ -2160,9 +2162,9 @@ function homeHtml(){ return homeParts().main; }
   });
   // 「アプリはデスクトップ（ホーム画面）にも出せます」の帯。「分かりました」を押すと、この端末では以後出さない。
   // すでにホーム画面から開いている（アプリとして起動している）ときも出さない。
+  // 帯を新しくしたので、以前の「分かりました」（okaiA2hsOk）は見ずに、もう一度だけ出す。ホーム画面から開いたときも出す
   function a2hsDone(){
-    try{ if(localStorage.getItem("okaiA2hsOk")==="1") return true; }catch(e){}
-    try{ if(window.navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)) return true; }catch(e){}
+    try{ if(localStorage.getItem("okaiA2hsOk2")==="1") return true; }catch(e){}
     return false;
   }
   function a2hsBannerHtml(){
@@ -2244,7 +2246,7 @@ function homeHtml(){ return homeParts().main; }
 
   document.getElementById("addHomeHelp").addEventListener("click", function(){ closeSheet("addHomeModal"); openSheet("help"); });
   document.getElementById("addHomeDone").addEventListener("click", function(){
-    try{ localStorage.setItem("okaiA2hsOk","1"); }catch(er){}
+    try{ localStorage.setItem("okaiA2hsOk2","1"); }catch(er){}
     closeSheet("addHomeModal"); if(data) render();
   });
   // 決める順番（全お客様共通の案内）を一度だけ組み立てる
