@@ -1576,10 +1576,10 @@ function homeHtml(){ return homeParts().main; }
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
     var list = notes.filter(function(n){ return String(n.date||"")===last; });
-    // 同じ日の部位ごとの記録で「決定ボタン」を出しているものは、ホームにも並べて決定できるようにする
-    (data.notes||[]).forEach(function(n){
+    // 総合のあとに、同じ日の部位ごとの記録（中身のあるもの）も並べる。部位の記録は「家づくり」の各項目でも見られる
+    all.forEach(function(n){
       if(String(n.date||"")!==last || list.indexOf(n)>=0) return;
-      var f = noteDecItem(n); if(f && f.x.showDecide) list.push(n);
+      list.push(n);
     });
     return hd+'<span class="countpill">'+fmtD(last)+'</span></div><div class="catlist">'+list.map(function(n){
         var f = noteDecItem(n);
