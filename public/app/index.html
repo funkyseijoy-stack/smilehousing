@@ -1668,7 +1668,6 @@
             <div class="row" style="gap:8px; flex-wrap:wrap; margin-block:-2px 6px;"><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 この案件の図面から選ぶ</button></div>
             <div id="mnFileList"></div>
             <div id="mnAiHint" class="muted" style="font-size:.85rem; margin-block:4px;" hidden></div>
-            <div style="margin-block:4px 6px;"><button type="button" class="btn secondary small" id="btnMnFinalAsk" title="お客様へのメッセージ欄に定型文を入れます（書き換えもできます）">📌 最終決定のお願いを入れる</button></div>
             <details class="mnmore">
               <summary>そのほか（お客様へのメッセージ・図面にも登録・タスクなど）</summary>
               <label class="field">お客様へのメッセージ（「反映する」とおうちノートに出ます）<textarea id="meetingNoteMessage" rows="2" placeholder="お客様に伝えたいこと"></textarea></label>
@@ -15012,16 +15011,6 @@
     document.getElementById("btnSyncNow").addEventListener("click", function(){ syncFromServer({}); });
     // 打合せ内容：書くたびに行の一覧を作り直し、行を押すと 印なし→✅→💭→印なし
     document.getElementById("mnBody").addEventListener("input", mnRender);
-    // 「最終決定のお願い」の定型文を、お客様へのメッセージ欄に差し込む（書き換え可。決定ボタンは記録の「⋮ 操作」で出す）
-    document.getElementById("btnMnFinalAsk").addEventListener("click", function(){
-      var FINAL_ASK = "最終決定です。よろしければ決定ボタンをお願いします。";
-      var el = document.getElementById("meetingNoteMessage");
-      var cur = String(el.value||"");
-      if(cur.indexOf(FINAL_ASK)<0) el.value = cur.trim() ? cur.replace(/\s+$/,"")+"\n"+FINAL_ASK : FINAL_ASK;
-      var d = el.closest("details"); if(d) d.open = true;
-      el.focus();
-      toast("お客様へのメッセージに入れました。決定ボタンは記録の「⋮ 操作」→「お客様の決定ボタン：出す」で出します");
-    });
     document.getElementById("mnLines").addEventListener("click", function(e){
       var rm = e.target.closest("[data-mnlrm]");
       if(rm){
