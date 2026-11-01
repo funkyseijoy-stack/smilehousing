@@ -735,6 +735,7 @@ export default async (req: Request, context: Context) => {
         channel: n.channel || "",
         changing: isChanging(n),
         part: (n.specPart && n.specPart.label) || "",
+        scope: (n.specPart && n.specPart.scope) || "",
         files: (n.files || []).map(fileOf),
       }))
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt)),

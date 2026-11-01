@@ -1020,7 +1020,7 @@ function consItems(){
     if(!ph.length) return out+'<div class="empty">写真が届くと、ここに表示されます。</div>';
     var when = sent && sc.at ? sc.at : null;
     out += '<div class="polas">'+ph.slice(0,3).map(function(a){
-      return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt || when)+'<br>'+(sent ? 'お送りした写真' : 'アルバムの写真')+'</div></button>';
+      return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt || when)+(sent ? '' : '<br>アルバムの写真')+'</div></button>';
     }).join("")+'</div>';
     if(sent && ph.length>3) out += '<div style="text-align:right;margin:6px 0 14px;"><button class="linkbtn" data-scphotos="1">📷 すべて見る（'+ph.length+'枚） ›</button></div>';
     return out;
@@ -1566,7 +1566,12 @@ function homeHtml(){ return homeParts().main; }
   }
   // ② 最新の打合せ内容：いちばん新しい日の記録を全部
   function latestNotesHtml(){
-    var notes = data.notes||[];
+    // ホームは「総合」（部位なしも含む）の記録だけ。部位ごとの記録は「家づくり」の各項目で見る。
+    // 総合の記録が1件も無いお客様は、従来どおり全部の記録から。中身（内容・決まったこと・メッセージ・資料）の無い記録は出さない
+    var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
+    var all = (data.notes||[]).filter(hasBody);
+    var gen = all.filter(function(n){ return n.scope==="general" || (n.scope==null ? (n.part==="総合" || !n.part) : !n.scope); });
+    var notes = gen.length ? gen : all;
     var hd = '<div class="sechd"><h3>🗒 最新の打合せ記録</h3>';
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
