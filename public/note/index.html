@@ -131,6 +131,7 @@
   .nph .ngrid img{ width:100%; height:100%; object-fit:cover; display:block; }
   .nph .scmore{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:700; font-size:1.1rem; }
   .nph .srep{ display:flex; justify-content:flex-end; gap:14px; flex-wrap:wrap; margin-top:8px; }
+  .plead{ font-size:.85rem; color:var(--ink2); margin:-4px 0 10px; }
   .pcards{ display:flex; flex-direction:column; gap:12px; margin-bottom:18px; }
   .pcard{ background:var(--card); border:1.5px solid #f0d9a8; border-left:5px solid #d9a441; border-radius:16px; padding:12px 14px; }
   .pcard.opt{ border-left-color:#7a9a6a; border-color:#d6e3cc; }
@@ -1597,7 +1598,6 @@ function homeHtml(){ return homeParts().main; }
       var ra = ' data-ckey="'+esc(x.key)+'" data-croom="'+esc(room)+'" data-clabel="'+esc(text.slice(0,40) || part)+'" data-ccat="'+esc(room ? "rooms" : c.id)+'"';
       cards.push('<div class="pcard"><div class="pch"><span class="ptag">'+esc(part)+'</span><span class="tk">'+fmtD(x.date||x.at)+'</span>'+nwTag(x.upd)+'</div>'+
         (text ? '<div class="pct">'+esc(text).replace(/\n/g,"<br>")+'</div>' : '')+
-        (x.message ? '<div class="box msg" style="margin-top:8px;"><div class="bl">スタッフからのメッセージ</div>'+esc(x.message).replace(/\n/g,"<br>")+'</div>' : '')+
         (files.length ? '<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>' : '')+
         (e.stamped
           ? '<div class="cdec" style="min-height:70px;"><div class="stamp'+(view.justStamped===x.key?' pop':'')+'" style="top:-30px;">決定<small>'+(function(){ var d=new Date(x.cardDecidedAt||Date.now()); return (d.getMonth()+1)+'/'+d.getDate(); })()+'</small></div>'+
@@ -1614,7 +1614,8 @@ function homeHtml(){ return homeParts().main; }
         '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
     });
     if(!cards.length) return "";
-    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+cards.length+'件</span></div><div class="pcards">'+cards.join("")+'</div>';
+    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+cards.length+'件</span></div>'+
+      '<p class="plead">こちらから、決定・変更のご依頼ができます。</p><div class="pcards">'+cards.join("")+'</div>';
   }
   // ---- ホームの「ご確認ください」：決定ボタンを出しているカードのうち、まだ検討中のもの ----
   function askItems(){
