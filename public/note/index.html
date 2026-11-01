@@ -807,7 +807,10 @@
   function renderBand(){
     var name = (data.project.customer || data.project.name || "お客様").replace(/様$/, "");
     document.getElementById("bandWho").textContent = name + "様のおうち";
-    document.getElementById("bandSt").textContent = (data.project.progressTag && !data.houseProgress) ? ("家づくり進行中・"+data.project.progressTag) : "家づくり進行中";
+    // 家づくりの進み具合で「現在」にした工程があれば「現在：木工事」のように出す
+    var hpB = data.houseProgress, curStep = (hpB && hpB.steps && hpB.current>=0) ? hpB.steps[hpB.current] : null;
+    document.getElementById("bandSt").textContent = (curStep && curStep.name) ? ("現在："+curStep.name)
+      : (data.project.progressTag && !data.houseProgress) ? ("家づくり進行中・"+data.project.progressTag) : "家づくり進行中";
     var nx = document.getElementById("bandNext");
     if(data.nextReservation){ nx.hidden = false; nx.textContent = "次回 "+md(data.nextReservation.date)+" "+(data.nextReservation.startTime||""); }
     else nx.hidden = true;
