@@ -204,6 +204,12 @@
   .todobox.hsec{ border-left-width:1.5px; border-color:var(--line); } .todobox.hsec .td:first-child{ border-top:0; padding-top:2px; }
   .homelink{ margin:-6px 2px 16px; text-align:right; }
   .qdetail.nmtext{ white-space:pre-wrap; line-height:1.7; font-size:.9rem; }
+  .a2hs{ background:#f4efe6; border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:0 0 14px; font-size:.86rem; line-height:1.6; }
+  .a2hs .a2b{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .a2hs .a2ok{ background:var(--brown); color:#fff; border:0; border-radius:999px; padding:7px 16px; font-family:inherit; font-weight:700; cursor:pointer; }
+  .mtop{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:#f4efe6; border:1px solid var(--line); border-radius:12px; padding:12px; margin:0 0 6px; font-family:inherit; font-weight:700; font-size:.88rem; color:inherit; cursor:pointer; }
+  .mtop .ug{ margin-left:auto; color:var(--brown); }
+  .help-key{ background:#e9f3ea; border:1px solid #bcd9c0; border-radius:12px; padding:12px; margin:6px 0 14px; line-height:1.7; font-size:.9rem; }
   .mhd{ font-size:.8rem; font-weight:700; color:var(--muted); letter-spacing:.08em; margin:18px 2px 8px; }
   .mgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 8px; }
   .mtile{ position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; background:none; border:0; padding:0; font-family:inherit; color:inherit; cursor:pointer; }
@@ -520,33 +526,19 @@
   <div class="help-card">
     <button class="x" id="helpX" aria-label="閉じる">×</button>
     <h2>おうちノートの使い方</h2>
-    <p class="help-lead">ホーム画面に追加すると、アプリのようにすぐ開けて便利です。</p>
-
-    <h3>📱 ホーム画面への追加方法</h3>
-    <div class="help-sub">iPhone（Safari）の場合</div>
-    <ol>
-      <li>画面下の共有ボタン（四角に↑のマーク）をタップ</li>
-      <li>「ホーム画面に追加」をタップ</li>
-      <li>右上の「追加」をタップ</li>
-    </ol>
-    <div class="help-sub">Android（Chrome）の場合</div>
-    <ol>
-      <li>右上の「⋮」（メニュー）をタップ</li>
-      <li>「ホーム画面に追加」または「アプリをインストール」をタップ</li>
-      <li>「追加」をタップ</li>
-    </ol>
+    <div class="help-key">✅ <b>「これで決定」を押していただくと、スタッフに届き、最終決定となります。</b><br>変えたいところがあるときは「✏️ 変更したい」から、どこをどう変えたいかを書いて送ってください。</div>
 
     <h3>🏠 画面の見方</h3>
     <ul>
       <li><b>ホーム</b>：打合せ内容やお家づくりの進み具合を確認できます</li>
       <li><b>アルバム</b>：お写真をまとめてご覧いただけます</li>
       <li><b>イメージ</b>：こんなお家にしたい、という写真をスタッフと一緒に追加できます</li>
-      <li><b>メッセージ</b>：住まいるハウジングのスタッフへメッセージを送れます</li>
-      <li><b>予約</b>：打合せなどのご予約ができます</li>
       <li><b>家づくり</b>：仕様やプランなど、詳しい内容を確認できます</li>
+      <li><b>≡ メニュー</b>：家づくりの項目、平面図・追加見積りなどの情報、ご予約・メッセージなどをまとめて開けます</li>
+      <li><b>メッセージ</b>（右上）：住まいるハウジングのスタッフへメッセージを送れます</li>
     </ul>
 
-    <h3>📌 上部のボタン</h3>
+    <h3>📌 メニューの中のボタン</h3>
     <ul>
       <li><b>決める順番</b>：家づくりで何から決めればいいか、順番の目安を確認できます</li>
       <li><b>わたしのメモ</b>：気になったことを自由に書き留められます（この端末にのみ保存されます）</li>
@@ -625,6 +617,33 @@
     <button class="x" id="menuX" aria-label="閉じる">×</button>
     <h2>メニュー</h2>
     <div id="menuList" class="menulist"></div>
+  </div>
+</div>
+<div class="help" id="addHomeModal" hidden>
+  <div class="help-card">
+    <button class="x" id="addHomeX" aria-label="閉じる">×</button>
+    <h2>📲 アプリのように使う</h2>
+    <p class="help-lead">おうちノートは、お使いのスマートフォンのホーム画面（パソコンはデスクトップ）に出しておけます。アプリのように、すぐ開けて便利です。</p>
+
+    <h3>📱 ホーム画面への追加方法</h3>
+    <div class="help-sub">iPhone（Safari）の場合</div>
+    <ol>
+      <li>画面下の共有ボタン（四角に↑のマーク）をタップ</li>
+      <li>「ホーム画面に追加」をタップ</li>
+      <li>右上の「追加」をタップ</li>
+    </ol>
+    <div class="help-sub">Android（Chrome）の場合</div>
+    <ol>
+      <li>右上の「⋮」（メニュー）をタップ</li>
+      <li>「ホーム画面に追加」または「アプリをインストール」をタップ</li>
+      <li>「追加」をタップ</li>
+    </ol>
+
+    <div class="help-sub">パソコン（Chrome・Edge）の場合</div>
+    <ol>
+      <li>アドレス欄の右にある「インストール」のマーク（または右上の「⋮」）をクリック</li>
+      <li>「インストール」／「アプリとしてインストール」を選ぶ</li>
+    </ol>
   </div>
 </div>
 <div class="help" id="memoModal" hidden>
@@ -1036,6 +1055,7 @@ function homeHtml(){ return homeParts().main; }
     var nextBox = '<div class="sechd"><h3>📅 次の打合せ</h3></div><div class="qbox">'+rvLine+
       (nmText ? '<div class="qdetail nmtext">📝 '+esc(nmText)+'</div>' : '')+'</div>';
     // ホームの上から：スタッフより → NEW → わが家のアルバム → 最新の打合せ記録 → 次の打合せ → 家づくりの進行状況 → ご検討いただく事
+    out += a2hsBannerHtml();
     out += staffCommentHtml();
     out += updatesHtml();
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
@@ -2025,6 +2045,7 @@ function homeHtml(){ return homeParts().main; }
     var jp = e.target.closest("[data-jump]"); if(jp){ jumpTo(jp.dataset.jump); return; }
     var mjp = e.target.closest("[data-menujump]"); if(mjp){ view.tab = homeParts().rest.indexOf('id="'+mjp.dataset.menujump+'"')>=0 ? "info" : "home"; view.cat=null; view.infoJump = mjp.dataset.menujump; render(); window.scrollTo(0,0); return; }
     var msh = e.target.closest("[data-menusheet]"); if(msh){ openSheet(msh.dataset.menusheet); return; }
+    var a2 = e.target.closest("[data-a2hsok]"); if(a2){ try{ localStorage.setItem("okaiA2hsOk","1"); }catch(er){} render(); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ jumpTo(uj.dataset.updjump); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; view.scPhotos=false; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
@@ -2119,13 +2140,26 @@ function homeHtml(){ return homeParts().main; }
     }catch(e){ toast("送れませんでした。もう一度お試しください"); }
     btn.disabled = false;
   });
+  // 「アプリはデスクトップ（ホーム画面）にも出せます」の帯。「分かりました」を押すと、この端末では以後出さない。
+  // すでにホーム画面から開いている（アプリとして起動している）ときも出さない。
+  function a2hsDone(){
+    try{ if(localStorage.getItem("okaiA2hsOk")==="1") return true; }catch(e){}
+    try{ if(window.navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)) return true; }catch(e){}
+    return false;
+  }
+  function a2hsBannerHtml(){
+    if(a2hsDone()) return "";
+    return '<div class="a2hs"><div class="a2t">📲 <b>おうちノートは、お使いのデスクトップ（ホーム画面）にも出せます</b><br>アプリのように、すぐ開けて便利です。</div>'+
+      '<div class="a2b"><button class="linkbtn" data-menusheet="addHomeModal">出し方を見る ›</button><button class="a2ok" data-a2hsok="1">分かりました</button></div></div>';
+  }
   // 下のタブ「≡ メニュー」の画面：絵＋名前のタイルを3列で（家づくりの項目／わが家の情報／そのほか）
   function menuPageHtml(){
     var tile = function(attr, pic, name, badge){
       return '<button class="mtile" '+attr+'><span class="mpic">'+pic+'</span><span class="mnm">'+esc(name)+'</span>'+(badge?'<span class="mbd">'+badge+'</span>':'')+'</button>';
     };
     var emo = function(e){ return '<span class="memo">'+e+'</span>'; };
-    var out = '<h2 class="big">メニュー</h2>';
+    var out = '<h2 class="big">メニュー</h2>'+
+      '<button class="mtop" data-menusheet="addHomeModal">📲 アプリは、お使いのデスクトップ（ホーム画面）にも出せます<span class="ug">›</span></button>';
     // 家づくりの項目（写真があればいちばん新しい写真、無ければ印）
     var cats = (data.categories||[]).filter(function(c){ return c.id!=="plan" && catAllItems(c).length; });
     if(cats.length){
@@ -2148,6 +2182,7 @@ function homeHtml(){ return homeParts().main; }
     out += '<div class="mhd">そのほか</div><div class="mgrid">'+
       tile('data-go="resv"', emo("📅"), "ご予約")+
       tile('data-go="msg"', emo("💬"), "メッセージ")+
+      tile('data-go="album"', emo("🌷"), "わが家のアルバム")+
       '<a class="mtile" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener" style="text-decoration:none;"><span class="mpic">'+emo("🏡")+'</span><span class="mnm">施工事例・イメージ集</span></a>'+
       tile('data-menusheet="orderModal"', emo("🔢"), "決める順番")+
       tile('data-menusheet="memoModal"', emo("✏️"), "わたしのメモ")+
@@ -2182,9 +2217,9 @@ function homeHtml(){ return homeParts().main; }
     var mj = e.target.closest("[data-menujump]"); if(mj){ closeSheet("menuModal"); view.tab = homeParts().rest.indexOf('id="'+mj.dataset.menujump+'"')>=0 ? "info" : "home"; view.cat=null; view.infoJump = mj.dataset.menujump; render(); window.scrollTo(0,0); return; }
     var ms = e.target.closest("[data-menusheet]"); if(ms){ closeSheet("menuModal"); openSheet(ms.dataset.menusheet); }
   });
-  [["btnHelp","help","helpX"],["btnOrder","orderModal","orderX"],["btnMemo","memoModal","memoX"]].forEach(function(t){
+  [["btnHelp","help","helpX"],["btnOrder","orderModal","orderX"],["btnMemo","memoModal","memoX"],[null,"addHomeModal","addHomeX"]].forEach(function(t){
     var openBtn = t[0], sheetId = t[1], closeBtn = t[2];
-    document.getElementById(openBtn).addEventListener("click", function(){ openSheet(sheetId); });
+    if(openBtn) document.getElementById(openBtn).addEventListener("click", function(){ openSheet(sheetId); });
     document.getElementById(closeBtn).addEventListener("click", function(){ closeSheet(sheetId); });
     document.getElementById(sheetId).addEventListener("click", function(e){ if(e.target.id===sheetId) closeSheet(sheetId); });
   });
