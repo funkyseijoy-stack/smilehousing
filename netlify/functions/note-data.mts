@@ -531,7 +531,8 @@ export default async (req: Request, context: Context) => {
       type: "note",
       id: n.id,
       key: "n:" + n.id,
-      askDecision: n.askDecision,
+      // 「最終決定のお願い」の文を入れた記録は、決定ボタンを出す設定にしていなくても出す（その文を入れた＝決定をお願いしたいため）
+      askDecision: n.askDecision === false ? false : (n.askDecision === true || String(n.message || "").includes(FINAL_ASK_TEXT)),
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
       roomId: sp.roomId || null,
       at: noteAt(n),
