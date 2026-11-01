@@ -537,6 +537,44 @@ export default async (req: Request, context: Context) => {
       talk: n.talkPublic ? (n.talk || "") : "", // スタッフが「お客様にも見せる」にした記録だけ
       channel: n.channel || "",
     });
+    // 行ごとに部位を付けた記録：その部位の項目にも、その行だけを「打合せ記録の一部」として出す
+    // （記録そのものの項目と同じ項目の行は重ねて出さない。決定ボタンは付けない）
+    const ownCat = noteCatFor(sp.scope, sp.category);
+    const byCat: Record<string, { p: any; lines: any[] }> = {};
+    for (const l of n.noteLines || []) {
+      const lp = l && l.p;
+      if (!lp || !lp.scope || !String(l.t || "").trim()) continue;
+      const cat = noteCatFor(lp.scope, lp.category);
+      if (!cat || cat === ownCat) continue;
+      const k = cat + "|" + (lp.roomId || "");
+      (byCat[k] = byCat[k] || { p: lp, lines: [] }).lines.push(l);
+    }
+    for (const k of Object.keys(byCat)) {
+      const g = byCat[k];
+      const pick = (m: string) => g.lines.filter((l) => (l.m || "") === m).map((l) => String(l.t)).join("\n");
+      const talk = n.talkPublic ? pick("") : "";
+      const decided = pick("d"), open = pick("o");
+      if (!talk && !decided && !open) continue;
+      push(noteCatFor(g.p.scope, g.p.category), {
+        type: "note",
+        id: n.id,
+        partial: true,
+        label: partLabel(project, g.p.scope, g.p.category, g.p.roomId),
+        roomId: g.p.roomId || null,
+        at: noteAt(n),
+        upd: updAt(n.reflectedAt, n.createdAt),
+        date: n.date || (n.createdAt || "").slice(0, 10),
+        title: n.title || "",
+        decided,
+        open,
+        files: [],
+        spec: { contract: false, quote: false },
+        changing: false,
+        message: "",
+        talk,
+        channel: n.channel || "",
+      });
+    }
   }
 
   const plans = attachments

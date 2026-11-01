@@ -1382,7 +1382,7 @@ function homeHtml(){ return homeParts().main; }
   function feedEntries(){
     var list = [];
     (data.categories||[]).forEach(function(c){
-      catAllItems(c).forEach(function(x){ list.push({ c:c, x:x, at: String(x.at || x.date || x.createdAt || "") }); });
+      catAllItems(c).forEach(function(x){ if(x.partial) return; list.push({ c:c, x:x, at: String(x.at || x.date || x.createdAt || "") }); });
     });
     // 部位を決めていない打合せ記録（どの項目にも入らないもの）
     (data.notes||[]).forEach(function(n){ if(!n.partName && !n.part) list.push({ c:null, x:Object.assign({type:"note"}, n), at: String(n.date || n.createdAt || "") }); });
@@ -1410,7 +1410,7 @@ function homeHtml(){ return homeParts().main; }
       '<button class="chgbtn" data-chg="'+esc(label)+'" data-chgkey="'+esc(x.key||label)+'">✏️ 変更したい</button></div>';
   }
   function feedKindTag(x){
-    if(x.type==="note") return '<span class="tag note">💬 打合せ記録</span>';
+    if(x.type==="note") return '<span class="tag note">💬 打合せ記録'+(x.partial?'の一部':'')+'</span>';
     var ct = String(x.contentType || (x.file && x.file.contentType) || "");
     if(x.type==="planboard" || (x.isQuote && x.quoteType!=="定価")) return '<span class="tag pdf">📐 プランボード</span>';
     if(x.isQuote || ct.indexOf("pdf")>=0) return '<span class="tag pdf">📄 資料</span>';
@@ -1771,7 +1771,7 @@ function homeHtml(){ return homeParts().main; }
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
-            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
+            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録'+(n.partial?'の一部':'')+'</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
           if(n.decided) html += '<div class="section-item-desc"><strong>打合せで決まったこと：</strong>'+esc(n.decided)+'</div>';

@@ -485,6 +485,10 @@
   .mnlrow{ display:flex; flex-direction:column; gap:3px; }
   .mnlmain{ display:flex; gap:4px; align-items:stretch; }
   .mnlmain .mnline{ flex:1; }
+  .mnlpart{ flex:none; max-width:9em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px dashed var(--border); border-radius:10px; background:var(--surface); cursor:pointer; font-size:.85rem; color:var(--muted); font-family:inherit; padding:0 8px; }
+  .mnlpart.on{ border-style:solid; color:var(--accent-ink); background:var(--accent-soft); font-weight:700; }
+  .nlparts{ display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 6px; font-size:.85rem; }
+  .noteitem.partial{ border-left:4px solid var(--accent-soft); }
   .mnlact{ flex:none; width:2.4em; border:1px solid var(--border); border-radius:10px; background:var(--surface); cursor:pointer; font-weight:700; color:var(--muted); font-family:inherit; }
   .mnlact:hover{ color:var(--accent-ink); border-color:var(--accent); }
   .mnlacts{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-inline-start:2em; }
@@ -6421,7 +6425,7 @@
     renderRecPartBox();
     var filter = state.recFilter || {big:"", sub:""};
     var rows = liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; })
-      .filter(function(n){ return recMatch(n.specPart, filter); })
+      .filter(function(n){ return recMatch(n.specPart, filter) || noteLinePartsMatch(n, filter).length>0; })
       .filter(function(n){ return noteHasMark(n, state.recMark||""); })
       .slice()
       .sort(function(a,b){
@@ -6432,7 +6436,20 @@
         if(da !== db) return db.localeCompare(da);
         return (b.createdAt||"").localeCompare(a.createdAt||"");
       });
+    // 部位で絞っていて、記録そのものの部位は違うが「行」にその部位が付いているとき：その行だけのカード
+    var partialCardOf = function(n){
+      var ls = noteLinePartsMatch(n, filter);
+      var grp = function(m, label, cls){ var t = ls.filter(function(l){ return (l.m||"")===m; }).map(function(l){ return l.t; }); return t.length ? '<div class="nbox '+cls+'"><div class="nboxlabel">'+label+'</div><div class="ntext">'+escapeHtml(t.join("\n"))+'</div></div>' : ""; };
+      return '<div class="noteitem partial'+(n.reflected?" reflected":"")+'">'+
+        '<div class="nhead"><span class="ndate">'+escapeHtml(n.date || fmtTs(n.createdAt))+' ・ '+escapeHtml(n.author||"")+'</span>'+
+        (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
+        '<span class="pill tag small">打合せ記録の一部</span>'+(n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
+        '<button class="btn ghost small" data-act="editnote" data-id="'+n.id+'" title="記録全体を開いて行の部位を直す">✏️ 記録を開く</button></div>'+
+        grp("", "打合せ内容", "talk")+grp("d", "✅ 決定事項", "decided")+grp("o", "💭 お客様に検討いただくこと", "open")+
+        '</div>';
+    };
     var cardOf = function(n){
+      if(filter && filter.big && filter.big!=="none" && !recMatch(n.specPart, filter)) return partialCardOf(n);
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
       var nsp = n.specPart || {scope:"general", category:null, roomId:null, side:null};
       var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files, 120)+
@@ -6452,6 +6469,7 @@
         '<button data-act="editnote" data-id="'+n.id+'">編集</button>'+
         '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
         '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
+        '<button data-act="editnote" data-id="'+n.id+'" title="記録を開いて、行ごとに「📍 部位」を付けます">行ごとに部位を付ける</button>'+
         '<div class="notemenu-divider"></div>'+
         '<button data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
         '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
@@ -6480,6 +6498,7 @@
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
+        noteLinePartsChipsHtml(n)+
         talkHtml+
         (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
@@ -6525,6 +6544,23 @@
     }).join("");
   }
   var noteGroupOpen = {};
+  // 記録の行に付けた部位（noteLines の p）のうち、絞り込みに合う行
+  function noteLinePartsMatch(n, f){
+    if(!f || !f.big || f.big==="none") return [];
+    return (n.noteLines||[]).filter(function(l){ return l && l.p && l.p.scope && recMatch(l.p, f); });
+  }
+  // 行に付けた部位の一覧（記録全体のカードに小さく出す）
+  function noteLinePartsChipsHtml(n){
+    var seen = {}, list = [];
+    (n.noteLines||[]).forEach(function(l){
+      if(!l || !l.p || !l.p.scope) return;
+      var k = [l.p.scope, l.p.category||"", l.p.roomId||"", l.p.side||""].join("|");
+      if(!seen[k]){ seen[k] = {p:l.p, c:0}; list.push(seen[k]); }
+      seen[k].c++;
+    });
+    if(!list.length) return "";
+    return '<div class="nlparts"><span class="muted">行の部位：</span>'+list.map(function(x){ return partChipHtml(x.p)+'<span class="muted">'+x.c+'行</span>'; }).join(" ")+'</div>';
+  }
   // 打合せ記録から各リストへ「入れたかどうか」の表示用。
   var NOTE_SEND_TYPES = [
     {type:"companytask", label:"→社内タスクへ", badge:"社内タスク済"},
@@ -12347,6 +12383,11 @@
 
   // ================= meeting notes (⑧) =================
   var editingMeetingNoteId = null;
+  // 入力中の記録の案件（編集中ならその記録の案件、新規ならいま開いている案件）
+  function editingMeetingNoteProjectId(){
+    var n = editingMeetingNoteId ? (state.meetingNotes||[]).find(function(x){ return x.id===editingMeetingNoteId; }) : null;
+    return (n && n.projectId) || state.currentProjectId;
+  }
   function meetingNoteDerivedContent(decided, open){
     // 旧 content フィールドを参照する箇所（部位タイムライン反映・業者/社内タスク化など）向けの後方互換テキスト。
     var parts = [];
@@ -12369,6 +12410,8 @@
   var mnMarks = {};
   // 行ごとに「記録したら作るもの」（社内タスク・追加見積・見積依頼）。キーは行の文
   var mnLineActs = {};
+  // 行ごとの部位（キーは行の文）。記録は「総合」のまま、行ごとに部位を付けると、その部位の一覧・おうちノートの項目にもその行が出る
+  var mnLineParts = {};
   var MN_ACT_LABEL = { task:"社内タスク", est:"追加見積", estreq:"見積依頼（Gmail）" };
   function mnLines(){ var el = document.getElementById("mnBody"); return String(el && el.value || "").split("\n").map(function(x){ return x.trim(); }).filter(Boolean); }
   function mnRender(){
@@ -12378,6 +12421,7 @@
       var m = mnMarks[t] || "";
       var acts = mnLineActs[t] || [];
       return '<div class="mnlrow"><div class="mnlmain"><button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>'+
+        '<button type="button" class="mnlpart'+(mnLineParts[t]?" on":"")+'" data-mnlpart="'+i+'" title="この行の部位">'+(mnLineParts[t] ? escapeHtml(partText(mnLineParts[t])) : "📍 部位")+'</button>'+
         '<button type="button" class="mnlact" data-mnlact="'+i+'" title="この行から作る" aria-label="この行から作る">⋯</button></div>'+
         (acts.length ? '<div class="mnlacts">'+acts.map(function(a, k){
           var extra = a.type==="task" ? (a.assignee?"："+a.assignee:"") : a.type==="estreq" ? "："+a.vendorIds.map(function(id){ var v = vendorById(id); return v?v.name:""; }).filter(Boolean).join("、") : "";
@@ -12395,13 +12439,15 @@
     document.getElementById("meetingNoteDecided").value = d.join("\n");
     document.getElementById("meetingNoteOpen").value = o.join("\n");
   }
-  function mnNoteLines(){ return mnLines().map(function(x){ return {t:x, m:mnMarks[x]||""}; }); }
+  function mnNoteLines(){ return mnLines().map(function(x){ var l = {t:x, m:mnMarks[x]||""}; if(mnLineParts[x]) l.p = mnLineParts[x]; return l; }); }
+  function mnHasLineParts(){ return mnLines().some(function(x){ return !!mnLineParts[x]; }); }
   function mnLoad(talk, decided, open, noteLines){
     mnMarks = {};
     mnLineActs = {};
+    mnLineParts = {};
     var lines = [];
     if(Array.isArray(noteLines) && noteLines.length){
-      noteLines.forEach(function(l){ var t = String(l.t||"").trim(); if(!t) return; lines.push(t); if(l.m) mnMarks[t] = l.m; });
+      noteLines.forEach(function(l){ var t = String(l.t||"").trim(); if(!t) return; lines.push(t); if(l.m) mnMarks[t] = l.m; if(l.p && l.p.scope) mnLineParts[t] = l.p; });
     } else {
       // 以前の記録：打合せ内容 → 決定事項（✅）→ 未決（💭）の順に1つにまとめる
       var split = function(v){ return String(v||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean); };
@@ -12492,6 +12538,7 @@
       existing.talk = talk;
       existing.talkPublic = talkPublic;
       existing.noteLines = mnNoteLines();
+      if(!existing.specPart && mnHasLineParts()) existing.specPart = recLeafPart("general", "", projectById(existing.projectId));
       existing.channel = channel;
       existing.message = message;
       existing.content = meetingNoteDerivedContent(decided, open);
@@ -12531,7 +12578,7 @@
     if(exFail) toast("書き込んだ図面のうち "+exFail+" 件を保存できませんでした");
     var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, noteLines:mnNoteLines(), channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
-      specPart: newMeetingNoteSpecPart || null, badges: badgesToApply, autoCreated: {} };
+      specPart: newMeetingNoteSpecPart || (mnHasLineParts() ? recLeafPart("general", "", projectById(pidNote)) : null), badges: badgesToApply, autoCreated: {} };
     state.meetingNotes.push(n);
     cancelEditMeetingNote();
     render();
@@ -14782,6 +14829,23 @@
         var pr = rm.dataset.mnlrm.split("|"), tx = mnLines()[+pr[0]];
         if(tx && mnLineActs[tx]){ mnLineActs[tx].splice(+pr[1], 1); if(!mnLineActs[tx].length) delete mnLineActs[tx]; }
         mnRender(); return;
+      }
+      var lp = e.target.closest("[data-mnlpart]");
+      if(lp){
+        var ltp = mnLines()[+lp.dataset.mnlpart]; if(!ltp) return;
+        var setPart = function(){
+          askSpecPart(function(part){
+            if(!part) return;
+            mnLineParts[ltp] = {scope:part.scope, category:part.category||null, roomId:part.roomId||null, side:part.side||null, label:part.label||""};
+            mnRender();
+          }, editingMeetingNoteProjectId());
+        };
+        if(mnLineParts[ltp]){
+          askChoice("この行の部位", "「"+ltp.slice(0,40)+"」\nいま：" + partText(mnLineParts[ltp]), [{label:"部位を変える", value:"set"},{label:"部位を外す", value:"rm"}], function(v){
+            if(v==="set") setPart(); else if(v==="rm"){ delete mnLineParts[ltp]; mnRender(); }
+          });
+        } else setPart();
+        return;
       }
       var ab = e.target.closest("[data-mnlact]");
       if(ab){
