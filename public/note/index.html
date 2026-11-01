@@ -204,6 +204,15 @@
   .todobox.hsec{ border-left-width:1.5px; border-color:var(--line); } .todobox.hsec .td:first-child{ border-top:0; padding-top:2px; }
   .homelink{ margin:-6px 2px 16px; text-align:right; }
   .qdetail.nmtext{ white-space:pre-wrap; line-height:1.7; font-size:.9rem; }
+  .mhd{ font-size:.8rem; font-weight:700; color:var(--muted); letter-spacing:.08em; margin:18px 2px 8px; }
+  .mgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 8px; }
+  .mtile{ position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; background:none; border:0; padding:0; font-family:inherit; color:inherit; cursor:pointer; }
+  .mtile .mpic{ width:100%; aspect-ratio:1/1; border-radius:14px; background:var(--card); border:1px solid var(--line); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .mtile .mpic img{ width:100%; height:100%; object-fit:cover; }
+  .mtile .mico svg{ width:40px; height:40px; color:var(--brown); }
+  .mtile .memo{ font-size:2rem; }
+  .mtile .mnm{ font-size:.82rem; font-weight:700; line-height:1.35; text-align:center; }
+  .mtile .mbd{ position:absolute; top:6px; right:6px; background:#d9534f; color:#fff; font-size:.6rem; font-weight:700; border-radius:999px; padding:1px 6px; }
   .dlist{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:4px 12px; margin:0 0 16px; }
   .dlist .dl{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:0; border-top:1px solid var(--line); padding:12px 0; font-family:inherit; color:inherit; cursor:pointer; }
   .dlist .dl:first-child{ border-top:0; }
@@ -485,7 +494,7 @@
     <button class="hbtn" id="btnMail" aria-label="メッセージ">
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
     <span class="hl">メッセージ</span></button>
-    <button class="hbtn" id="btnMenu" aria-label="メニュー">
+    <button class="hbtn" id="btnMenu" aria-label="メニュー" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="#d8bf9d" stroke-width="1.7" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
     <span class="hl">メニュー</span></button>
   </header>
@@ -500,9 +509,8 @@
   <button data-tab="home"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg></span>ホーム</button>
   <button data-tab="album"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>アルバム</button>
   <button data-tab="image"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>イメージ</button>
-  <button data-tab="msg"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span>メッセージ</button>
-  <button data-tab="resv"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M8 14h3M13 14h3M8 17h3"/></svg></span>予約</button>
   <button data-tab="build"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg></span>家づくり</button>
+  <button data-tab="menu"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>メニュー</button>
 </nav>
 
 <div class="lb" id="lb" hidden><button class="x" id="lbX" aria-label="閉じる">×</button><img id="lbImg" alt=""></div>
@@ -779,10 +787,11 @@
 
   function render(){
     renderBand();
-    Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function(b){ b.classList.toggle("on", b.dataset.tab===view.tab); });
+    Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function(b){ b.classList.toggle("on", b.dataset.tab===view.tab || (b.dataset.tab==="menu" && (view.tab==="info" || view.tab==="resv"))); });
     var html = "";
     if(view.tab==="home") html = homeHtml();
     else if(view.tab==="info") html = infoHtml();
+    else if(view.tab==="menu") html = menuPageHtml();
     else if(view.tab==="album") html = albumHtml();
     else if(view.tab==="msg") html = msgHtml();
     else if(view.tab==="resv") html = resvHtml();
@@ -2014,6 +2023,8 @@ function homeHtml(){ return homeParts().main; }
     var pt = e.target.closest("[data-progtoggle]"); if(pt){ view.progOpen = !view.progOpen; render(); return; }
     var fa = e.target.closest("[data-feedall]"); if(fa){ view.feedAll = true; render(); return; }
     var jp = e.target.closest("[data-jump]"); if(jp){ jumpTo(jp.dataset.jump); return; }
+    var mjp = e.target.closest("[data-menujump]"); if(mjp){ view.tab = homeParts().rest.indexOf('id="'+mjp.dataset.menujump+'"')>=0 ? "info" : "home"; view.cat=null; view.infoJump = mjp.dataset.menujump; render(); window.scrollTo(0,0); return; }
+    var msh = e.target.closest("[data-menusheet]"); if(msh){ openSheet(msh.dataset.menusheet); return; }
     var uj = e.target.closest("[data-updjump]"); if(uj){ jumpTo(uj.dataset.updjump); return; }
     var go = e.target.closest("[data-go]"); if(go){ view.tab = go.dataset.go; view.cat=null; view.scPhotos=false; render(); window.scrollTo(0,0); return; }
     var hx = e.target.closest("[data-hintx]"); if(hx){ try{ localStorage.setItem("okaiHintClosed","1"); }catch(er){} render(); return; }
@@ -2108,6 +2119,42 @@ function homeHtml(){ return homeParts().main; }
     }catch(e){ toast("送れませんでした。もう一度お試しください"); }
     btn.disabled = false;
   });
+  // 下のタブ「≡ メニュー」の画面：絵＋名前のタイルを3列で（家づくりの項目／わが家の情報／そのほか）
+  function menuPageHtml(){
+    var tile = function(attr, pic, name, badge){
+      return '<button class="mtile" '+attr+'><span class="mpic">'+pic+'</span><span class="mnm">'+esc(name)+'</span>'+(badge?'<span class="mbd">'+badge+'</span>':'')+'</button>';
+    };
+    var emo = function(e){ return '<span class="memo">'+e+'</span>'; };
+    var out = '<h2 class="big">メニュー</h2>';
+    // 家づくりの項目（写真があればいちばん新しい写真、無ければ印）
+    var cats = (data.categories||[]).filter(function(c){ return c.id!=="plan" && catAllItems(c).length; });
+    if(cats.length){
+      out += '<div class="mhd">家づくり</div><div class="mgrid">'+cats.map(function(c){
+        var imgs = catAllItems(c).filter(function(x){ return !x.partial && x.file && x.file.url && isImg(x.file); })
+          .sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
+        var pic = imgs.length ? '<img loading="lazy" src="'+esc(imgs[0].file.url)+'" alt="">' : '<span class="mico">'+(ICONS[c.icon]||ICONS.house)+'</span>';
+        var nw = catNewCount(c);
+        return tile('data-buildcat="'+esc(c.id)+'"', pic, c.name, nw ? 'NEW' : '');
+      }).join("")+'</div>';
+    }
+    // わが家の情報（ホームに出していない欄）
+    var info = homeParts().rest;
+    var has = function(id){ return info.indexOf('id="'+id+'"')>=0; };
+    var infoTiles = [["sec-plan","📐","平面図"],["sec-pb","🖼","最新のプランボード"],["sec-est","🧾","追加見積り"],["sec-chk","✅","決めることの一覧"],
+      ["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電"],["sec-ntc","📢","お知らせ"],["sec-proc","📘","契約後に知っておきたいこと"],["sec-svc","🔗","ご利用中のサービス"]]
+      .filter(function(m){ return has(m[0]) || m[0]==="sec-fam"; })
+      .map(function(m){ return tile('data-menujump="'+m[0]+'"', emo(m[1]), m[2]); });
+    if(infoTiles.length) out += '<div class="mhd">わが家の情報</div><div class="mgrid">'+infoTiles.join("")+'</div>';
+    out += '<div class="mhd">そのほか</div><div class="mgrid">'+
+      tile('data-go="resv"', emo("📅"), "ご予約")+
+      tile('data-go="msg"', emo("💬"), "メッセージ")+
+      '<a class="mtile" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener" style="text-decoration:none;"><span class="mpic">'+emo("🏡")+'</span><span class="mnm">施工事例・イメージ集</span></a>'+
+      tile('data-menusheet="orderModal"', emo("🔢"), "決める順番")+
+      tile('data-menusheet="memoModal"', emo("✏️"), "わたしのメモ")+
+      tile('data-menusheet="help"', emo("❔"), "使い方")+
+      '</div>';
+    return out;
+  }
   // ≡メニュー：ホームに出さない欄（わが家の情報）と、決める順番・メモ・使い方
   function menuRows(){
     var r = [];
