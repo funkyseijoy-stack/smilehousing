@@ -13281,6 +13281,79 @@
     if(!blob) return;
     mnOpenDraw(blob, name, mnIsPdf(ct, name), after);
   }
+  // この案件に登録済みのファイル（図面・見積の書類＝ロック中のNETは除く／記録・部位の履歴の写真・PDF）を選んで行に付ける。
+  // アップロードし直さず同じファイルを参照する（{ref}）。同じファイル（url）は1つにまとめる
+  function mnRegisteredFiles(pid){
+    var out = [], seen = {};
+    var okType = function(ct, nm){ ct = ct||""; return ct.indexOf("image")===0 || ct.indexOf("pdf")>=0 || /\.(pdf|jpe?g|png|gif|webp|heic)$/i.test(nm||""); };
+    var add = function(group, ref, at, sub){
+      if(!ref || !ref.url || seen[ref.url] || !okType(ref.contentType, ref.name)) return;
+      seen[ref.url] = 1; out.push({ group:group, ref:ref, at:String(at||""), sub:sub||"" });
+    };
+    liveAttachments().forEach(function(a){
+      if(a.projectId!==pid || (a.kind!=="plan" && a.kind!=="quote")) return;
+      if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return;
+      add(a.kind==="plan" ? "📐 図面" : "📄 見積の書類", { id:a.assetId, url:a.url, contentType:a.contentType, name:a.name||"書類" }, a.uploadedAt||a.createdAt, a.kind==="plan" ? "" : quoteTypeNorm(a.quoteType||""));
+    });
+    liveSpecPhotos().forEach(function(p){
+      if(p.projectId!==pid || p.kind==="note" || !p.url) return;
+      add("📷 部位の写真・PDF", { id:p.assetId, url:p.url, contentType:p.contentType, name:p.fileName||p.title||"写真" }, p.createdAt, p.scope ? partText({scope:p.scope, category:p.category, roomId:p.roomId, side:p.side}) : "");
+    });
+    liveNotes().forEach(function(n){
+      if(n.projectId!==pid) return;
+      var sub = (n.date||"")+(n.title?" "+n.title:"");
+      (n.files||[]).forEach(function(f){ add("🗒 記録の添付", { id:f.id, url:f.url, contentType:f.contentType, name:f.name||"添付" }, n.date||n.createdAt, sub); });
+      (n.noteLines||[]).forEach(function(l){ (l.f||[]).forEach(function(f){ add("🗒 記録の添付", { id:f.id, url:f.url, contentType:f.contentType, name:f.name||"添付" }, n.date||n.createdAt, sub); }); });
+    });
+    out.sort(function(a,b){ return b.at.localeCompare(a.at); });
+    return out;
+  }
+  function mnLinePickRegistered(line){
+    var pid = editingMeetingNoteProjectId();
+    var rows = mnRegisteredFiles(pid);
+    if(!rows.length){ toast("この案件にはまだ登録済みのファイルがありません", 6000); return; }
+    var groups = ["📐 図面","📄 見積の書類","📷 部位の写真・PDF","🗒 記録の添付"];
+    var picked = {};
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "90";
+    ov.innerHTML = '<div class="taskform-card" style="max-width:820px; width:100%; max-height:92vh; overflow:auto;">'+
+      '<div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">📐 登録済みのファイルから選ぶ</h3><button type="button" class="btn secondary small" data-mnr-close>閉じる</button></div>'+
+      '<p class="muted" style="margin:4px 0 8px; font-size:.85rem;">「'+escapeHtml(line.slice(0,40))+'」に付けます。押して選び（複数可）、下の「選んだものを付ける」。</p>'+
+      groups.map(function(g){
+        var gs = rows.map(function(r, i){ return {r:r, i:i}; }).filter(function(x){ return x.r.group===g; });
+        if(!gs.length) return "";
+        return '<div style="font-weight:700; margin:10px 0 4px;">'+escapeHtml(g)+'（'+gs.length+'）</div><div class="ftgrid">'+gs.map(function(x){
+          var r = x.r;
+          return '<div class="fttile" data-mnr="'+x.i+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(r.ref.url, r.ref.contentType, r.ref.name)+'</div>'+
+            '<div class="ftbody"><div class="ftname">'+escapeHtml(r.ref.name)+'</div><div class="ftmeta">'+(r.sub?'<span class="pill small">'+escapeHtml(r.sub)+'</span>':'')+'</div></div></div>';
+        }).join("")+'</div>';
+      }).join("")+
+      '<div class="row" style="position:sticky; bottom:0; background:var(--surface); padding-block:10px 2px; gap:8px; margin-block-start:10px;"><button type="button" class="btn" data-mnr-ok disabled>選んだものを付ける</button><button type="button" class="btn secondary" data-mnr-close>やめる</button></div></div>';
+    document.body.appendChild(ov);
+    var okBtn = ov.querySelector("[data-mnr-ok]");
+    ov.addEventListener("click", function(e){
+      if(e.target===ov || e.target.closest("[data-mnr-close]")){ ov.remove(); return; }
+      var t = e.target.closest("[data-mnr]");
+      if(t){
+        var i = +t.dataset.mnr;
+        if(picked[i]) delete picked[i]; else picked[i] = 1;
+        t.style.outline = picked[i] ? "3px solid var(--accent)" : ""; t.style.outlineOffset = picked[i] ? "2px" : "";
+        var n = Object.keys(picked).length; okBtn.disabled = !n; okBtn.textContent = n ? "選んだ "+n+" 件を付ける" : "選んだものを付ける";
+        return;
+      }
+      if(e.target.closest("[data-mnr-ok]")){
+        if(mnLines().indexOf(line)<0){ ov.remove(); toast("行が見つかりません（文を書き換えた場合は、もう一度「⋯」から選んでください）"); return; }
+        var arr = mnLineFiles[line] = mnLineFiles[line] || [], added = 0;
+        Object.keys(picked).forEach(function(k){
+          var r = rows[+k]; if(!r) return;
+          if(arr.some(function(f){ return f.ref && f.ref.url===r.ref.url; })) return;
+          arr.push({ ref: Object.assign({}, r.ref) }); added++;
+        });
+        ov.remove(); mnRender();
+        toast(added ? "この行に "+added+" 件のファイルを付けました（「✏️ 書き込む」もできます。「記録する／更新」で保存）" : "すでに付いているファイルでした", 7000);
+      }
+    });
+  }
   // 行に付けたファイル：見る／プランボードで書き込む（書いた版はその行に足す。元のファイルは残す）
   function mnLineFileView(it){
     var w = window.open("", "_blank");
@@ -15278,11 +15351,13 @@
         var lt = mnLines()[+ab.dataset.mnlact]; if(!lt) return;
         askChoice("この行で", "「"+lt.slice(0,40)+"」", [
           {label:"📎 この行にファイルを付ける", value:"file"},
+          {label:"📐 登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
           {label: mnLineAsk[lt] ? "🔘 お客様に決定してもらう（取り消す）" : "🔘 この行をお客様に決定してもらう", value:"ask"},
           {label:"📍 この行の部位", value:"part"},
           {label:"→ 社内タスク", value:"task"}, {label:"→ 追加見積（おうちノート）", value:"est"}, {label:"→ 見積依頼（Gmail下書き・添付付き）", value:"estreq"}
         ], function(kind){
           if(!kind) return;
+          if(kind==="pick"){ mnLinePickRegistered(lt); return; }
           if(kind==="file"){ mnLineFileTarget = lt; var lfi = document.getElementById("mnLineFileInput"); if(lfi){ lfi.value = ""; lfi.click(); } return; }
           if(kind==="ask"){
             if(mnMarks[lt]==="c"){ toast("🔒社内で確認の行は、お客様には出せません"); return; }
