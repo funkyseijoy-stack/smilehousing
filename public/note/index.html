@@ -203,6 +203,7 @@
   .todobox .td{ border-top:1px solid var(--line); padding:10px 0 4px; }
   .todobox.hsec{ border-left-width:1.5px; border-color:var(--line); } .todobox.hsec .td:first-child{ border-top:0; padding-top:2px; }
   .homelink{ margin:-6px 2px 16px; text-align:right; }
+  .qdetail.nmtext{ white-space:pre-wrap; line-height:1.7; font-size:.9rem; }
   .dlist{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:4px 12px; margin:0 0 16px; }
   .dlist .dl{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:0; border-top:1px solid var(--line); padding:12px 0; font-family:inherit; color:inherit; cursor:pointer; }
   .dlist .dl:first-child{ border-top:0; }
@@ -1020,9 +1021,14 @@ function homeHtml(){ return homeParts().main; }
     } else {
       rvLine = '<button class="qrow" data-go="resv"><span class="qi">📅</span><span class="qt">次回のご予約はありません　<b class="lnk">予約する</b></span><span class="ug">›</span></button>';
     }
-    out += '<div class="qbox"><button class="qrow" data-progtoggle="1"><span class="qi">🏠</span><span class="qt">'+progLine+'</span><span class="ug">'+(view.progOpen?'▴':'▾')+'</span></button>'+
-      (view.progOpen ? '<div class="qdetail">'+progDetail+'</div>' : '')+rvLine+'</div>';
-
+    var progBox = '<div class="sechd"><h3>🏠 家づくりの進行状況</h3></div><div class="qbox"><button class="qrow" data-progtoggle="1"><span class="qi">🏠</span><span class="qt">'+progLine+'</span><span class="ug">'+(view.progOpen?'▴':'▾')+'</span></button>'+
+      (view.progOpen ? '<div class="qdetail">'+progDetail+'</div>' : '')+'</div>';
+    var nmText = (data.nextMeeting && data.nextMeeting.text) ? String(data.nextMeeting.text) : "";
+    var nextBox = '<div class="sechd"><h3>📅 次の打合せ</h3></div><div class="qbox">'+rvLine+
+      (nmText ? '<div class="qdetail nmtext">📝 '+esc(nmText)+'</div>' : '')+'</div>';
+    // ホームの上から：スタッフより → NEW → わが家のアルバム → 最新の打合せ記録 → 次の打合せ → 家づくりの進行状況 → ご検討いただく事
+    out += staffCommentHtml();
+    out += updatesHtml();
     out += '<div class="sechd"><h3>🌷 わが家のアルバム</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(newCount) out += '<div class="newmsg">新しい写真が'+newCount+'枚届いています</div>';
     var homeShown = homeChosen(album);
@@ -1033,19 +1039,15 @@ function homeHtml(){ return homeParts().main; }
         return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt)+'<br>'+(a.kind==="reference"?"参考写真":"アルバムの写真")+'</div></button>';
       }).join("")+'</div>';
     } else out += '<div class="empty">写真が届くと、ここに表示されます。</div>';
-    out += updatesHtml();
-    out += staffCommentHtml();
     out += latestNotesHtml();
+    out += nextBox;
+    out += progBox;
     out += decideListHtml();
     // ここから下は「そのほかの情報」にまとめる
     var mainOut = out; out = "";
     out += homePbHtml();
 
-    // 次回の打合せの予定（スタッフが入力した文章）
-    if(data.nextMeeting && data.nextMeeting.text){
-      out += '<div class="sechd" id="sec-nextmeet"><h3>📝 打合せの予定</h3></div>'+
-        '<div class="rv" style="display:block;"><div class="tm" style="white-space:pre-wrap; line-height:1.7; color:var(--ink,inherit);">'+esc(data.nextMeeting.text)+'</div></div>';
-    }
+    // 次回の打合せの予定（スタッフが入力した文章）は、ホームの「次の打合せ」に出す
 
     // 決めることの一覧（スタッフが入力。決まった項目だけ「✓ 決まった」の印が付く）
     if(data.meetingChecklist && data.meetingChecklist.items && data.meetingChecklist.items.length){
@@ -1515,37 +1517,41 @@ function homeHtml(){ return homeParts().main; }
   // ② 最新の打合せ内容：いちばん新しい日の記録を全部
   function latestNotesHtml(){
     var notes = data.notes||[];
-    var hd = '<div class="sechd"><h3>🗒 最近の打合せ内容</h3>';
+    var hd = '<div class="sechd"><h3>🗒 最新の打合せ記録</h3>';
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
     var list = notes.filter(function(n){ return String(n.date||"")===last; });
     return hd+'<span class="countpill">'+fmtD(last)+'</span></div><div class="catlist">'+list.map(function(n){
-        return '<div class="tli flat">'+noteBody(n, true)+'</div>';
+        return '<div class="tli flat">'+noteBody(n, true, true)+'</div>';
       }).join("")+'</div>'+
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
   }
   // 決めていただきたいこと：承認待ちの追加見積り・決定ボタンのカード・打合せ記録の💭を1行ずつ。押すとその場所へ移動
   function decideListHtml(){
-    var rows = [], LIM = 6;
-    (data.estimates||[]).forEach(function(x){
+    // 項目ごとに1行：「キッチン：決定してください（2件）」「外壁：ご検討ください」「追加見積りの金額をご確認ください」。押すとその場所へ
+    var rows = [], byCat = {}, order = [];
+    var ests = (data.estimates||[]).filter(function(x){
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
-      if(pendingAmt || !x.id || (x.customerResponse||"未回答")!=="未回答") return;
-      rows.push({ tag:"追加見積り", t:(x.title||"")+"　"+(x.amount||""), sub:"承認・見送りをお選びください", a:'data-jump="est-'+esc(x.id)+'"' });
+      return !pendingAmt && x.id && (x.customerResponse||"未回答")==="未回答";
     });
-    askItems().forEach(function(e){
-      var t = e.x.title || e.x.decided || e.x.open || (e.x.source && e.x.source.noteSnippet) || (e.x.type==="planboard"?"プランボード":"写真・資料");
-      rows.push({ tag:e.c.name, t:String(t).slice(0,50), sub:"「変更したい」か「これで決定」をお選びください", a:'data-buildcat="'+esc(e.c.id)+'"' });
-    });
+    if(ests.length) rows.push({ t:"追加見積りの金額をご確認ください", n:ests.length, a:'data-jump="sec-est"' });
+    var add = function(key, name, kind, attr){
+      if(!byCat[key]){ byCat[key] = { name:name, ask:0, cons:0, a:attr }; order.push(key); }
+      byCat[key][kind]++;
+    };
+    askItems().forEach(function(e){ add(e.c.id, e.c.name, "ask", 'data-buildcat="'+esc(e.c.id)+'"'); });
     consItems().forEach(function(c){
-      rows.push({ tag:c.part||c.title||"打合せ", t:c.t, sub:"ご検討ください（"+fmtD(c.date)+"の打合せ）", a:(c.id ? 'data-opennote="'+esc(c.id)+'"' : 'data-opennotes="1"') });
+      var cat = null;
+      if(c.id) (data.categories||[]).some(function(cc){ if(catAllItems(cc).some(function(x){ return x.type==="note" && x.id===c.id && !x.partial; })){ cat = cc; return true; } return false; });
+      if(cat) add(cat.id, cat.name, "cons", 'data-buildcat="'+esc(cat.id)+'"');
+      else { var nm = c.part || c.title || "打合せ"; add("n:"+nm, nm, "cons", c.id ? 'data-opennote="'+esc(c.id)+'"' : 'data-opennotes="1"'); }
     });
-    var out = '<div class="sechd"><h3>🙋 決めていただきたいこと</h3>'+(rows.length?'<span class="countpill">'+rows.length+'件</span>':'')+'</div>';
+    order.forEach(function(k){ var g = byCat[k]; rows.push({ t: g.name+"："+(g.ask ? "決定してください" : "ご検討ください"), n: g.ask + g.cons, a: g.a }); });
+    var out = '<div class="sechd"><h3>🙋 ご検討いただく事</h3></div>';
     if(!rows.length) return out+'<div class="empty">いまはありません。</div>';
-    var show = view.apprAll ? rows : rows.slice(0, LIM);
-    return out+'<div class="dlist">'+show.map(function(r){
-        return '<button class="dl" '+r.a+'><span class="ptag">'+esc(r.tag)+'</span><span class="dt"><b>'+esc(r.t)+'</b><small>'+esc(r.sub)+'</small></span><span class="ug">›</span></button>';
-      }).join("")+
-      (rows.length>LIM ? '<button class="consmore" data-apprall="1">'+(view.apprAll?'閉じる ▴':'ほか '+(rows.length-LIM)+'件を見る ▾')+'</button>' : '')+'</div>';
+    return out+'<div class="dlist">'+rows.map(function(r){
+      return '<button class="dl" '+r.a+'><span class="dt"><b>・'+esc(r.t)+(r.n>1?'（'+r.n+'件）':'')+'</b></span><span class="ug">›</span></button>';
+    }).join("")+'</div>';
   }
   // ③ ご検討いただきたいこと：打合せ記録の💭（反映済みの記録から）
   function homeConsHtml(){
@@ -1639,12 +1645,13 @@ function homeHtml(){ return homeParts().main; }
     }
     return out;
   }
-  function noteBody(n, showPart){
+  function noteBody(n, showPart, noOpen){
     return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.talk?'<div class="box"><div class="bl">打合せの内容</div>'+esc(n.talk).replace(/\n/g,"<br>")+'</div>':'')+
       (n.decided?'<div class="box dec"><div class="bl">打合せで決まったこと</div>'+esc(n.decided)+'</div>':'')+
-      (n.open?'<div class="box opn"><div class="bl">ご検討いただきたいこと</div>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:''))):'')+
+      (n.open && noOpen?'<div class="tm" style="margin-top:6px;">💭 ご検討いただく事は、下の「ご検討いただく事」にまとめています</div>':'')+
+      (n.open && !noOpen?'<div class="box opn"><div class="bl">ご検討いただきたいこと</div>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:''))):'')+
       (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
   }
