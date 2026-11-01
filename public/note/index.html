@@ -131,6 +131,15 @@
   .nph .ngrid img{ width:100%; height:100%; object-fit:cover; display:block; }
   .nph .scmore{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:700; font-size:1.1rem; }
   .nph .srep{ display:flex; justify-content:flex-end; gap:14px; flex-wrap:wrap; margin-top:8px; }
+  .pcards{ display:flex; flex-direction:column; gap:12px; margin-bottom:18px; }
+  .pcard{ background:var(--card); border:1.5px solid #f0d9a8; border-left:5px solid #d9a441; border-radius:16px; padding:12px 14px; }
+  .pcard.opt{ border-left-color:#7a9a6a; border-color:#d6e3cc; }
+  .pcard .pch{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .pcard .pct{ font-size:.92rem; line-height:1.7; }
+  .pcard .pamt{ font-size:1.15rem; font-weight:700; margin-top:6px; }
+  .pcard .pamt .tx{ font-size:.75rem; font-weight:400; color:var(--muted); margin-left:4px; }
+  .pcard .pcb{ display:flex; gap:8px; margin-top:10px; }
+  .pcard .pcb .btn{ flex:1; }
   .scphotos{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 18px; }
   .scphotos h3{ margin:0 0 4px; font-size:1rem; color:var(--brown); }
   .scphotos .scnote{ font-size:.85rem; color:var(--muted); margin:0 0 10px; white-space:pre-wrap; }
@@ -1090,6 +1099,7 @@ function homeHtml(){ return homeParts().main; }
     out += staffCommentHtml();
     out += updatesHtml();
     out += latestNotesHtml();
+    out += pendingCardsHtml();
     out += nextBox;
     out += progBox;
     out += decideListHtml();
@@ -1555,11 +1565,47 @@ function homeHtml(){ return homeParts().main; }
     out += '<div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;"><button class="linkbtn" data-seg="notes">✅ 決まったことのまとめ</button><button class="linkbtn" data-seg="docs">📄 資料・平面図をまとめて見る</button></div>';
     return out;
   }
+  // 「変更したい」を送ったカード（この端末で送った／お客様からのメッセージに同じカードの【変更のご依頼】がある）
+  function chgDone(c, x){
+    if(!x.key) return false;
+    if(chgSent[x.key]) return true;
+    try{ var cs = JSON.parse(localStorage.getItem("okaiChg:"+P)||"{}"); if(cs[x.key]) return true; }catch(e){}
+    var lab = "【変更のご依頼】"+chgLabelOf(c, x), at = Date.parse(x.at||x.date||"")||0;
+    return (data.messages||[]).some(function(m){ return m.fromCustomer && String(m.content||"").indexOf(lab)===0 && (Date.parse(m.createdAt||"")||0) >= at; });
+  }
+  // ホームの「ご確認・ご決定ください」：決定ボタンを出していて返事のないカードと、金額が入った追加見積り（オプション）。
+  // 決定・変更のご依頼・承認・見送りをすると、ホームから外れる（各部位の項目にはそのまま残る）
+  function pendingCardsHtml(){
+    var cards = [];
+    askItems().forEach(function(e){
+      var c = e.c, x = e.x, room = "", roomName = "";
+      (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
+      var part = roomName || partOf(c, x) || x.label || c.name;
+      var files = (x.files && x.files.length) ? x.files : (x.file ? [x.file] : []);
+      var text = String(x.title || x.snippet || x.decided || x.talk || x.note || "").trim();
+      var ra = ' data-ckey="'+esc(x.key)+'" data-croom="'+esc(room)+'" data-clabel="'+esc(text.slice(0,40) || part)+'" data-ccat="'+esc(room ? "rooms" : c.id)+'"';
+      cards.push('<div class="pcard"><div class="pch"><span class="ptag">'+esc(part)+'</span><span class="tk">'+fmtD(x.date||x.at)+'</span>'+nwTag(x.upd)+'</div>'+
+        (text ? '<div class="pct">'+esc(text).replace(/\n/g,"<br>")+'</div>' : '')+
+        (files.length ? '<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>' : '')+
+        '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn dk" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>'+
+        '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
+    });
+    (data.estimates||[]).forEach(function(x){
+      var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
+      if(pendingAmt || !x.id || (x.customerResponse||"未回答")!=="未回答") return;
+      cards.push('<div class="pcard opt"><div class="pch"><span class="ptag">オプション（追加見積り）</span>'+nwTag(x.updated||x.createdAt)+'</div>'+
+        '<div class="pct"><b>'+esc(x.title||"")+'</b>'+(x.note && x.note!==x.title ? '<br>'+esc(x.note).replace(/\n/g,"<br>") : '')+'</div>'+
+        '<div class="pamt">'+esc(String(x.amount||""))+'<span class="tx">（税抜き）</span></div>'+
+        '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn dk" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
+    });
+    if(!cards.length) return "";
+    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+cards.length+'件</span></div><div class="pcards">'+cards.join("")+'</div>';
+  }
   // ---- ホームの「ご確認ください」：決定ボタンを出しているカードのうち、まだ検討中のもの ----
   function askItems(){
     var a = [];
     (data.categories||[]).forEach(function(c){
-      catAllItems(c).forEach(function(x){ if(x.showDecide && (x.cardStatus||"検討中")==="検討中") a.push({c:c, x:x, at:String(x.at||x.date||"")}); });
+      catAllItems(c).forEach(function(x){ if(x.showDecide && (x.cardStatus||"検討中")==="検討中" && !chgDone(c, x)) a.push({c:c, x:x, at:String(x.at||x.date||"")}); });
     });
     a.sort(function(p,q){ return (Date.parse(q.at)||0) - (Date.parse(p.at)||0); });
     return a;
@@ -1576,16 +1622,12 @@ function homeHtml(){ return homeParts().main; }
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
     var list = notes.filter(function(n){ return String(n.date||"")===last; });
-    // 総合のあとに、同じ日の部位ごとの記録（中身のあるもの）も並べる。部位の記録は「家づくり」の各項目でも見られる
-    all.forEach(function(n){
-      if(String(n.date||"")!==last || list.indexOf(n)>=0) return;
-      list.push(n);
-    });
+    // 部位ごとの記録はホームには出さない（決定待ちのものは下の「ご確認・ご決定ください」、過去の分は「家づくり」の各部位で見る）
     return hd+'<span class="countpill">'+fmtD(last)+'</span></div><div class="catlist">'+list.map(function(n){
         var f = noteDecItem(n);
         var isGen = n.scope==="general" || !n.scope;
         var link = (!isGen && f) ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
-        return '<div class="tli flat">'+noteBody(n, true, true)+homeDecHtml(n, f)+link+'</div>';
+        return '<div class="tli flat">'+noteBody(n, true, true)+link+'</div>';
       }).join("")+'</div>'+
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
   }
@@ -1619,12 +1661,11 @@ function homeHtml(){ return homeParts().main; }
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
       return !pendingAmt && x.id && (x.customerResponse||"未回答")==="未回答";
     });
-    if(ests.length) rows.push({ t:"追加見積りの金額をご確認ください", n:ests.length, a:'data-jump="sec-est"' });
+    // 追加見積り・決定ボタンのカードは、上の「ご確認・ご決定ください」にカードで出すので、ここは💭（ご検討いただく事）だけ
     var add = function(key, name, kind, attr){
       if(!byCat[key]){ byCat[key] = { name:name, ask:0, cons:0, a:attr }; order.push(key); }
       byCat[key][kind]++;
     };
-    askItems().forEach(function(e){ add(e.c.id, e.c.name, "ask", 'data-buildcat="'+esc(e.c.id)+'"'); });
     consItems().forEach(function(c){
       var cat = null;
       if(c.id) (data.categories||[]).some(function(cc){ if(catAllItems(cc).some(function(x){ return x.type==="note" && x.id===c.id && !x.partial; })){ cat = cc; return true; } return false; });
@@ -2191,6 +2232,7 @@ function homeHtml(){ return homeParts().main; }
       if(!res.ok) throw new Error(j.error||"error");
       data.messages.push({ content:full, sender:"", fromCustomer:true, createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
       chgSent[chgCur.key] = true;
+      try{ var cs = JSON.parse(localStorage.getItem("okaiChg:"+P)||"{}"); cs[chgCur.key] = new Date().toISOString(); localStorage.setItem("okaiChg:"+P, JSON.stringify(cs)); }catch(er){}
       closeSheet("chgModal"); render(); toast("スタッフに送りました");
     }catch(e){ toast("送れませんでした。もう一度お試しください"); }
     btn.disabled = false;
