@@ -1602,7 +1602,7 @@ function homeHtml(){ return homeParts().main; }
         (e.stamped
           ? '<div class="cdec" style="min-height:70px;"><div class="stamp'+(view.justStamped===x.key?' pop':'')+'" style="top:-30px;">決定<small>'+(function(){ var d=new Date(x.cardDecidedAt||Date.now()); return (d.getMonth()+1)+'/'+d.getDate(); })()+'</small></div>'+
             '<div class="cnow">✅ 決定のはんこを押しました</div><button class="linkbtn" data-cdecide="検討中"'+ra+'>🔴 はんこを外す（検討中に戻す）</button></div>'
-          : '<div class="pwait">まだお返事をいただいていません</div><div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>')+
+          : '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>')+
         '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
     });
     (data.estimates||[]).forEach(function(x){
@@ -1611,7 +1611,7 @@ function homeHtml(){ return homeParts().main; }
       cards.push('<div class="pcard opt"><div class="pch"><span class="ptag">オプション（追加見積り）</span>'+nwTag(x.updated||x.createdAt)+'</div>'+
         '<div class="pct"><b>'+esc(x.title||"")+'</b>'+(x.note && x.note!==x.title ? '<br>'+esc(x.note).replace(/\n/g,"<br>") : '')+'</div>'+
         '<div class="pamt">'+esc(String(x.amount||""))+'<span class="tx">（税抜き）</span></div>'+
-        '<div class="pwait">まだお返事をいただいていません</div><div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
+        '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
     });
     if(!cards.length) return "";
     return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+cards.length+'件</span></div><div class="pcards">'+cards.join("")+'</div>';
@@ -1662,8 +1662,8 @@ function homeHtml(){ return homeParts().main; }
     var status = f.x.cardStatus || "検討中", key = f.x.key;
     var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(f.room)+'" data-clabel="'+esc(String(n.title||n.decided||n.open||"").slice(0,40))+'" data-ccat="'+esc(f.room ? "rooms" : f.c.id)+'"';
     var done = status==="決定";
-    var nowTxt = (status==="決定"||status==="仮決定") ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>' : '<span class="cwait">まだお返事をいただいていません</span>';
-    return '<div class="cdec"><div class="cnow">このカードの状態：'+nowTxt+(chgSent[key]?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
+    var nowTxt = (status==="決定"||status==="仮決定") ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>' : '';
+    return '<div class="cdec">'+((nowTxt||chgSent[key]) ? '<div class="cnow">'+(nowTxt ? 'このカードの状態：'+nowTxt : '')+(chgSent[key]?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>' : '')+
       '<div class="btns"><button class="btn ol" data-chg="'+esc(chgLabelOf(f.c, f.x))+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
       (done ? '<button class="btn dk" disabled>✅ 決定しました</button>' : '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ これで決定</button>')+'</div>'+
       ((status==="仮決定"||status==="決定")?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
@@ -1891,10 +1891,10 @@ function homeHtml(){ return homeParts().main; }
         var dd = dAt ? new Date(dAt) : null;
         stampHtml = '<div class="stamp'+(view.justStamped===key?' pop':'')+'">決定'+(dd && !isNaN(dd) ? '<small>'+(dd.getMonth()+1)+'/'+dd.getDate()+'</small>' : '')+'</div>';
       }
+      // 決まるまでは状態の文言は出さない（催促しているように見えるため）。仮決定・決定・変更のご依頼を送ったときだけ出す
       var nowTxt = (status==="決定"||status==="仮決定")
-        ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>'
-        : '<span class="cwait">まだお返事をいただいていません</span>';
-      return '<div class="cdec">'+stampHtml+'<div class="cnow">このカードの状態：'+nowTxt+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>'+
+        ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>' : '';
+      return '<div class="cdec">'+stampHtml+((nowTxt||sent) ? '<div class="cnow">'+(nowTxt ? 'このカードの状態：'+nowTxt : '')+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>' : '')+
         '<div class="btns"><button class="btn ol" data-chg="'+esc(cl)+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
         (done ? '<button class="btn dk" disabled>✅ 決定しました</button>'
               : '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ これで決定</button>')+'</div>'+
