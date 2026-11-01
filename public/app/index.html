@@ -510,6 +510,8 @@
   .recview{ display:flex; gap:6px; flex-wrap:wrap; margin-block:0 10px; }
   .recview button{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:6px 14px; font:inherit; font-weight:700; cursor:pointer; color:var(--ink); }
   .recview button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .mnlchip .mnlfopen{ font-weight:700; text-decoration:underline; text-underline-offset:2px; }
+  .mnlchip .mnlfdraw{ background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:.85rem; margin-inline:2px; }
   .mnlchip button{ border:0; background:none; cursor:pointer; color:inherit; font-size:.9rem; padding:0 6px; }
   .mnline .mnmark{ flex-shrink:0; width:1.4em; text-align:center; color:var(--muted); }
   .mnline .mntext{ flex:1; min-width:0; word-break:break-word; }
@@ -12764,7 +12766,7 @@
         '<button type="button" class="mnlact" data-mnlact="'+i+'" title="この行から作る" aria-label="この行から作る">⋯</button></div>'+
         ((mnLineAsk[t] || (mnLineFiles[t]||[]).length) ? '<div class="mnlacts">'+
           (mnLineAsk[t] ? '<span class="mnlchip ask">🔘 お客様に決定してもらう <button type="button" data-mnlaskrm="'+i+'" aria-label="取り消す">×</button></span>' : '')+
-          (mnLineFiles[t]||[]).map(function(f, k){ var nm = f.ref ? (f.ref.name||"ファイル") : (f.name||"ファイル"); return '<span class="mnlchip">📎 '+escapeHtml(nm.length>18?nm.slice(0,18)+"…":nm)+' <button type="button" data-mnlfrm="'+i+'|'+k+'" aria-label="外す">×</button></span>'; }).join("")+
+          (mnLineFiles[t]||[]).map(function(f, k){ var nm = f.ref ? (f.ref.name||"ファイル") : (f.name||"ファイル"); return '<span class="mnlchip"><button type="button" class="mnlfopen" data-mnlfopen="'+i+'|'+k+'" title="見る・書き込む">📎 '+escapeHtml(nm.length>18?nm.slice(0,18)+"…":nm)+'</button><button type="button" class="btn small mnlfdraw" data-mnlfdraw="'+i+'|'+k+'">✏️ 書き込む</button><button type="button" data-mnlfrm="'+i+'|'+k+'" aria-label="外す">×</button></span>'; }).join("")+
         '</div>' : '')+
         (acts.length ? '<div class="mnlacts">'+acts.map(function(a, k){
           var extra = a.type==="task" ? (a.assignee?"："+a.assignee:"") : a.type==="estreq" ? "："+a.vendorIds.map(function(id){ var v = vendorById(id); return v?v.name:""; }).filter(Boolean).join("、") : "";
@@ -13279,6 +13281,20 @@
     if(!blob) return;
     mnOpenDraw(blob, name, mnIsPdf(ct, name), after);
   }
+  // 行に付けたファイル：見る／プランボードで書き込む（書いた版はその行に足す。元のファイルは残す）
+  function mnLineFileView(it){
+    var w = window.open("", "_blank");
+    if(it.ref){ if(w) w.location.href = it.ref.url; else window.open(it.ref.url, "_blank"); return; }
+    var u = URL.createObjectURL(it.file); if(w) w.location.href = u; else window.open(u, "_blank");
+  }
+  async function mnLineFileDraw(line, it){
+    var blob = it.file || null, name = it.ref ? it.ref.name : it.name, ct = it.ref ? it.ref.contentType : it.type;
+    if(!blob && it.ref) blob = await mnBlobOfRef(it.ref);
+    if(!blob) return;
+    if(!mnIsPdf(ct, name) && !/^image\//.test(ct||blob.type||"")){ toast("書き込めるのは写真とPDFだけです"); return; }
+    mnOpenDraw(blob, name, mnIsPdf(ct, name), "x", "line");
+    pb.saveTarget.line = line;
+  }
   function mnOpenDraw(blob, name, isPdf, after, sink){
     document.getElementById("pbModal").hidden = false;
     pb.currentAttachmentId = null;
@@ -13303,8 +13319,9 @@
     }
     var base = String(target.name||"図面").replace(/\.[^.]+$/,"").replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","");
     var pid = state.currentProjectId;
-    var toTask = target.sink==="task";
+    var toTask = target.sink==="task", toLine = target.sink==="line";
     function add(b, nm, type){
+      if(toLine){ (mnLineFiles[target.line] = mnLineFiles[target.line] || []).push({ file: b, name: nm, type: type }); return; }
       if(toTask) tfExtras.push({ key: uid("tfx"), file: b, name: nm, type: type });
       else mnExtras.push({ key: uid("mnx"), pid: pid, after: target.after||"x", file: b, name: nm, type: type });
     }
@@ -13317,6 +13334,7 @@
       add(blobs[0], base+".png", "image/png");
     }
     closePlanBoard();
+    if(toLine){ mnRender(); toast("書き込んだ版をこの行に足しました（元のファイルも残ります。「記録する／更新」で保存されます）", 7000); return; }
     if(toTask){ renderTfFileList(); toast("書き込んだ図面をタスクの添付に足しました（元のファイルも残ります。「追加／保存」で保存されます）", 7000); return; }
     renderMnFileList();
     toast("書き込んだ図面を記録に足しました（元のファイルも残ります。「記録する／更新」で保存されます）", 7000);
@@ -15240,6 +15258,19 @@
       }
       var arm = e.target.closest("[data-mnlaskrm]");
       if(arm){ var at0 = mnLines()[+arm.dataset.mnlaskrm]; if(at0) delete mnLineAsk[at0]; mnRender(); return; }
+      var fop = e.target.closest("[data-mnlfopen],[data-mnlfdraw]");
+      if(fop){
+        var isDraw = fop.hasAttribute("data-mnlfdraw");
+        var fq = (isDraw ? fop.dataset.mnlfdraw : fop.dataset.mnlfopen).split("|"), fl = mnLines()[+fq[0]];
+        var it = fl && (mnLineFiles[fl]||[])[+fq[1]]; if(!it) return;
+        if(isDraw) mnLineFileDraw(fl, it);
+        else askChoice("この行のファイル", (it.ref ? it.ref.name : it.name)||"ファイル", [{label:"👁 見る", value:"view"},{label:"✏️ 書き込む（書いた版をこの行に足す）", value:"draw"},{label:"外す", value:"rm"}], function(v){
+          if(v==="view") mnLineFileView(it);
+          else if(v==="draw") mnLineFileDraw(fl, it);
+          else if(v==="rm"){ var arr = mnLineFiles[fl]||[], ix = arr.indexOf(it); if(ix>=0) arr.splice(ix,1); if(!arr.length) delete mnLineFiles[fl]; mnRender(); }
+        });
+        return;
+      }
       var frm = e.target.closest("[data-mnlfrm]");
       if(frm){ var fp = frm.dataset.mnlfrm.split("|"), ft = mnLines()[+fp[0]]; if(ft && mnLineFiles[ft]){ mnLineFiles[ft].splice(+fp[1], 1); if(!mnLineFiles[ft].length) delete mnLineFiles[ft]; } mnRender(); return; }
       var ab = e.target.closest("[data-mnlact]");
