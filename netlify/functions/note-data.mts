@@ -65,6 +65,12 @@ function mergeInteriorStatus(mainStatus: string, rooms: any[]): string {
 
 const ROOM_CAT_LABELS: Record<string, string> = { ceiling: "天井", wall: "壁", accent: "アクセント" };
 // 各部位の表示名。部屋別インテリアは「部屋名・天井/壁/アクセント」の形にする
+// 以前の「最終決定のお願い」の定型文はお客様画面に出さない（決定ボタンのカード自体で分かるため）
+const FINAL_ASK_TEXT = "最終決定です。よろしければ決定ボタンをお願いします。";
+function cleanNoteMsg(m: any): string {
+  return String(m || "").split(FINAL_ASK_TEXT).join("").replace(/\n{2,}/g, "\n").trim();
+}
+
 function partLabel(project: any, scope?: string, category?: string | null, roomId?: string | null): string {
   if (scope === "room") {
     const room = (project.rooms || []).find((r: any) => r.id === roomId);
@@ -537,7 +543,7 @@ export default async (req: Request, context: Context) => {
       files: (n.files || []).map(fileOf),
       spec: specBadge(n.badges),
       changing: isChanging(n),
-      message: n.message || "",
+      message: cleanNoteMsg(n.message),
       talk: n.talkPublic ? (n.talk || "") : "", // スタッフが「お客様にも見せる」にした記録だけ
       channel: n.channel || "",
     });
@@ -730,7 +736,7 @@ export default async (req: Request, context: Context) => {
         title: n.title || "",
         decided: n.decided != null ? n.decided : n.content || "",
         open: n.open || "",
-        message: n.message || "",
+        message: cleanNoteMsg(n.message),
         talk: n.talkPublic ? (n.talk || "") : "",
         channel: n.channel || "",
         changing: isChanging(n),
