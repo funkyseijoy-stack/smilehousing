@@ -1835,6 +1835,12 @@
     </div>
 
     <div class="card">
+      <h3>🧪 記録のデモ案件</h3>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">練習用の案件「デモ様邸（練習用）」を作り、打合せ記録の見本（行の印・行ごとの部位・ファイル・お客様への決定のお願い・社内で確認・お客様の決定のはんこ）を入れます。お客様には関係ありません。いらなくなったら案件ごと削除してください。</p>
+      <button class="btn secondary small" id="btnDemoProject">デモ案件を作る／開く</button>
+    </div>
+
+    <div class="card">
       <h3>アプリの重さの診断</h3>
       <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">データの件数と、読み込み・画面の描き直しにかかる時間を測ります（何も変更・削除しません）。重いと感じるときに押して、結果をお知らせください。</p>
       <button class="btn secondary small" id="btnPerfCheck">診断する</button>
@@ -11457,6 +11463,75 @@
   }
 
   // ================= project / vendor / request actions =================
+  // 記録のデモ案件（練習用）：打合せ記録の見本を入れた案件を作る。すでにあれば開くだけ
+  var DEMO_PROJECT_NAME = "デモ様邸（練習用）";
+  function demoOpenRecord(pid){
+    switchTab("projects"); openProjectDetail(pid);
+    setTimeout(function(){ var b = document.querySelector('.sub-btn[data-sub="meeting"]'); if(b) b.click(); window.scrollTo({top:0}); }, 50);
+  }
+  async function createDemoProject(){
+    var ex = liveProjects().find(function(p){ return p.name===DEMO_PROJECT_NAME; });
+    if(ex){ demoOpenRecord(ex.id); toast("デモ案件を開きました"); return; }
+    if(!confirm("練習用の案件「"+DEMO_PROJECT_NAME+"」を作り、打合せ記録の見本を入れます。よろしいですか？")) return;
+    var btn = document.getElementById("btnDemoProject"); if(btn) btn.disabled = true;
+    try{
+      var arr = new Uint8Array(18); (window.crypto||window.msCrypto).getRandomValues(arr);
+      var p = { id:uid("proj"), name:DEMO_PROJECT_NAME, customer:"デモ", type:"その他", folderId:"", progressTag:(state.settings.progressTags||[])[0]||"", createdAt: todayStr(), demo:true,
+        noteToken: Array.prototype.map.call(arr, function(b){ return ("0"+b.toString(16)).slice(-2); }).join("") };
+      state.projects.push(p);
+      if(await saveDoc("projects", p.id, p)===false){ toast("案件を保存できませんでした"); return; }
+      // 見本の図面（画像）を1枚作る
+      var file = null;
+      try{
+        var cv = document.createElement("canvas"); cv.width = 800; cv.height = 560;
+        var g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,800,560);
+        g.strokeStyle = "#555"; g.lineWidth = 4; g.strokeRect(60,80,680,400); g.strokeRect(100,330,600,110);
+        g.fillStyle = "#e9e2d6"; g.fillRect(100,330,600,110);
+        g.fillStyle = "#333"; g.font = "bold 34px sans-serif"; g.fillText("サンプル：キッチン（デモ）", 70, 55);
+        g.font = "26px sans-serif"; g.fillText("リシェルSI　ホワイト　I型2550", 120, 395);
+        var blob = await new Promise(function(res){ cv.toBlob(res, "image/png"); });
+        if(blob) file = new File([blob], "デモ_キッチン図面.png", {type:"image/png"});
+      }catch(e){}
+      var img = null;
+      if(file){ try{ var r = await assets.upload(file, {type:"image/png", noClean:true}); blobCache[r.id] = file; img = { id:r.id, url:r.url, contentType:"image/png", name:file.name }; }catch(e){} }
+      var kit = {scope:"facility", category:"キッチン", roomId:null, side:null, label:"設備仕様・キッチン"};
+      var bath = {scope:"facility", category:"お風呂", roomId:null, side:null, label:"設備仕様・お風呂"};
+      var wall = {scope:"exterior", category:"外壁", roomId:null, side:null, label:"外部仕様・外壁"};
+      var gen = {scope:"general", category:null, roomId:null, side:null, label:"総合"};
+      var day = function(n){ var d = new Date(); d.setDate(d.getDate()-n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+      var lines = [
+        {t:"本日はキッチン・お風呂・外壁を打合せしました", m:""},
+        {t:"キッチンはリシェルSI、色はホワイトに決定", m:"d", p:kit, ask:true},
+        {t:"食洗機の有無は次回までにご検討いただく", m:"o", p:kit},
+        {t:"お風呂の窓の位置は図面のとおりでよいか", m:"", p:bath, ask:true},
+        {t:"外壁の色はサンプルで最終確認", m:"o", p:wall},
+        {t:"吊戸棚の高さは現場で確認", m:"c"}
+      ];
+      if(img) lines[1].f = [img];
+      var pick = function(m){ return lines.filter(function(l){ return l.m===m; }).map(function(l){ return l.t; }).join("\n"); };
+      var now = nowIso();
+      var n1 = { id:uid("note"), projectId:p.id, title:"第2回打合せ（デモ）", date:day(0), channel:"打合せ", author:state.currentUser||"",
+        talk:pick(""), talkPublic:true, decided:pick("d"), open:pick("o"), internal:pick("c"), noteLines:lines, message:"本日はありがとうございました。決定ボタンのあるカードは、よろしければ押してください。",
+        content: meetingNoteDerivedContent(pick("d"), pick("o")), files:[], specPart:gen, reflected:true, reflectedAt:now, createdAt:now, badges:{}, autoCreated:{}, demo:true };
+      var n0 = { id:uid("note"), projectId:p.id, title:"カップボード（デモ）", date:day(3), channel:"LINE", author:state.currentUser||"",
+        talk:"", talkPublic:true, decided:"カップボードは幅2700・ホワイトで決定", open:"", internal:"", noteLines:[{t:"カップボードは幅2700・ホワイトで決定", m:"d"}], message:"",
+        content:"カップボードは幅2700・ホワイトで決定", files: img ? [img] : [], specPart:kit, reflected:true, reflectedAt:now, askDecision:true,
+        createdAt:new Date(Date.now()-3*86400000).toISOString(), badges:{}, autoCreated:{}, demo:true };
+      state.meetingNotes.push(n0, n1);
+      await saveDoc("meetingNotes", n0.id, n0);
+      await saveDoc("meetingNotes", n1.id, n1);
+      try{ upsertNoteSpecEntry(n0); upsertNoteSpecEntry(n1); }catch(e){}
+      // お客様が「決定」のはんこを押した見本（カップボードの記録）
+      var dec = { id: p.id+"__card__n_"+n0.id, projectId:p.id, category: noteCatIdFor("facility","キッチン"), cardKey:"n:"+n0.id, status:"決定",
+        label:"カップボード（デモ）", by:"お客様", decidedAt: new Date(Date.now()-2*86400000).toISOString(), updatedAt: now };
+      state.noteDecisions = state.noteDecisions || []; state.noteDecisions.push(dec);
+      await saveDoc("noteDecisions", dec.id, dec);
+      logActivity("記録のデモ案件「"+DEMO_PROJECT_NAME+"」を作りました");
+      render();
+      demoOpenRecord(p.id);
+      toast("デモ案件を作りました。おうちノートは案件の「おうちノートを見る」から見られます", 9000);
+    } finally { if(btn) btn.disabled = false; }
+  }
   async function addProject(){
     var nameEl = document.getElementById("newProjectName");
     var custEl = document.getElementById("newProjectCustomer");
@@ -15226,6 +15301,7 @@
       document.addEventListener("click", function(e){ if(mm.classList.contains("open") && !mm.contains(e.target) && e.target!==mb){ mm.classList.remove("open"); mb.setAttribute("aria-expanded","false"); } });
     })();
     document.getElementById("btnPerfCheck").addEventListener("click", runPerfCheck);
+    document.getElementById("btnDemoProject").addEventListener("click", createDemoProject);
     startAutoRefresh();
     var fsBtn = document.getElementById("btnFullscreen");
     if(fsBtn){
