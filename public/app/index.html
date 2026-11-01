@@ -337,6 +337,13 @@
   .noteitem .nbox.msg{ background:#f1ebf5; }
   .noteitem .nbox.msg .nboxlabel{ color:#6b4f86; }
   .nchgbadge{ font-size:.85rem; font-weight:700; background:#fbe9d6; color:#a8581c; border-radius:999px; padding:2px 10px; }
+  .cdlist{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
+  .cditem{ display:flex; gap:12px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:#fffaf8; }
+  .cdstamp{ flex-shrink:0; width:58px; height:58px; border:3px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-12deg); font-weight:900; font-size:1rem; line-height:1.05; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
+  .cdstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.8); }
+  .cdbody{ flex:1; min-width:0; }
+  .cdname{ font-weight:700; font-size:.95rem; }
+  .cdtext{ font-size:.9rem; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
   .decsum{ background:var(--accent-soft); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
   .decsum .dsi{ border-top:1px solid var(--border); padding:6px 0; font-size:.85rem; white-space:pre-wrap; }
   .decsum .dsi:first-of-type{ border-top:none; }
@@ -1622,6 +1629,11 @@
             <button type="button" class="btn secondary" id="btnRecImport">＋ 取り込む（写真・PDF・見積の書類・図面）</button>
             <button type="button" class="btn secondary small" id="btnOpenNoteImport" hidden>📥 まとめて取り込む</button>
             <input type="file" id="recFileInput" multiple accept=".pdf,image/*" hidden>
+          </div>
+          <div class="card" id="custDecidedCard" hidden>
+            <h3>🔴 お客様が決定したもの（決定のはんこ）</h3>
+            <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">おうちノートでお客様が「決定」のはんこを押したカードを、新しい順に並べています。はんこを外されると一覧からも消えます。</p>
+            <div id="custDecidedList"></div>
           </div>
           <div class="card" id="decidedSummaryCard" hidden>
             <h3>✅ 決定事項のまとめ</h3>
@@ -6542,7 +6554,42 @@
       return '<div class="dsi"><div class="dsd">'+escapeHtml(n.date || fmtTs(n.createdAt))+(n.title?'　'+escapeHtml(n.title):'')+(n.specPart?'　'+escapeHtml(partText(n.specPart)):'')+'</div>'+escapeHtml(n.decided)+'</div>';
     }).join("");
   }
+  // お客様が「決定」のはんこを押したもの（noteDecisions の status:"決定"）を、記録タブの決定事項のまとめの上に一覧で出す
+  var custDecidedAll = false;
+  function renderCustDecided(){
+    var card = document.getElementById("custDecidedCard"), box = document.getElementById("custDecidedList");
+    if(!card || !box) return;
+    var proj = projectById(state.currentProjectId);
+    var ds = (state.noteDecisions||[]).filter(function(d){ return proj && d.projectId===proj.id && !d.deletedAt && d.status==="決定"; })
+      .sort(function(a,b){ return (b.decidedAt||"").localeCompare(a.decidedAt||""); });
+    card.hidden = !ds.length;
+    if(!ds.length){ box.innerHTML = ""; return; }
+    var LIM = 5, show = custDecidedAll ? ds : ds.slice(0, LIM);
+    box.innerHTML = '<div class="cdlist">'+show.map(function(d){
+      var key = String(d.cardKey||""), text = "", files = [];
+      if(key.indexOf("n:")===0){
+        var n = state.meetingNotes.find(function(x){ return x.id===key.slice(2); });
+        if(n){ text = [n.title, n.decided || n.talk || n.content || ""].filter(Boolean).join("："); files = n.files||[]; }
+      } else if(key.indexOf("t:")===0){
+        var t = state.tasks.find(function(x){ return x.id===key.slice(2); });
+        if(t){ text = t.content||""; files = t.attachments||[]; }
+      } else if(key.indexOf("s:")===0){
+        var sp = state.specPhotos.find(function(x){ return x.id===key.slice(2); });
+        if(sp){ text = sp.title || sp.memo || sp.name || ""; if(sp.url) files = [{url:sp.url, contentType:sp.contentType, name:sp.name}]; }
+      }
+      var dd = d.decidedAt ? new Date(d.decidedAt) : null;
+      var md = dd && !isNaN(dd) ? (dd.getMonth()+1)+"/"+dd.getDate() : "";
+      return '<div class="cditem"><div class="cdstamp">決定<small>'+escapeHtml(md)+'</small></div><div class="cdbody">'+
+        '<div class="cdname">'+escapeHtml(noteDecisionName(proj, d).replace(/「.*」$/, ""))+'<span class="muted">　'+escapeHtml((d.decidedAt||"").slice(0,10))+'</span></div>'+
+        (text || d.label ? '<div class="cdtext">'+escapeHtml(String(text || d.label).slice(0,120))+'</div>' : '')+
+        (files.length ? fileThumbRowHtml(files, 64) : '')+'</div></div>';
+    }).join("")+'</div>'+
+    (ds.length>LIM ? '<button type="button" class="btn ghost small" id="btnCustDecidedAll">'+(custDecidedAll?'閉じる ▴':'ほか '+(ds.length-LIM)+'件を見る ▾')+'</button>' : '');
+    var b = document.getElementById("btnCustDecidedAll");
+    if(b) b.onclick = function(){ custDecidedAll = !custDecidedAll; renderCustDecided(); };
+  }
   function renderMeetingNotes(){
+    renderCustDecided();
     renderDecidedSummary();
     var dateInput = document.getElementById("meetingNoteDate");
     if(dateInput && !dateInput.value) dateInput.value = todayStr();
