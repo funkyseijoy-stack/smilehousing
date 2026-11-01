@@ -66,6 +66,12 @@ function mergeInteriorStatus(mainStatus: string, rooms: any[]): string {
 const ROOM_CAT_LABELS: Record<string, string> = { ceiling: "天井", wall: "壁", accent: "アクセント" };
 // 各部位の表示名。部屋別インテリアは「部屋名・天井/壁/アクセント」の形にする
 // 以前の「最終決定のお願い」の定型文はお客様画面に出さない（決定ボタンのカード自体で分かるため）
+// 記録の行の文から作る短い印（行ごとの決定カードの key。住まいるアプリの lineHash と同じ計算）
+function lineHash(t: string): string {
+  let h = 5381;
+  for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
 const FINAL_ASK_TEXT = "最終決定です。よろしければ決定ボタンをお願いします。";
 function cleanNoteMsg(m: any): string {
   return String(m || "").split(FINAL_ASK_TEXT).join("").replace(/\n{2,}/g, "\n").trim();
@@ -270,7 +276,7 @@ export default async (req: Request, context: Context) => {
       const cardKey = String(body.cardKey || "");
       if (!catsOf(project).some((c) => c.id === cat) || cat === "plan") return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
-      if (!/^[nts]:[A-Za-z0-9_\-]{1,80}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
+      if (!/^[ntsl]:[A-Za-z0-9_\-]{1,100}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
       let roomId: string | null = null;
       if (cat === "rooms") {
         roomId = String(body.roomId || "");
@@ -552,9 +558,38 @@ export default async (req: Request, context: Context) => {
     // （記録そのものの項目と同じ項目の行は重ねて出さない。決定ボタンは付けない）
     const ownCat = noteCatFor(sp.scope, sp.category);
     const byCat: Record<string, { p: any; lines: any[] }> = {};
+    // 「この行をお客様に決定してもらう」（l.ask）の行：その行だけのカード（行に付けたファイル付き）。
+    // 部位があればその項目、無ければ記録と同じ項目に出す。カードの key は "l:<記録ID>_<行の文の短い印>"
+    for (const l of n.noteLines || []) {
+      if (!l || !l.ask || !String(l.t || "").trim() || (l.m || "") === "c") continue;
+      const lp = (l.p && l.p.scope) ? l.p : sp;
+      const t = String(l.t).trim();
+      const m = l.m || "";
+      push(noteCatFor(lp.scope, lp.category), {
+        type: "note",
+        id: n.id,
+        key: "l:" + n.id + "_" + lineHash(t),
+        askDecision: true,
+        lineCard: true,
+        label: partLabel(project, lp.scope, lp.category, lp.roomId),
+        roomId: lp.roomId || null,
+        at: noteAt(n),
+        upd: updAt(n.reflectedAt, n.createdAt),
+        date: n.date || (n.createdAt || "").slice(0, 10),
+        title: "",
+        decided: m === "d" ? t : "",
+        open: m === "o" ? t : "",
+        talk: m === "" ? t : "",
+        files: (Array.isArray(l.f) ? l.f : []).map(fileOf),
+        spec: { contract: false, quote: false },
+        changing: false,
+        message: "",
+        channel: n.channel || "",
+      });
+    }
     for (const l of n.noteLines || []) {
       const lp = l && l.p;
-      if (!lp || !lp.scope || !String(l.t || "").trim()) continue;
+      if (!lp || !lp.scope || !String(l.t || "").trim() || l.ask) continue;
       const cat = noteCatFor(lp.scope, lp.category);
       if (!cat || cat === ownCat) continue;
       const k = cat + "|" + (lp.roomId || "");

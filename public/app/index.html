@@ -500,6 +500,16 @@
   .mnlact:hover{ color:var(--accent-ink); border-color:var(--accent); }
   .mnlacts{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-inline-start:2em; }
   .mnlchip{ font-size:.85rem; background:var(--accent-soft); color:var(--accent-ink); border-radius:999px; padding:2px 4px 2px 10px; display:inline-flex; align-items:center; gap:2px; }
+  .mnlchip.ask{ background:#fdecea; color:#b3261e; font-weight:700; }
+  .mnaskdec{ background:#fdf6e3; border:1px solid #e9d6a3; border-radius:10px; padding:8px 10px; font-weight:700; }
+  .notemenu-h{ font-size:.85rem; color:var(--muted); font-weight:700; padding:6px 8px 2px; }
+  .nlines-x{ margin:6px 0; }
+  .nlx{ border:1px solid var(--border); border-radius:10px; padding:8px 10px; margin-block-end:6px; background:var(--surface); }
+  .nlx .nlxt{ white-space:pre-wrap; }
+  .nlx .nlxs{ font-size:.85rem; margin-block-start:4px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .recview{ display:flex; gap:6px; flex-wrap:wrap; margin-block:0 10px; }
+  .recview button{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:6px 14px; font:inherit; font-weight:700; cursor:pointer; color:var(--ink); }
+  .recview button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
   .mnlchip button{ border:0; background:none; cursor:pointer; color:inherit; font-size:.9rem; padding:0 6px; }
   .mnline .mnmark{ flex-shrink:0; width:1.4em; text-align:center; color:var(--muted); }
   .mnline .mntext{ flex:1; min-width:0; word-break:break-word; }
@@ -1630,6 +1640,12 @@
             <button type="button" class="btn secondary small" id="btnOpenNoteImport" hidden>📥 まとめて取り込む</button>
             <input type="file" id="recFileInput" multiple accept=".pdf,image/*" hidden>
           </div>
+          <div class="recview" id="recViewBar"></div>
+          <div class="card" id="recCheckCard" hidden>
+            <h3>🔒 社内で確認</h3>
+            <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">記録の「🔒 社内で確認」の行を、全部の記録から集めています（お客様には出ません）。</p>
+            <div id="recCheckList"></div>
+          </div>
           <div class="card" id="custDecidedCard" hidden>
             <h3>🔴 お客様が決定したもの（決定のはんこ）</h3>
             <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">おうちノートでお客様が「決定」のはんこを押したカードを、新しい順に並べています。はんこを外されると一覧からも消えます。</p>
@@ -1658,14 +1674,15 @@
             <div class="field mnfield">
               <span>打合せ内容（LINEで来た内容もここに。1行に1つずつ）</span>
               <textarea id="mnBody" rows="5" placeholder="例）キッチンはリシェルSI、色はホワイトに決定&#10;食洗機の有無は次回までにご検討いただく&#10;吊戸棚の高さは現場で確認"></textarea>
-              <div class="mnhint">書いたら下の行を押して印を付けます：<b>✅ 決定したこと</b> → <b>💭 お客様に検討いただくこと</b> → <b>🔒 社内で確認</b>（お客様には出ません） → 印なし</div>
+              <div class="mnhint">行を押すと印：<b>✅決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」で部位・ファイル・決定のお願い・タスク</div>
               <div id="mnLines" class="mnlines"></div>
             </div>
-            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 印のない行（打合せの内容）もお客様に見せる（✅・💭の行は「反映する」とお客様に出ます）</label>
+            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 印のない行もお客様に見せる</label>
             <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea><textarea id="meetingNoteInternal" hidden></textarea>
             <div id="meetingNoteExistingFiles" hidden></div>
-            <label class="field">資料を添付（PDF・写真など）<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*"></label>
-            <div class="row" style="gap:8px; flex-wrap:wrap; margin-block:-2px 6px;"><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 この案件の図面から選ぶ</button></div>
+            <div class="field"><span>資料を添付（記録全体）</span>
+              <div class="row mnfilerow" style="gap:8px; flex-wrap:wrap; align-items:center;"><label class="btn secondary small" style="cursor:pointer;">📎 ファイルを選ぶ<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*" hidden></label><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 図面から選ぶ</button></div></div>
+            <input type="file" id="mnLineFileInput" multiple accept=".pdf,image/*" hidden>
             <div id="mnFileList"></div>
             <div id="mnAiHint" class="muted" style="font-size:.85rem; margin-block:4px;" hidden></div>
             <details class="mnmore">
@@ -1675,9 +1692,10 @@
               <div id="meetingNoteBadgePicker"></div>
             </details>
             <p class="muted" id="meetingNoteEditHint" style="margin:6px 0 0; font-size:.85rem;" hidden>編集中：内容を書き換えて更新を押してください（添付ファイルは、上の「いまの添付」で削除・差し替え、下の欄で追加ができます）。</p>
+            <label class="field mnaskdec" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteAskDecide"> ✅ お客様に決定をお願いする（記録するとおうちノートに反映し、決定ボタンを出します）</label>
             <div class="row" style="margin-block-start:8px;"><button class="btn" id="btnAddMeetingNote">記録する</button><button class="btn secondary" id="btnCancelEditMeetingNote" hidden>キャンセル</button></div>
           </div>
-          <div class="card">
+          <div class="card" id="recListCard">
             <div class="row" style="justify-content:space-between; align-items:baseline; gap:8px;"><h3 style="margin:0;">これまでの記録（新しい順）</h3><span class="muted" id="recCount" style="font-size:.85rem;"></span></div>
             <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">打合せ記録・写真・PDF・見積の書類・書き込んだ図面を、日付の新しい順に1列で並べています。部位のプルダウンで選ぶと、その部位だけに絞り込みます（並びは日付順のまま）。各カードの「⋯ 操作」から、反映・書き込み・タスク依頼・見積依頼・部位の変更ができます。</p>
             <div class="row recfilter" id="noteSpecFilterBar"></div>
@@ -5190,7 +5208,7 @@
     state.currentProjectId = id;
     state.editingProject = false;
     state.noteSpecFilter = null;
-    state.recFilter = {big:"", sub:""}; state.recMark = "";
+    state.recFilter = {big:"", sub:""}; state.recMark = ""; state.recView = "rec";
     document.getElementById("projectListView").hidden = true;
     document.getElementById("projectDetailView").hidden = false;
     renderProjectDetail();
@@ -6219,6 +6237,34 @@
   }
   // 🔒 社内で確認の行（noteLines の m="c"）。確認済みは note.checkDone[行の文]、
   // 行から作った社内タスク（note.lineActs の type:"task"）が完了なら確認済み扱い。お客様には出さない。
+  // 行の文から作る短い印（おうちノートの行ごとの決定カードの key。note-data.mts の lineHash と同じ計算）
+  function lineHash(t){ var h = 5381; t = String(t||""); for(var i=0;i<t.length;i++) h = ((h*33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); }
+  // 行に付けたファイル・「お客様に決定してもらう」の行（記録カードに出す）
+  function noteLineExtrasHtml(n){
+    var ls = (n.noteLines||[]).filter(function(l){ return l && String(l.t||"").trim() && (l.ask || (l.f && l.f.length)); });
+    if(!ls.length) return "";
+    return '<div class="nlines-x">'+ls.map(function(l){
+      var t = String(l.t).trim(), st = "";
+      if(l.ask){
+        var key = "l:"+n.id+"_"+lineHash(t);
+        var d = (state.noteDecisions||[]).find(function(x){ return x.cardKey===key && !x.deletedAt; });
+        st = d && d.status==="決定" ? '<span class="pill" style="background:#c0392b; color:#fff;">🔴 お客様が決定（'+escapeHtml((d.decidedAt||"").slice(5,10).replace("-","/"))+'）</span>'
+          : d && d.status==="仮決定" ? '<span class="pill">お客様：仮決定</span>'
+          : '<span class="pill" style="background:#fdecea; color:#b3261e;">🔘 決定待ち'+(n.reflected?'':'（未反映）')+'</span>';
+      }
+      var mk = l.m==="d"?"✅ ":l.m==="o"?"💭 ":"";
+      return '<div class="nlx"><div class="nlxt">'+mk+escapeHtml(t)+'</div><div class="nlxs">'+st+(l.p&&l.p.scope?partChipHtml(l.p):'')+'</div>'+
+        (l.f && l.f.length ? '<div style="margin-block-start:4px;">'+fileThumbRowHtml(l.f, 84)+'</div>' : '')+'</div>';
+    }).join("")+'</div>';
+  }
+  // 記録全体の決定ボタン：🔘 決定待ち／🔴 お客様が決定
+  function noteDecMarkHtml(n){
+    var d = (state.noteDecisions||[]).find(function(x){ return x.cardKey==="n:"+n.id && !x.deletedAt; });
+    if(d && d.status==="決定") return '<span class="pill" style="background:#c0392b; color:#fff;">🔴 お客様が決定</span>';
+    if(d && d.status==="仮決定") return '<span class="pill">お客様：仮決定</span>';
+    if(n.askDecision===true) return '<span class="pill" style="background:#fdecea; color:#b3261e;">🔘 決定待ち'+(n.reflected?'':'（未反映）')+'</span>';
+    return "";
+  }
   function noteCheckItems(n){
     var done = n.checkDone || {};
     return (n.noteLines||[]).filter(function(l){ return l && l.m==="c" && String(l.t||"").trim(); }).map(function(l){
@@ -6569,6 +6615,12 @@
       if(key.indexOf("n:")===0){
         var n = state.meetingNotes.find(function(x){ return x.id===key.slice(2); });
         if(n){ text = [n.title, n.decided || n.talk || n.content || ""].filter(Boolean).join("："); files = n.files||[]; }
+      } else if(key.indexOf("l:")===0){
+        var nid = key.slice(2, key.lastIndexOf("_")), lh = key.slice(key.lastIndexOf("_")+1);
+        var ln = state.meetingNotes.find(function(x){ return x.id===nid; });
+        var ll = ln && (ln.noteLines||[]).find(function(l){ return l && lineHash(String(l.t||"").trim())===lh; });
+        if(ll){ text = String(ll.t||""); files = ll.f||[]; }
+        else if(ln) text = ln.title||"";
       } else if(key.indexOf("t:")===0){
         var t = state.tasks.find(function(x){ return x.id===key.slice(2); });
         if(t){ text = t.content||""; files = t.attachments||[]; }
@@ -6587,9 +6639,40 @@
     var b = document.getElementById("btnCustDecidedAll");
     if(b) b.onclick = function(){ custDecidedAll = !custDecidedAll; renderCustDecided(); };
   }
+  // 記録タブの切り替え：📝 記録／✅ 決定／🔒 社内確認
+  function renderRecView(){
+    var v = state.recView || "rec", pid = state.currentProjectId;
+    var notes = liveNotes().filter(function(n){ return n.projectId===pid; });
+    var openChk = 0; notes.forEach(function(n){ noteCheckItems(n).forEach(function(x){ if(!x.done) openChk++; }); });
+    var bar = document.getElementById("recViewBar");
+    if(bar) bar.innerHTML = [["rec","📝 記録"],["dec","✅ 決定"],["chk","🔒 社内確認"+(openChk?"（未確認 "+openChk+"）":"")]].map(function(x){
+      return '<button type="button" data-recview="'+x[0]+'" class="'+(v===x[0]?"on":"")+'">'+escapeHtml(x[1])+'</button>'; }).join("");
+    var show = function(id, on){ var el = document.getElementById(id); if(el) el.style.display = on ? "" : "none"; };
+    show("recListCard", v==="rec");
+    show("custDecidedCard", v==="dec");
+    show("decidedSummaryCard", v==="dec");
+    var cc = document.getElementById("recCheckCard"), cl = document.getElementById("recCheckList");
+    if(cc){ cc.hidden = v!=="chk"; }
+    if(cl && v==="chk"){
+      var withChk = notes.filter(function(n){ return noteCheckItems(n).length; }).sort(function(a,b){
+        var da = a.date || (a.createdAt||"").slice(0,10), db = b.date || (b.createdAt||"").slice(0,10); return db.localeCompare(da); });
+      var open = withChk.filter(function(n){ return noteCheckItems(n).some(function(x){ return !x.done; }); });
+      var done = withChk.filter(function(n){ return open.indexOf(n)<0; });
+      var blk = function(n){ return '<div class="nlx"><div class="muted" style="font-size:.85rem;">'+escapeHtml(n.date || fmtTs(n.createdAt))+(n.title?'　'+escapeHtml(n.title):'')+'　<button class="btn ghost small" data-act="editnote" data-id="'+n.id+'">✏️ 記録を開く</button></div>'+noteCheckHtml(n)+'</div>'; };
+      cl.innerHTML = (open.length ? open.map(blk).join("") : '<div class="empty">未確認の「🔒 社内で確認」はありません。</div>')+
+        (done.length ? '<details style="margin-block-start:8px;"><summary class="muted">確認済み（'+done.length+'件の記録）</summary>'+done.map(blk).join("")+'</details>' : '');
+    }
+    if(v==="dec"){
+      var cd = document.getElementById("custDecidedCard"), ds = document.getElementById("decidedSummaryCard");
+      var de = document.getElementById("recDecEmpty");
+      if(!de && ds){ de = document.createElement("div"); de.id = "recDecEmpty"; de.className = "card"; de.innerHTML = '<div class="empty">まだ決定したものはありません。</div>'; ds.parentNode.insertBefore(de, ds.nextSibling); }
+      if(de) de.style.display = (cd && !cd.hidden) || (ds && !ds.hidden) ? "none" : "";
+    } else { var de2 = document.getElementById("recDecEmpty"); if(de2) de2.style.display = "none"; }
+  }
   function renderMeetingNotes(){
     renderCustDecided();
     renderDecidedSummary();
+    renderRecView();
     var dateInput = document.getElementById("meetingNoteDate");
     if(dateInput && !dateInput.value) dateInput.value = todayStr();
     var wrap = document.getElementById("meetingNoteList");
@@ -6639,17 +6722,10 @@
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
         '<button class="notemenu-close" data-act="togglenotemenu" data-id="'+n.id+'" title="閉じる">✕ 閉じる</button>'+
-        '<button data-act="editnote" data-id="'+n.id+'">編集</button>'+
-        '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
-        '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
-        '<button data-act="editnote" data-id="'+n.id+'" title="記録を開いて、行ごとに「📍 部位」を付けます">行ごとに部位を付ける</button>'+
-        '<div class="notemenu-divider"></div>'+
-        '<button data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
-        '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
-        '<div class="notemenu-divider"></div>'+
+        '<div class="notemenu-h">🏠 お客様へ</div>'+
         '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
         '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>'+
-        '<div class="notemenu-divider"></div>'+
+        '<div class="notemenu-divider"></div><div class="notemenu-h">📋 タスク・依頼</div>'+
         noteSendButtonHtml(n, sent, "companytask")+
         noteSendButtonHtml(n, sent, "vendortask")+
         noteSendButtonHtml(n, sent, "estreq")+
@@ -6657,6 +6733,14 @@
         noteSendButtonHtml(n, sent, "confirm")+
         noteSendButtonHtml(n, sent, "consider")+
         noteSendButtonHtml(n, sent, "estimate")+
+        '<div class="notemenu-divider"></div><div class="notemenu-h">📤 共有</div>'+
+        '<button data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
+        '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
+        '<div class="notemenu-divider"></div><div class="notemenu-h">🗂 記録の整理</div>'+
+        '<button data-act="editnote" data-id="'+n.id+'">編集（行ごとの部位・ファイル・決定のお願いも）</button>'+
+        '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
+        '<div class="notemenu-divider"></div>'+
+        '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
         '</div>';
       var sentBadgeHtml = NOTE_SEND_TYPES.filter(function(t){ return sent[t.type]; }).map(function(t){
         if(t.type==="estimate") return '<span class="nsentbadge" data-goest="'+escapeHtml(n.projectId+"|"+((sent.estimate&&sent.estimate.ref)||""))+'" title="押すと追加見積りの欄へ移動します">✓ '+t.badge+' ›</span>';
@@ -6665,6 +6749,7 @@
       return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
+        noteDecMarkHtml(n)+
         (isChangeRequesting(n) ? '<span class="nchgbadge">変更依頼中</span>' : '')+
         sentBadgeHtml+
         chHtml+(specHtml ? specHtml : '')+
@@ -6672,10 +6757,11 @@
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
         noteLinePartsChipsHtml(n)+
+        noteCheckHtml(n)+
         talkHtml+
         (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
-        noteCheckHtml(n)+
+        noteLineExtrasHtml(n)+
         msgHtml+
         filesHtml+
         menuHtml+
@@ -12587,6 +12673,10 @@
   // 行ごとの部位（キーは行の文）。記録は「総合」のまま、行ごとに部位を付けると、その部位の一覧・おうちノートの項目にもその行が出る
   var mnLineParts = {};
   var MN_ACT_LABEL = { task:"社内タスク", est:"追加見積", estreq:"見積依頼（Gmail）" };
+  // 行ごとのファイル（キーは行の文。{file,name,type} か {ref}）と「お客様に決定してもらう」印
+  var mnLineFiles = {};
+  var mnLineAsk = {};
+  var mnLineFileTarget = "";
   function mnLines(){ var el = document.getElementById("mnBody"); return String(el && el.value || "").split("\n").map(function(x){ return x.trim(); }).filter(Boolean); }
   function mnRender(){
     var box = document.getElementById("mnLines"); if(!box) return;
@@ -12597,6 +12687,10 @@
       return '<div class="mnlrow"><div class="mnlmain"><button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":m==="c"?"🔒":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>'+
         '<button type="button" class="mnlpart'+(mnLineParts[t]?" on":"")+'" data-mnlpart="'+i+'" title="この行の部位">'+(mnLineParts[t] ? escapeHtml(partText(mnLineParts[t])) : "📍 部位")+'</button>'+
         '<button type="button" class="mnlact" data-mnlact="'+i+'" title="この行から作る" aria-label="この行から作る">⋯</button></div>'+
+        ((mnLineAsk[t] || (mnLineFiles[t]||[]).length) ? '<div class="mnlacts">'+
+          (mnLineAsk[t] ? '<span class="mnlchip ask">🔘 お客様に決定してもらう <button type="button" data-mnlaskrm="'+i+'" aria-label="取り消す">×</button></span>' : '')+
+          (mnLineFiles[t]||[]).map(function(f, k){ var nm = f.ref ? (f.ref.name||"ファイル") : (f.name||"ファイル"); return '<span class="mnlchip">📎 '+escapeHtml(nm.length>18?nm.slice(0,18)+"…":nm)+' <button type="button" data-mnlfrm="'+i+'|'+k+'" aria-label="外す">×</button></span>'; }).join("")+
+        '</div>' : '')+
         (acts.length ? '<div class="mnlacts">'+acts.map(function(a, k){
           var extra = a.type==="task" ? (a.assignee?"："+a.assignee:"") : a.type==="estreq" ? "："+a.vendorIds.map(function(id){ var v = vendorById(id); return v?v.name:""; }).filter(Boolean).join("、") : "";
           return '<span class="mnlchip">→ '+escapeHtml(MN_ACT_LABEL[a.type]+extra)+' <button type="button" data-mnlrm="'+i+'|'+k+'" aria-label="取り消す">×</button></span>';
@@ -12615,15 +12709,35 @@
     document.getElementById("meetingNoteDecided").value = d.join("\n");
     document.getElementById("meetingNoteOpen").value = o.join("\n");
   }
-  function mnNoteLines(){ return mnLines().map(function(x){ var l = {t:x, m:mnMarks[x]||""}; if(mnLineParts[x]) l.p = mnLineParts[x]; return l; }); }
+  function mnNoteLines(){ return mnLines().map(function(x){ var l = {t:x, m:mnMarks[x]||""}; if(mnLineParts[x]) l.p = mnLineParts[x];
+    var fs = (mnLineFiles[x]||[]).filter(function(f){ return f.ref; }).map(function(f){ return f.ref; }); if(fs.length) l.f = fs;
+    if(mnLineAsk[x] && l.m!=="c") l.ask = true; return l; }); }
+  function mnHasLineAsk(){ return mnLines().some(function(x){ return mnLineAsk[x] && mnMarks[x]!=="c"; }); }
+  // 行に付けたファイルをアップロード（記録するときに1回）。失敗した数を返す
+  async function mnUploadLineFiles(){
+    var fail = 0, lines = mnLines();
+    for(var i=0;i<lines.length;i++){
+      var arr = mnLineFiles[lines[i]] || [];
+      for(var k=0;k<arr.length;k++){
+        if(arr[k].ref) continue;
+        try{ var r = await assets.upload(arr[k].file, {type:arr[k].type}); blobCache[r.id] = arr[k].file; arr[k].ref = { id:r.id, url:r.url, contentType:r.contentType||arr[k].type, name:arr[k].name }; }
+        catch(e){ fail++; }
+      }
+    }
+    return fail;
+  }
   function mnHasLineParts(){ return mnLines().some(function(x){ return !!mnLineParts[x]; }); }
   function mnLoad(talk, decided, open, noteLines){
     mnMarks = {};
     mnLineActs = {};
     mnLineParts = {};
+    mnLineFiles = {};
+    mnLineAsk = {};
     var lines = [];
     if(Array.isArray(noteLines) && noteLines.length){
-      noteLines.forEach(function(l){ var t = String(l.t||"").trim(); if(!t) return; lines.push(t); if(l.m) mnMarks[t] = l.m; if(l.p && l.p.scope) mnLineParts[t] = l.p; });
+      noteLines.forEach(function(l){ var t = String(l.t||"").trim(); if(!t) return; lines.push(t); if(l.m) mnMarks[t] = l.m; if(l.p && l.p.scope) mnLineParts[t] = l.p;
+        if(Array.isArray(l.f) && l.f.length) mnLineFiles[t] = l.f.map(function(f){ return {ref:f}; });
+        if(l.ask) mnLineAsk[t] = true; });
     } else {
       // 以前の記録：打合せ内容 → 決定事項（✅）→ 未決（💭）の順に1つにまとめる
       var split = function(v){ return String(v||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean); };
@@ -12661,6 +12775,10 @@
     var fileInput = document.getElementById("meetingNoteFile");
     var pidNote = state.currentProjectId; // アップロード中に別の案件を開いても、最初の案件に保存する
     var asPlan = !!(document.getElementById("meetingNoteAsPlan") && document.getElementById("meetingNoteAsPlan").checked);
+    var askDecide = !!(document.getElementById("meetingNoteAskDecide") && document.getElementById("meetingNoteAskDecide").checked);
+    var lineFileFail = await mnUploadLineFiles();
+    if(lineFileFail) toast("行に付けたファイルのうち "+lineFileFail+" 件を保存できませんでした");
+    var lineAsk = mnHasLineAsk();
     // 書き込み済み・図面から選んだファイル（mnExtras）は、元のファイルの隣に入れる
     var extrasNow = mnLiveExtras(); mnExtras = [];
     var exFail = 0;
@@ -12716,6 +12834,10 @@
       existing.talkPublic = talkPublic;
       existing.internal = internal;
       existing.noteLines = mnNoteLines();
+      // 「お客様に決定をお願いする」／行の「決定してもらう」：おうちノートに反映（記録全体のチェックは決定ボタンも出す）
+      if(askDecide){ existing.askDecision = true; }
+      if((askDecide || lineAsk) && !existing.reflected){ existing.reflected = true; existing.reflectedAt = nowIso(); }
+      if((askDecide || lineAsk) && !existing.specPart && !newMeetingNoteSpecPart) existing.specPart = recLeafPart("general", "", projectById(existing.projectId)); // 部位なしはお客様画面に出ないので「総合」に
       if(!existing.specPart && mnHasLineParts()) existing.specPart = recLeafPart("general", "", projectById(existing.projectId));
       existing.channel = channel;
       existing.message = message;
@@ -12757,6 +12879,9 @@
     var n = { id:uid("note"), projectId: pidNote, title:title, decided:decided, open:open, talk:talk, talkPublic:talkPublic, internal:internal, noteLines:mnNoteLines(), channel:channel, message:message,
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || (mnHasLineParts() ? recLeafPart("general", "", projectById(pidNote)) : null), badges: badgesToApply, autoCreated: {} };
+    if(askDecide) n.askDecision = true;
+    if(askDecide || lineAsk){ n.reflected = true; n.reflectedAt = nowIso(); }
+    if((askDecide || lineAsk) && !n.specPart) n.specPart = recLeafPart("general", "", projectById(pidNote)); // 部位なしはお客様画面に出ないので「総合」に
     state.meetingNotes.push(n);
     cancelEditMeetingNote();
     render();
@@ -12765,6 +12890,7 @@
     await applyNewlyOnBadges(n, badgesToApply, vendorIdToApply, assigneeToApply);
     if(lineActsToApply.length) await runNoteLineActs(n, lineActsToApply);
     if(asPlan && newFiles.length) toast(planFailed ? ("図面に登録できなかったファイルが "+planFailed+" 件あります") : "図面にも登録しました");
+    else if(askDecide || lineAsk) toast("おうちノートに反映し、お客様に決定をお願いしました");
     logActivity("打合せ内容を記録しました");
   }
 
@@ -13302,6 +13428,7 @@
     document.getElementById("meetingNoteTalk").value = n.talk || "";
     document.getElementById("meetingNoteMessage").value = n.message || "";
     document.getElementById("meetingNoteChannel").value = n.channel || "打合せ";
+    var akd = document.getElementById("meetingNoteAskDecide"); if(akd) akd.checked = n.askDecision===true;
     document.getElementById("meetingNoteTalkShow").checked = !!n.talkPublic; // これまでの記録は社内メモ扱いのまま（チェックを入れた記録だけお客様に出る）
     mnLoad(n.talk, (n.decided!=null ? n.decided : (n.content||"")), n.open, n.noteLines);
     var mm = document.querySelector("details.mnmore"); if(mm && (n.message || (n.badges && Object.keys(n.badges).some(function(k){ return n.badges[k]; })))) mm.open = true;
@@ -13339,6 +13466,7 @@
     document.getElementById("meetingNoteMessage").value = "";
     document.getElementById("meetingNoteChannel").value = "打合せ";
     document.getElementById("meetingNoteTalkShow").checked = true;
+    var akd0 = document.getElementById("meetingNoteAskDecide"); if(akd0) akd0.checked = false;
     mnLoad("", "", "", null);
     if(dateInput) dateInput.value = todayStr();
     if(fileInput) fileInput.value = "";
@@ -15035,13 +15163,27 @@
         } else setPart();
         return;
       }
+      var arm = e.target.closest("[data-mnlaskrm]");
+      if(arm){ var at0 = mnLines()[+arm.dataset.mnlaskrm]; if(at0) delete mnLineAsk[at0]; mnRender(); return; }
+      var frm = e.target.closest("[data-mnlfrm]");
+      if(frm){ var fp = frm.dataset.mnlfrm.split("|"), ft = mnLines()[+fp[0]]; if(ft && mnLineFiles[ft]){ mnLineFiles[ft].splice(+fp[1], 1); if(!mnLineFiles[ft].length) delete mnLineFiles[ft]; } mnRender(); return; }
       var ab = e.target.closest("[data-mnlact]");
       if(ab){
         var lt = mnLines()[+ab.dataset.mnlact]; if(!lt) return;
-        askChoice("この行から作る", "「"+lt.slice(0,40)+"」\n記録すると、選んだものを作ります。", [
-          {label:"社内タスク", value:"task"}, {label:"追加見積（おうちノート）", value:"est"}, {label:"見積依頼（Gmail下書き・添付付き）", value:"estreq"}
+        askChoice("この行で", "「"+lt.slice(0,40)+"」", [
+          {label:"📎 この行にファイルを付ける", value:"file"},
+          {label: mnLineAsk[lt] ? "🔘 お客様に決定してもらう（取り消す）" : "🔘 この行をお客様に決定してもらう", value:"ask"},
+          {label:"📍 この行の部位", value:"part"},
+          {label:"→ 社内タスク", value:"task"}, {label:"→ 追加見積（おうちノート）", value:"est"}, {label:"→ 見積依頼（Gmail下書き・添付付き）", value:"estreq"}
         ], function(kind){
           if(!kind) return;
+          if(kind==="file"){ mnLineFileTarget = lt; var lfi = document.getElementById("mnLineFileInput"); if(lfi){ lfi.value = ""; lfi.click(); } return; }
+          if(kind==="ask"){
+            if(mnMarks[lt]==="c"){ toast("🔒社内で確認の行は、お客様には出せません"); return; }
+            if(mnLineAsk[lt]) delete mnLineAsk[lt]; else { mnLineAsk[lt] = true; toast("記録すると、この行がおうちノートに決定ボタン付きのカードで出ます"); }
+            mnRender(); return;
+          }
+          if(kind==="part"){ var pb2 = ab.parentNode.querySelector("[data-mnlpart]"); if(pb2) pb2.click(); return; }
           var push = function(a){ (mnLineActs[lt] = mnLineActs[lt] || []).push(a); mnRender(); };
           if(kind==="task"){ askAssignee(function(who){ if(who===null) return; push({type:"task", assignee:who}); }); }
           else if(kind==="est"){
@@ -15421,6 +15563,14 @@
       window.addEventListener("resize", size);
       size();
     })();
+    document.getElementById("mnLineFileInput").addEventListener("change", function(){
+      var t = mnLineFileTarget, fs = Array.prototype.slice.call(this.files||[]);
+      if(!t || !fs.length) return;
+      if(mnLines().indexOf(t)<0){ toast("行が見つかりません（文を書き換えた場合は、もう一度「⋯」から付けてください）"); return; }
+      mnLineFiles[t] = (mnLineFiles[t]||[]).concat(fs.map(function(f){ return {file:f, name:f.name, type:f.type||""}; }));
+      this.value = ""; mnRender();
+      toast("この行に "+fs.length+" 件のファイルを付けました（「記録する」で保存）");
+    });
     document.getElementById("meetingNoteFile").addEventListener("change", function(){
       // 選び直したら、前に選んだファイルへの書き込みは「最後」に回す（消さない）
       mnExtras.forEach(function(x){ if(x.after.indexOf("l:")===0) x.after = "x"; });
@@ -16042,6 +16192,13 @@
     document.getElementById("vendorTableBody").addEventListener("click", handleTableClick);
     var meetingNoteListEl = document.getElementById("meetingNoteList");
     if(meetingNoteListEl) meetingNoteListEl.addEventListener("click", handleTableClick);
+    var recCheckListEl = document.getElementById("recCheckList");
+    if(recCheckListEl) recCheckListEl.addEventListener("click", handleTableClick);
+    var recViewBarEl = document.getElementById("recViewBar");
+    if(recViewBarEl) recViewBarEl.addEventListener("click", function(e){
+      var b = e.target.closest("[data-recview]"); if(!b) return;
+      state.recView = b.dataset.recview; renderMeetingNotes();
+    });
     // カード内以外をクリックしたら「⋮ 操作」メニューを閉じる
     document.addEventListener("click", function(e){
       if(openNoteMenuId==null) return;
