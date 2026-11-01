@@ -12792,12 +12792,14 @@
   function mnHasLineAsk(){ return mnLines().some(function(x){ return mnLineAsk[x] && mnMarks[x]!=="c"; }); }
   // 行に付けたファイルをアップロード（記録するときに1回）。失敗した数を返す
   async function mnUploadLineFiles(){
-    var fail = 0, lines = mnLines();
+    var fail = 0, lines = mnLines(), done = [];
     for(var i=0;i<lines.length;i++){
       var arr = mnLineFiles[lines[i]] || [];
       for(var k=0;k<arr.length;k++){
         if(arr[k].ref) continue;
-        try{ var r = await assets.upload(arr[k].file, {type:arr[k].type}); blobCache[r.id] = arr[k].file; arr[k].ref = { id:r.id, url:r.url, contentType:r.contentType||arr[k].type, name:arr[k].name }; }
+        var same = done.find(function(d){ return d.file===arr[k].file; }); // 同じ書き込み版を複数の行に付けたときは1回だけアップロード
+        if(same){ arr[k].ref = same.ref; continue; }
+        try{ var r = await assets.upload(arr[k].file, {type:arr[k].type}); blobCache[r.id] = arr[k].file; arr[k].ref = { id:r.id, url:r.url, contentType:r.contentType||arr[k].type, name:arr[k].name }; done.push(arr[k]); }
         catch(e){ fail++; }
       }
     }
@@ -13285,11 +13287,16 @@
   // アップロードし直さず同じファイルを参照する（{ref}）。同じファイル（url）は1つにまとめる
   function mnRegisteredFiles(pid){
     var out = [], seen = {};
-    var okType = function(ct, nm){ ct = ct||""; return ct.indexOf("image")===0 || ct.indexOf("pdf")>=0 || /\.(pdf|jpe?g|png|gif|webp|heic)$/i.test(nm||""); };
+    // 種類が分からないもの（contentType も拡張子も無い）は除外しない。動画・Office等だけ外す
+    var okType = function(ct, nm){ ct = ct||""; if(ct.indexOf("image")===0 || ct.indexOf("pdf")>=0 || /\.(pdf|jpe?g|png|gif|webp|heic)$/i.test(nm||"")) return true; return !ct && !/\.[a-z0-9]{2,5}$/i.test(nm||""); };
     var add = function(group, ref, at, sub){
       if(!ref || !ref.url || seen[ref.url] || !okType(ref.contentType, ref.name)) return;
       seen[ref.url] = 1; out.push({ group:group, ref:ref, at:String(at||""), sub:sub||"" });
     };
+    // この画面で書き込んだばかり（まだ保存していない）の版も選べる
+    var addFile = function(group, x, sub){ if(!x || !x.file) return; out.push({ group:group, file:x.file, name:x.name, type:x.type, at:"9999", sub:sub||"" }); };
+    mnLiveExtras().forEach(function(x){ if(x.file) addFile("✏️ この画面で書き込んだもの", x, "未保存"); else if(x.ref) add("✏️ この画面で書き込んだもの", x.ref, "9999", "図面から"); });
+    Object.keys(mnLineFiles).forEach(function(t){ (mnLineFiles[t]||[]).forEach(function(x){ if(x.file) addFile("✏️ この画面で書き込んだもの", x, "未保存・"+t.slice(0,12)); }); });
     liveAttachments().forEach(function(a){
       if(a.projectId!==pid || (a.kind!=="plan" && a.kind!=="quote")) return;
       if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return;
@@ -13305,6 +13312,10 @@
       (n.files||[]).forEach(function(f){ add("🗒 記録の添付", { id:f.id, url:f.url, contentType:f.contentType, name:f.name||"添付" }, n.date||n.createdAt, sub); });
       (n.noteLines||[]).forEach(function(l){ (l.f||[]).forEach(function(f){ add("🗒 記録の添付", { id:f.id, url:f.url, contentType:f.contentType, name:f.name||"添付" }, n.date||n.createdAt, sub); }); });
     });
+    liveTasks().concat(state.tasks.filter(function(t){ return t.archivedAt && !t.deletedAt; })).forEach(function(t){
+      if(t.projectId!==pid) return;
+      (t.attachments||[]).forEach(function(f){ add("📋 タスクの添付", { id:f.id||f.assetId, url:f.url, contentType:f.contentType, name:f.name||"添付" }, t.updatedAt||t.createdAt, String(t.content||"").slice(0,14)); });
+    });
     out.sort(function(a,b){ return b.at.localeCompare(a.at); });
     return out;
   }
@@ -13312,7 +13323,7 @@
     var pid = editingMeetingNoteProjectId();
     var rows = mnRegisteredFiles(pid);
     if(!rows.length){ toast("この案件にはまだ登録済みのファイルがありません", 6000); return; }
-    var groups = ["📐 図面","📄 見積の書類","📷 部位の写真・PDF","🗒 記録の添付"];
+    var groups = ["✏️ この画面で書き込んだもの","📐 図面","📄 見積の書類","📷 部位の写真・PDF","🗒 記録の添付","📋 タスクの添付"];
     var picked = {};
     var ov = document.createElement("div");
     ov.className = "taskform-modal"; ov.style.zIndex = "90";
@@ -13324,8 +13335,10 @@
         if(!gs.length) return "";
         return '<div style="font-weight:700; margin:10px 0 4px;">'+escapeHtml(g)+'（'+gs.length+'）</div><div class="ftgrid">'+gs.map(function(x){
           var r = x.r;
-          return '<div class="fttile" data-mnr="'+x.i+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(r.ref.url, r.ref.contentType, r.ref.name)+'</div>'+
-            '<div class="ftbody"><div class="ftname">'+escapeHtml(r.ref.name)+'</div><div class="ftmeta">'+(r.sub?'<span class="pill small">'+escapeHtml(r.sub)+'</span>':'')+'</div></div></div>';
+          if(r.file && !r.url) r.url = URL.createObjectURL(r.file);
+          var u = r.ref ? r.ref.url : r.url, ct = r.ref ? r.ref.contentType : r.type, nm = r.ref ? r.ref.name : r.name;
+          return '<div class="fttile" data-mnr="'+x.i+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(u, ct, nm)+'</div>'+
+            '<div class="ftbody"><div class="ftname">'+escapeHtml(nm||"ファイル")+'</div><div class="ftmeta">'+(r.sub?'<span class="pill small">'+escapeHtml(r.sub)+'</span>':'')+'</div></div></div>';
         }).join("")+'</div>';
       }).join("")+
       '<div class="row" style="position:sticky; bottom:0; background:var(--surface); padding-block:10px 2px; gap:8px; margin-block-start:10px;"><button type="button" class="btn" data-mnr-ok disabled>選んだものを付ける</button><button type="button" class="btn secondary" data-mnr-close>やめる</button></div></div>';
@@ -13346,6 +13359,7 @@
         var arr = mnLineFiles[line] = mnLineFiles[line] || [], added = 0;
         Object.keys(picked).forEach(function(k){
           var r = rows[+k]; if(!r) return;
+          if(r.file){ if(arr.some(function(f){ return f.file===r.file; })) return; arr.push({ file:r.file, name:r.name, type:r.type }); added++; return; }
           if(arr.some(function(f){ return f.ref && f.ref.url===r.ref.url; })) return;
           arr.push({ ref: Object.assign({}, r.ref) }); added++;
         });
