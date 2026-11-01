@@ -214,6 +214,11 @@
   .qdetail.nmtext{ white-space:pre-wrap; line-height:1.7; font-size:.9rem; }
   .a2hs{ background:#f4efe6; border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:0 0 14px; font-size:.86rem; line-height:1.6; }
   .a2hs .a2b{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .a2hs .a2tap{ display:flex; align-items:center; gap:8px; width:100%; background:none; border:0; padding:0; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  .a2hs .a2tap b{ font-size:.95rem; color:var(--brown); }
+  .a2hs .a2tap .ug{ margin-left:auto; color:var(--muted); }
+  .a2done{ display:block; width:100%; margin-top:16px; background:var(--brown); color:#fff; border:0; border-radius:999px; padding:12px; font-family:inherit; font-weight:700; font-size:.95rem; cursor:pointer; }
+  .a2more{ display:block; width:100%; margin-top:10px; background:none; border:1.5px solid var(--line); border-radius:999px; padding:10px; font-family:inherit; font-weight:700; color:var(--brown); cursor:pointer; }
   .a2hs .a2ok{ background:var(--brown); color:#fff; border:0; border-radius:999px; padding:7px 16px; font-family:inherit; font-weight:700; cursor:pointer; }
   .mtop{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:#f4efe6; border:1px solid var(--line); border-radius:12px; padding:12px; margin:0 0 6px; font-family:inherit; font-weight:700; font-size:.88rem; color:inherit; cursor:pointer; }
   .mtop .ug{ margin-left:auto; color:var(--brown); }
@@ -630,7 +635,7 @@
 <div class="help" id="addHomeModal" hidden>
   <div class="help-card">
     <button class="x" id="addHomeX" aria-label="閉じる">×</button>
-    <h2>📲 アプリのように使う</h2>
+    <h2>📲 アプリの便利な使い方</h2>
     <p class="help-lead">おうちノートは、お使いのスマートフォンのホーム画面（パソコンはデスクトップ）に出しておけます。アプリのように、すぐ開けて便利です。</p>
 
     <h3>📱 ホーム画面への追加方法</h3>
@@ -652,6 +657,8 @@
       <li>アドレス欄の右にある「インストール」のマーク（または右上の「⋮」）をクリック</li>
       <li>「インストール」／「アプリとしてインストール」を選ぶ</li>
     </ol>
+    <button class="a2more" id="addHomeHelp">❔ 画面の見方・使い方を見る</button>
+    <button class="a2done" id="addHomeDone">✅ 追加できたよ（この案内をホームに出さない）</button>
   </div>
 </div>
 <div class="help" id="memoModal" hidden>
@@ -2160,8 +2167,8 @@ function homeHtml(){ return homeParts().main; }
   }
   function a2hsBannerHtml(){
     if(a2hsDone()) return "";
-    return '<div class="a2hs"><div class="a2t">📲 <b>おうちノートは、お使いのデスクトップ（ホーム画面）にも出せます</b><br>アプリのように、すぐ開けて便利です。</div>'+
-      '<div class="a2b"><button class="linkbtn" data-menusheet="addHomeModal">出し方を見る ›</button><button class="a2ok" data-a2hsok="1">分かりました</button></div></div>';
+    return '<div class="a2hs"><button class="a2tap" data-menusheet="addHomeModal">📲 <span><b>アプリの便利な使い方</b><br>デスクトップ（ホーム画面）への貼り付け方</span><span class="ug">›</span></button>'+
+      '<div class="a2b"><span></span><button class="a2ok" data-a2hsok="1">追加できたよ</button></div></div>';
   }
   // 下のタブ「≡ メニュー」の画面：絵＋名前のタイルを3列で（家づくりの項目／わが家の情報／そのほか）
   function menuPageHtml(){
@@ -2170,7 +2177,7 @@ function homeHtml(){ return homeParts().main; }
     };
     var emo = function(e){ return '<span class="memo">'+e+'</span>'; };
     var out = '<h2 class="big">メニュー</h2>'+
-      '<button class="mtop" data-menusheet="addHomeModal">📲 アプリは、お使いのデスクトップ（ホーム画面）にも出せます<span class="ug">›</span></button>';
+      '<button class="mtop" data-menusheet="addHomeModal">📲 アプリの便利な使い方（デスクトップへの貼り付け方）<span class="ug">›</span></button>';
     // 家づくりの項目（写真があればいちばん新しい写真、無ければ印）
     var cats = (data.categories||[]).filter(function(c){ return c.id!=="plan" && catAllItems(c).length; });
     if(cats.length){
@@ -2235,6 +2242,11 @@ function homeHtml(){ return homeParts().main; }
     document.getElementById(sheetId).addEventListener("click", function(e){ if(e.target.id===sheetId) closeSheet(sheetId); });
   });
 
+  document.getElementById("addHomeHelp").addEventListener("click", function(){ closeSheet("addHomeModal"); openSheet("help"); });
+  document.getElementById("addHomeDone").addEventListener("click", function(){
+    try{ localStorage.setItem("okaiA2hsOk","1"); }catch(er){}
+    closeSheet("addHomeModal"); if(data) render();
+  });
   // 決める順番（全お客様共通の案内）を一度だけ組み立てる
   document.getElementById("orderlist").innerHTML = DECISION_ORDER.map(function(o,i){
     return '<div class="orderitem"><div class="num">'+(i+1)+'</div><div><div class="ot">'+esc(o.title)+'</div>'+
