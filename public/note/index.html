@@ -979,13 +979,26 @@ function estTotalHtml(list){
   }
 
 // 反映済みの打合せ記録から「ご検討いただきたいこと」を1行ずつ取り出す（同じ文は新しいほうだけ）
+// 「💬 決めたことを伝える」を送った検討事項か（この画面で送った分＋お客様のメッセージに「【決めました】「その文」」があり、記録より後のもの）
+var consDecidedNow = {};
+function consDecidedSent(t, n){
+  if(consDecidedNow[t]) return true;
+  var head = "【決めました】「"+t+"」", at = Date.parse((n && n.createdAt) || "")||0;
+  return (data.messages||[]).some(function(m){
+    return m.fromCustomer && String(m.content||"").indexOf(head)===0 && (Date.parse(m.createdAt||"")||0) >= at;
+  });
+}
 function consItems(){
   var out = [], seen = {};
   var notes = (data.notes||[]).slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); });
   notes.forEach(function(n){
     String(n.open||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean).forEach(function(t){
       if(seen[t]) return; seen[t] = 1;
-      out.push({ t:t, date:n.date, part:n.partName||n.part||"", title:n.title||"", id:n.id||"" });
+      // お客様が「決めたことを伝える」を送った項目は、ホームの一覧から外す
+      if(consDecidedSent(t, n)) return;
+      // 行に部位を付けていれば、その部位の名前を札にする（無ければ記録の部位）
+      var lp = ""; (n.lines||[]).some(function(l){ if(l.t===t && l.part){ lp = l.part; return true; } return false; });
+      out.push({ t:t, date:n.date, part:lp||n.partName||n.part||"", title:n.title||"", id:n.id||"" });
     });
   });
   return out;
@@ -1950,7 +1963,7 @@ function homeHtml(){ return homeParts().main; }
     if(hasLines(n)){
       return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
         (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
-        linesHtml(n, false, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:'')))+
+        linesHtml(n, noOpen, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:'')))+
         (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
         noteEstHtml(n)+
         ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
