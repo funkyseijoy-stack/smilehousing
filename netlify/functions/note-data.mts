@@ -349,7 +349,7 @@ export default async (req: Request, context: Context) => {
       const roomName = roomId ? ((project.rooms || []).find((r: any) => r.id === roomId)?.name || "") : "";
       const where = roomName ? `${catName}（${roomName}）` : catName;
       await notifyDecision(store, project, projectId, doc.label ? `${where}「${doc.label}」` : where, status, prev ? prev.status : null);
-      return json({ ok: true, decision: doc });
+      const { ordered: _ord, ...pub } = doc; return json({ ok: true, decision: pub });
     }
     if (body.action === "message") {
       const text = String(body.text || "").trim().slice(0, 2000);
