@@ -973,7 +973,8 @@ function consItems(){
     if(seenInitAt && Date.now() - seenInitAt < 30*60*1000) return;
     var key = "okaiLastSeen:"+P, prev = null;
     try{ prev = localStorage.getItem(key); localStorage.setItem(key, new Date().toISOString()); }catch(e){}
-    seenSince = prev || null; seenInitAt = Date.now(); view.updDismissed = false;
+    // 初めて開いた端末は、ここ3日以内に届いたものを「NEW」にする
+    seenSince = prev || new Date(Date.now() - 3*86400000).toISOString(); seenInitAt = Date.now(); view.updDismissed = false;
   }
   function isNew(t){ return !!(seenSince && t && String(t) > seenSince); }
   function nwTag(t){ return isNew(t) ? '<span class="tag nw">NEW</span>' : ''; }
