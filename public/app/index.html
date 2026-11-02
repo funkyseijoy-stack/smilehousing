@@ -4059,7 +4059,7 @@
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
         (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
-        (!canReviewTask(t) && canCommentBack(t)?'<button class="btn small" data-taskact="commentback" data-id="'+t.id+'" title="コメントを書いて担当者へ戻す（対応中へ）">💬 コメントして戻す</button>':'')+
+        (!canReviewTask(t) && canCommentBack(t)?'<button class="btn small" data-taskact="commentback" data-id="'+t.id+'" title="コメントを書いて担当者へ戻す（未着手へ）">💬 コメントして戻す</button>':'')+
         (canAssigneeComment(t)?'<button class="btn small secondary" data-taskact="comment" data-id="'+t.id+'" title="コメントを書いて、最後にコメントした人（いなければ作った人）へ知らせる">💬 コメント</button>':'')+
         '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
         '<button class="btn small secondary" data-kcmore="'+t.id+'">'+(state.taskMoreOpen&&state.taskMoreOpen[t.id]?'⋯ その他 ▴':'⋯ その他 ▾')+'</button>'+
@@ -14338,7 +14338,7 @@
       if(to===me) to = "";
     }
     var note = await askComment(back ? "💬 コメントして戻す" : "💬 コメント",
-      back ? "コメントを書いてください。"+to+"さんに届き、タスクは「対応中」へ戻ります。"
+      back ? "コメントを書いてください。"+to+"さんに届き、タスクは「未着手」へ戻ります。"
            : (to ? "コメントを書いてください。"+to+"さんに届きます（進捗は変わりません）。" : "コメントを書いてください（進捗は変わりません）。"),
       true);
     if(note===null) return;
@@ -14348,12 +14348,12 @@
     t.reviews = taskReviewList(t).concat([entry]);
     t.review = entry;
     if(back){
-      t.status = "対応中"; t.completedAt = null; t.archivedAt = null;
+      t.status = "未着手"; t.completedAt = null; t.archivedAt = null;
       state.taskOpen = state.taskOpen || {}; state.taskOpen[t.status] = true;
     }
     t.updatedAt = nowIso();
     render();
-    toast(back ? "コメントして"+to+"さんへ戻しました（「対応中」へ移しました）" : (to ? to+"さんへコメントを送りました" : "コメントを残しました"));
+    toast(back ? "コメントして"+to+"さんへ戻しました（「未着手」へ移しました）" : (to ? to+"さんへコメントを送りました" : "コメントを残しました"));
     await saveDoc("tasks", t.id, t);
     logActivity("タスクにコメントしました（"+(t.content||"").slice(0,20)+"）");
   }
