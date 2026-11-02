@@ -1128,6 +1128,7 @@ function homeHtml(){ return homeParts().main; }
     out += staffCommentHtml();
     out += updatesHtml();
     out += latestNotesHtml();
+    out += reflectedNotesHtml();
     out += pendingCardsHtml();
     // 次回のご予約・家づくりの進行状況は上の帯（現在：〇〇／次回 〇/〇）に出ているので、ホームには出さない。
     // スタッフが書いた「打合せの予定」の文章があるときだけ出す
@@ -1662,6 +1663,20 @@ function homeHtml(){ return homeParts().main; }
     return a;
   }
   // ② 最新の打合せ内容：いちばん新しい日の記録を全部
+  // 「反映する」を押した打合せ記録を、部位に関係なく反映した順（新しい順）に全部。上の「最新の打合せ記録」に出したものは除く
+  var homeLatestIds = {};
+  function reflectedNotesHtml(){
+    var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.open||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
+    var list = (data.notes||[]).filter(function(n){ return hasBody(n) && !homeLatestIds[n.id]; });
+    if(!list.length) return "";
+    var at = function(n){ return Date.parse(n.reflectedAt||n.upd||n.createdAt||"")||0; };
+    list.sort(function(a,b){ return at(b)-at(a); });
+    return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+list.map(function(n){
+        var f = noteDecItem(n);
+        var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
+        return '<div class="tli flat">'+noteBody(n, true, true)+link+'</div>';
+      }).join("")+'</div>';
+  }
   function latestNotesHtml(){
     // ホームは「総合」（部位なしも含む）の記録だけ。部位ごとの記録は「家づくり」の各項目で見る。
     // 総合の記録が1件も無いお客様は、従来どおり全部の記録から。中身（内容・決まったこと・メッセージ・資料）の無い記録は出さない
@@ -1673,6 +1688,7 @@ function homeHtml(){ return homeParts().main; }
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
     var list = notes.filter(function(n){ return String(n.date||"")===last; });
+    homeLatestIds = {}; list.forEach(function(n){ homeLatestIds[n.id] = 1; });
     // 部位ごとの記録はホームには出さない（決定待ちのものは下の「ご確認・ご決定ください」、過去の分は「家づくり」の各部位で見る）
     return hd+'<span class="countpill">'+fmtD(last)+'</span></div><div class="catlist">'+list.map(function(n){
         var f = noteDecItem(n);

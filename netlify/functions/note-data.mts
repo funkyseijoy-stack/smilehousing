@@ -851,6 +851,7 @@ export default async (req: Request, context: Context) => {
         date: n.date || (n.createdAt || "").slice(0, 10),
         createdAt: n.createdAt || "",
         upd: updAt(n.reflectedAt, n.createdAt),
+        reflectedAt: n.reflectedAt || n.updatedAt || n.createdAt || "",
         partName: n.specPart ? partLabel(project, n.specPart.scope, n.specPart.category, n.specPart.roomId) : "",
         title: n.title || "",
         decided: n.decided != null ? n.decided : n.content || "",
