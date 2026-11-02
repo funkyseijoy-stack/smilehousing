@@ -1630,10 +1630,15 @@ function homeHtml(){ return homeParts().main; }
       (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
       var part = roomName || partOf(c, x) || x.label || c.name;
       var files = (x.files && x.files.length) ? x.files : (x.file ? [x.file] : []);
-      var text = String(x.title || x.snippet || x.decided || x.talk || x.note || "").trim();
+      // 題名だけだと何を決めるのか分からないので、題名＋中身（決まったこと・打合せの内容・ご検討いただきたいこと）を出す
+      var ttl = String(x.title || "").trim();
+      var body = [x.decided, x.talk, x.open, x.snippet, x.note, x.msg].map(function(v){ return String(v||"").trim(); }).filter(function(v, i, arr){ return v && v!==ttl && arr.indexOf(v)===i; }).join("\n");
+      var text = ttl || body;
       var ra = ' data-ckey="'+esc(x.key)+'" data-croom="'+esc(room)+'" data-clabel="'+esc(text.slice(0,40) || part)+'" data-ccat="'+esc(room ? "rooms" : c.id)+'"';
       cards.push('<div class="pcard"><div class="pch"><span class="ptag">'+esc(part)+'</span><span class="tk">'+fmtD(x.date||x.at)+'</span>'+nwTag(x.upd)+'</div>'+
-        (text ? '<div class="pct">'+esc(text).replace(/\n/g,"<br>")+'</div>' : '')+
+        (ttl ? '<div class="pct"><b>'+esc(ttl)+'</b></div>' : '')+
+        (body ? '<div class="pct">'+esc(body).replace(/\n/g,"<br>")+'</div>' : '')+
+        (!ttl && !body && !(x.files||[]).length && !x.file ? '<div class="pct" style="color:var(--muted);">（内容は「'+esc(c.name)+'の記録を見る」でご確認ください）</div>' : '')+
         (files.length ? '<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>' : '')+
         (e.stamped
           ? '<div class="cdec" style="min-height:70px;"><div class="stamp'+(view.justStamped===x.key?' pop':'')+'" style="top:-30px;">決定<small>'+(function(){ var d=new Date(x.cardDecidedAt||Date.now()); return (d.getMonth()+1)+'/'+d.getDate(); })()+'</small></div>'+
@@ -1684,14 +1689,16 @@ function homeHtml(){ return homeParts().main; }
         if(e.n){
           var f = noteDecItem(e.n);
           var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
-          return '<div class="tli flat">'+noteBody(e.n, true, true)+link+'</div>';
+          return '<div class="tli flat">'+noteBody(e.n, true, true)+homeDecHtml(e.n, f)+link+'</div>';
         }
         var x = e.x, c = e.c;
         var kind = x.isQuote ? (x.quoteType==="定価" ? "お見積り" : "プランボード") : (x.type==="planboard" ? "プランボード" : "写真・資料");
         var part = partOf(c, x) || x.label || c.name;
+        var room = ""; (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; return true; } return false; });
         return '<div class="tli flat"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+(x.type==="planboard"||x.isQuote?"pb":"ph")+'">'+esc(kind)+'</span>'+nwTag(x.upd)+(part?'<span class="tag">'+esc(part)+'</span>':'')+'</div>'+
           (x.msg ? '<div class="box"><div class="bl">スタッフから</div>'+esc(x.msg).replace(/\n/g,"<br>")+'</div>' : '')+
           '<div class="thumbs one" style="max-width:220px;">'+thumbHtml(x.file,"")+'</div>'+
+          homeDecHtml({ title: part }, { c:c, x:x, room:room })+
           '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>';
       }).join("")+'</div>';
   }
