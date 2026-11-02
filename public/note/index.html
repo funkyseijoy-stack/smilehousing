@@ -927,7 +927,11 @@ function estIsMinus(x){ var n=estAmountNum(x && x.amount); return n!=null && n<0
 function estAmountText(x){
   var n=estAmountNum(x && x.amount);
   if(n!=null && n<0) return "−"+Math.abs(n).toLocaleString("ja-JP")+"円";
-  return String((x && x.amount)||"");
+  var raw=String((x && x.amount)||"");
+  // 数字だけ（「,」「円」「¥」付きも含む）で入っていれば「58,272円」の形にそろえる。「約5万」など文字入りは入力どおり
+  var t=raw.replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);}).replace(/[,，\s]/g,"").replace(/^[¥￥]/,"").replace(/円$/,"");
+  if(/^\d+$/.test(t)) return Number(t).toLocaleString("ja-JP")+"円";
+  return raw;
 }
 function estTotalHtml(list){
   var all=0, ok=0, n=0, bad=0;
@@ -1726,7 +1730,7 @@ function homeHtml(){ return homeParts().main; }
       pendN++;
       cards.push('<div class="pcard opt"><div class="pch"><span class="ptag">オプション（追加見積り）</span>'+nwTag(x.updated||x.createdAt)+'</div>'+
         '<div class="pct"><b>'+esc(x.title||"")+'</b>'+(x.note && x.note!==x.title ? '<br>'+esc(x.note).replace(/\n/g,"<br>") : '')+'</div>'+
-        '<div class="pamt">'+esc(String(x.amount||""))+'<span class="tx">（税抜き）</span></div>'+
+        '<div class="pamt">'+esc(estAmountText(x))+'<span class="tx">（税抜き）</span></div>'+
         '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
     });
     // 決定のはんこを押したカードは、ホームのいちばん下の「🔴 決定したもの」にまとめる
@@ -1887,7 +1891,7 @@ function homeHtml(){ return homeParts().main; }
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
       if(pendingAmt || !x.id || estIsMinus(x) || (x.customerResponse||"未回答")!=="未回答") return;
       rows.push('<div class="td"><div class="tdh"><span class="ptag">追加見積り</span><span class="tk">税抜き</span></div>'+
-        '<div class="tt">'+esc(x.title||"")+'　'+esc(x.amount||"")+'</div>'+(x.note?'<div class="tk" style="margin-top:2px;">'+esc(String(x.note).slice(0,80))+'</div>':'')+
+        '<div class="tt">'+esc(x.title||"")+'　'+esc(estAmountText(x))+'</div>'+(x.note?'<div class="tk" style="margin-top:2px;">'+esc(String(x.note).slice(0,80))+'</div>':'')+
         '<div style="display:flex; gap:8px; margin-top:8px;"><button class="btn dk" style="flex:1; padding:10px 6px;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1; padding:10px 6px;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div></div>');
     });
     askItems().forEach(function(e){
