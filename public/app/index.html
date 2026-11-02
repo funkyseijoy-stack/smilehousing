@@ -344,6 +344,10 @@
   .cdlist{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
   .cditem{ display:flex; gap:12px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:#fffaf8; }
   .cdstamp{ flex-shrink:0; width:58px; height:58px; border:3px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-12deg); font-weight:900; font-size:1rem; line-height:1.05; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
+  .cdstamp.ord{ border-color:#2e8b57; color:#2e8b57; }
+  .cdstamp.ord small{ border-top-color:#2e8b57; }
+  .cdstamps{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+  .apstamp.o{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.8); }
   .cdbody{ flex:1; min-width:0; }
   .cdname{ font-weight:700; font-size:.95rem; }
@@ -6945,7 +6949,8 @@
     if(!x) return "";
     var h = (x.badges && x.badges.quote ? '<span class="apstamp q">見積<br>仕様</span>' : '')+
       (hasEstReqStamp(x) ? '<span class="apstamp r">見積<br>依頼中</span>' : '')+
-      (hasChangeStamp(x) ? '<span class="apstamp c">変更<br>依頼中</span>' : '');
+      (hasChangeStamp(x) ? '<span class="apstamp c">変更<br>依頼中</span>' : '')+
+      (orderedOf(x) ? '<span class="apstamp o" title="社内だけ（お客様には出ません）">発注<br>済み</span>' : '');
     return h ? '<span class="apstamps">'+h+'</span>' : '';
   }
   async function toggleAutoStamp(kind, id, k){
@@ -7014,14 +7019,41 @@
       }
       var dd = d.decidedAt ? new Date(d.decidedAt) : null;
       var md = dd && !isNaN(dd) ? (dd.getMonth()+1)+"/"+dd.getDate() : "";
-      return '<div class="cditem"><div class="cdstamp">決定<small>'+escapeHtml(md)+'</small></div><div class="cdbody">'+
+      var od = d.ordered && d.ordered.at ? new Date(d.ordered.at) : null;
+      var omd = od && !isNaN(od) ? (od.getMonth()+1)+"/"+od.getDate() : "";
+      return '<div class="cditem"><div class="cdstamps"><div class="cdstamp">決定<small>'+escapeHtml(md)+'</small></div>'+
+        (d.ordered ? '<div class="cdstamp ord">発注<br>済み<small>'+escapeHtml(omd)+'</small></div>' : '')+'</div><div class="cdbody">'+
         '<div class="cdname">'+escapeHtml(noteDecisionName(proj, d).replace(/「.*」$/, ""))+'<span class="muted">　'+escapeHtml((d.decidedAt||"").slice(0,10))+'</span></div>'+
         (text || d.label ? '<div class="cdtext">'+escapeHtml(String(text || d.label).slice(0,120))+'</div>' : '')+
-        (files.length ? fileThumbRowHtml(files, 64) : '')+'</div></div>';
+        (files.length ? fileThumbRowHtml(files, 64) : '')+
+        '<div style="margin-block-start:6px;">'+(d.ordered
+          ? '<span class="muted" style="font-size:.85rem;">🟢 発注済み（'+escapeHtml(d.ordered.by||"")+'・'+escapeHtml(omd)+'）</span> <button type="button" class="btn ghost small" data-cdorder="'+escapeHtml(d.id)+'">外す</button>'
+          : '<button type="button" class="btn secondary small" data-cdorder="'+escapeHtml(d.id)+'">🟢 発注済みのはんこを押す</button>')+'</div>'+
+        '</div></div>';
     }).join("")+'</div>'+
     (ds.length>LIM ? '<button type="button" class="btn ghost small" id="btnCustDecidedAll">'+(custDecidedAll?'閉じる ▴':'ほか '+(ds.length-LIM)+'件を見る ▾')+'</button>' : '');
     var b = document.getElementById("btnCustDecidedAll");
     if(b) b.onclick = function(){ custDecidedAll = !custDecidedAll; renderCustDecided(); };
+    box.onclick = function(e){ var ob = e.target.closest("[data-cdorder]"); if(ob) toggleOrdered(ob.dataset.cdorder); };
+  }
+  // 「発注済み」のはんこ（社内だけ・緑）。お客様が決定したもの（noteDecisions）に ordered={by,at} で保存。
+  // お客様が「はんこを外す」→もう一度決定しても、サーバー（note-data の decideCard）が ordered を引き継ぐ。
+  async function toggleOrdered(did){
+    var d = (state.noteDecisions||[]).find(function(x){ return x.id===did; }); if(!d) return;
+    var prev = d.ordered || null;
+    if(prev && !confirm("発注済みのはんこを外しますか？")) return;
+    d.ordered = prev ? null : { by: state.currentUser || "スタッフ", at: nowIso() };
+    d.updatedAt = nowIso();
+    render();
+    if(await saveDoc("noteDecisions", d.id, d)===false){ d.ordered = prev; render(); toast("保存できませんでした"); return; }
+    toast(d.ordered ? "🟢 発注済みのはんこを押しました（社内だけ・お客様には出ません）" : "発注済みのはんこを外しました");
+  }
+  // カード（記録・写真PDF・見積の書類・タスクの写し）に対応する「発注済み」の決定
+  function orderedOf(x){
+    if(!x || !x.id) return null;
+    var keys = ["n:"+x.id, "s:"+String(x.id).slice(0,78), "a:"+String(x.id).slice(0,78)];
+    if(x.source && x.source.taskId) keys.push("t:"+x.source.taskId);
+    return (state.noteDecisions||[]).find(function(d){ return d.ordered && !d.deletedAt && d.projectId===x.projectId && keys.indexOf(d.cardKey)>=0; }) || null;
   }
   // 記録タブの切り替え：📝 記録／✅ 決定／🔒 社内確認
   function renderRecView(){

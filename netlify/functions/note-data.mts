@@ -318,6 +318,8 @@ export default async (req: Request, context: Context) => {
       const doc: any = { id, projectId, category: cat, status, by: "お客様", decidedAt: now, updatedAt: now };
       if (roomId) doc.roomId = roomId;
       const prev: any = await store.get(`noteDecisions/${id}`, { type: "json" });
+      // スタッフが押した「発注済み」（社内だけ）は、お客様が決定し直しても消さない
+      if (prev && prev.ordered) doc.ordered = prev.ordered;
       await store.setJSON(`noteDecisions/${id}`, doc);
       const catName = catsOf(project).find((c) => c.id === cat)?.name || cat;
       const roomName = roomId ? ((project.rooms || []).find((r: any) => r.id === roomId)?.name || "") : "";
