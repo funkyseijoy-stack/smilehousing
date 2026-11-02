@@ -112,7 +112,12 @@
   .tag.pb{ background:#f3e6ec; color:#9a4f68; }
   .tag.ph{ background:var(--green); color:var(--green-ink); }
   .tag.new{ background:var(--rose); color:#fff; }
-  .tag.nw{ background:#fff; color:#d9534f; font-weight:700; border:1.5px solid #d9534f; }
+  .tag.nw{ background:#d9534f; color:#fff; font-weight:700; border:1.5px solid #d9534f; }
+  /* 「NEW」は赤く塗って、ふわっと大きく・小さく（目に入りやすく） */
+  @keyframes nwPulse{ 0%,100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(217,83,79,.55); } 50%{ transform:scale(1.12); box-shadow:0 0 0 5px rgba(217,83,79,0); } }
+  .tag.nw, .upd .nwb, .bchips .cnew, .mtile .mbd, .pmi .dt b.nwp{ display:inline-block; animation:nwPulse 1.6s ease-in-out infinite; transform-origin:center; }
+  .pmi .dt b.nwp{ background:#d9534f; color:#fff; border-radius:999px; padding:0 5px; font-size:.6rem; }
+  @media (prefers-reduced-motion: reduce){ .tag.nw, .upd .nwb, .bchips .cnew, .mtile .mbd, .pmi .dt b.nwp{ animation:none; } }
   .scom{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 16px; }
   .scom .sh{ font-weight:700; font-size:.9rem; color:var(--brown); margin-bottom:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .scom .sd{ font-weight:400; font-size:.76rem; color:var(--muted); }
@@ -1556,7 +1561,7 @@ function homeHtml(){ return homeParts().main; }
     list.sort(function(a,b){ return (Date.parse(b.x.at)||0) - (Date.parse(a.x.at)||0); });
     return '<div class="sechd" id="sec-pb"><h3>📐 最新のプランボード</h3><button class="more" data-go="build">すべて見る →</button></div><div class="pbmini">'+list.map(function(e){
       var d = new Date(e.x.at);
-      return '<button class="pmi" data-buildcat="'+esc(e.c.id)+'"><img loading="lazy" src="'+esc(e.x.file.url)+'" alt=""><span class="nm">'+esc(e.c.name)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+(isNew(e.x.upd)?' <b>NEW</b>':'')+'</span></button>';
+      return '<button class="pmi" data-buildcat="'+esc(e.c.id)+'"><img loading="lazy" src="'+esc(e.x.file.url)+'" alt=""><span class="nm">'+esc(e.c.name)+'</span><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+(isNew(e.x.upd)?' <b class="nwp">NEW</b>':'')+'</span></button>';
     }).join("")+'</div>';
   }
   function buildFeedHtml(){
