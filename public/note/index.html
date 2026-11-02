@@ -1027,8 +1027,13 @@ function consItems(){
   // ホームのいちばん上「🆕 新しい写真」＝スタッフが「お客様に写真を送る」で最後に送った写真（次に送るまで出す）
   // ホームの「🆕 新しい写真」＝スタッフが「お客様に写真を送る」で最後に送った写真（次に送るまで出す）。
   // 形は以前のアルバムと同じポラロイド風の3枚。送った写真が無いときはアルバムの新しい3枚
+  // 最後に送った写真（サーバーの sentPhotos。古いサーバーならひとことの写真）
+  function sentPhotosOf(){
+    if(data.sentPhotos && (data.sentPhotos.photos||[]).length) return data.sentPhotos;
+    return data.staffComment;
+  }
   function newPhotosHtml(){
-    var sc = data.staffComment;
+    var sc = sentPhotosOf();
     var ph = sc ? (sc.photos||[]).filter(isImg) : [];
     var sent = ph.length > 0;
     if(!sent) ph = homeChosen(data.album.filter(function(a){ return isImg(a) && a.kind!=="reference"; })).list;
@@ -1303,11 +1308,11 @@ function homeHtml(){ return homeParts().main; }
     var mine = album.filter(function(a){ return a.kind!=="reference"; });
     var ref = album.filter(function(a){ return a.kind==="reference"; });
     var out = '<h2 class="big">わが家のアルバム</h2><p class="sub">住まいるハウジングからお届けした写真です。タップで大きく表示します。</p>';
-    var sc = data.staffComment, scph = sc ? (sc.photos||[]).filter(isImg) : [];
+    var sc = sentPhotosOf(), scph = sc ? (sc.photos||[]).filter(isImg) : [];
     if(view.scPhotos && scph.length){
       var sd = sc.at ? new Date(sc.at) : null;
       out += '<div class="scphotos" id="scPhotosSec"><h3>📷 '+(sd && !isNaN(sd) ? (sd.getMonth()+1)+'/'+sd.getDate()+' ' : '')+'お送りした写真（'+scph.length+'枚）</h3>'+
-        '<p class="scnote">'+esc(sc.text||"")+'</p><div class="agrid">'+scph.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div></div>'+
+        (sc.text ? '<p class="scnote">'+esc(sc.text)+'</p>' : '')+'<div class="agrid">'+scph.map(function(a){ return thumbHtml(a, ""); }).join("")+'</div></div>'+
         (mine.length ? '<div class="sechd"><h3>アルバムのすべての写真</h3></div>' : '');
     }
     out += mine.length ? '<div class="agrid">'+mine.map(function(a){ return thumbHtml(a, fmtD(a.createdAt)); }).join("")+'</div>' : '<div class="empty">まだ写真はありません。</div>';

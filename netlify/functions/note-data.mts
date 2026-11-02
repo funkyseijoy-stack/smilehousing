@@ -213,6 +213,20 @@ function staffCommentPhotos(sc: any, album: any[]) {
     .map((a) => ({ ...fileOf(a), createdAt: a.createdAt || "" }));
 }
 
+// 「お客様に写真を送る」で最後に送った写真のまとまり（ひとことの有無に関係なく）。
+// いちばん新しい via:"sendPhoto" の写真から30分以内に入れた写真をひとまとまりとする。
+function latestSentPhotos(album: any[]) {
+  const sent = (album || []).filter((a) => a && a.url && a.kind !== "reference" && a.via === "sendPhoto" && a.createdAt);
+  if (!sent.length) return null;
+  const newest = Math.max(...sent.map((a) => Date.parse(a.createdAt) || 0));
+  if (!newest) return null;
+  const batch = sent
+    .filter((a) => newest - (Date.parse(a.createdAt) || 0) <= 30 * 60 * 1000)
+    .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")))
+    .slice(0, 30);
+  return { at: new Date(newest).toISOString(), ids: batch.map((a) => String(a.id)), photos: batch.map((a) => ({ ...fileOf(a), createdAt: a.createdAt || "" })) };
+}
+
 function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
@@ -759,6 +773,16 @@ export default async (req: Request, context: Context) => {
     staffComment: project.staffComment && String(project.staffComment.text || "").trim()
       ? { text: String(project.staffComment.text).slice(0, 500), at: String(project.staffComment.at || ""), photos: staffCommentPhotos(project.staffComment, album) }
       : null,
+    // ホームの「新しい写真」用：最後に送った写真（ひとことを書き忘れても出る）。
+    // そのとき一緒に送ったひとことがあれば text も付ける。
+    sentPhotos: (() => {
+      const b = latestSentPhotos(album);
+      if (!b) return null;
+      const sc = project.staffComment;
+      const ids = sc && Array.isArray(sc.photoIds) ? sc.photoIds.map(String) : [];
+      const withText = sc && String(sc.text || "").trim() && ids.some((id: string) => b.ids.includes(id));
+      return { at: b.at, photos: b.photos, text: withText ? String(sc.text).slice(0, 500) : "" };
+    })(),
     today,
     categories,
     plans,
