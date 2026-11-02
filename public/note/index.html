@@ -1644,6 +1644,7 @@ function homeHtml(){ return homeParts().main; }
     if(stHidden) stamped = stamped.slice(0, ST_LIM);
     var pendN = 0;
     var addCard = function(e){
+      if(e.x.key && homeRefKeys[e.x.key]) return;
       var c = e.c, x = e.x, room = "", roomName = "";
       (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
       var part = roomName || partOf(c, x) || x.label || c.name;
@@ -1702,7 +1703,10 @@ function homeHtml(){ return homeParts().main; }
   // ② 最新の打合せ内容：いちばん新しい日の記録を全部
   // スタッフが「おうちノートのホームに出す」にした打合せ記録（部位に関係なく、出した順）。上の「最新の打合せ記録」に出したものは除く
   var homeLatestIds = {};
+  // 「📝 打合せ記録」に決定ボタン・はんこ付きで出したカード（下の「ご確認・ご決定ください」には重ねて出さない）
+  var homeRefKeys = {};
   function reflectedNotesHtml(){
+    homeRefKeys = {};
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.open||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
     // スタッフが「おうちノートのホームに出す」にした記録・写真・資料だけ。出した順（新しい順）
     var list = (data.notes||[]).filter(function(n){ return n.homeShow && hasBody(n) && !homeLatestIds[n.id]; }).map(function(n){ return { n:n, at:n.homeShowAt }; });
@@ -1720,10 +1724,12 @@ function homeHtml(){ return homeParts().main; }
     return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+list.map(function(e){
         if(e.n){
           var f = noteDecItem(e.n);
+          if(f && f.x.showDecide && f.x.key) homeRefKeys[f.x.key] = 1;
           var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
           return '<div class="tli flat">'+noteBody(e.n, true, true)+homeDecHtml(e.n, f)+link+'</div>';
         }
         var x = e.x, c = e.c;
+        if(x.showDecide && x.key) homeRefKeys[x.key] = 1;
         var kind = x.isQuote ? (x.quoteType==="定価" ? "お見積り" : "プランボード") : (x.type==="planboard" ? "プランボード" : "写真・資料");
         var part = partOf(c, x) || x.label || c.name;
         var room = ""; (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; return true; } return false; });
