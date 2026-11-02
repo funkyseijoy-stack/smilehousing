@@ -1620,12 +1620,16 @@ function homeHtml(){ return homeParts().main; }
   // 決定・変更のご依頼・承認・見送りをすると、ホームから外れる（各部位の項目にはそのまま残る）
   function pendingCardsHtml(){
     var cards = [];
-    // この画面で「決定」を押したカードは、はんこを付けたままホームに残す（次に開いたときはホームから外れる）
-    var stamped = [];
-    if(view.homeStamped) (data.categories||[]).forEach(function(c){
-      catAllItems(c).forEach(function(x){ if(x.key && view.homeStamped[x.key] && x.cardStatus==="決定") stamped.push({c:c, x:x, stamped:true}); });
+    // 「決定」を押したカードは、はんこ付きでホームにずっと残す（決定待ちと追加見積りのあと、決定した新しい順。4件め以降は「ほか n件」）
+    var stamped = [], seenSt = {};
+    (data.categories||[]).forEach(function(c){
+      catAllItems(c).forEach(function(x){ if(x.key && !x.partial && x.cardStatus==="決定" && !seenSt[x.key]){ seenSt[x.key] = 1; stamped.push({c:c, x:x, stamped:true}); } });
     });
-    askItems().concat(stamped).forEach(function(e){
+    stamped.sort(function(a,b){ return (Date.parse(b.x.cardDecidedAt||"")||0) - (Date.parse(a.x.cardDecidedAt||"")||0); });
+    var ST_LIM = 3, stHidden = view.stampAll ? 0 : Math.max(0, stamped.length - ST_LIM);
+    if(stHidden) stamped = stamped.slice(0, ST_LIM);
+    var pendN = 0;
+    var addCard = function(e){
       var c = e.c, x = e.x, room = "", roomName = "";
       (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
       var part = roomName || partOf(c, x) || x.label || c.name;
@@ -1645,17 +1649,23 @@ function homeHtml(){ return homeParts().main; }
             '<div class="cnow">✅ 決定のはんこを押しました</div><button class="linkbtn" data-cdecide="検討中"'+ra+'>🔴 はんこを外す（検討中に戻す）</button></div>'
           : '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>')+
         '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
-    });
+      if(!e.stamped) pendN++;
+    };
+    askItems().forEach(addCard);
     (data.estimates||[]).forEach(function(x){
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
       if(pendingAmt || !x.id || estIsMinus(x) || (x.customerResponse||"未回答")!=="未回答") return;
+      pendN++;
       cards.push('<div class="pcard opt"><div class="pch"><span class="ptag">オプション（追加見積り）</span>'+nwTag(x.updated||x.createdAt)+'</div>'+
         '<div class="pct"><b>'+esc(x.title||"")+'</b>'+(x.note && x.note!==x.title ? '<br>'+esc(x.note).replace(/\n/g,"<br>") : '')+'</div>'+
         '<div class="pamt">'+esc(String(x.amount||""))+'<span class="tx">（税抜き）</span></div>'+
         '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
     });
+    stamped.forEach(addCard);
+    if(stHidden) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">決定したもの ほか '+stHidden+'件を見る</button>');
+    else if(view.stampAll && stamped.length > ST_LIM) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">閉じる ▴</button>');
     if(!cards.length) return "";
-    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+cards.length+'件</span></div>'+
+    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+(pendN ? '決定待ち '+pendN+'件' : 'すべて決定済み')+'</span></div>'+
       '<p class="plead">こちらから、決定・変更のご依頼ができます。</p><div class="pcards">'+cards.join("")+'</div>';
   }
   // ---- ホームの「ご確認ください」：決定ボタンを出しているカードのうち、まだ検討中のもの ----
@@ -2254,6 +2264,7 @@ function homeHtml(){ return homeParts().main; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
     var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
     var consall = e.target.closest("[data-consall]"); if(consall){ view.consAll = !view.consAll; render(); return; }
+    var stampall = e.target.closest("[data-stampall]"); if(stampall){ view.stampAll = !view.stampAll; render(); return; }
     var apprall = e.target.closest("[data-apprall]"); if(apprall){ view.apprAll = !view.apprAll; render(); return; }
     var onote = e.target.closest("[data-opennote]");
     if(onote){
