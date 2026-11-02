@@ -177,6 +177,12 @@ async function changeCardInfo(store: ReturnType<typeof getStore>, projectId: str
     const f = pick({ id: p.assetId || p.id, url: p.url, contentType: p.contentType, name: p.fileName });
     return { files: f ? [f] : [], part: p.scope ? { scope: p.scope, category: p.category || null, roomId: p.roomId || null, side: p.side || null } : null };
   }
+  if (kind === "a") {
+    const a = await get(`attachments/${rest}`);
+    if (!a || a.projectId !== projectId) return { files: [], part: null };
+    const f = pick({ id: a.assetId || a.id, url: a.url, contentType: a.contentType, name: a.name });
+    return { files: f ? [f] : [], part: a.specPart && a.specPart.scope ? a.specPart : null };
+  }
   if (kind === "t") {
     const t = await get(`tasks/${rest}`);
     if (!t || t.projectId !== projectId) return { files: [], part: null };
@@ -325,7 +331,7 @@ export default async (req: Request, context: Context) => {
       const cardKey = String(body.cardKey || "");
       if (!catsOf(project).some((c) => c.id === cat) || cat === "plan") return json({ error: "unknown_category" }, 400);
       if (!["検討中", "仮決定", "決定"].includes(status)) return json({ error: "invalid_status" }, 400);
-      if (!/^[ntsl]:[A-Za-z0-9_\-]{1,100}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
+      if (!/^[ntsla]:[A-Za-z0-9_\-]{1,100}$/.test(cardKey)) return json({ error: "invalid_card" }, 400);
       let roomId: string | null = null;
       if (cat === "rooms") {
         roomId = String(body.roomId || "");
@@ -349,7 +355,7 @@ export default async (req: Request, context: Context) => {
       const id = genId("msg");
       const now = new Date().toISOString();
       // 「変更を依頼」：どのカードへの依頼かを覚える（ホームの「ご確認・ご決定ください」から外すため）
-      const chgKey = /^[ntsl]:[A-Za-z0-9_\-.]{1,120}$/.test(String(body.chgKey || "")) && text.startsWith("【変更のご依頼】") ? String(body.chgKey) : "";
+      const chgKey = /^[ntsla]:[A-Za-z0-9_\-.]{1,120}$/.test(String(body.chgKey || "")) && text.startsWith("【変更のご依頼】") ? String(body.chgKey) : "";
       const doc: any = {
         id, projectId, content: text, sender: (project.customer || "お客様") + "（おうちノート）",
         fromCustomer: true, createdAt: now, updatedAt: now,
@@ -542,6 +548,7 @@ export default async (req: Request, context: Context) => {
       // タスク由来はタスク単位（t:）、手動追加などはこの写真・PDF単位（s:）でカードごとに仮決定／決定できる
       key: srcTask ? "t:" + srcTask.id : "s:" + String(p.id).slice(0, 78),
       askDecision: srcTask ? srcTask.askDecision : p.askDecision,
+      homeShow: !!p.homeShow, homeShowAt: p.homeShowAt || "", docId: p.id,
       source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
@@ -592,6 +599,10 @@ export default async (req: Request, context: Context) => {
       type: "photo",
       isQuote: true,
       quoteType: qt,
+      // 見積の書類もカードごとに決定できる（a:）。ホームに出すかもスタッフが選ぶ
+      key: "a:" + String(a.id).slice(0, 78),
+      askDecision: a.askDecision,
+      homeShow: !!a.homeShow, homeShowAt: a.homeShowAt || "", docId: a.id,
       // スタッフが書いた「お客様へのひとこと」（社内コメント staffMemo は出さない）
       msg: String(a.customerNote || "").slice(0, 500),
       at: a.reflectedAt || a.uploadedAt || "",

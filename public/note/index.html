@@ -1667,15 +1667,32 @@ function homeHtml(){ return homeParts().main; }
   var homeLatestIds = {};
   function reflectedNotesHtml(){
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.open||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
-    // スタッフが「おうちノートのホームに出す」にした記録だけ。出した順（新しい順）
-    var list = (data.notes||[]).filter(function(n){ return n.homeShow && hasBody(n) && !homeLatestIds[n.id]; });
+    // スタッフが「おうちノートのホームに出す」にした記録・写真・資料だけ。出した順（新しい順）
+    var list = (data.notes||[]).filter(function(n){ return n.homeShow && hasBody(n) && !homeLatestIds[n.id]; }).map(function(n){ return { n:n, at:n.homeShowAt }; });
+    var seenDoc = {};
+    (data.categories||[]).forEach(function(c){
+      catAllItems(c).forEach(function(x){
+        if(!x.homeShow || x.type==="note" || !x.file || !x.file.url) return;
+        var k = x.docId || x.file.url; if(seenDoc[k]) return; seenDoc[k] = 1;
+        list.push({ x:x, c:c, at:x.homeShowAt });
+      });
+    });
     if(!list.length) return "";
-    var at = function(n){ return Date.parse(n.homeShowAt||n.upd||n.createdAt||"")||0; };
+    var at = function(e){ return Date.parse(e.at||(e.n ? (e.n.upd||e.n.createdAt) : (e.x.upd||e.x.at))||"")||0; };
     list.sort(function(a,b){ return at(b)-at(a); });
-    return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+list.map(function(n){
-        var f = noteDecItem(n);
-        var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
-        return '<div class="tli flat">'+noteBody(n, true, true)+link+'</div>';
+    return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+list.map(function(e){
+        if(e.n){
+          var f = noteDecItem(e.n);
+          var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
+          return '<div class="tli flat">'+noteBody(e.n, true, true)+link+'</div>';
+        }
+        var x = e.x, c = e.c;
+        var kind = x.isQuote ? (x.quoteType==="定価" ? "お見積り" : "プランボード") : (x.type==="planboard" ? "プランボード" : "写真・資料");
+        var part = partOf(c, x) || x.label || c.name;
+        return '<div class="tli flat"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+(x.type==="planboard"||x.isQuote?"pb":"ph")+'">'+esc(kind)+'</span>'+nwTag(x.upd)+(part?'<span class="tag">'+esc(part)+'</span>':'')+'</div>'+
+          (x.msg ? '<div class="box"><div class="bl">スタッフから</div>'+esc(x.msg).replace(/\n/g,"<br>")+'</div>' : '')+
+          '<div class="thumbs one" style="max-width:220px;">'+thumbHtml(x.file,"")+'</div>'+
+          '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>';
       }).join("")+'</div>';
   }
   function latestNotesHtml(){
@@ -1880,7 +1897,7 @@ function homeHtml(){ return homeParts().main; }
     }
     // Organize items into sections
     // 「仮決定／決定」ボタンを出す設定の写真・PDF・プランボード（s:）は、記録・図面と同じ時系列のカードにする
-    var isSpecCard = function(x){ return x.showDecide && x.key && String(x.key).charAt(0)==="s"; };
+    var isSpecCard = function(x){ return x.showDecide && x.key && /^[sa]:/.test(String(x.key)); };
     var specCards = items.filter(isSpecCard);
     items = items.filter(function(x){ return !isSpecCard(x); });
     // 色見本カード（スタッフが色と名前を入れたもの）は、写真ではなくカードで見せる（写真は押すと開く）
@@ -2307,7 +2324,7 @@ function homeHtml(){ return homeParts().main; }
     var btn = this; btn.disabled = true;
     var full = chgCur.prefix+chgCur.label+"\n"+text;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: (chgCur.prefix==="【変更のご依頼】" && chgCur.key && /^[ntsl]:/.test(chgCur.key)) ? chgCur.key : "" }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: (chgCur.prefix==="【変更のご依頼】" && chgCur.key && /^[ntsla]:/.test(chgCur.key)) ? chgCur.key : "" }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
       data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:(j.message && j.message.chgKey)||"", createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });

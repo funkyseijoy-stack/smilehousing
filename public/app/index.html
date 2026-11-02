@@ -6797,6 +6797,9 @@
       } else if(key.indexOf("s:")===0){
         var sp = state.specPhotos.find(function(x){ return x.id===key.slice(2); });
         if(sp){ text = sp.title || sp.memo || sp.name || ""; if(sp.url) files = [{url:sp.url, contentType:sp.contentType, name:sp.name}]; }
+      } else if(key.indexOf("a:")===0){
+        var ad = state.attachments.find(function(x){ return x.id===key.slice(2); });
+        if(ad){ text = ad.name || ""; if(ad.url) files = [{url:ad.url, contentType:ad.contentType, name:ad.name}]; }
       }
       var dd = d.decidedAt ? new Date(d.decidedAt) : null;
       var md = dd && !isNaN(dd) ? (dd.getMonth()+1)+"/"+dd.getDate() : "";
@@ -6892,12 +6895,8 @@
       var menuOpen = openNoteMenuId === n.id;
       // 操作メニュー（写真・PDF・見積の書類のカードと同じ並び）
       var noteOps = uniOpsSections("n", n.id, drawMenuHtml ? '<div class="notemenu-draw">'+drawMenuHtml+'</div>' : "",
-        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
-        '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>'+
-        '<button class="'+(n.homeShow?"on":"")+'" data-act="togglenotehome" data-id="'+n.id+'">'+(n.homeShow?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す")+'</button>',
-        { estimate: sent.estimate, companytask: sent.companytask, estreq: sent.estreq },
-        '<button data-act="editnote" data-id="'+n.id+'">✏️ 編集</button>'+
-        '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>');
+        { reflected: n.reflected, ask: n.askDecision, home: n.homeShow },
+        { estimate: sent.estimate, companytask: sent.companytask, estreq: sent.estreq });
       var menuHtml = '<div class="notemenu">'+
         '<button class="notemenu-close" data-act="togglenotemenu" data-id="'+n.id+'" title="閉じる">✕ 閉じる</button>'+
         uniOpsInnerHtml(noteOps)+
@@ -8367,16 +8366,23 @@
   // ---- 記録の一覧・変更履歴のカードの「⋮ 操作」（記録・写真・PDF・見積の書類で同じ並び） ----
   // 書き込む → 反映 → 追加見積り → 社内タスク → 業者へGmail → Gmailから取り込み → 部位の変更 →（編集・削除）
   // kind："n"＝打合せ記録（id は記録ID）／"sp"＝写真・PDF（specPhotos）／"att"＝見積の書類（attachments）
-  function uniOpsSections(kind, id, drawHtml, reflectHtml, sent, tailHtml){
-    sent = sent || {};
-    var b = function(act, label, on){ return '<button type="button" class="'+(on?"on":"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>'; };
-    var main = (reflectHtml||"")+
+  // どのカード（記録・写真/PDF・見積の書類）も同じ項目・同じ並び：
+  // 書き込む → 反映 → お客様の決定ボタン → ホームに出す → 追加見積り → 社内タスク → 業者へGmail → Gmailから取り込み → 部位の変更 → 編集 → 削除
+  // f = { reflected, reflectNote（反映できないときの理由）, ask, home, delOk }
+  function uniOpsSections(kind, id, drawHtml, f, sent){
+    sent = sent || {}; f = f || {};
+    var b = function(act, label, on, cls){ return '<button type="button" class="'+(on?"on ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>'; };
+    var main =
+      (f.reflectNote ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", f.reflected?"✓反映済み":"反映する", !!f.reflected))+
+      b("ask", f.ask?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない", !!f.ask)+
+      b("home", f.home?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す", !!f.home)+
       b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
       b("ctask", (sent.companytask?"✓ ":"")+"📋 社内タスク", !!sent.companytask)+
       b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へGmail（見積依頼＋下書き）", !!sent.estreq)+
       b("gmail", "📥 Gmailから取り込み")+
       b("part", "📍 部位の変更");
-    return [["", drawHtml||""], ["", main], ["", tailHtml||""]];
+    var tail = b("edit", "✏️ 編集")+(f.delOk===false ? "" : b("del", "削除", false, "danger"));
+    return [["", drawHtml||""], ["", main], ["", tail]];
   }
   function uniOpsInnerHtml(sections){
     return sections.filter(function(x){ return x && x[1]; }).map(function(x, i){
@@ -8402,18 +8408,77 @@
     }
     return null;
   }
+  // 写真・PDF・見積の書類の「おうちノートのホームに出す」（出すときは反映もする。反映できない種類は出せない）
+  async function toggleCardHomeShow(coll, doc, canReflect){
+    if(!doc.homeShow && !canReflect){ toast("この種類はお客様に出せないので、ホームにも出せません"); return; }
+    doc.homeShow = !doc.homeShow;
+    doc.homeShowAt = doc.homeShow ? nowIso() : null;
+    var reflNow = false;
+    if(doc.homeShow && !doc.reflected){ doc.reflected = true; doc.reflectedAt = nowIso(); reflNow = true; }
+    render();
+    if(await saveDoc(coll, doc.id, doc)===false){ toast("保存に失敗しました"); return; }
+    toast(doc.homeShow ? ("おうちノートのホームに出しました"+(reflNow?"（あわせて反映しました）":"")) : "おうちノートのホームから外しました（反映はそのままです）");
+  }
+  async function toggleCardAsk(coll, doc){
+    doc.askDecision = !doc.askDecision;
+    render();
+    if(await saveDoc(coll, doc.id, doc)===false){ doc.askDecision = !doc.askDecision; render(); toast("保存できませんでした"); return; }
+    toast(doc.askDecision ? "お客様の画面に「決定」ボタンを出します（反映済みのとき）" : "お客様の画面の「決定」ボタンを出さないようにしました");
+  }
+  // 見積の書類の「✏️ 編集」：書類の一覧の「直す・コメント」と同じ中身を小さな画面で
+  function openAttEditPopup(id){
+    var a = state.attachments.find(function(x){ return x.id===id; }); if(!a) return;
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+    ov.innerHTML = '<div class="card" style="max-width:640px; width:calc(100% - 24px); max-height:86vh; overflow:auto;">'+
+      '<div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">✏️ 書類を直す・コメント</h3><button type="button" class="btn small ghost" data-ae-close>✕ 閉じる</button></div>'+
+      '<div class="muted" style="margin:4px 0 8px;">'+escapeHtml(a.name||"")+'</div>'+docEditHtml(a, projectById(a.projectId))+'</div>';
+    document.body.appendChild(ov);
+    var close = function(){ ov.remove(); };
+    ov.addEventListener("click", function(e){
+      if(e.target===ov || e.target.closest("[data-ae-close]")){ close(); return; }
+      if(docHandleClick(e)) return;
+      var btn = e.target.closest("button[data-act]"); if(!btn) return;
+      var bid = btn.dataset.id;
+      if(btn.dataset.act==="setquotepart"){ close(); setQuotePart(bid); }
+      else if(btn.dataset.act==="quotetohearing"){ close(); quoteToHearing(bid); }
+      else if(btn.dataset.act==="delattachment"){ close(); deleteAttachment(bid); }
+    });
+    ov.addEventListener("change", function(e){ docHandleChange(e); });
+  }
   function runUniOp(act, kind, id){
     // 打合せ記録（記録のカード・変更履歴の記録の写し）は、記録の操作をそのまま使う
     if(kind==="n"){
       var n = state.meetingNotes.find(function(x){ return x.id===id; }); if(!n) return;
       openNoteMenuId = null;
-      if(act==="est") createTaskFromNote(id, "estimate");
+      if(act==="refl") toggleMeetingReflected(id);
+      else if(act==="ask") toggleMeetingAskDecision(id);
+      else if(act==="home") toggleMeetingHomeShow(id);
+      else if(act==="edit") editMeetingNote(id);
+      else if(act==="del"){ if(confirm2()) deleteMeetingNote(id); }
+      else if(act==="est") createTaskFromNote(id, "estimate");
       else if(act==="ctask") createTaskFromNote(id, "companytask");
       else if(act==="vgmail") createBundleFromNote(id);
       else if(act==="gmail") noteGmailImport(id);
       else if(act==="part") setNoteSpecPart(id);
       render();
       return;
+    }
+    if(kind==="sp"){
+      var sp = state.specPhotos.find(function(z){ return z.id===id; }); if(!sp) return;
+      if(act==="refl"){ togglePbReflected(id); return; }
+      if(act==="ask"){ if(sp.source && sp.source.taskId) toggleTaskAskDecision(sp.source.taskId); else toggleSpecAskDecision(id); return; }
+      if(act==="home"){ toggleCardHomeShow("specPhotos", sp, true); return; }
+      if(act==="edit"){ openSpecEdit(id); return; }
+      if(act==="del"){ if(confirm2()) deleteSpecPhoto(id); return; }
+    }
+    if(kind==="att"){
+      var at = state.attachments.find(function(z){ return z.id===id; }); if(!at) return;
+      if(act==="refl"){ toggleQuoteReflect(id); return; }
+      if(act==="ask"){ toggleCardAsk("attachments", at); return; }
+      if(act==="home"){ toggleCardHomeShow("attachments", at, quoteSharable(at)); return; }
+      if(act==="edit"){ openAttEditPopup(id); return; }
+      if(act==="del"){ if(confirm2()) deleteAttachment(id); return; }
     }
     var x = uniOpsCtx(kind, id); if(!x) return;
     if(act==="part"){
@@ -8534,8 +8599,8 @@
     var st = 'style="cursor:pointer; border:none; font-family:inherit;"';
     // 操作メニュー（記録・写真・PDFのカードと同じ並び）
     var ops = uniOpsSections("att", a.id, drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : "",
-      sharable ? '<button class="'+(a.reflected?"on":"")+'" data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：この種類（'+escapeHtml(quoteTypeNorm(a.quoteType)||"")+'）はお客様には出ません</div>',
-      specSentInfo(a), "");
+      { reflected: a.reflected && sharable, reflectNote: sharable ? "" : "この種類（"+(quoteTypeNorm(a.quoteType)||"")+"）はお客様には出ません", ask: a.askDecision, home: a.homeShow },
+      specSentInfo(a));
     return '<div class="spectl-card spectl-type-vendor-border">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
       '<div class="spectl-meta"><div class="row" style="gap:5px;">'+
@@ -8678,19 +8743,15 @@
         if(!relatedNote) return [["", drawHtml]];
         var ns = noteSentInfo(relatedNote);
         return uniOpsSections("n", relatedNote.id, drawHtml,
-          '<button class="'+(relatedNote.reflected?"on":"")+'" data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>'+
-          '<button class="'+(relatedNote.askDecision?"on":"")+'" data-spec-togglenoteask="'+relatedNote.id+'">'+(relatedNote.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>'+
-          '<button class="'+(relatedNote.homeShow?"on":"")+'" data-spec-togglenotehome="'+relatedNote.id+'">'+(relatedNote.homeShow?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す")+'</button>',
-          { estimate: ns.estimate, companytask: ns.companytask, estreq: ns.estreq },
-          '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
+          { reflected: relatedNote.reflected, ask: relatedNote.askDecision, home: relatedNote.homeShow },
+          { estimate: ns.estimate, companytask: ns.companytask, estreq: ns.estreq });
       }
+      var srcTask = p.source && p.source.taskId ? state.tasks.find(function(t){ return t.id===p.source.taskId; }) : null;
       return uniOpsSections("sp", p.id, drawHtml,
-        '<button class="'+(p.reflected?"on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>'+
-          (askBtnHtml ? askBtnHtml.replace(/class="pill reflect small( on)?"/, function(m, on){ return 'class="'+(on?"on":"")+'"'; }).replace(/ style="[^"]*"/,"").replace(">お客様の決定ボタン：出さない<", ">🔘 お客様の決定ボタン：出さない<").replace(">✓お客様の決定ボタン：出す<", ">✓ お客様の決定ボタン：出す<") : ""),
-        spSent,
-        '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
+        { reflected: p.reflected, ask: srcTask ? srcTask.askDecision : p.askDecision, home: p.homeShow },
+        spSent);
     };
-    var opsDel = p.kind==="note" ? "" : '<button class="danger" data-delspec="'+p.id+'">削除</button>';
+    var opsDel = "";
     // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
     // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
     // サムネイル1枚＋テキストを横並びで表示する。
