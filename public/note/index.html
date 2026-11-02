@@ -174,6 +174,13 @@
   .dsum .di:first-of-type{ border-top:none; }
   .dsum .dd{ font-size:.72rem; color:var(--ink2); margin-bottom:2px; }
   .box.opn{ background:#f8eee4; } .box.opn .bl{ color:#a8682c; }
+  .nlines{ margin-top:6px; display:flex; flex-direction:column; gap:6px; }
+  .nline{ border-radius:10px; padding:8px 10px; background:#f6f3ee; }
+  .nline.m-d{ background:#eef3ef; } .nline.m-o{ background:#f8eee4; }
+  .nline .nlh{ display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:.78rem; color:var(--muted); margin-bottom:2px; }
+  .nline.m-d .nlh b{ color:var(--green-ink); } .nline.m-o .nlh b{ color:#a8682c; }
+  .nline .nlt{ white-space:pre-wrap; }
+  .nline .thumbs{ margin-top:6px; grid-template-columns:repeat(3,1fr); }
   .thumbs{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
   .thumbs.one{ grid-template-columns:1fr; }
   .th{ position:relative; border-radius:12px; overflow:hidden; background:#eee6de; aspect-ratio:1/1; cursor:pointer; border:none; padding:0; }
@@ -1875,7 +1882,28 @@ function homeHtml(){ return homeParts().main; }
     }
     return out;
   }
+  // 行ごとの部位・ファイルがある記録は、スタッフの画面と同じく1行ずつ（印・文・部位・その行の図面）で見せる
+  function hasLines(n){ return n && Array.isArray(n.lines) && n.lines.length>0; }
+  function linesHtml(n, noOpen, consCtx){
+    var rows = n.lines.filter(function(l){ return !(noOpen && l.m==="o"); });
+    if(!rows.length) return "";
+    return '<div class="nlines">'+rows.map(function(l){
+      var lbl = l.m==="d" ? "✅ 打合せで決まったこと" : (l.m==="o" ? "💭 ご検討いただきたいこと" : "・打合せの内容");
+      return '<div class="nline m-'+(l.m||"t")+'"><div class="nlh"><b>'+lbl+'</b>'+(l.part?'<span class="tag">'+esc(l.part)+'</span>':'')+'</div>'+
+        '<div class="nlt">'+esc(l.t)+'</div>'+
+        ((l.files||[]).length?'<div class="thumbs">'+l.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'')+
+        (l.m==="o" && consCtx ? consBtnsHtml(l.t, consCtx) : '')+
+        '</div>';
+    }).join("")+'</div>';
+  }
   function noteBody(n, showPart, noOpen){
+    if(hasLines(n)){
+      return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
+        (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
+        linesHtml(n, false, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:'')))+
+        (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
+        ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
+    }
     return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>'+
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.talk?'<div class="box"><div class="bl">打合せの内容</div>'+esc(n.talk).replace(/\n/g,"<br>")+'</div>':'')+
@@ -2015,9 +2043,10 @@ function homeHtml(){ return homeParts().main; }
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
             '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録'+((n.partial||n.lineCard)?'の一部':'')+'</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
-          if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
-          if(n.decided) html += '<div class="section-item-desc"><strong>打合せで決まったこと：</strong>'+esc(n.decided)+'</div>';
-          if(n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, c.name+'・'+(n.title||fmtD(n.date)));
+          if(hasLines(n)) html += linesHtml(n, false, c.name+'・'+(n.title||fmtD(n.date)));
+          else if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
+          if(!hasLines(n) && n.decided) html += '<div class="section-item-desc"><strong>打合せで決まったこと：</strong>'+esc(n.decided)+'</div>';
+          if(!hasLines(n) && n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, c.name+'・'+(n.title||fmtD(n.date)));
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
           html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';

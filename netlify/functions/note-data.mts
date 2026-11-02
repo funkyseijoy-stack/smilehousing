@@ -615,6 +615,21 @@ export default async (req: Request, context: Context) => {
       changing: false,
     });
   }
+  // 行ごとの部位・ファイルを付けた記録は、スタッフの画面と同じく1行ずつ（文・印・部位・その行のファイル）で見せる。
+  // 🔒社内（m:"c"）の行は出さない。印のない行は「お客様にも見せる」（talkPublic）のときだけ。
+  const linesOf = (n: any, only?: any[]) => {
+    const src = only || (Array.isArray(n.noteLines) ? n.noteLines : []);
+    const hasExtra = src.some((l: any) => l && ((l.p && l.p.scope) || (Array.isArray(l.f) && l.f.length)));
+    if (!hasExtra && !only) return [];
+    return src
+      .filter((l: any) => l && String(l.t || "").trim() && (l.m || "") !== "c" && ((l.m || "") !== "" || n.talkPublic))
+      .map((l: any) => ({
+        t: String(l.t).trim(),
+        m: l.m || "",
+        part: l.p && l.p.scope ? partLabel(project, l.p.scope, l.p.category, l.p.roomId) : "",
+        files: (Array.isArray(l.f) ? l.f : []).map(fileOf),
+      }));
+  };
   for (const n of reflectedNotes) {
     const sp = n.specPart || {};
     push(noteCatFor(sp.scope, sp.category), {
@@ -637,6 +652,7 @@ export default async (req: Request, context: Context) => {
       message: cleanNoteMsg(n.message),
       talk: n.talkPublic ? (n.talk || "") : "", // スタッフが「お客様にも見せる」にした記録だけ
       channel: n.channel || "",
+      lines: linesOf(n),
     });
     // 行ごとに部位を付けた記録：その部位の項目にも、その行だけを「打合せ記録の一部」として出す
     // （記録そのものの項目と同じ項目の行は重ねて出さない。決定ボタンは付けない）
@@ -698,6 +714,7 @@ export default async (req: Request, context: Context) => {
         decided,
         open,
         files: [],
+        lines: linesOf(n, g.lines),
         spec: { contract: false, quote: false },
         changing: false,
         message: "",
@@ -875,6 +892,7 @@ export default async (req: Request, context: Context) => {
         part: (n.specPart && n.specPart.label) || "",
         scope: (n.specPart && n.specPart.scope) || "",
         files: (n.files || []).map(fileOf),
+        lines: linesOf(n),
       }))
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt)),
     album: album
