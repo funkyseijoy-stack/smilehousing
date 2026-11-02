@@ -550,7 +550,7 @@
   <button data-tab="home"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg></span>ホーム</button>
   <button data-tab="album"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>アルバム</button>
   <button data-tab="image"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>イメージ</button>
-  <button data-tab="build"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg></span>家づくり</button>
+  <button data-tab="msg"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>メッセージ</button>
   <button data-tab="menu"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>メニュー</button>
 </nav>
 
@@ -847,7 +847,7 @@
 
   function render(){
     renderBand();
-    Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function(b){ b.classList.toggle("on", b.dataset.tab===view.tab || (b.dataset.tab==="menu" && (view.tab==="info" || view.tab==="resv"))); });
+    Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function(b){ b.classList.toggle("on", b.dataset.tab===view.tab || (b.dataset.tab==="menu" && (view.tab==="info" || view.tab==="resv" || view.tab==="build"))); });
     var html = "";
     if(view.tab==="home") html = homeHtml();
     else if(view.tab==="info") html = infoHtml();
@@ -1044,7 +1044,7 @@ function consItems(){
     var ph = sc ? (sc.photos||[]).filter(isImg) : [];
     var sent = ph.length > 0;
     if(!sent) ph = homeChosen(data.album.filter(function(a){ return isImg(a) && a.kind!=="reference"; })).list;
-    var out = '<div class="sechd"><h3>'+(sent ? '<span class="tag nw nwh">NEW</span> 新しい写真' : '🌷 わが家のアルバム')+'</h3><button class="more" data-go="album">ひらく →</button></div>';
+    var out = '<div class="sechd"><h3>'+(sent ? '<span class="tag nw nwh">NEW</span>' : '🌷 わが家のアルバム')+'</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(!ph.length) return out+'<div class="empty">写真が届くと、ここに表示されます。</div>';
     var when = sent && sc.at ? sc.at : null;
     out += '<div class="polas">'+ph.slice(0,3).map(function(a){
@@ -1125,7 +1125,7 @@ function homeHtml(){ return homeParts().main; }
     out += decideListHtml();
     // ここから下は「そのほかの情報」にまとめる
     var mainOut = out; out = "";
-    out += homePbHtml();
+    // 最新のプランボードは「わが家の情報」から外した（家づくりの各項目で見る）
 
     // 次回の打合せの予定（スタッフが入力した文章）は、ホームの「次の打合せ」に出す
 
@@ -1158,7 +1158,7 @@ function homeHtml(){ return homeParts().main; }
     var svcs = data.notices.filter(function(n){ return n.kind==="service"; }).slice();
     if(data.ace3dUrl) svcs.unshift({ title:"A's 3Dで見る", linkUrl:data.ace3dUrl });
     if(svcs.length){
-      out += '<div class="sechd" id="sec-svc"><h3>ご利用中のサービス</h3></div><div class="svcs">'+svcs.map(function(s){
+      out += '<div class="sechd" id="sec-svc"><h3>3D</h3></div><div class="svcs">'+svcs.map(function(s){
         var ic = /ポイント/.test(s.title) ? ICONS.card : (/3D|3d/i.test(s.title) ? ICONS.house : ICONS.link);
         return '<a class="svc" '+(s.linkUrl?'href="'+esc(s.linkUrl)+'" target="_blank" rel="noopener"':'')+'><span class="si">'+ic+'</span>'+esc(s.title)+'</a>';
       }).join("")+'</div>';
@@ -1684,6 +1684,8 @@ function homeHtml(){ return homeParts().main; }
   }
   // 決めていただきたいこと：承認待ちの追加見積り・決定ボタンのカード・打合せ記録の💭を1行ずつ。押すとその場所へ移動
   function decideListHtml(){
+    // 項目名だけ並べて別の画面へ飛ぶと何をすればよいか分かりにくいので、検討いただく内容とボタンをその場に並べる
+    return homeConsHtml();
     // 項目ごとに1行：「キッチン：決定してください（2件）」「外壁：ご検討ください」「追加見積りの金額をご確認ください」。押すとその場所へ
     var rows = [], byCat = {}, order = [];
     var ests = (data.estimates||[]).filter(function(x){
@@ -1710,8 +1712,8 @@ function homeHtml(){ return homeParts().main; }
   }
   // ③ ご検討いただきたいこと：打合せ記録の💭（反映済みの記録から）
   function homeConsHtml(){
-    var cons = consItems(), LIM = 4;
-    var out = '<div class="sechd"><h3>💭 検討事項</h3>'+(cons.length?'<span class="countpill">'+cons.length+'件</span>':'')+'</div>';
+    var cons = consItems(), LIM = 5;
+    var out = '<div class="sechd"><h3>🙋 ご検討いただく事</h3>'+(cons.length?'<span class="countpill">'+cons.length+'件</span>':'')+'</div>';
     if(!cons.length) return out+'<div class="empty">いまはありません。</div>';
     var rows = cons.map(function(c){
       return '<div class="td"><div class="tdh"><span class="ptag">'+esc(c.part||c.title||"打合せ")+'</span><span class="tk">'+fmtD(c.date)+'</span></div>'+
@@ -2310,8 +2312,8 @@ function homeHtml(){ return homeParts().main; }
     // わが家の情報（ホームに出していない欄）
     var info = homeParts().rest;
     var has = function(id){ return info.indexOf('id="'+id+'"')>=0; };
-    var infoTiles = [["sec-plan","📐","平面図"],["sec-pb","🖼","最新のプランボード"],["sec-est","🧾","追加見積り"],["sec-chk","✅","決めることの一覧"],
-      ["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電"],["sec-ntc","📢","お知らせ"],["sec-proc","📘","契約後に知っておきたいこと"],["sec-svc","🔗","ご利用中のサービス"]]
+    var infoTiles = [["sec-plan","📐","平面図"],["sec-est","🧾","追加見積り"],["sec-chk","✅","決めることの一覧"],
+      ["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電"],["sec-ntc","📢","お知らせ"],["sec-proc","📘","契約後に知っておきたいこと"],["sec-svc","🏠","3D"]]
       .filter(function(m){ return has(m[0]) || m[0]==="sec-fam"; })
       .map(function(m){ return tile('data-menujump="'+m[0]+'"', emo(m[1]), m[2]); });
     if(infoTiles.length) out += '<div class="mhd">わが家の情報</div><div class="mgrid">'+infoTiles.join("")+'</div>';
@@ -2331,8 +2333,8 @@ function homeHtml(){ return homeParts().main; }
     var r = [];
     var info = homeParts().rest;
     function has(id){ return info.indexOf('id="'+id+'"')>=0; }
-    [["sec-pb","📐","最新のプランボード"],["sec-nextmeet","📝","打合せの予定"],["sec-chk","✅","決めることの一覧"],["sec-plan","📐","わが家の平面図"],
-     ["sec-est","🧾","追加見積り"],["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電・持ち込み品"],["sec-svc","🔗","ご利用中のサービス"],
+    [["sec-nextmeet","📝","打合せの予定"],["sec-chk","✅","決めることの一覧"],["sec-plan","📐","わが家の平面図"],
+     ["sec-est","🧾","追加見積り"],["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電・持ち込み品"],["sec-svc","🏠","3D"],
      ["sec-ntc","📢","お知らせ・豆知識"],["sec-proc","📘","契約後に知っておきたいこと"]].forEach(function(m){
       // ご家族（未入力）はホームに出ているので、ホームへ移動する
       if(has(m[0]) || m[0]==="sec-fam") r.push('<button class="mi" data-menujump="'+m[0]+'"><span class="mic">'+m[1]+'</span>'+m[2]+'<span class="ug">›</span></button>');
