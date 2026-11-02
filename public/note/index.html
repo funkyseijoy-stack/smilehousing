@@ -208,6 +208,16 @@
   .thumbs.one{ grid-template-columns:1fr; }
   .th{ position:relative; border-radius:12px; overflow:hidden; background:#eee6de; aspect-ratio:1/1; cursor:pointer; border:none; padding:0; }
   .th img{ width:100%; height:100%; object-fit:cover; display:block; }
+  /* 2ページ以上のPDF：ページを横に並べる（グリッドの中では1行まるごと使う） */
+  .pdfpages{ grid-column:1/-1; display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:4px; }
+  .pdfpages > .th{ flex:0 0 calc(50% - 4px); scroll-snap-align:start; }
+  .thumbs[style*="repeat(3"] .pdfpages > .th{ flex-basis:calc(33.333% - 6px); }
+  .pdfpages .pgno{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.6); color:#fff; font-size:.68rem; border-radius:999px; padding:1px 7px; }
+  .pdfpages .th.more{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; text-decoration:none; color:var(--ink2); }
+  /* 小さな枠（最新のプランボードの列・アルバムなど）は1ページ目だけ */
+  .pbstrip .pdfpages > .th:not(:first-child), .imgcell .pdfpages > .th:not(:first-child), .agrid .pdfpages > .th:not(:first-child){ display:none; }
+  .pbstrip .pdfpages > .th, .imgcell .pdfpages > .th, .agrid .pdfpages > .th{ flex-basis:100%; }
+  .pbstrip .pdfpages .pgno, .imgcell .pdfpages .pgno, .agrid .pdfpages .pgno{ display:none; }
   .th.pdf{ text-decoration:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--brown); font-size:.78rem; }
   .th.pdf .pi{ font-size:2rem; }
   .th .cap{ position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent,rgba(0,0,0,.55)); color:#fff; font-size:.7rem; padding:14px 8px 6px; text-align:left; }
@@ -799,23 +809,30 @@
   // 生成には時間がかかるため、先に簡易アイコンを出しつつ裏で読み込み、
   // 出来上がったら render() を呼んで差し替える。
   var pdfThumbCache = {};
+  var PDF_THUMB_MAX = 6;
   function loadPdfThumb(url){
     pdfThumbCache[url] = {status:"pending"};
     (async function(){
       try{
         if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
         var doc = await pdfjsLib.getDocument(url).promise;
-        var page = await doc.getPage(1);
-        var baseViewport = page.getViewport({scale:1});
-        var scale = 320 / Math.max(baseViewport.width, baseViewport.height);
-        if(!(scale>0)) scale = 1;
-        var viewport = page.getViewport({scale:scale});
-        var canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        var ctx = canvas.getContext("2d");
-        await page.render({canvasContext:ctx, viewport:viewport}).promise;
-        pdfThumbCache[url] = {status:"done", dataUrl:canvas.toDataURL("image/png")};
+        // 複数ページのPDFは、PDF_THUMB_MAX ページまで見本を作って横に並べる（それ以上は「ほか n ページ」）
+        var n = Math.min(doc.numPages||1, PDF_THUMB_MAX), pages = [];
+        for(var pi=1; pi<=n; pi++){
+          var page = await doc.getPage(pi);
+          var baseViewport = page.getViewport({scale:1});
+          var scale = 320 / Math.max(baseViewport.width, baseViewport.height);
+          if(!(scale>0)) scale = 1;
+          var viewport = page.getViewport({scale:scale});
+          var canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          var ctx = canvas.getContext("2d");
+          await page.render({canvasContext:ctx, viewport:viewport}).promise;
+          pages.push(canvas.toDataURL("image/png"));
+          if(pi===1){ pdfThumbCache[url] = {status:"done", dataUrl:pages[0], pages:pages.slice(), numPages:doc.numPages||1}; if(n>1) render(); }
+        }
+        pdfThumbCache[url] = {status:"done", dataUrl:pages[0], pages:pages, numPages:doc.numPages||1};
       }catch(e){
         pdfThumbCache[url] = {status:"error"};
       }
@@ -831,7 +848,15 @@
       var cached = pdfThumbCache[f.url];
       if(!cached) loadPdfThumb(f.url);
       if(cached && cached.status==="done"){
-        return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><img src="'+cached.dataUrl+'" alt="PDF"><span class="pdfbadge">PDF</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+        var one = '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><img src="'+cached.dataUrl+'" alt="PDF"><span class="pdfbadge">PDF</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+        if(!(cached.numPages>1)) return one;
+        // 2ページ以上のPDF：ページごとの見本を横に並べる（多いときは横にスクロール。押すとそのページから開く）
+        var tot = cached.numPages, pg = cached.pages||[cached.dataUrl];
+        return '<div class="pdfpages">'+pg.map(function(d, i){
+            return '<a class="th pdf" href="'+esc(f.url)+'#page='+(i+1)+'" target="_blank" rel="noopener"><img src="'+d+'" alt="PDF '+(i+1)+'ページ"><span class="pdfbadge">PDF</span><span class="pgno">'+(i+1)+'/'+tot+'</span>'+(cap&&i===0?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+          }).join("")+
+          (tot>pg.length ? '<a class="th pdf more" href="'+esc(f.url)+'#page='+(pg.length+1)+'" target="_blank" rel="noopener"><span class="pi">📄</span><span>ほか '+(tot-pg.length)+' ページ</span></a>' : '')+
+          '</div>';
       }
       return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📄</span><span>PDFを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
     }
