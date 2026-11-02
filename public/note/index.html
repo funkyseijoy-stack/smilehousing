@@ -1825,11 +1825,8 @@ function homeHtml(){ return homeParts().main; }
           homeDecHtml({ title: part }, { c:c, x:x, room:room })+
           '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>';
       });
-    // 打合せ記録（文章のカード）は横いっぱい、続けて並ぶプランボード・写真・書類のカードは2列にまとめる
-    var out = "", buf = [];
-    var flush = function(){ if(!buf.length) return; out += buf.length>1 ? '<div class="hgrid2">'+buf.join("")+'</div>' : buf[0]; buf = []; };
-    list.forEach(function(e, i){ if(e.n){ flush(); out += cardsHtml[i]; } else buf.push(cardsHtml[i]); });
-    flush();
+    // カードは縦に1枚ずつ（2列にまとめる形は、ともこさんの希望で取りやめ）
+    var out = cardsHtml.join("");
     return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+out+'</div>';
   }
   function latestNotesHtml(){
