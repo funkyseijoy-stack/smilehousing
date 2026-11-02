@@ -116,6 +116,7 @@
   /* 「NEW」は赤く塗って、ふわっと大きく・小さく（目に入りやすく） */
   @keyframes nwPulse{ 0%,100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(217,83,79,.55); } 50%{ transform:scale(1.12); box-shadow:0 0 0 5px rgba(217,83,79,0); } }
   .tag.nw, .upd .nwb, .bchips .cnew, .mtile .mbd, .pmi .dt b.nwp{ display:inline-block; animation:nwPulse 1.6s ease-in-out infinite; transform-origin:center; }
+  .sechd h3 .tag.nwh{ font-size:.8rem; vertical-align:2px; margin-inline-end:4px; }
   .pmi .dt b.nwp{ background:#d9534f; color:#fff; border-radius:999px; padding:0 5px; font-size:.6rem; }
   @media (prefers-reduced-motion: reduce){ .tag.nw, .upd .nwb, .bchips .cnew, .mtile .mbd, .pmi .dt b.nwp{ animation:none; } }
   .scom{ background:var(--card); border:1.5px solid var(--line); border-left:5px solid var(--brown); border-radius:16px; padding:12px 14px; margin:0 0 16px; }
@@ -1043,7 +1044,7 @@ function consItems(){
     var ph = sc ? (sc.photos||[]).filter(isImg) : [];
     var sent = ph.length > 0;
     if(!sent) ph = homeChosen(data.album.filter(function(a){ return isImg(a) && a.kind!=="reference"; })).list;
-    var out = '<div class="sechd"><h3>'+(sent ? '🆕 新しい写真' : '🌷 わが家のアルバム')+'</h3><button class="more" data-go="album">ひらく →</button></div>';
+    var out = '<div class="sechd"><h3>'+(sent ? '<span class="tag nw nwh">NEW</span> 新しい写真' : '🌷 わが家のアルバム')+'</h3><button class="more" data-go="album">ひらく →</button></div>';
     if(!ph.length) return out+'<div class="empty">写真が届くと、ここに表示されます。</div>';
     var when = sent && sc.at ? sc.at : null;
     out += '<div class="polas">'+ph.slice(0,3).map(function(a){
