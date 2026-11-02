@@ -1721,11 +1721,11 @@ function homeHtml(){ return homeParts().main; }
   }
   function latestNotesHtml(){
     // ホームは「総合」（部位なしも含む）の記録だけ。部位ごとの記録は「家づくり」の各項目で見る。
-    // 総合の記録が1件も無いお客様は、従来どおり全部の記録から。中身（内容・決まったこと・メッセージ・資料）の無い記録は出さない
+    // 総合の記録が無いお客様は何も出さない（部位ごとの記録が勝手にホームに出ないように）。中身（内容・決まったこと・メッセージ・資料）の無い記録は出さない
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
     var all = (data.notes||[]).filter(hasBody);
     var gen = all.filter(function(n){ return n.scope==="general" || (n.scope==null ? (n.part==="総合" || !n.part) : !n.scope); });
-    var notes = gen.length ? gen : all;
+    var notes = gen;
     var hd = '<div class="sechd"><h3>🗒 最新の打合せ記録</h3>';
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
