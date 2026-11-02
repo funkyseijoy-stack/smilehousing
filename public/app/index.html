@@ -9750,6 +9750,13 @@
   }
   // 打合せ記録 → 業者タスク＋見積依頼（会社ごと）＋Gmail下書き（会社ごと）を一度に作る。メールは送らない（下書きだけ）。
   // 見積依頼（会社ごと）を作り、Gmail下書き（添付付き）まで作る。結果の文を返す
+  function noteAllFiles(note){
+    var out = [], seen = {};
+    (note.files||[]).concat.apply((note.files||[]).slice(), (note.noteLines||[]).map(function(l){ return (l && l.f) || []; })).forEach(function(f){
+      if(!f || !f.url || seen[f.url]) return; seen[f.url] = 1; out.push(f);
+    });
+    return out;
+  }
   async function makeEstReqWithDrafts(proj, content, part, files, vendors, sourceNoteId){
     var reqs = [];
     vendors.forEach(function(vendor){
@@ -9794,12 +9801,16 @@
     note.lineActs = note.lineActs || [];
     for(var i=0;i<acts.length;i++){
       var a = acts[i], text = a.text;
+      // その行に付けたファイル（あれば）を添付に使う。無ければ記録全体の添付
+      var lineRow = (note.noteLines||[]).find(function(l){ return l && String(l.t||"").trim()===String(text||"").trim(); });
+      var actFiles = (lineRow && lineRow.f && lineRow.f.length) ? lineRow.f.slice() : (note.files||[]).slice();
+      var actPart = (lineRow && lineRow.p && lineRow.p.scope) ? lineRow.p : (note.specPart||null);
       try{
         if(a.type==="taskmade"){ note.lineActs.push({ t:text, type:"task", ref:a.ref, at:nowIso() }); continue; }
         if(a.type==="task"){
           var t = { id: uid("task"), projectId: proj.id, content: text, assignee: a.assignee||"", instructor: "", creator: state.currentUser||"",
-            hasDeadline:false, deadline:"", requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments:(note.files||[]).slice(),
-            vendorSpec: note.specPart||null, private:false, reflected:false, reflectedAt:null, status:"未着手", createdAt: nowIso(), updatedAt: nowIso() };
+            hasDeadline:false, deadline:"", requestTo:"", requestMethod:"", attachmentAssetIds:actFiles.map(function(f){ return f.id; }).filter(Boolean), attachments:actFiles,
+            vendorSpec: actPart, private:false, reflected:false, reflectedAt:null, status:"未着手", createdAt: nowIso(), updatedAt: nowIso() };
           state.tasks.push(t);
           await saveDoc("tasks", t.id, t);
           note.lineActs.push({ t:text, type:"task", ref:t.id, at:nowIso() });
@@ -9815,7 +9826,7 @@
         } else if(a.type==="estreq"){
           var vs = (a.vendorIds||[]).map(vendorById).filter(Boolean);
           if(!vs.length) continue;
-          var r = await makeEstReqWithDrafts(proj, text, note.specPart||null, note.files||[], vs, note.id);
+          var r = await makeEstReqWithDrafts(proj, text, actPart, actFiles, vs, note.id);
           note.lineActs.push({ t:text, type:"estreq", refs:r.refs, at:nowIso() });
           (r.draftIds||[]).forEach(function(x){ lineDraftIds.push(x); });
           done.push(r.msg);
@@ -9856,7 +9867,7 @@
     var vendors = vendorIds.map(function(id){ return vendorById(id); }).filter(Boolean);
     if(!vendors.length){ toast("業者が見つかりませんでした"); return; }
     var names = vendors.map(function(v){ return v.name; });
-    var files = (note.files||[]).slice();
+    var files = noteAllFiles(note); // 記録の添付＋行に付けたファイル（同じファイルは1つ）
 
     // 1) 業者タスクは作らない（見積依頼の一覧で進み具合を見る。ホームの「見積り依頼」にも出る）
     if(!note.specPart){ note.specPart = part; upsertNoteSpecEntry(note); }
