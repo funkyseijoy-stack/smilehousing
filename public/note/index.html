@@ -265,14 +265,14 @@
   .mtop .ug{ margin-left:auto; color:var(--brown); }
   .help-key{ background:#e9f3ea; border:1px solid #bcd9c0; border-radius:12px; padding:12px; margin:6px 0 14px; line-height:1.7; font-size:.9rem; }
   .mhd{ font-size:.8rem; font-weight:700; color:var(--muted); letter-spacing:.08em; margin:18px 2px 8px; }
-  .mgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 8px; }
+  .mgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px 6px; }
   .mtile{ position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; background:none; border:0; padding:0; font-family:inherit; color:inherit; cursor:pointer; }
-  .mtile .mpic{ width:100%; aspect-ratio:1/1; border-radius:14px; background:var(--card); border:1px solid var(--line); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .mtile .mpic{ width:58px; height:58px; border-radius:16px; background:var(--card); border:1px solid var(--line); overflow:hidden; display:flex; align-items:center; justify-content:center; }
   .mtile .mpic img{ width:100%; height:100%; object-fit:cover; }
-  .mtile .mico svg{ width:40px; height:40px; color:var(--brown); }
-  .mtile .memo{ font-size:2rem; }
-  .mtile .mnm{ font-size:.82rem; font-weight:700; line-height:1.35; text-align:center; }
-  .mtile .mbd{ position:absolute; top:6px; right:6px; background:#d9534f; color:#fff; font-size:.6rem; font-weight:700; border-radius:999px; padding:1px 6px; }
+  .mtile .mico svg{ width:30px; height:30px; color:var(--brown); }
+  .mtile .memo{ font-size:1.6rem; }
+  .mtile .mnm{ font-size:.74rem; font-weight:700; line-height:1.3; text-align:center; }
+  .mtile .mbd{ position:absolute; top:-4px; right:2px; background:#d9534f; color:#fff; font-size:.6rem; font-weight:700; border-radius:999px; padding:1px 6px; }
   .dlist{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:4px 12px; margin:0 0 16px; }
   .dlist .dl{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:0; border-top:1px solid var(--line); padding:12px 0; font-family:inherit; color:inherit; cursor:pointer; }
   .dlist .dl:first-child{ border-top:0; }
@@ -2558,9 +2558,8 @@ function homeHtml(){ return homeParts().main; }
     var cats = (data.categories||[]).filter(function(c){ return c.id!=="plan" && catAllItems(c).length; });
     if(cats.length){
       out += '<div class="mhd">家づくり</div><div class="mgrid">'+cats.map(function(c){
-        var imgs = catAllItems(c).filter(function(x){ return !x.partial && x.file && x.file.url && isImg(x.file); })
-          .sort(function(a,b){ return (Date.parse(b.at)||0) - (Date.parse(a.at)||0); });
-        var pic = imgs.length ? '<img loading="lazy" src="'+esc(imgs[0].file.url)+'" alt="">' : '<span class="mico">'+(ICONS[c.icon]||ICONS.house)+'</span>';
+        // 写真は使わず、項目のアイコンだけ（ともこさんの希望。2026年11月）
+        var pic = '<span class="mico">'+(ICONS[c.icon]||ICONS.house)+'</span>';
         var nw = catNewCount(c);
         return tile('data-buildcat="'+esc(c.id)+'"', pic, c.name, nw ? 'NEW' : '');
       }).join("")+'</div>';
