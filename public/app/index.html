@@ -360,6 +360,11 @@
   .notemenu-trigger{ margin-inline-start:auto; flex-shrink:0; }
   .notemenu{ display:none; position:absolute; inset-inline-end:12px; top:40px; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.14); padding:6px; min-width:210px; }
   .noteitem.notemenu-open .notemenu{ display:block; }
+  .uoprow{ display:flex; align-items:center; gap:6px; }
+  .uoprow > button{ flex:1; min-width:0; }
+  .uopchk{ width:20px; height:20px; flex:0 0 auto; margin:0 0 0 4px; }
+  .uopchk-sp{ width:20px; flex:0 0 auto; margin-left:4px; }
+  .notemenu .uoprun{ margin-top:6px; background:#1f6f43 !important; color:#fff !important; border-radius:10px; font-weight:700; text-align:center; }
   .notemenu button{ display:block; width:100%; text-align:start; background:none; border:none; font:inherit; padding:8px 8px; border-radius:7px; cursor:pointer; color:var(--ink); }
   .notemenu button:hover{ background:var(--surface-2); }
   .notemenu button.danger{ color:var(--red, #c0392b); }
@@ -1712,7 +1717,7 @@
             <div class="field mnfield">
               <span>打合せ内容（LINEで来た内容もここに。1行に1つずつ）</span>
               <textarea id="mnBody" rows="5" placeholder="例）キッチンはリシェルSI、色はホワイトに決定&#10;食洗機の有無は次回までにご検討いただく&#10;吊戸棚の高さは現場で確認"></textarea>
-              <div class="mnhint">行を押すと印：<b>✅決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」で部位・ファイル・決定のお願い・タスク</div>
+              <div class="mnhint">行を押すと印：<b>✅仮決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」で部位・ファイル・決定のお願い・タスク</div>
               <div id="mnLines" class="mnlines"></div>
             </div>
             <input type="checkbox" id="meetingNoteTalkShow" checked hidden><div class="muted" style="font-size:.85rem;">「・」の行（印なし）・✅・💭 は、記録するとおうちノートに打合せ記録として出ます。お客様に見せない行は🔒社内に。</div>
@@ -6588,7 +6593,7 @@
     var mcount = function(m){ return pnotes.filter(function(n){ return noteHasMark(n, m); }).length; };
     html += '<label class="field recsel">検討・決定<select data-recmark>'+opt("", "すべて", !mk)+
       opt("open", "💭 検討いただくこと（"+mcount("open")+"件）", mk==="open")+
-      opt("decided", "✅ 決定したこと（"+mcount("decided")+"件）", mk==="decided")+
+      opt("decided", "✅ 仮決定したこと（"+mcount("decided")+"件）", mk==="decided")+
       opt("checkopen", "🔒 社内で確認・未確認（"+mcount("checkopen")+"件）", mk==="checkopen")+
       opt("check", "🔒 社内で確認・すべて（"+mcount("check")+"件）", mk==="check")+'</select></label>';
     if(f.big || mk) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
@@ -6951,7 +6956,7 @@
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         '<span class="pill tag small">打合せ記録の一部</span>'+(n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small" data-act="editnote" data-id="'+n.id+'" title="記録全体を開いて行の部位を直す">✏️ 記録を開く</button></div>'+
-        grp("", "打合せ内容", "talk")+grp("d", "✅ 決定事項", "decided")+grp("o", "💭 お客様に検討いただくこと", "open")+grp("c", "🔒 社内で確認（お客様には出ません）", "chk")+
+        grp("", "打合せ内容", "talk")+grp("d", "✅ 仮決定（打合せで決めたこと）", "decided")+grp("o", "💭 お客様に検討いただくこと", "open")+grp("c", "🔒 社内で確認（お客様には出ません）", "chk")+
         '</div>';
     };
     var cardOf = function(n){
@@ -6996,7 +7001,7 @@
         noteLinePartsChipsHtml(n)+
         noteCheckHtml(n)+
         talkHtml+
-        (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 決定事項</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
+        (decided ? '<div class="nbox decided'+(state.recMark==="decided"?" markhl":"")+'"><div class="nboxlabel">✅ 仮決定（打合せで決めたこと）</div><div class="ntext">'+escapeHtml(decided)+'</div></div>' : '')+
         openHtml+
         noteLineExtrasHtml(n)+
         msgHtml+
@@ -8446,18 +8451,74 @@
   // どのカード（記録・写真/PDF・見積の書類）も同じ項目・同じ並び：
   // 書き込む → 反映 → お客様の決定ボタン → ホームに出す → 追加見積り → 社内タスク → 業者へGmail → Gmailから取り込み → 部位の変更 → 編集 → 削除
   // f = { reflected, reflectNote（反映できないときの理由）, ask, home, delOk }
+  // 操作メニューの対象（記録・写真PDF・見積の書類）：保存先・お客様画面のカードの印（cardKey）・部位
+  function uniDocOf(kind, id){
+    if(kind==="n"){ var n = state.meetingNotes.find(function(x){ return x.id===id; }); if(!n) return null;
+      return { doc:n, coll:"meetingNotes", key:"n:"+n.id, part:n.specPart||null, pid:n.projectId }; }
+    if(kind==="sp"){ var p = state.specPhotos.find(function(x){ return x.id===id; }); if(!p) return null;
+      var tid = p.source && p.source.taskId;
+      return { doc:p, coll:"specPhotos", key: tid ? "t:"+tid : "s:"+String(p.id).slice(0,78), part:{scope:p.scope, category:p.category||null, roomId:p.roomId||null}, pid:p.projectId }; }
+    if(kind==="att"){ var a = state.attachments.find(function(x){ return x.id===id; }); if(!a) return null;
+      return { doc:a, coll:"attachments", key:"a:"+String(a.id).slice(0,78), part:a.specPart||null, pid:a.projectId }; }
+    return null;
+  }
+  function staffStampOf(u){
+    if(!u) return null;
+    return (state.noteDecisions||[]).find(function(d){ return d.projectId===u.pid && d.cardKey===u.key && !d.deletedAt; }) || null;
+  }
+  // スタッフが押す「決定」のはんこ（お客様画面に赤い丸の「決定」。お客様は外せない）。もう一度押すと外す
+  async function toggleStaffStamp(kind, id){
+    var u = uniDocOf(kind, id); if(!u) return;
+    if(!u.part || !u.part.scope){ toast("先に部位を決めてください"); return; }
+    var cat = noteCatIdFor(u.part.scope, u.part.category);
+    if(!cat){ toast("この部位はお客様画面に出ないため、はんこを押せません"); return; }
+    if(cat==="rooms" && !u.part.roomId) cat = "interior";
+    var d = staffStampOf(u), on = !(d && d.status==="決定");
+    if(!on && !confirm("決定のはんこを外しますか？（お客様画面のはんこも消えます）")) return;
+    var did = u.pid+"__card__"+u.key.replace(":","_");
+    var doc = Object.assign({}, d||{}, { id:did, projectId:u.pid, category:cat, cardKey:u.key, status: on ? "決定" : "検討中",
+      label: String(u.doc.title || u.doc.fileName || u.doc.name || "").slice(0,60), by: state.currentUser || "スタッフ", decidedAt: nowIso(), updatedAt: nowIso() });
+    if(cat==="rooms") doc.roomId = u.part.roomId; else delete doc.roomId;
+    var ok = await saveDoc("noteDecisions", did, doc);
+    if(ok===false){ toast("保存できませんでした"); return; }
+    state.noteDecisions = (state.noteDecisions||[]).filter(function(x){ return x.id!==did; }).concat([doc]);
+    render();
+    toast(on ? "🔴 決定のはんこを押しました"+(u.doc.reflected ? "" : "（お客様に出すには「反映する」も押してください）") : "決定のはんこを外しました");
+  }
+  // 「見積もり仕様」のはんこ（badges.quote。お客様画面に青い丸の「見積仕様」）
+  async function toggleQuoteSpecStamp(kind, id){
+    var u = uniDocOf(kind, id); if(!u) return;
+    u.doc.badges = Object.assign({}, u.doc.badges||{});
+    u.doc.badges.quote = !u.doc.badges.quote;
+    u.doc.updatedAt = nowIso();
+    render();
+    var ok = await saveDoc(u.coll, u.doc.id, u.doc);
+    if(ok===false){ u.doc.badges.quote = !u.doc.badges.quote; render(); toast("保存できませんでした"); return; }
+    toast(u.doc.badges.quote ? "🔵 見積仕様のはんこを付けました" : "見積仕様のはんこを外しました");
+  }
+  // まとめて実行できる操作（チェック欄を出す）。いまオンになっていないものだけチェックできる
+  var UNI_BATCH = ["refl","ask","home","stamp","qspec","est","ctask","vgmail","part"];
   function uniOpsSections(kind, id, drawHtml, f, sent){
     sent = sent || {}; f = f || {};
-    var b = function(act, label, on, cls){ return '<button type="button" class="'+(on?"on ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>'; };
+    var u = uniDocOf(kind, id), sd = staffStampOf(u), stamped = !!(sd && sd.status==="決定");
+    var qspec = !!(u && u.doc.badges && u.doc.badges.quote);
+    var b = function(act, label, on, cls){
+      var btn = '<button type="button" class="'+(on?"on ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>';
+      if(UNI_BATCH.indexOf(act)<0) return btn;
+      return '<div class="uoprow">'+(on ? '<span class="uopchk-sp"></span>' : '<input type="checkbox" class="uopchk" data-uopchk="'+act+'" aria-label="まとめて実行に入れる">')+btn+'</div>';
+    };
     var main =
       (f.reflectNote ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", f.reflected?"✓反映済み":"反映する", !!f.reflected))+
       b("ask", f.ask?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない", !!f.ask)+
       b("home", f.home?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す", !!f.home)+
+      b("stamp", stamped?"✓ 🔴 決定のはんこ済み（押すと外す）":"🔴 決定のはんこを押す", stamped)+
+      b("qspec", qspec?"✓ 🔵 見積仕様のはんこ（押すと外す）":"🔵 見積仕様のはんこを付ける", qspec)+
       b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
       b("ctask", (sent.companytask?"✓ ":"")+"📋 社内タスク", !!sent.companytask)+
       b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へGmail（見積依頼＋下書き）", !!sent.estreq)+
       b("gmail", "📥 Gmailから取り込み")+
-      b("part", "📍 部位の変更");
+      b("part", "📍 部位の変更")+
+      '<button type="button" class="uoprun" data-uoprun="1" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">☑ チェックしたものをまとめて実行</button>';
     var tail = b("edit", "✏️ 編集")+(f.delOk===false ? "" : b("del", "削除", false, "danger"));
     return [["", drawHtml||""], ["", main], ["", tail]];
   }
@@ -8528,32 +8589,37 @@
     if(kind==="n"){
       var n = state.meetingNotes.find(function(x){ return x.id===id; }); if(!n) return;
       openNoteMenuId = null;
-      if(act==="refl") toggleMeetingReflected(id);
-      else if(act==="ask") toggleMeetingAskDecision(id);
-      else if(act==="home") toggleMeetingHomeShow(id);
+      var r0 = null;
+      if(act==="stamp") r0 = toggleStaffStamp(kind, id);
+      else if(act==="qspec") r0 = toggleQuoteSpecStamp(kind, id);
+      else if(act==="refl") r0 = toggleMeetingReflected(id);
+      else if(act==="ask") r0 = toggleMeetingAskDecision(id);
+      else if(act==="home") r0 = toggleMeetingHomeShow(id);
       else if(act==="edit") editMeetingNote(id);
       else if(act==="del"){ if(confirm2()) deleteMeetingNote(id); }
-      else if(act==="est") createTaskFromNote(id, "estimate");
-      else if(act==="ctask") createTaskFromNote(id, "companytask");
-      else if(act==="vgmail") createBundleFromNote(id);
+      else if(act==="est") r0 = createTaskFromNote(id, "estimate");
+      else if(act==="ctask") r0 = createTaskFromNote(id, "companytask");
+      else if(act==="vgmail") r0 = createBundleFromNote(id);
       else if(act==="gmail") noteGmailImport(id);
-      else if(act==="part") setNoteSpecPart(id);
+      else if(act==="part") r0 = setNoteSpecPart(id);
       render();
-      return;
+      return r0;
     }
+    if(act==="stamp") return toggleStaffStamp(kind, id);
+    if(act==="qspec") return toggleQuoteSpecStamp(kind, id);
     if(kind==="sp"){
       var sp = state.specPhotos.find(function(z){ return z.id===id; }); if(!sp) return;
-      if(act==="refl"){ togglePbReflected(id); return; }
-      if(act==="ask"){ if(sp.source && sp.source.taskId) toggleTaskAskDecision(sp.source.taskId); else toggleSpecAskDecision(id); return; }
-      if(act==="home"){ toggleCardHomeShow("specPhotos", sp, true); return; }
+      if(act==="refl"){ return togglePbReflected(id); }
+      if(act==="ask"){ return (sp.source && sp.source.taskId) ? toggleTaskAskDecision(sp.source.taskId) : toggleSpecAskDecision(id); }
+      if(act==="home"){ return toggleCardHomeShow("specPhotos", sp, true); }
       if(act==="edit"){ openSpecEdit(id); return; }
       if(act==="del"){ if(confirm2()) deleteSpecPhoto(id); return; }
     }
     if(kind==="att"){
       var at = state.attachments.find(function(z){ return z.id===id; }); if(!at) return;
-      if(act==="refl"){ toggleQuoteReflect(id); return; }
-      if(act==="ask"){ toggleCardAsk("attachments", at); return; }
-      if(act==="home"){ toggleCardHomeShow("attachments", at, quoteSharable(at)); return; }
+      if(act==="refl"){ return toggleQuoteReflect(id); }
+      if(act==="ask"){ return toggleCardAsk("attachments", at); }
+      if(act==="home"){ return toggleCardHomeShow("attachments", at, quoteSharable(at)); }
       if(act==="edit"){ openAttEditPopup(id); return; }
       if(act==="del"){ if(confirm2()) deleteAttachment(id); return; }
     }
@@ -8596,6 +8662,26 @@
       });
     }
   }
+  // 「☑ チェックしたものをまとめて実行」：チェックした操作を上から順に1つずつ行う（反映→ホーム→はんこ→追加見積り…）
+  var uniBatchBusy = false;
+  document.addEventListener("click", async function(e){
+    var rb = e.target.closest("[data-uoprun]"); if(!rb) return;
+    e.preventDefault();
+    var menu = rb.closest(".notemenu") || rb.parentElement;
+    var acts = Array.prototype.slice.call(menu.querySelectorAll("input.uopchk:checked")).map(function(c){ return c.dataset.uopchk; });
+    if(!acts.length){ toast("まとめて行う操作に、チェックを入れてください"); return; }
+    if(uniBatchBusy) return; uniBatchBusy = true;
+    acts.sort(function(a,b){ return UNI_BATCH.indexOf(a)-UNI_BATCH.indexOf(b); });
+    openNoteMenuId = null;
+    try{
+      for(var i=0;i<acts.length;i++){
+        try{ await runUniOp(acts[i], rb.dataset.uk, rb.dataset.uid); }catch(er){}
+        await new Promise(function(r){ setTimeout(r, 300); });
+      }
+      render();
+      toast(acts.length+"つの操作をまとめて行いました");
+    } finally { uniBatchBusy = false; }
+  });
   document.addEventListener("click", function(e){
     var u = e.target.closest("[data-uop]");
     if(!u) return;

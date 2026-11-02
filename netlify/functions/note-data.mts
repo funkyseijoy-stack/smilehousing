@@ -611,7 +611,7 @@ export default async (req: Request, context: Context) => {
       roomId: sp.roomId || null,
       file: fileOf(a),
       contentType: a.contentType || "",
-      spec: { contract: false, quote: false },
+      spec: specBadge(a.badges),
       changing: false,
     });
   }
@@ -748,11 +748,13 @@ export default async (req: Request, context: Context) => {
       const d = cardDecByKey[it.key];
       it.cardStatus = d ? d.status : "検討中";
       it.cardDecidedAt = d ? d.decidedAt : null;
+      // スタッフが押した「決定」のはんこ（by が「お客様」以外）。お客様画面では外せない
+      it.cardByStaff = !!(d && d.status === "決定" && d.by && d.by !== "お客様");
       // 「仮決定／決定」ボタンを出すか：スタッフが出す設定にした記録・タスクだけ。
       // 初めは出さない。ただし、お客様がすでに選んでいるカードは（スタッフが明示的に外さない限り）出し続ける。
       // ただし、お客様が一度押して「検討中に戻した」だけのカード（スタッフは出す設定にしていない）は出さない
       // （ホームの「お願いしたいこと」に昔のカードが溜まって出ていたため。2026年10月31日）
-      it.showDecide = it.askDecision === true || (it.askDecision !== false && !!d && d.status !== "検討中");
+      it.showDecide = it.askDecision === true || (it.askDecision !== false && !!d && d.status !== "検討中") || it.cardByStaff;
       delete it.askDecision;
     }
   }
@@ -904,6 +906,7 @@ export default async (req: Request, context: Context) => {
         files: (n.files || []).map(fileOf),
         lines: linesOf(n),
         estId: (n.sent && n.sent.estimate && n.sent.estimate.ref) || "",
+        spec: specBadge(n.badges),
       }))
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt)),
     album: album
