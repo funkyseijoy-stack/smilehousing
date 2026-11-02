@@ -6758,6 +6758,7 @@
       var menuHtml = '<div class="notemenu">'+
         '<button class="notemenu-close" data-act="togglenotemenu" data-id="'+n.id+'" title="閉じる">✕ 閉じる</button>'+
         (drawMenuHtml ? '<div class="notemenu-h">✏️ 添付の図面・写真に書き込む</div><div class="notemenu-draw">'+drawMenuHtml+'</div><div class="notemenu-divider"></div>' : '')+
+        '<div class="notemenu-h">📎 ファイル</div><button data-act="notegmail" data-id="'+n.id+'">✉️ Gmailから取り込む（この記録に添付）</button><div class="notemenu-divider"></div>'+
         '<div class="notemenu-h">🏠 お客様へ</div>'+
         '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
         '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>'+
@@ -12306,6 +12307,86 @@
       toast(String(e.message)==="too_large" ? "ファイルが大きいため、ここでは開けません（Gmailで確認してください）" : "ファイルを開けませんでした", 7000);
     }
   }
+  // ✉️ Gmailから取り込む（記録の行・記録のカード用）：業者・キーワードで過去1年の添付付きメールを探し、
+  // 見本つきで並べて、選んだ添付を案件（pid）の置き場へ取り込む。cb(refs) に {id,url,contentType,name} の配列を渡す
+  function gmailPickFiles(pid, title, cb){
+    var vendors = (state.vendors||[]).filter(function(v){ return !v.deletedAt && v.email; }).sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""),"ja"); });
+    var ov = document.createElement("div");
+    ov.className = "opspop-ov";
+    ov.innerHTML = '<div class="notemenu opsmenu opspop" style="width:min(720px,100%);">'+
+      '<div class="opspop-head"><div><b>✉️ Gmailから取り込む</b><div class="muted" style="font-size:.85rem;">'+escapeHtml(title||"")+'</div></div><button type="button" class="notemenu-close" data-gpclose>✕ 閉じる</button></div>'+
+      '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center; padding:4px 6px;">'+
+        '<select data-gpv style="flex:1 1 180px;"><option value="">業者を選ばない（すべてのメール）</option>'+vendors.map(function(v){ return '<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>'; }).join("")+'</select>'+
+        '<input type="text" data-gpq placeholder="キーワード（お客様名・件名など）" style="flex:2 1 200px;">'+
+        '<button type="button" class="btn small" data-gpsearch>🔍 探す</button></div>'+
+      '<div class="muted" data-gpmsg style="font-size:.85rem; padding:4px 8px;">業者を選ぶか、キーワードを入れて「探す」を押してください（過去1年の添付付きメール）。</div>'+
+      '<div data-gplist></div>'+
+      '<div class="row" style="gap:8px; padding:8px 6px; position:sticky; bottom:0; background:var(--surface);"><button type="button" class="btn" data-gpok disabled>選んだ添付を取り込む</button><button type="button" class="btn secondary" data-gpclose>やめる</button></div></div>';
+    document.body.appendChild(ov);
+    var items = [], picked = {}, busy = false;
+    var msg = ov.querySelector("[data-gpmsg]"), list = ov.querySelector("[data-gplist]"), okBtn = ov.querySelector("[data-gpok]");
+    var close = function(){ ov.remove(); };
+    var updOk = function(){ var n = Object.keys(picked).length; okBtn.disabled = !n || busy; okBtn.textContent = n ? "選んだ "+n+" 件を取り込む" : "選んだ添付を取り込む"; };
+    async function search(){
+      var vid = ov.querySelector("[data-gpv]").value, kw = ov.querySelector("[data-gpq]").value.trim();
+      if(!vid && !kw){ msg.textContent = "業者を選ぶか、キーワードを入れてください"; return; }
+      var v = vid ? vendorById(vid) : null, info = v ? vendorMailInfo(v) : null;
+      var q = (info && info.email ? vendorFromQuery(info)+" " : "")+(kw ? kw+" " : "")+gmailPastYearQuery()+" has:attachment";
+      msg.textContent = "探しています…"; list.innerHTML = ""; items = []; picked = {}; updOk();
+      try{
+        var hdr = { "X-Staff-Token": getStaffToken()||"" };
+        var sr = await fetch("/api/gmail-search-threads?maxResults=20&q="+encodeURIComponent(q), { headers:hdr });
+        if(!sr.ok){ msg.textContent = gmailErrText(await gmailErrCode(sr)); return; }
+        var tids = ((await sr.json()).threads||[]).map(function(t){ return t.id; }).filter(Boolean);
+        for(var i=0;i<tids.length;i+=10){
+          var res = await fetch("/api/gmail-attachments?threadId="+encodeURIComponent(tids.slice(i,i+10).join(",")), { headers:hdr });
+          if(!res.ok){ msg.textContent = gmailErrText(await gmailErrCode(res)); return; }
+          items = items.concat((await res.json()).items||[]);
+        }
+      }catch(e){ msg.textContent = "Gmailにつながりませんでした（通信を確認してください）"; return; }
+      if(info && info.email) items = items.filter(function(it){ return senderMatchesVendor(it.sender, info); });
+      var seen = {}; items = items.filter(function(it){ var k = it.messageId+"|"+it.partId; if(seen[k]) return false; seen[k] = 1; return true; });
+      items.sort(function(x,y){ return (y.internalDate||0)-(x.internalDate||0); });
+      if(!items.length){ msg.textContent = "見つかりませんでした（業者・キーワードを変えてみてください）"; return; }
+      msg.textContent = items.length+" 件の添付が見つかりました。押して選んでください（複数可）。";
+      list.innerHTML = items.map(function(it, i){
+        return '<div class="gprow" data-gpi="'+i+'" style="display:flex; gap:10px; align-items:center; padding:6px 8px; border-radius:10px; cursor:pointer;">'+
+          '<div class="rcvthumb" data-rcvthumb="'+i+'">📄</div>'+
+          '<div style="flex:1; min-width:0;"><div style="font-weight:700; word-break:break-all;">'+escapeHtml(it.filename||"添付")+'</div>'+
+          '<div class="muted" style="font-size:.85rem;">'+escapeHtml((it.sender||"").replace(/<.*>/,"").trim())+'　'+escapeHtml(rcvDate(it.internalDate ? Number(it.internalDate) : it.date))+'</div>'+
+          '<div class="muted" style="font-size:.85rem; word-break:break-all;">'+escapeHtml(it.subject||"")+'</div></div>'+
+          '<button type="button" class="btn ghost small" data-gpview="'+i+'" style="flex-shrink:0;">👁 見る</button></div>';
+      }).join("");
+      rcvLoadThumbs(ov, items);
+    }
+    ov.addEventListener("click", async function(e){
+      if(e.target===ov || e.target.closest("[data-gpclose]")){ if(!busy) close(); return; }
+      if(e.target.closest("[data-gpsearch]")){ search(); return; }
+      var vw = e.target.closest("[data-gpview]"); if(vw){ e.stopPropagation(); rcvOpenItem(items[+vw.dataset.gpview]); return; }
+      var row = e.target.closest("[data-gpi]");
+      if(row){ var i = +row.dataset.gpi; if(picked[i]) delete picked[i]; else picked[i] = 1; row.style.background = picked[i] ? "var(--accent-soft)" : ""; row.style.outline = picked[i] ? "2px solid var(--accent)" : ""; updOk(); return; }
+      if(e.target.closest("[data-gpok]") && !busy){
+        busy = true; updOk(); okBtn.textContent = "取り込んでいます…";
+        var refs = [], fail = 0, slug = pid || "_global";
+        var keys = Object.keys(picked).map(Number);
+        for(var k=0;k<keys.length;k++){
+          var it = items[keys[k]];
+          try{
+            var r = await fetch("/api/gmail-attachments", { method:"POST", headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
+              body: JSON.stringify({ slug: slug, messageId: it.messageId, partId: it.partId }) });
+            if(!r.ok) throw new Error("http_"+r.status);
+            var j = await r.json();
+            refs.push({ id: slug+"/"+j.key, url:'/api/get-photo?slug='+encodeURIComponent(slug)+'&key='+encodeURIComponent(j.key), contentType: j.contentType || it.mimeType || "", name: it.filename || j.filename || "添付" });
+          }catch(err){ fail++; }
+        }
+        busy = false; close();
+        if(fail) toast(fail+" 件を取り込めませんでした", 7000);
+        if(refs.length) cb(refs);
+      }
+    });
+    ov.querySelector("[data-gpq]").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); search(); } });
+    ov.querySelector("[data-gpv]").addEventListener("change", function(){ if(this.value) search(); });
+  }
   function rcvLoadThumbs(overlay, items){
     var queue = items.map(function(it, i){ return i; }), running = 0;
     function one(i){
@@ -15462,7 +15543,8 @@
         opsPopup("この行の操作", "「"+lt.slice(0,40)+"」", [
           ["📎 ファイル", [
             {label:"この行にファイルを付ける"+(lfn?"（いま "+lfn+" 件）":""), value:"file"},
-            {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"}]],
+            {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
+            {label:"✉️ Gmailから取り込む", value:"gmail"}]],
           ["🏠 お客様へ", [
             {label: mnLineAsk[lt] ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!mnLineAsk[lt]}]],
           ["🗂 整理", [
@@ -15474,6 +15556,15 @@
         ], function(kind){
           if(!kind) return;
           if(kind==="pick"){ mnLinePickRegistered(lt); return; }
+          if(kind==="gmail"){
+            gmailPickFiles(editingMeetingNoteProjectId(), "「"+lt.slice(0,30)+"」に付けます", function(refs){
+              if(mnLines().indexOf(lt)<0){ toast("行が見つかりません（文を書き換えた場合は、もう一度「⋯」から付けてください）"); return; }
+              var arr = mnLineFiles[lt] = mnLineFiles[lt] || [];
+              refs.forEach(function(r){ arr.push({ref:r}); });
+              mnRender(); toast("Gmailの添付を "+refs.length+" 件この行に付けました（「記録する／更新」で保存）", 7000);
+            });
+            return;
+          }
           if(kind==="file"){ mnLineFileTarget = lt; var lfi = document.getElementById("mnLineFileInput"); if(lfi){ lfi.value = ""; lfi.click(); } return; }
           if(kind==="ask"){
             if(mnMarks[lt]==="c"){ toast("🔒社内で確認の行は、お客様には出せません"); return; }
@@ -16493,6 +16584,21 @@
       else if(act==="notebundle"){ createBundleFromNote(id); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
       else if(act==="togglenotemenu"){ e.stopPropagation(); toggleNoteMenu(id); }
+      else if(act==="notegmail"){
+        var gn = state.meetingNotes.find(function(x){ return x.id===id; });
+        if(gn){ openNoteMenuId = null; renderMeetingNotes();
+          gmailPickFiles(gn.projectId, "この記録（"+(gn.date||"")+(gn.title?" "+gn.title:"")+"）に添付します", async function(refs){
+            var before = (gn.files||[]).slice();
+            gn.files = before.concat(refs); gn.updatedAt = nowIso();
+            renderMeetingNotes();
+            var ok = await saveDoc("meetingNotes", gn.id, gn);
+            if(ok===false){ gn.files = before; renderMeetingNotes(); toast("保存できませんでした"); return; }
+            if(gn.specPart) upsertNoteSpecEntry(gn);
+            logActivity("打合せ記録にGmailの添付を "+refs.length+" 件追加しました");
+            toast("Gmailの添付を "+refs.length+" 件この記録に付けました", 6000);
+          });
+        }
+      }
       else if(act==="copynote"){ copyMeetingNote(id); }
       else if(act==="linenote"){ lineMeetingNote(id); }
     }
