@@ -6882,30 +6882,15 @@
       var openHtml = open ? '<div class="nbox open'+(state.recMark==="open"?" markhl":"")+'"><div class="nboxlabel">💭 お客様に検討いただくこと</div><div class="ntext">'+escapeHtml(open)+'</div></div>' : "";
       var sent = noteSentInfo(n);
       var menuOpen = openNoteMenuId === n.id;
+      // 操作メニュー（写真・PDF・見積の書類のカードと同じ並び）
+      var noteOps = uniOpsSections("n", n.id, drawMenuHtml ? '<div class="notemenu-draw">'+drawMenuHtml+'</div>' : "",
+        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>',
+        { estimate: sent.estimate, companytask: sent.companytask, estreq: sent.estreq },
+        '<button data-act="editnote" data-id="'+n.id+'">✏️ 編集</button>'+
+        '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>');
       var menuHtml = '<div class="notemenu">'+
         '<button class="notemenu-close" data-act="togglenotemenu" data-id="'+n.id+'" title="閉じる">✕ 閉じる</button>'+
-        (drawMenuHtml ? '<div class="notemenu-h">✏️ 添付の図面・写真に書き込む</div><div class="notemenu-draw">'+drawMenuHtml+'</div><div class="notemenu-divider"></div>' : '')+
-        '<div class="notemenu-h">📎 ファイル</div><button data-act="notegmail" data-id="'+n.id+'">✉️ Gmailから取り込む（この記録に添付）</button><div class="notemenu-divider"></div>'+
-        '<div class="notemenu-h">🏠 お客様へ</div>'+
-        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
-        '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>'+
-        '<div class="notemenu-divider"></div><div class="notemenu-h">📋 タスク・依頼</div>'+
-        noteSendButtonHtml(n, sent, "companytask")+
-        noteSendButtonHtml(n, sent, "vendortask")+
-        noteSendButtonHtml(n, sent, "estreq")+
-        '<button class="'+(sent.estreq?"on":"")+'" data-act="notebundle" data-id="'+n.id+'" title="見積依頼とGmail下書きを一度に作る（送信はしません。タスクは作りません）">→見積依頼＋Gmail下書き</button>'+
-        noteSendButtonHtml(n, sent, "confirm")+
-        noteSendButtonHtml(n, sent, "consider")+
-        noteSendButtonHtml(n, sent, "estimate")+
-        '<div class="notemenu-divider"></div><div class="notemenu-h">📤 共有</div>'+
-        '<button data-act="copynote" data-id="'+n.id+'">共有文をコピー</button>'+
-        '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
-        '<div class="notemenu-divider"></div><div class="notemenu-h">🗂 記録の整理</div>'+
-        '<button data-act="editnote" data-id="'+n.id+'">編集（行ごとの部位・ファイル・決定のお願いも）</button>'+
-
-        '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
-        '<div class="notemenu-divider"></div>'+
-        '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
+        uniOpsInnerHtml(noteOps)+
         '</div>';
       var sentBadgeHtml = NOTE_SEND_TYPES.filter(function(t){ return sent[t.type]; }).map(function(t){
         if(t.type==="estimate") return '<span class="nsentbadge" data-goest="'+escapeHtml(n.projectId+"|"+((sent.estimate&&sent.estimate.ref)||""))+'" title="押すと追加見積りの欄へ移動します">✓ '+t.badge+' ›</span>';
@@ -7095,6 +7080,22 @@
     };
     state.specPhotos.push(doc);
     saveDoc("specPhotos", doc.id, doc);
+  }
+  // 記録に Gmail の添付を足す（記録のカードの「⋮ 操作」→ Gmailから取り込み）
+  function noteGmailImport(id){
+    var gn = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!gn) return;
+    openNoteMenuId = null; renderMeetingNotes();
+    gmailPickFiles(gn.projectId, "この記録（"+(gn.date||"")+(gn.title?" "+gn.title:"")+"）に添付します", async function(refs){
+      var before = (gn.files||[]).slice();
+      gn.files = before.concat(refs); gn.updatedAt = nowIso();
+      renderMeetingNotes();
+      var ok = await saveDoc("meetingNotes", gn.id, gn);
+      if(ok===false){ gn.files = before; renderMeetingNotes(); toast("保存できませんでした"); return; }
+      if(gn.specPart) upsertNoteSpecEntry(gn);
+      logActivity("打合せ記録にGmailの添付を "+refs.length+" 件追加しました");
+      toast("Gmailの添付を "+refs.length+" 件この記録に付けました", 6000);
+    });
   }
   function setNoteSpecPart(noteId){
     var note = state.meetingNotes.find(function(n){ return n.id===noteId; });
@@ -8243,6 +8244,8 @@
         info[t.type] = state.confirmItems.some(function(x){ return x.id===rec.ref && !x.deletedAt; });
       }
     });
+    // 追加見積り（カードの「⋮ 操作」から載せたもの）。押すと追加見積りの欄へ移動するので記録を返す
+    info.estimate = (s.estimate && s.estimate.ref) ? s.estimate : false;
     return info;
   }
   function specSentTypes(p){ var s = specSentInfo(p); return SPEC_SEND_TYPES.filter(function(t){ return s[t.type]; }); }
@@ -8275,7 +8278,18 @@
     });
     askChoice("タスク依頼・見積依頼", "部位：「"+label+"」", choices, function(type){
       if(!type) return;
-      if(sent[type]){ toast("すでに登録済みです"); return; }
+      runLinkedType(holder, coll, c, type);
+    });
+  }
+  // 1つの種類だけを作る（カードの「⋮ 操作」から直接呼ぶ）。type: companytask／vendortask／estreq／confirm／consider／estimate
+  function runLinkedType(holder, coll, c, type){
+    var sent = specSentInfo(holder);
+    var label = c.part.label || "";
+    (function(){
+      if(sent[type]){
+        if(type==="estimate" && sent.estimate.ref){ goToOkaiEstimates(c.projectId, sent.estimate.ref); return; }
+        toast("すでに登録済みです"); return;
+      }
       var content = "【"+label+"】"+c.what;
       var mark = function(ref, refs){
         holder.sent = holder.sent || {};
@@ -8284,6 +8298,28 @@
         render();
         saveDoc(coll, holder.id, holder);
       };
+      if(type==="estimate"){
+        var proj0 = projectById(c.projectId);
+        if(!proj0){ toast("案件が見つかりません"); return; }
+        var est0 = String(c.what||"").split("\n")[0].trim();
+        var estTitle = (label ? label+"：" : "")+est0;
+        if(estTitle.length>30) estTitle = estTitle.slice(0,30)+"…";
+        askChoice("追加見積りに載せる", "「"+proj0.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が載ります（金額確認中）。\n金額は「おうちノート連携」タブの追加見積りで入れてください。", [{label:"載せる", value:"go"}], async function(v){
+          if(v!=="go") return;
+          var estId = uid("est"), cust;
+          try{
+            cust = await okaiUpdateList(c.projectId, "customerEstimates", function(list){
+              return list.concat([{ id: estId, title: estTitle, amount: "", note: content, status: "確認中", updated: nowIso(), createdAt: nowIso() }]);
+            });
+          }catch(e){ toast("追加見積りへの追加に失敗しました。「おうちノート」タブでリンクを発行済みか確認してください"); return; }
+          if(!((cust && cust.customerEstimates) || []).some(function(x){ return x.id===estId; })){ toast("追加見積りに入りませんでした。もう一度お試しください"); return; }
+          mark(estId);
+          logActivity("記録のカードから追加見積り「"+estTitle.slice(0,20)+"」を追加しました（金額確認中）");
+          toast("✅ 追加見積りに載せました。金額を入れてください", 6000);
+          goToOkaiEstimates(c.projectId, estId);
+        });
+        return;
+      }
       if(type==="estreq"){
         askVendorForBadge(function(ids){
           if(ids===null) return;
@@ -8315,8 +8351,104 @@
       } else if(type==="companytask"){
         askAssignee(function(a){ if(a===null) return; run(null, a); });
       } else run(null, "");
-    });
+    })();
   }
+  // ---- 記録の一覧・変更履歴のカードの「⋮ 操作」（記録・写真・PDF・見積の書類で同じ並び） ----
+  // 書き込む → 反映 → 追加見積り → 社内タスク → 業者へGmail → Gmailから取り込み → 部位の変更 →（編集・削除）
+  // kind："n"＝打合せ記録（id は記録ID）／"sp"＝写真・PDF（specPhotos）／"att"＝見積の書類（attachments）
+  function uniOpsSections(kind, id, drawHtml, reflectHtml, sent, tailHtml){
+    sent = sent || {};
+    var b = function(act, label, on){ return '<button type="button" class="'+(on?"on":"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>'; };
+    var main = (reflectHtml||"")+
+      b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
+      b("ctask", (sent.companytask?"✓ ":"")+"📋 社内タスク", !!sent.companytask)+
+      b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へGmail（見積依頼＋下書き）", !!sent.estreq)+
+      b("gmail", "📥 Gmailから取り込み")+
+      b("part", "📍 部位の変更");
+    return [["", drawHtml||""], ["", main], ["", tailHtml||""]];
+  }
+  function uniOpsInnerHtml(sections){
+    return sections.filter(function(x){ return x && x[1]; }).map(function(x, i){
+      return (i?'<div class="notemenu-divider"></div>':'')+'<div class="opsgrp">'+x[1]+'</div>';
+    }).join("");
+  }
+  // 写真・PDF・見積の書類の「部位・内容・ファイル」（タスク・見積依頼・追加見積りに使う）
+  function uniOpsCtx(kind, id){
+    if(kind==="sp"){
+      var p = state.specPhotos.find(function(x){ return x.id===id; }); if(!p) return null;
+      var part = { scope: p.scope, category: p.category||null, roomId: p.roomId||null, side: p.side||null };
+      var info = partInfo(part); part.label = info ? info.text : specPartLabelFor(p.scope, p.category, p.roomId, p.side);
+      var what = (p.source && p.source.noteSnippet) || p.memo || p.fileName || ((p.contentType||"").indexOf("pdf")>=0 ? "PDF資料" : "写真");
+      var files = (p.url||p.assetId) ? [{ id: p.assetId||p.id, url: p.url, contentType: p.contentType, name: p.fileName||"" }] : [];
+      return { holder: p, coll: "specPhotos", c: { projectId: p.projectId, part: part, what: what, files: files } };
+    }
+    if(kind==="att"){
+      var a = state.attachments.find(function(x){ return x.id===id; }); if(!a) return null;
+      if(!a.specPart) return { holder: a, coll: "attachments", noPart: true };
+      var pa = Object.assign({}, a.specPart); var ia = partInfo(pa); pa.label = ia ? ia.text : (pa.label||"");
+      return { holder: a, coll: "attachments", c: { projectId: a.projectId, part: pa, what: a.name || "見積の書類",
+        files: [{ id: a.assetId||a.id, url: a.url, contentType: a.contentType, name: a.name||"" }] } };
+    }
+    return null;
+  }
+  function runUniOp(act, kind, id){
+    // 打合せ記録（記録のカード・変更履歴の記録の写し）は、記録の操作をそのまま使う
+    if(kind==="n"){
+      var n = state.meetingNotes.find(function(x){ return x.id===id; }); if(!n) return;
+      openNoteMenuId = null;
+      if(act==="est") createTaskFromNote(id, "estimate");
+      else if(act==="ctask") createTaskFromNote(id, "companytask");
+      else if(act==="vgmail") createBundleFromNote(id);
+      else if(act==="gmail") noteGmailImport(id);
+      else if(act==="part") setNoteSpecPart(id);
+      render();
+      return;
+    }
+    var x = uniOpsCtx(kind, id); if(!x) return;
+    if(act==="part"){
+      if(kind==="att"){ setQuotePart(id); return; }
+      var p = x.holder;
+      askSpecPart(function(part){
+        if(!part) return;
+        var before = { scope:p.scope, category:p.category, roomId:p.roomId, side:p.side };
+        p.scope = part.scope; p.category = part.category||null; p.roomId = part.roomId||null; p.side = part.side||null;
+        p.updatedAt = nowIso();
+        render();
+        saveDoc("specPhotos", p.id, p).then(function(ok){
+          if(ok===false){ Object.assign(p, before); render(); toast("保存できませんでした"); return; }
+          toast("部位を「"+(part.label||"")+"」に変えました");
+        });
+      }, p.projectId);
+      return;
+    }
+    if(x.noPart){ toast("先に「📍 部位の変更」で部位を決めてください"); return; }
+    if(act==="est") return runLinkedType(x.holder, x.coll, x.c, "estimate");
+    if(act==="ctask") return runLinkedType(x.holder, x.coll, x.c, "companytask");
+    if(act==="vgmail") return runLinkedType(x.holder, x.coll, x.c, "estreq");
+    if(act==="gmail"){
+      // 取り込んだファイルは、このカードと同じ部位の新しいカード（写真・PDF、今日の日付。お客様にはまだ出さない）
+      var pt = x.c.part, pid = x.c.projectId;
+      gmailPickFiles(pid, "「"+(pt.label||"")+"」に新しいカードとして入れます", async function(refs){
+        var n = 0;
+        for(var i=0;i<refs.length;i++){
+          var r = refs[i];
+          var doc = { id: uid("sp"), projectId: pid, scope: pt.scope, category: pt.category||null, roomId: pt.roomId||null, side: pt.side||null,
+            assetId: r.id||null, url: r.url, kind: "photo", contentType: r.contentType||"", fileName: r.name||"Gmailの添付", createdAt: nowIso(), source: { gmail: true } };
+          state.specPhotos.push(doc);
+          if(await saveDoc("specPhotos", doc.id, doc) !== false) n++;
+        }
+        render();
+        logActivity("Gmailの添付を「"+(pt.label||"")+"」に "+n+" 件取り込みました");
+        toast("Gmailの添付を "+n+" 件「"+(pt.label||"")+"」に入れました（お客様にはまだ出ていません）", 6000);
+      });
+    }
+  }
+  document.addEventListener("click", function(e){
+    var u = e.target.closest("[data-uop]");
+    if(!u) return;
+    e.preventDefault();
+    runUniOp(u.dataset.uop, u.dataset.uk, u.dataset.uid);
+  });
   function samePartLoose(sp, scope, category, roomId){
     if(!sp || sp.scope!==scope) return false;
     if((sp.category||null)!==(category||null)) return false;
@@ -8389,13 +8521,10 @@
     var from = v ? v.name + (via && via.id!==(v&&v.id) ? "（"+via.name+"経由）" : "") : "";
     var sharable = quoteSharable(a);
     var st = 'style="cursor:pointer; border:none; font-family:inherit;"';
-    var ops = [
-      ["✏️ 書き込む", drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : ""],
-      ["🏠 お客様へ", sharable ? '<button class="'+(a.reflected?"on":"")+'" data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<div class="muted" style="font-size:.85rem; padding:4px 8px;">この種類はお客様には出ません</div>'],
-      ["📋 タスク・依頼", '<button data-spec-quotetask="'+a.id+'">'+(specSentTypes(a).length?'✓ ':'')+'タスク依頼・見積依頼</button>'+
-        '<button data-spec-quotehearing="'+a.id+'">'+(quoteInHearing(a)?"✓ ヒアリングに入れ済み":"📋 ヒアリングに入れる")+'</button>'],
-      ["🗂 整理", '<button data-spec-quotepart="'+a.id+'">📍 部位を変える</button>']
-    ];
+    // 操作メニュー（記録・写真・PDFのカードと同じ並び）
+    var ops = uniOpsSections("att", a.id, drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : "",
+      sharable ? '<button class="'+(a.reflected?"on":"")+'" data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：この種類（'+escapeHtml(quoteTypeNorm(a.quoteType)||"")+'）はお客様には出ません</div>',
+      specSentInfo(a), "");
     return '<div class="spectl-card spectl-type-vendor-border">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
       '<div class="spectl-meta"><div class="row" style="gap:5px;">'+
@@ -8531,16 +8660,23 @@
       : '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("sp:"+p.id, p.badges, "spec")+'</div>';
     var cardClass = "spectl-card "+typeClass+"-border";
     // 操作メニューの並び（打合せ記録のカードと同じ順）：書き込む→お客様へ→タスク・依頼→整理→削除
+    // 操作メニュー（記録・写真・PDF・見積の書類で同じ並び）：書き込む→反映→追加見積り→社内タスク→業者へGmail→Gmailから取り込み→部位の変更→編集・削除
     var opsSections = function(drawHtml){
-      return [
-        ["✏️ 書き込む", drawHtml],
-        ["🏠 お客様へ", reflectBtnHtml+askBtnHtml+decideBtnHtml],
-        ["📋 タスク・依頼", taskBtnHtml+reqBtnHtml],
-        ["🗂 整理", editBtnHtml],
-        ["🏷 分類", badgeRowHtml ? '<div class="opsbadges">'+badgeRowHtml+'</div>' : ""]
-      ];
+      if(p.kind==="note"){
+        // 打合せ記録の写し：記録そのものの操作を使う
+        if(!relatedNote) return [["", drawHtml]];
+        var ns = noteSentInfo(relatedNote);
+        return uniOpsSections("n", relatedNote.id, drawHtml,
+          '<button class="'+(relatedNote.reflected?"on":"")+'" data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>',
+          { estimate: ns.estimate, companytask: ns.companytask, estreq: ns.estreq },
+          '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
+      }
+      return uniOpsSections("sp", p.id, drawHtml,
+        '<button class="'+(p.reflected?"on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>',
+        spSent,
+        '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
     };
-    var opsDel = '<button class="danger" data-delspec="'+p.id+'">削除</button>';
+    var opsDel = p.kind==="note" ? "" : '<button class="danger" data-delspec="'+p.id+'">削除</button>';
     // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
     // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
     // サムネイル1枚＋テキストを横並びで表示する。
@@ -16918,7 +17054,8 @@
       else if(act==="notebundle"){ createBundleFromNote(id); }
       else if(act==="setnotespec"){ setNoteSpecPart(id); }
       else if(act==="togglenotemenu"){ e.stopPropagation(); toggleNoteMenu(id); }
-      else if(act==="notegmail"){
+      else if(act==="notegmail"){ noteGmailImport(id); }
+      else if(act==="notegmail_old"){
         var gn = state.meetingNotes.find(function(x){ return x.id===id; });
         if(gn){ openNoteMenuId = null; renderMeetingNotes();
           gmailPickFiles(gn.projectId, "この記録（"+(gn.date||"")+(gn.title?" "+gn.title:"")+"）に添付します", async function(refs){
