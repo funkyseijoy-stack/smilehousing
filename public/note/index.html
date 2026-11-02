@@ -182,6 +182,13 @@
   .estcard .es.ok{ color:var(--green-ink); font-weight:700; }
   .estcard .btns{ display:flex; gap:8px; margin-top:8px; } .estcard .btns .btn{ flex:1; white-space:nowrap; }
   .nlines{ margin-top:6px; display:flex; flex-direction:column; gap:6px; }
+  .nlgrp{ border-radius:10px; padding:8px 10px 6px; background:#f6f3ee; }
+  .nlgrp.m-d{ background:#eef3ef; } .nlgrp.m-o{ background:#f8eee4; }
+  .nlgh{ font-size:.8rem; font-weight:700; color:var(--muted); margin-bottom:4px; }
+  .nlgrp.m-d .nlgh{ color:var(--green-ink); } .nlgrp.m-o .nlgh{ color:#a8682c; }
+  .nlul{ margin:0; padding-left:1.1em; } .nlul li{ margin:0 0 6px; line-height:1.6; }
+  .nlul .nlt{ white-space:pre-wrap; } .nlul .nlp{ display:inline-block; font-size:.72rem; color:var(--muted); background:rgba(0,0,0,.05); border-radius:999px; padding:0 8px; white-space:nowrap; }
+  .nlul .thumbs{ margin-top:6px; grid-template-columns:repeat(3,1fr); }
   .nline{ border-radius:10px; padding:8px 10px; background:#f6f3ee; }
   .nline.m-d{ background:#eef3ef; } .nline.m-o{ background:#f8eee4; }
   .nline .nlh{ display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:.78rem; color:var(--muted); margin-bottom:2px; }
@@ -1953,17 +1960,21 @@ function homeHtml(){ return homeParts().main; }
   }
   // 行ごとの部位・ファイルがある記録は、スタッフの画面と同じく1行ずつ（印・文・部位・その行の図面）で見せる
   function hasLines(n){ return n && Array.isArray(n.lines) && n.lines.length>0; }
+  // 印ごとに見出しを1回だけ出し、その下に1行ずつ箇条書き（部位の札・その行の図面・追加見積りは行のすぐ下）
   function linesHtml(n, noOpen, consCtx){
     var rows = n.lines.filter(function(l){ return !(noOpen && l.m==="o"); });
     if(!rows.length) return "";
-    return '<div class="nlines">'+rows.map(function(l){
-      var lbl = l.m==="d" ? "✅ 打合せで仮決定したこと" : (l.m==="o" ? "💭 ご検討いただきたいこと" : "・打合せの内容");
-      return '<div class="nline m-'+(l.m||"t")+'"><div class="nlh"><b>'+lbl+'</b>'+(l.part?'<span class="tag">'+esc(l.part)+'</span>':'')+'</div>'+
-        '<div class="nlt">'+esc(l.t)+'</div>'+
-        ((l.files||[]).length?'<div class="thumbs">'+l.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'')+
-        (l.m==="o" && consCtx ? consBtnsHtml(l.t, consCtx) : '')+
-        (l.estId ? noteEstHtml(l) : '')+
-        '</div>';
+    var groups = [["", "打合せの内容"], ["d", "✅ 打合せで仮決定したこと"], ["o", "💭 ご検討いただきたいこと"]];
+    return '<div class="nlines">'+groups.map(function(g){
+      var rs = rows.filter(function(l){ return (l.m||"")===g[0]; });
+      if(!rs.length) return "";
+      return '<div class="nlgrp m-'+(g[0]||"t")+'"><div class="nlgh">'+g[1]+'</div><ul class="nlul">'+rs.map(function(l){
+        var part = String(l.part||"").replace(/[・\s]+$/,"");
+        return '<li><span class="nlt">'+esc(l.t)+'</span>'+(part?' <span class="nlp">'+esc(part)+'</span>':'')+
+          ((l.files||[]).length?'<div class="thumbs">'+l.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'')+
+          (l.m==="o" && consCtx ? consBtnsHtml(l.t, consCtx) : '')+
+          (l.estId ? noteEstHtml(l) : '')+'</li>';
+      }).join("")+'</ul></div>';
     }).join("")+'</div>';
   }
   // 記録から作った追加見積り（n.estId）を、その記録のカードの中に金額と「承認する／見送る」で出す
