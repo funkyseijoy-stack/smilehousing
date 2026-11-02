@@ -847,10 +847,22 @@
   .spectl-meta{ flex-grow:1; min-width:120px; }
   .spectl-actions{ display:flex; flex-wrap:wrap; gap:6px; max-width:100%; margin-inline-start:auto; }
   /* 変更履歴のカード：ボタン類は「⋯」の中（ふだんは閉じる） */
-  .spectl-ops{ flex-basis:100%; }
-  .spectl-ops > summary{ list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:.85rem; font-weight:700; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:2px 12px; background:var(--surface-2); }
+  .spectl-card{ position:relative; padding-inline-end:96px !important; }
+  .spectl-ops{ position:absolute; top:6px; inset-inline-end:8px; }
+  .spectl-ops > summary.btn{ list-style:none; }
+  .spectl-ops[open] .opsmenu{ display:block; top:36px; }
+  .opsmenu button:not(.notemenu-close){ display:block; width:100%; text-align:start; background:none !important; border:none !important; font:inherit !important; font-size:1rem !important; padding:8px 8px !important; border-radius:7px; cursor:pointer; color:var(--ink) !important; font-weight:400 !important; }
+  .opsmenu button:not(.notemenu-close):hover{ background:var(--surface-2) !important; }
+  .opsmenu button.on{ color:var(--accent-ink) !important; font-weight:700 !important; }
+  .opsmenu button.danger{ color:var(--red, #c0392b) !important; }
+  .opsmenu .opsbadges button{ display:inline-block !important; width:auto !important; padding:2px 10px !important; border:1px solid var(--border) !important; border-radius:999px; margin:2px; font-size:.85rem !important; }
+  @media (max-width:760px){
+    .spectl-ops[open] .opsmenu{ position:fixed; inset-inline:12px; top:calc(env(safe-area-inset-top) + 64px); bottom:calc(env(safe-area-inset-bottom) + 84px); max-height:none; z-index:120; }
+  }
+  .spectl-ops-old{ flex-basis:100%; }
+  .spectl-ops-old > summary{ list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:.85rem; font-weight:700; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:2px 12px; background:var(--surface-2); }
   .spectl-ops > summary::-webkit-details-marker{ display:none; }
-  .spectl-ops[open] > summary{ color:var(--accent-ink); border-color:var(--accent); }
+  .spectl-ops-old[open] > summary{ color:var(--accent-ink); border-color:var(--accent); }
   .spectl-ops > .spectl-actions{ margin:8px 0 2px; justify-content:flex-start; }
   .spectl-st{ display:inline-flex; gap:4px; flex-wrap:wrap; }
   .spectl-thumb{ position:relative; width:88px; height:88px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:1.8rem; }
@@ -8203,8 +8215,15 @@
     return '<div class="relpart"><div class="relhd">📎 見積の書類・依頼'+(links.length?' <span class="rellinks">'+links.join("")+'</span>':'')+'</div>'+(chips?'<div class="relchips">'+chips+'</div>':'')+'</div>';
   }
   var specOpsOpen = {};
-  function specOpsHtml(id, inner){
-    return '<details class="spectl-ops"'+(specOpsOpen[id]?' open':'')+'><summary data-specops="'+id+'">⋯ 操作</summary>'+inner+'</details>';
+  // 写真・PDF・見積の書類のカードの「⋮ 操作」：打合せ記録のカードと同じ見た目（右上のボタン→見出し付きのメニュー）。
+  // sections：[["見出し", "ボタンのHTML"], …]（空の欄は出さない）。del：削除ボタンのHTML（いちばん下）
+  function specOpsHtml(id, sections, del){
+    var body = (sections||[]).filter(function(s){ return s && s[1]; }).map(function(s, i){
+      return (i?'<div class="notemenu-divider"></div>':'')+(s[0]?'<div class="notemenu-h">'+s[0]+'</div>':'')+'<div class="opsgrp">'+s[1]+'</div>';
+    }).join("");
+    if(del) body += '<div class="notemenu-divider"></div>'+del;
+    return '<details class="spectl-ops"'+(specOpsOpen[id]?' open':'')+'><summary class="btn ghost small" data-specops="'+id+'" title="操作">⋮ 操作</summary>'+
+      '<div class="notemenu opsmenu"><button type="button" class="notemenu-close" data-specopsclose="'+id+'">✕ 閉じる</button>'+body+'</div></details>';
   }
   function quoteTimelineCardHtml(a, opsId, drawCtx){
     var ct = String(a.contentType||""), url = a.url||"#";
@@ -8215,13 +8234,13 @@
     var from = v ? v.name + (via && via.id!==(v&&v.id) ? "（"+via.name+"経由）" : "") : "";
     var sharable = quoteSharable(a);
     var st = 'style="cursor:pointer; border:none; font-family:inherit;"';
-    var ops = '<div class="spectl-actions">'+
-      (sharable ? '<button class="pill reflect small'+(a.reflected?" on":"")+'" '+st+' data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<span class="muted" style="font-size:.85rem;">この種類はお客様には出ません</span>')+
-      '<button class="pill tag small" '+st+' data-spec-quotepart="'+a.id+'">📍 部位を変える</button>'+
-      '<button class="pill tag small" '+st+' data-spec-quotehearing="'+a.id+'">'+(quoteInHearing(a)?"✓ ヒアリングに入れ済み":"📋 ヒアリングに入れる")+'</button>'+
-      '<button class="pill tag small" '+st+' data-spec-quotetask="'+a.id+'">'+(specSentTypes(a).length?'✓ ':'')+'タスク依頼・見積依頼</button>'+
-      (drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : '')+
-      '</div>';
+    var ops = [
+      ["✏️ 書き込む", drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : ""],
+      ["🏠 お客様へ", sharable ? '<button class="'+(a.reflected?"on":"")+'" data-spec-quotereflect="'+a.id+'" title="お客様のおうちノートに出す">'+(a.reflected?"✓反映済み":"反映する")+'</button>' : '<div class="muted" style="font-size:.85rem; padding:4px 8px;">この種類はお客様には出ません</div>'],
+      ["📋 タスク・依頼", '<button data-spec-quotetask="'+a.id+'">'+(specSentTypes(a).length?'✓ ':'')+'タスク依頼・見積依頼</button>'+
+        '<button data-spec-quotehearing="'+a.id+'">'+(quoteInHearing(a)?"✓ ヒアリングに入れ済み":"📋 ヒアリングに入れる")+'</button>'],
+      ["🗂 整理", '<button data-spec-quotepart="'+a.id+'">📍 部位を変える</button>']
+    ];
     return '<div class="spectl-card spectl-type-vendor-border">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
       '<div class="spectl-meta"><div class="row" style="gap:5px;">'+
@@ -8355,6 +8374,17 @@
       ? (relatedNote ? '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("note:"+relatedNote.id, relatedNote.badges)+'</div>' : "")
       : '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("sp:"+p.id, p.badges, "spec")+'</div>';
     var cardClass = "spectl-card "+typeClass+"-border";
+    // 操作メニューの並び（打合せ記録のカードと同じ順）：書き込む→お客様へ→タスク・依頼→整理→削除
+    var opsSections = function(drawHtml){
+      return [
+        ["✏️ 書き込む", drawHtml],
+        ["🏠 お客様へ", reflectBtnHtml+askBtnHtml+decideBtnHtml],
+        ["📋 タスク・依頼", taskBtnHtml+reqBtnHtml],
+        ["🗂 整理", editBtnHtml],
+        ["🏷 分類", badgeRowHtml ? '<div class="opsbadges">'+badgeRowHtml+'</div>' : ""]
+      ];
+    };
+    var opsDel = '<button class="danger" data-delspec="'+p.id+'">削除</button>';
     // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
     // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
     // サムネイル1枚＋テキストを横並びで表示する。
@@ -8365,7 +8395,7 @@
         '</div>'+
         fileThumbRowHtml(noteFiles, 84)+
         memoHtml+
-        specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+specDrawBtnsHtml(p.id, noteFiles, drawCtx, true)+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
+        specOpsHtml(p.id, opsSections(specDrawBtnsHtml(p.id, noteFiles, drawCtx, true)), opsDel)+
         '</div>';
     }
     return '<div class="'+cardClass+'">'+
@@ -8373,7 +8403,7 @@
       '<div class="spectl-meta">'+metaHtml+'</div>'+
       sentBadgesHtml+
       memoHtml+
-      specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], drawCtx, true) : '')+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
+      specOpsHtml(p.id, opsSections(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], drawCtx, true) : ''), opsDel)+
       '</div>';
   }
   function renderSpecTimeline(scope, category, roomId, side){
@@ -15853,7 +15883,18 @@
       if(!sm) return;
       var id = sm.dataset.specops; var d = sm.parentElement;
       specOpsOpen[id] = !d.open; // クリック直後はまだ切り替わる前
+      // ほかに開いている操作メニューは閉じる（1つだけ開く）
+      if(!d.open) document.querySelectorAll("details.spectl-ops[open]").forEach(function(o){ if(o!==d){ o.open = false; var s2 = o.querySelector("summary[data-specops]"); if(s2) specOpsOpen[s2.dataset.specops] = false; } });
     });
+    // 写真・PDF・見積の書類の「⋮ 操作」：閉じるボタン・メニューの外を押す・メニューの項目を押したら閉じる（打合せ記録の操作メニューと同じ動き）
+    document.addEventListener("click", function(e){
+      var closeOps = function(d){ d.open = false; var s2 = d.querySelector("summary[data-specops]"); if(s2) specOpsOpen[s2.dataset.specops] = false; };
+      var cb = e.target.closest("[data-specopsclose]");
+      if(cb){ var d0 = cb.closest("details.spectl-ops"); if(d0) closeOps(d0); return; }
+      var inMenuBtn = e.target.closest(".opsmenu button");
+      if(inMenuBtn && !e.target.closest(".opsbadges")){ var d1 = inMenuBtn.closest("details.spectl-ops"); if(d1) closeOps(d1); return; }
+      document.querySelectorAll("details.spectl-ops[open]").forEach(function(d){ if(!d.contains(e.target)) closeOps(d); });
+    }, true);
     (function(){
       var hb = document.getElementById("btnHelpToggle");
       function apply(on){ document.body.classList.toggle("showhelp", on); if(hb) hb.textContent = on ? "❔ 説明を隠す" : "❔ 説明を表示"; }
