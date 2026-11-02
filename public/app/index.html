@@ -1712,7 +1712,7 @@
               <div class="mnhint">行を押すと印：<b>✅決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」で部位・ファイル・決定のお願い・タスク</div>
               <div id="mnLines" class="mnlines"></div>
             </div>
-            <label class="field" style="flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" id="meetingNoteTalkShow" checked> 印のない行もお客様に見せる</label>
+            <input type="checkbox" id="meetingNoteTalkShow" checked hidden><div class="muted" style="font-size:.85rem;">「・」の行（印なし）・✅・💭 は、記録するとおうちノートに打合せ記録として出ます。お客様に見せない行は🔒社内に。</div>
             <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea><textarea id="meetingNoteInternal" hidden></textarea>
             <div id="meetingNoteExistingFiles" hidden></div>
             <div class="field"><span>資料を添付（記録全体）</span>
@@ -13044,7 +13044,7 @@
     var internal = (document.getElementById("meetingNoteInternal").value || "").trim();
     var message = (document.getElementById("meetingNoteMessage").value || "").trim();
     var channel = document.getElementById("meetingNoteChannel").value || "打合せ";
-    var talkPublic = !!document.getElementById("meetingNoteTalkShow").checked;
+    var talkPublic = true; // 「・」の行（印なし）はいつもお客様に出す（見せない行は🔒社内の印）
     // PDF・写真などの資料を添付する場合は、決定事項・未決事項が空でも記録できる（契約書類の保管など）。
     var hasFilePicked = !!(document.getElementById("meetingNoteFile") && document.getElementById("meetingNoteFile").files && document.getElementById("meetingNoteFile").files.length) || mnLiveExtras().length>0;
     var editingHasFiles = false;
@@ -13142,6 +13142,9 @@
         await pushExtras(keptFiles, "e:"+ei); // この添付に書き込んだ新しい版は、すぐ後ろに入れる
       }
       existing.files = keptFiles.concat(newFiles);
+      // お客様に出す内容（・／✅／💭／メッセージ／資料）があれば、おうちノートに自動で反映（部位なしは「総合」）
+      if((talk || decided || open || message || existing.files.length) && !existing.reflected){ existing.reflected = true; existing.reflectedAt = nowIso(); }
+      if(existing.reflected && !existing.specPart && !newMeetingNoteSpecPart) existing.specPart = recLeafPart("general", "", projectById(existing.projectId));
       if(replFailed) toast("差し替えに失敗したファイルが "+replFailed+" 件あります（元のファイルのままです）");
       if(exFail) toast("書き込んだ図面のうち "+exFail+" 件を保存できませんでした");
       if(newMeetingNoteSpecPart) existing.specPart = newMeetingNoteSpecPart;
@@ -13164,7 +13167,8 @@
       content: meetingNoteDerivedContent(decided, open), date: noteDate, files: newFiles, author: state.currentUser||"", createdAt: nowIso(),
       specPart: newMeetingNoteSpecPart || (mnHasLineParts() ? recLeafPart("general", "", projectById(pidNote)) : null), badges: badgesToApply, autoCreated: {} };
     if(askDecide) n.askDecision = true;
-    if(askDecide || lineAsk){ n.reflected = true; n.reflectedAt = nowIso(); }
+    if(askDecide || lineAsk || talk || decided || open || message || newFiles.length){ n.reflected = true; n.reflectedAt = nowIso(); } // お客様に出す内容があれば自動で反映
+    if(n.reflected && !n.specPart) n.specPart = recLeafPart("general", "", projectById(pidNote));
     if((askDecide || lineAsk) && !n.specPart) n.specPart = recLeafPart("general", "", projectById(pidNote)); // 部位なしはお客様画面に出ないので「総合」に
     state.meetingNotes.push(n);
     cancelEditMeetingNote();
