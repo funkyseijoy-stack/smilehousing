@@ -1879,6 +1879,18 @@
     </div>
 
     <div class="card">
+      <h3>🔎 記録から外れたファイルを探す</h3>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">記録の行などから外れてしまった写真・PDFを探します。アップロードしたファイルは案件の保管場所に残っているので、どこにも付いていないものをアップロードした日時の新しい順に出します（何も消しません）。見つけたら「図面に登録」すると、記録の行の「⋯」→「📐 登録済みのファイルから選ぶ」で付け直せます。</p>
+      <div class="row" style="gap:8px; flex-wrap:wrap; align-items:center;">
+        <select id="orfProject" style="min-width:220px;"></select>
+        <select id="orfDays"><option value="1">今日（24時間）</option><option value="7" selected>7日以内</option><option value="30">30日以内</option><option value="365">1年以内</option></select>
+        <label style="font-size:.9rem;"><input type="checkbox" id="orfAll"> 付いているものも出す</label>
+        <button class="btn secondary small" id="btnOrfSearch">探す</button>
+      </div>
+      <div id="orfResult" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
       <h3>アプリの重さの診断</h3>
       <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">データの件数と、読み込み・画面の描き直しにかかる時間を測ります（何も変更・削除しません）。重いと感じるときに押して、結果をお知らせください。</p>
       <button class="btn secondary small" id="btnPerfCheck">診断する</button>
@@ -3246,6 +3258,70 @@
   }
 
   // 重さの診断：各データの件数・サイズ・取得時間と、画面の描き直しの時間を測る（読み取りだけ。何も書き換えない）
+  // ===== 記録から外れたファイルを探す（/api/orphan-files は保管場所の一覧を返すだけ） =====
+  var orf = { items: null, pid: "", busy: false };
+  function orfFillProjects(){
+    var sel = document.getElementById("orfProject"); if(!sel) return;
+    var cur = sel.value || state.currentProjectId || "";
+    var ps = state.projects.filter(function(p){ return !p.deletedAt; }).slice().sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""), "ja"); });
+    sel.innerHTML = '<option value="">案件を選ぶ</option>'+ps.map(function(p){ return '<option value="'+escapeHtml(p.id)+'">'+escapeHtml((p.name||"")+(p.customer?"（"+p.customer+"）":""))+'</option>'; }).join("")+'<option value="_global">（案件を開いていないときのアップロード）</option>';
+    sel.value = cur;
+  }
+  function orfReferencedText(){
+    var parts = [];
+    Object.keys(state).forEach(function(k){
+      var v = state[k];
+      if(Array.isArray(v) && v.length && typeof v[0]==="object"){ try{ parts.push(JSON.stringify(v)); }catch(e){} }
+    });
+    if(state.settings){ try{ parts.push(JSON.stringify(state.settings)); }catch(e){} }
+    return parts.join("\n");
+  }
+  async function orfSearch(){
+    var pid = document.getElementById("orfProject").value;
+    if(!pid){ toast("案件を選んでください"); return; }
+    if(orf.busy) return; orf.busy = true;
+    var out = document.getElementById("orfResult"); out.innerHTML = '<div class="muted">探しています…</div>';
+    try{
+      var res = await fetch('/api/orphan-files?slug='+encodeURIComponent(pid)+'&days='+encodeURIComponent(document.getElementById("orfDays").value), { headers:{'X-Staff-Token': getStaffToken()} });
+      if(!res.ok) throw new Error("status "+res.status);
+      var j = await res.json();
+      var ref = orfReferencedText();
+      orf.items = (j.items||[]).map(function(it){ it.used = ref.indexOf(it.key)>=0; return it; });
+      orf.total = j.total||0; orf.pid = pid;
+    }catch(e){ orf.items = null; out.innerHTML = '<div class="muted">探せませんでした（'+escapeHtml(e.message||"")+'）。公開されているか、通信を確かめてください。</div>'; orf.busy = false; return; }
+    orf.busy = false;
+    renderOrphanFiles();
+  }
+  function renderOrphanFiles(){
+    var out = document.getElementById("orfResult"); if(!out || !orf.items) return;
+    var showAll = document.getElementById("orfAll").checked;
+    var list = orf.items.filter(function(it){ return showAll || !it.used; });
+    if(!list.length){ out.innerHTML = '<div class="muted">'+(orf.items.length ? 'この期間にアップロードしたファイルは、すべて記録などに付いています。' : 'この期間にアップロードしたファイルはありません。')+'</div>'; return; }
+    var fmt = function(t){ var d = new Date(t); return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+    out.innerHTML = '<div class="muted" style="font-size:.85rem; margin-bottom:6px;">'+list.length+'件'+(orf.total>orf.items.length?'（新しい'+orf.items.length+'件の中から）':'')+'</div>'+
+      '<div class="ftgrid">'+list.map(function(it){
+        var nm = "アップロード "+fmt(it.at);
+        return '<div class="fttile"><a class="ftthumb" href="'+escapeHtml(it.url)+'" target="_blank" rel="noopener">'+fileThumbInner(it.url, it.contentType, "")+'</a>'+
+          '<div class="ftbody"><div class="ftname">'+escapeHtml(nm)+(it.used?' <span class="muted">（付いています）</span>':'')+'</div>'+
+          '<div class="ftacts"><a class="btn small secondary" href="'+escapeHtml(it.url)+'" target="_blank" rel="noopener">👁 見る</a>'+
+          (it.registered ? '<span class="muted" style="font-size:.85rem;">✓ 図面に登録しました</span>' : '<button type="button" class="btn small" data-orfreg="'+escapeHtml(it.key)+'">📐 図面に登録</button>')+'</div></div></div>';
+      }).join("")+'</div>';
+  }
+  async function orfRegister(key){
+    var it = (orf.items||[]).find(function(x){ return x.key===key; }); if(!it || it.registered) return;
+    var pid = orf.pid; if(!pid || pid==="_global"){ toast("案件を開いていないときのファイルは、図面に登録できません（「見る」から保存して付け直してください）"); return; }
+    var ct = it.contentType || "";
+    var ext = /pdf/.test(ct) ? ".pdf" : /png/.test(ct) ? ".png" : /jpe?g/.test(ct) ? ".jpg" : "";
+    var d = new Date(it.at);
+    var att = { id: uid("att"), projectId: pid, assetId: it.id, name: "復元_"+(d.getMonth()+1)+"月"+d.getDate()+"日"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")+ext,
+      url: it.url, contentType: ct, uploadedAt: todayStr(), kind: "plan", restoredFrom: it.key };
+    var ok = await saveDoc("attachments", att.id, att);
+    if(ok===false){ toast("登録できませんでした"); return; }
+    state.attachments.push(att);
+    it.registered = true; it.used = true;
+    renderOrphanFiles();
+    toast("図面に登録しました。記録の行の「⋯」→「📐 登録済みのファイルから選ぶ」で付け直せます");
+  }
   async function runPerfCheck(){
     var out = document.getElementById("perfResult"), btn = document.getElementById("btnPerfCheck");
     if(!out) return;
@@ -3474,6 +3550,7 @@
 
   // ================= render =================
   function render(){
+    if(typeof orf!=="undefined" && orf && orf.items) renderOrphanFiles();
     renderStats();
     renderKanban();
     renderHomeActivity();
@@ -16386,6 +16463,11 @@
       document.addEventListener("click", function(e){ if(mm.classList.contains("open") && !mm.contains(e.target) && e.target!==mb){ mm.classList.remove("open"); mb.setAttribute("aria-expanded","false"); } });
     })();
     document.getElementById("btnPerfCheck").addEventListener("click", runPerfCheck);
+    orfFillProjects();
+    document.getElementById("orfProject").addEventListener("focus", orfFillProjects);
+    document.getElementById("btnOrfSearch").addEventListener("click", orfSearch);
+    document.getElementById("orfAll").addEventListener("change", renderOrphanFiles);
+    document.getElementById("orfResult").addEventListener("click", function(e){ var b = e.target.closest("[data-orfreg]"); if(b) orfRegister(b.dataset.orfreg); });
     document.getElementById("btnDemoProject").addEventListener("click", createDemoProject);
     startAutoRefresh();
     var fsBtn = document.getElementById("btnFullscreen");
