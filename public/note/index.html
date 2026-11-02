@@ -1118,8 +1118,9 @@ function homeHtml(){ return homeParts().main; }
     out += updatesHtml();
     out += latestNotesHtml();
     out += pendingCardsHtml();
-    out += nextBox;
-    out += progBox;
+    // 次回のご予約・家づくりの進行状況は上の帯（現在：〇〇／次回 〇/〇）に出ているので、ホームには出さない。
+    // スタッフが書いた「打合せの予定」の文章があるときだけ出す
+    if(nmText) out += '<div class="sechd"><h3>📝 打合せの予定</h3></div><div class="qbox"><div class="qdetail nmtext">'+esc(nmText)+'</div></div>';
     out += decideListHtml();
     // ここから下は「そのほかの情報」にまとめる
     var mainOut = out; out = "";
