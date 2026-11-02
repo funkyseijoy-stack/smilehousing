@@ -502,6 +502,8 @@
   .mnlchip{ font-size:.85rem; background:var(--accent-soft); color:var(--accent-ink); border-radius:999px; padding:2px 4px 2px 10px; display:inline-flex; align-items:center; gap:2px; }
   .mnlchip.ask{ background:#fdecea; color:#b3261e; font-weight:700; }
   .mnaskdec{ background:#fdf6e3; border:1px solid #e9d6a3; border-radius:10px; padding:8px 10px; font-weight:700; }
+  .notemenu-draw{ display:flex; flex-wrap:wrap; gap:4px; padding:2px 4px; }
+  .notemenu .notemenu-draw button{ width:auto; display:inline-block; }
   .notemenu-h{ font-size:.85rem; color:var(--muted); font-weight:700; padding:6px 8px 2px; }
   .nlines-x{ margin:6px 0; }
   .nlx{ border:1px solid var(--border); border-radius:10px; padding:8px 10px; margin-block-end:6px; background:var(--surface); }
@@ -6716,8 +6718,8 @@
       if(filter && filter.big && filter.big!=="none" && !recMatch(n.specPart, filter)) return partialCardOf(n);
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
       var nsp = n.specPart || {scope:"general", category:null, roomId:null, side:null};
-      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files, 120)+
-        specDrawBtnsHtml("n:"+n.id, n.files, {scope:nsp.scope, category:nsp.category||null, roomId:nsp.roomId||null, side:nsp.side||null})+'</div>' : "";
+      var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files, 120)+'</div>' : "";
+      var drawMenuHtml = (n.files && n.files.length) ? specDrawBtnsHtml("n:"+n.id, n.files, {scope:nsp.scope, category:nsp.category||null, roomId:nsp.roomId||null, side:nsp.side||null}, true) : "";
       var chHtml = (n.channel && n.channel!=="打合せ") ? '<span class="pill" style="background:#06c755; color:#fff; font-weight:700;">'+escapeHtml(n.channel)+'</span> ' : "";
       var specHtml = n.specPart ?
         partChipHtml(n.specPart) : "";
@@ -6746,6 +6748,7 @@
         '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
         '<div class="notemenu-divider"></div><div class="notemenu-h">🗂 記録の整理</div>'+
         '<button data-act="editnote" data-id="'+n.id+'">編集（行ごとの部位・ファイル・決定のお願いも）</button>'+
+        (drawMenuHtml ? '<div class="notemenu-draw">'+drawMenuHtml+'</div>' : '')+
         '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
         '<div class="notemenu-divider"></div>'+
         '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
@@ -8211,6 +8214,7 @@
       '<button class="pill tag small" '+st+' data-spec-quotepart="'+a.id+'">📍 部位を変える</button>'+
       '<button class="pill tag small" '+st+' data-spec-quotehearing="'+a.id+'">'+(quoteInHearing(a)?"✓ ヒアリングに入れ済み":"📋 ヒアリングに入れる")+'</button>'+
       '<button class="pill tag small" '+st+' data-spec-quotetask="'+a.id+'">'+(specSentTypes(a).length?'✓ ':'')+'タスク依頼・見積依頼</button>'+
+      (drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : '')+
       '</div>';
     return '<div class="spectl-card spectl-type-vendor-border">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
@@ -8222,7 +8226,7 @@
       '<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml((from?from+"より：":"")+(a.name||""))+'</div>'+
       (a.staffMemo ? '<div class="docmemo staff" style="margin-block-start:3px;">🔒 社内：'+escapeHtml(a.staffMemo)+'</div>' : '')+
       (a.customerNote && sharable ? '<div class="docmemo cust" style="margin-block-start:3px;">💬 お客様へ：'+escapeHtml(a.customerNote)+'</div>' : '')+
-      (drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx) : '')+'</div>'+
+      '</div>'+
       specOpsHtml(opsId, ops)+
       '</div>';
   }
@@ -8230,14 +8234,15 @@
   // 同じ部位の変更履歴に新しいカード（書き込んだ版・お客様には未反映）として入る。元のファイルはそのまま。
   var specDrawReg = {};
   function specDrawable(f){ var ct = String((f&&f.contentType)||""); return !!(f && f.url) && (ct.indexOf("pdf")>=0 || ct.indexOf("image/")===0 || /\.pdf$/i.test(f.name||f.fileName||"")); }
-  function specDrawBtnsHtml(key, files, ctx){
+  // menu=true：「⋯ 操作」「⋮ 操作」の中に並べる形（外側の行の枠を付けない）
+  function specDrawBtnsHtml(key, files, ctx, menu){
     var list = (files||[]).filter(specDrawable);
     if(!list.length) return "";
-    return '<div class="row" style="gap:6px; flex-wrap:wrap; margin-block-start:6px;">'+list.map(function(f, i){
+    return (menu ? '' : '<div class="row" style="gap:6px; flex-wrap:wrap; margin-block-start:6px;">')+list.map(function(f, i){
       var k = key+":"+i;
       specDrawReg[k] = { url:f.url, isPdf: String(f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||f.fileName||""), name: f.name||f.fileName||"", scope:ctx.scope, category:ctx.category, roomId:ctx.roomId, side:ctx.side };
       return '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-draw="'+escapeHtml(k)+'" title="プランボードで書き込む（元の図面はそのまま残り、書き込んだ版が新しい変更履歴になります）">✏️ '+(list.length>1?(i+1)+'枚目に書き込む':'書き込む')+'</button>';
-    }).join("")+'</div>';
+    }).join("")+(menu ? '' : '</div>');
   }
   function openSpecDraw(k){
     var d = specDrawReg[k]; if(!d) return;
@@ -8353,17 +8358,16 @@
         '<div class="spectl-meta">'+metaHtml+'</div>'+
         '</div>'+
         fileThumbRowHtml(noteFiles, 84)+
-        specDrawBtnsHtml(p.id, noteFiles, drawCtx)+
         memoHtml+
-        specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
+        specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+specDrawBtnsHtml(p.id, noteFiles, drawCtx, true)+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
         '</div>';
     }
     return '<div class="'+cardClass+'">'+
       thumbHtml+
-      '<div class="spectl-meta">'+metaHtml+(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], drawCtx) : '')+'</div>'+
+      '<div class="spectl-meta">'+metaHtml+'</div>'+
       sentBadgesHtml+
       memoHtml+
-      specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
+      specOpsHtml(p.id, '<div class="spectl-actions">'+editBtnHtml+(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], drawCtx, true) : '')+taskBtnHtml+reqBtnHtml+reflectBtnHtml+askBtnHtml+decideBtnHtml+delBtnHtml+'</div>'+badgeRowHtml)+
       '</div>';
   }
   function renderSpecTimeline(scope, category, roomId, side){
