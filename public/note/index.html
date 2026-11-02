@@ -1835,7 +1835,14 @@ function homeHtml(){ return homeParts().main; }
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
     var all = (data.notes||[]).filter(hasBody);
     var gen = all.filter(function(n){ return n.scope==="general" || (n.scope==null ? (n.part==="総合" || !n.part) : !n.scope); });
-    var notes = gen;
+    // 下の「✅ ご確認・ご決定ください」（決定待ち）か「🔴 決定したもの」に出る記録は、ここには出さない（同じ記録を2回出さない）
+    var notes = gen.filter(function(n){
+      var f = noteDecItem(n); if(!f) return true;
+      var st = f.x.cardStatus || "検討中";
+      if(st==="決定") return false;
+      if(f.x.showDecide && st==="検討中" && !chgDone(f.c, f.x)) return false;
+      return true;
+    });
     var hd = '<div class="sechd"><h3>🗒 最新の打合せ記録</h3>';
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
