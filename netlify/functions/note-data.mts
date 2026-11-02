@@ -625,7 +625,7 @@ export default async (req: Request, context: Context) => {
   };
   const linesOf = (n: any, only?: any[]) => {
     const src = only || (Array.isArray(n.noteLines) ? n.noteLines : []);
-    const hasExtra = src.some((l: any) => l && ((l.p && l.p.scope) || (Array.isArray(l.f) && l.f.length)));
+    const hasExtra = src.some((l: any) => l && ((l.p && l.p.scope) || (Array.isArray(l.f) && l.f.length) || (l.ask && (l.m || "") !== "c")));
     if (!hasExtra && !only) return [];
     return src
       .filter((l: any) => l && String(l.t || "").trim() && (l.m || "") !== "c" && ((l.m || "") !== "" || n.talkPublic))
@@ -635,6 +635,8 @@ export default async (req: Request, context: Context) => {
         part: l.p && l.p.scope ? partLabel(project, l.p.scope, l.p.category, l.p.roomId) : "",
         files: (Array.isArray(l.f) ? l.f : []).map(fileOf),
         estId: lineEstId(n, l.t),
+        // 「この行をお客様に決定してもらう」の行：記録の中のその行に決定ボタンを出すためのカードの印（各部位の行のカードと同じ key）
+        key: l.ask ? "l:" + n.id + "_" + lineHash(String(l.t).trim()) : "",
       }));
   };
   for (const n of reflectedNotes) {

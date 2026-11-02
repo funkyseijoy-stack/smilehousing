@@ -186,6 +186,8 @@
   .nlgrp.m-d{ background:#eef3ef; } .nlgrp.m-o{ background:#f8eee4; }
   .nlgh{ font-size:.8rem; font-weight:700; color:var(--muted); margin-bottom:4px; }
   .nlgrp.m-d .nlgh{ color:var(--green-ink); } .nlgrp.m-o .nlgh{ color:#a8682c; }
+  .nldec{ margin:6px 0 4px; }
+  .nldec .cdec{ margin-top:4px; }
   .nlul{ margin:0; padding-left:1.1em; } .nlul li{ margin:0 0 6px; line-height:1.6; }
   .nlul .nlt{ white-space:pre-wrap; } .nlul .nlp{ display:inline-block; font-size:.72rem; color:var(--muted); background:rgba(0,0,0,.05); border-radius:999px; padding:0 8px; white-space:nowrap; }
   .nlul .thumbs{ margin-top:6px; grid-template-columns:repeat(3,1fr); }
@@ -1682,15 +1684,11 @@ function homeHtml(){ return homeParts().main; }
       var c = e.c, x = e.x, room = "", roomName = "";
       (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
       var part = roomName || partOf(c, x) || x.label || c.name;
-      // 添付：カードのファイル＋行ごとに付けたファイル。決定してもらう行のカードにファイルが無ければ、その記録の添付を出す
+      // 添付：カードのファイル＋行ごとに付けたファイル（決定してもらう行のカードは、その行に付けたファイルだけ）
       var files = [], seenF = {};
       var addF = function(f){ if(f && f.url && !seenF[f.url]){ seenF[f.url] = 1; files.push(f); } };
       (x.files||[]).forEach(addF); if(x.file) addF(x.file);
       (x.lines||[]).forEach(function(l){ (l.files||[]).forEach(addF); });
-      if(!files.length && x.lineCard && x.id){
-        var pn = (data.notes||[]).find(function(n){ return n.id===x.id; });
-        if(pn){ (pn.files||[]).forEach(addF); (pn.lines||[]).forEach(function(l){ (l.files||[]).forEach(addF); }); }
-      }
       // 題名だけだと何を決めるのか分からないので、題名＋中身（決まったこと・打合せの内容・ご検討いただきたいこと）を出す
       var ttl = String(x.title || "").trim();
       var body = [x.decided, x.talk, x.open, x.snippet, x.note, x.msg].map(function(v){ return String(v||"").trim(); }).filter(function(v, i, arr){ return v && v!==ttl && arr.indexOf(v)===i; }).join("\n");
@@ -1716,7 +1714,8 @@ function homeHtml(){ return homeParts().main; }
       if(!cards.length) return "";
       return '<div class="sechd"><h3>🔴 決定したもの</h3><span class="countpill">'+(stamped.length+stHidden)+'件</span></div><div class="pcards">'+cards.join("")+'</div>';
     }
-    asks.forEach(addCard);
+    // 打合せ記録の行を切り出したカード（決定してもらう行）は出さない：ホームの記録の中のその行で決定する（各部位の画面には独立したカードで出る）
+    asks.filter(function(e){ return !e.x.lineCard; }).forEach(addCard);
     // 記録のカードの中に出した追加見積りは、ここには重ねて出さない（ホームに出ている記録・決定待ち・決定済みのカード）
     var onCard = {};
     var markN = function(n){
@@ -1813,8 +1812,10 @@ function homeHtml(){ return homeParts().main; }
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
   }
   // 打合せ記録が入っている項目と、その項目の中のカード（決定ボタンの状態）を探す
-  function noteDecItem(n){
-    var key = "n:"+n.id, hit = null;
+  function noteDecItem(n){ return decItemByKey("n:"+n.id); }
+  // カードの key（n:／l:／s:…）から、そのカードが入っている項目とカードを探す
+  function decItemByKey(key){
+    var hit = null;
     (data.categories||[]).some(function(c){
       var inRoom = (c.rooms||[]).some(function(r){ return (r.items||[]).some(function(x){ if(x.key===key && !x.partial){ hit = {c:c, x:x, room:r.id||x.roomId||""}; return true; } return false; }); });
       if(inRoom) return true;
@@ -1980,9 +1981,18 @@ function homeHtml(){ return homeParts().main; }
         return '<li><span class="nlt">'+esc(l.t)+'</span>'+(part?' <span class="nlp">'+esc(part)+'</span>':'')+
           ((l.files||[]).length?'<div class="thumbs">'+l.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'')+
           (l.m==="o" && consCtx ? consBtnsHtml(l.t, consCtx) : '')+
-          (l.estId ? noteEstHtml(l) : '')+'</li>';
+          lineDecInline(l)+'</li>';
       }).join("")+'</ul></div>';
     }).join("")+'</div>';
+  }
+  // 「この行をお客様に決定してもらう」の行：記録の中のその行のすぐ下に「変更したい／これで決定」（各部位の行のカードと同じ決定）
+  function lineDecInline(l){
+    var f = l.key ? decItemByKey(l.key) : null;
+    if(f && f.x.showDecide){
+      var ce = (f.x.cardStatus||"検討中")!=="決定" ? comboEstOf(f.x) : null;
+      return '<div class="nldec">'+homeDecHtml({title:l.t}, f)+'</div>'+(ce || !l.estId ? '' : noteEstHtml(l));
+    }
+    return l.estId ? noteEstHtml(l) : '';
   }
   // 記録から作った追加見積り（n.estId）を、その記録のカードの中に金額と「承認する／見送る」で出す
   function noteEstOf(n){
