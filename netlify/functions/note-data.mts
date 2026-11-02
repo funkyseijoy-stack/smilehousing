@@ -653,6 +653,8 @@ export default async (req: Request, context: Context) => {
       talk: n.talkPublic ? (n.talk || "") : "", // スタッフが「お客様にも見せる」にした記録だけ
       channel: n.channel || "",
       lines: linesOf(n),
+      // 記録の「＋ 追加見積り」で作った追加見積り（お客様画面でこのカードに金額と承認／見送りを出す）
+      estId: (n.sent && n.sent.estimate && n.sent.estimate.ref) || "",
     });
     // 行ごとに部位を付けた記録：その部位の項目にも、その行だけを「打合せ記録の一部」として出す
     // （記録そのものの項目と同じ項目の行は重ねて出さない。決定ボタンは付けない）
@@ -893,6 +895,7 @@ export default async (req: Request, context: Context) => {
         scope: (n.specPart && n.specPart.scope) || "",
         files: (n.files || []).map(fileOf),
         lines: linesOf(n),
+        estId: (n.sent && n.sent.estimate && n.sent.estimate.ref) || "",
       }))
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt)),
     album: album
