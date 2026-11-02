@@ -849,6 +849,14 @@
   /* 変更履歴のカード：ボタン類は「⋯」の中（ふだんは閉じる） */
   .spectl-card{ position:relative; padding-inline-end:96px !important; }
   .spectl-ops{ position:absolute; top:6px; inset-inline-end:8px; }
+  .opspop-ov{ position:fixed; inset:0; z-index:200; background:rgba(20,16,12,.35); display:flex; align-items:center; justify-content:center; padding:12px; }
+  .opspop-ov .opspop{ display:block; position:static; width:min(440px, 100%); max-height:80vh; }
+  .opspop-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:4px 6px 8px; border-block-end:1px solid var(--border); margin-block-end:4px; }
+  .opspop-head .notemenu-close{ width:auto !important; border:none !important; margin:0 !important; flex-shrink:0; }
+  @media (max-width:760px){
+    .opspop-ov{ align-items:stretch; padding:calc(env(safe-area-inset-top) + 64px) 12px calc(env(safe-area-inset-bottom) + 84px); }
+    .opspop-ov .opspop{ max-height:none; width:100%; }
+  }
   .spectl-ops > summary.btn{ list-style:none; }
   .spectl-ops[open] .opsmenu{ display:block; top:36px; }
   .opsmenu button:not(.notemenu-close){ display:block; width:100%; text-align:start; background:none !important; border:none !important; font:inherit !important; font-size:1rem !important; padding:8px 8px !important; border-radius:7px; cursor:pointer; color:var(--ink) !important; font-weight:400 !important; }
@@ -8215,6 +8223,25 @@
     return '<div class="relpart"><div class="relhd">📎 見積の書類・依頼'+(links.length?' <span class="rellinks">'+links.join("")+'</span>':'')+'</div>'+(chips?'<div class="relchips">'+chips+'</div>':'')+'</div>';
   }
   var specOpsOpen = {};
+  // 見出し付きの操作メニュー（カードの「⋮ 操作」と同じ見た目）を画面の上に出す。押した項目の value を cb に渡す（閉じたら null）
+  function opsPopup(title, sub, sections, cb){
+    var ov = document.createElement("div");
+    ov.className = "opspop-ov";
+    var body = sections.filter(function(s){ return s && s[1] && s[1].length; }).map(function(s, i){
+      return (i?'<div class="notemenu-divider"></div>':'')+'<div class="notemenu-h">'+escapeHtml(s[0])+'</div>'+
+        s[1].map(function(it){ return '<button type="button" class="'+(it.on?"on":"")+(it.danger?" danger":"")+'" data-opsv="'+escapeHtml(it.value)+'">'+escapeHtml(it.label)+'</button>'; }).join("");
+    }).join("");
+    ov.innerHTML = '<div class="notemenu opsmenu opspop" role="dialog" aria-label="'+escapeHtml(title)+'">'+
+      '<div class="opspop-head"><div><b>'+escapeHtml(title)+'</b>'+(sub?'<div class="muted" style="font-size:.85rem;">'+escapeHtml(sub)+'</div>':'')+'</div>'+
+      '<button type="button" class="notemenu-close" data-opsclose>✕ 閉じる</button></div>'+body+'</div>';
+    document.body.appendChild(ov);
+    var done = false;
+    var finish = function(v){ if(done) return; done = true; ov.remove(); cb(v); };
+    ov.addEventListener("click", function(e){
+      if(e.target===ov || e.target.closest("[data-opsclose]")){ finish(null); return; }
+      var b = e.target.closest("[data-opsv]"); if(b) finish(b.dataset.opsv);
+    });
+  }
   // 写真・PDF・見積の書類のカードの「⋮ 操作」：打合せ記録のカードと同じ見た目（右上のボタン→見出し付きのメニュー）。
   // sections：[["見出し", "ボタンのHTML"], …]（空の欄は出さない）。del：削除ボタンのHTML（いちばん下）
   function specOpsHtml(id, sections, del){
@@ -15430,12 +15457,20 @@
       var ab = e.target.closest("[data-mnlact]");
       if(ab){
         var lt = mnLines()[+ab.dataset.mnlact]; if(!lt) return;
-        askChoice("この行で", "「"+lt.slice(0,40)+"」", [
-          {label:"📎 この行にファイルを付ける", value:"file"},
-          {label:"📐 登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
-          {label: mnLineAsk[lt] ? "🔘 お客様に決定してもらう（取り消す）" : "🔘 この行をお客様に決定してもらう", value:"ask"},
-          {label:"📍 この行の部位", value:"part"},
-          {label:"→ 社内タスク", value:"task"}, {label:"→ 追加見積（おうちノート）", value:"est"}, {label:"→ 見積依頼（Gmail下書き・添付付き）", value:"estreq"}
+        var lacts = mnLineActs[lt] || [], lfn = (mnLineFiles[lt]||[]).length;
+        var hasAct = function(tp){ return lacts.some(function(a){ return a.type===tp; }); };
+        opsPopup("この行の操作", "「"+lt.slice(0,40)+"」", [
+          ["📎 ファイル", [
+            {label:"この行にファイルを付ける"+(lfn?"（いま "+lfn+" 件）":""), value:"file"},
+            {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"}]],
+          ["🏠 お客様へ", [
+            {label: mnLineAsk[lt] ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!mnLineAsk[lt]}]],
+          ["🗂 整理", [
+            {label:(mnLineParts[lt] ? "✓部位："+partText(mnLineParts[lt])+"（変える・外す）" : "この行の部位を付ける"), value:"part", on: !!mnLineParts[lt]}]],
+          ["📋 タスク・依頼", [
+            {label:(hasAct("task")?"✓ ":"")+"社内タスクにする", value:"task", on: hasAct("task")},
+            {label:(hasAct("est")?"✓ ":"")+"追加見積（おうちノート）に入れる", value:"est", on: hasAct("est")},
+            {label:(hasAct("estreq")?"✓ ":"")+"見積依頼（Gmail下書き・添付付き）", value:"estreq", on: hasAct("estreq")}]]
         ], function(kind){
           if(!kind) return;
           if(kind==="pick"){ mnLinePickRegistered(lt); return; }
