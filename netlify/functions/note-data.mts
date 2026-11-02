@@ -150,6 +150,41 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   return null;
 }
 
+// 「変更を依頼」のカード（n:記録／l:記録の行／s:仕様写真・PDF／t:タスク）のファイルと部位。この案件のものだけ
+async function changeCardInfo(store: ReturnType<typeof getStore>, projectId: string, key: string): Promise<{ files: any[]; part: any }> {
+  const kind = key.slice(0, 1), rest = key.slice(2);
+  const pick = (f: any) => f && f.url ? { id: f.id || "", url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "ファイル" } : null;
+  const get = async (k: string) => { try { return await store.get(k, { type: "json" }) as any; } catch { return null; } };
+  if (kind === "n" || kind === "l") {
+    const noteId = kind === "l" ? rest.replace(/_[^_]*$/, "") : rest;
+    const n = await get(`meetingNotes/${noteId}`);
+    if (!n || n.projectId !== projectId) return { files: [], part: null };
+    let files = (n.files || []).map(pick).filter(Boolean);
+    let part = n.specPart && n.specPart.scope ? n.specPart : null;
+    if (kind === "l") {
+      const h = rest.slice(noteId.length + 1);
+      const l = (n.noteLines || []).find((x: any) => x && lineHash(String(x.t || "").trim()) === h);
+      if (l) {
+        if (Array.isArray(l.f) && l.f.length) files = l.f.map(pick).filter(Boolean);
+        if (l.p && l.p.scope) part = l.p;
+      }
+    }
+    return { files, part };
+  }
+  if (kind === "s") {
+    const p = await get(`specPhotos/${rest}`);
+    if (!p || p.projectId !== projectId) return { files: [], part: null };
+    const f = pick({ id: p.assetId || p.id, url: p.url, contentType: p.contentType, name: p.fileName });
+    return { files: f ? [f] : [], part: p.scope ? { scope: p.scope, category: p.category || null, roomId: p.roomId || null, side: p.side || null } : null };
+  }
+  if (kind === "t") {
+    const t = await get(`tasks/${rest}`);
+    if (!t || t.projectId !== projectId) return { files: [], part: null };
+    return { files: (t.attachments || []).map(pick).filter(Boolean), part: t.vendorSpec || null };
+  }
+  return { files: [], part: null };
+}
+
 async function listCollection(store: ReturnType<typeof getStore>, collection: string, projectId?: string) {
   const { blobs } = await store.list({ prefix: collection + "/" });
   const items = await Promise.all(blobs.map((b) => store.get(b.key, { type: "json" })));
@@ -313,11 +348,33 @@ export default async (req: Request, context: Context) => {
       if (!text) return json({ error: "empty" }, 400);
       const id = genId("msg");
       const now = new Date().toISOString();
-      const doc = {
+      // 「変更を依頼」：どのカードへの依頼かを覚える（ホームの「ご確認・ご決定ください」から外すため）
+      const chgKey = /^[ntsl]:[A-Za-z0-9_\-.]{1,120}$/.test(String(body.chgKey || "")) && text.startsWith("【変更のご依頼】") ? String(body.chgKey) : "";
+      const doc: any = {
         id, projectId, content: text, sender: (project.customer || "お客様") + "（おうちノート）",
         fromCustomer: true, createdAt: now, updatedAt: now,
       };
+      if (chgKey) doc.chgKey = chgKey;
       await store.setJSON(`messages/${id}`, doc);
+      // 変更のご依頼は、社内タスク（担当者なし・未着手）にも入れる。カードの図面・写真も付ける（同じファイルを参照）
+      if (chgKey) {
+        try {
+          const card = await changeCardInfo(store, projectId, chgKey);
+          const taskId = genId("task");
+          const body2 = text.replace(/^【変更のご依頼】/, "");
+          await store.setJSON(`tasks/${taskId}`, {
+            id: taskId, projectId, content: "【お客様から変更のご依頼】" + body2,
+            assignee: "", instructor: "お客様", creator: "おうちノート",
+            hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+            attachmentAssetIds: [], attachments: card.files,
+            vendorSpec: card.part, private: false, reflected: false, reflectedAt: null,
+            status: "未着手", fromCustomerChange: { messageId: id, cardKey: chgKey },
+            createdAt: now, updatedAt: now,
+          });
+          doc.taskId = taskId;
+          await store.setJSON(`messages/${id}`, doc);
+        } catch (e) { console.error("change task failed", e); }
+      }
       // スタッフへ通知メール（失敗してもメッセージ送信自体は成功扱い）
       await sendNotifyMail(
         `【おうちノート】${project.customer || "お客様"}様からメッセージが届きました`,
@@ -817,7 +874,7 @@ export default async (req: Request, context: Context) => {
       .map(imageOf)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     messages: messages
-      .map((m) => ({ content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "" }))
+      .map((m) => ({ content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || "" }))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     reservations: resv,
     nextReservation: resv.find((r) => r.date >= today) || null,

@@ -1601,8 +1601,19 @@ function homeHtml(){ return homeParts().main; }
     if(!x.key) return false;
     if(chgSent[x.key]) return true;
     try{ var cs = JSON.parse(localStorage.getItem("okaiChg:"+P)||"{}"); if(cs[x.key]) return true; }catch(e){}
+    // どの端末から送っても外れるよう、サーバーに残したカードの印（chgKey）で見る。以前の分は文の頭（カード名）で見る
     var lab = "【変更のご依頼】"+chgLabelOf(c, x), at = Date.parse(x.at||x.date||"")||0;
-    return (data.messages||[]).some(function(m){ return m.fromCustomer && String(m.content||"").indexOf(lab)===0 && (Date.parse(m.createdAt||"")||0) >= at; });
+    return (data.messages||[]).some(function(m){
+      if(!m.fromCustomer || (Date.parse(m.createdAt||"")||0) < at) return false;
+      if(m.chgKey) return m.chgKey===x.key;
+      var first = String(m.content||"").split("\n")[0];
+      if(first.indexOf(lab)===0) return true;
+      // 以前の分：部屋の画面などから送ると頭の項目名が違うので、「種類（月/日）」と部位・部屋の名前で見る
+      if(first.indexOf("【変更のご依頼】")!==0 || first.slice(-chgLabelOf(null, x).length)!==chgLabelOf(null, x)) return false;
+      var names = [c && c.name, x.label];
+      ((c && c.rooms)||[]).forEach(function(r){ if((r.items||[]).indexOf(x)>=0) names.push(r.name); });
+      return names.some(function(n){ return n && first.indexOf(n)>=0; });
+    });
   }
   // ホームの「ご確認・ご決定ください」：決定ボタンを出していて返事のないカードと、金額が入った追加見積り（オプション）。
   // 決定・変更のご依頼・承認・見送りをすると、ホームから外れる（各部位の項目にはそのまま残る）
@@ -2279,10 +2290,10 @@ function homeHtml(){ return homeParts().main; }
     var btn = this; btn.disabled = true;
     var full = chgCur.prefix+chgCur.label+"\n"+text;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: (chgCur.prefix==="【変更のご依頼】" && chgCur.key && /^[ntsl]:/.test(chgCur.key)) ? chgCur.key : "" }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
-      data.messages.push({ content:full, sender:"", fromCustomer:true, createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
+      data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:(j.message && j.message.chgKey)||"", createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
       chgSent[chgCur.key] = true;
       try{ var cs = JSON.parse(localStorage.getItem("okaiChg:"+P)||"{}"); cs[chgCur.key] = new Date().toISOString(); localStorage.setItem("okaiChg:"+P, JSON.stringify(cs)); }catch(er){}
       closeSheet("chgModal"); render(); toast("スタッフに送りました");
