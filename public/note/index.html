@@ -315,6 +315,10 @@
   .fhd .fd{ font-weight:700; font-size:.9rem; color:var(--ink); }
   .tag.pdf{ background:#fbeede; color:#b4691f; }
   .cdec{ margin-top:12px; padding-top:10px; border-top:1px dashed rgba(0,0,0,.15); position:relative; }
+  .combo{ margin-top:10px; border-top:1px dashed var(--line, #e2d6c6); padding-top:10px; }
+  .combo-amt{ font-size:.9rem; margin-bottom:8px; } .combo-amt b{ font-size:1.25rem; margin:0 4px 0 10px; } .combo-amt small{ color:var(--muted); }
+  .combo-ttl{ font-size:.85rem; color:#a8682c; font-weight:700; margin-bottom:2px; }
+  .combo-go{ width:100%; margin-bottom:8px; white-space:nowrap; }
   .qstamp{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; width:46px; height:46px; margin-left:auto; border:2.5px solid #2a63b8; border-radius:50%; color:#2a63b8; font-weight:900; font-size:.72rem; line-height:1.1; transform:rotate(-10deg); font-family:"Hiragino Mincho ProN","Yu Mincho",serif; background:rgba(255,255,255,.6); flex:0 0 auto; }
   .stamp{ position:absolute; right:6px; top:-62px; width:86px; height:86px; border:3.5px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.35rem; letter-spacing:.08em; line-height:1.05; background:rgba(255,255,255,.55); box-shadow:inset 0 0 0 2px rgba(210,60,50,.25); pointer-events:none; opacity:.92; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
   .stamp.pop{ animation:stampPop .55s cubic-bezier(.2,1.6,.4,1) both; }
@@ -1683,10 +1687,10 @@ function homeHtml(){ return homeParts().main; }
         (body ? '<div class="pct">'+esc(body).replace(/\n/g,"<br>")+'</div>' : '')+
         (!ttl && !body && !files.length ? '<div class="pct" style="color:var(--muted);">（内容は「'+esc(c.name)+'の記録を見る」でご確認ください）</div>' : '')+
         (files.length ? '<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>' : '')+
-        (x.type==="note" && !x.partial ? noteEstHtml(x) : '')+
+        (comboEstOf(x) ? '' : (x.type==="note" && !x.partial ? noteEstHtml(x) : ''))+
         (e.stamped
           ? stampDoneHtml(x.key, x.cardDecidedAt, ra, x.cardByStaff)
-          : '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>')+
+          : comboEstOf(x) ? comboDecHtml(comboEstOf(x), ra, chgLabelOf(c, x), x.key) : '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>')+
         '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
       if(!e.stamped) pendN++;
     };
@@ -1759,7 +1763,7 @@ function homeHtml(){ return homeParts().main; }
           var f = noteDecItem(e.n);
           if(f && f.x.showDecide && f.x.key) homeRefKeys[f.x.key] = 1;
           var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
-          return '<div class="tli flat">'+noteBody(e.n, true, true)+homeDecHtml(e.n, f)+link+'</div>';
+          return '<div class="tli flat">'+noteBody(e.n, true, true, !!(f && comboEstOf(f.x)))+homeDecHtml(e.n, f)+link+'</div>';
         }
         var x = e.x, c = e.c;
         if(x.showDecide && x.key) homeRefKeys[x.key] = 1;
@@ -1820,6 +1824,7 @@ function homeHtml(){ return homeParts().main; }
     var status = f.x.cardStatus || "検討中", key = f.x.key;
     var ra = ' data-ckey="'+esc(key)+'" data-croom="'+esc(f.room)+'" data-clabel="'+esc(String(n.title||n.decided||n.open||"").slice(0,40))+'" data-ccat="'+esc(f.room ? "rooms" : f.c.id)+'"';
     if(status==="決定") return stampDoneHtml(key, f.x.cardDecidedAt, ra, f.x.cardByStaff);
+    var ce = comboEstOf(f.x); if(ce) return comboDecHtml(ce, ra, chgLabelOf(f.c, f.x), key);
     var nowTxt = status==="仮決定" ? '<span class="status s-仮決定" style="margin-left:0;">仮決定</span>' : '';
     return '<div class="cdec">'+((nowTxt||chgSent[key]) ? '<div class="cnow">'+(nowTxt ? 'このカードの状態：'+nowTxt : '')+(chgSent[key]?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>' : '')+
       '<div class="btns"><button class="btn ol" data-chg="'+esc(chgLabelOf(f.c, f.x))+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
@@ -1979,13 +1984,27 @@ function homeHtml(){ return homeParts().main; }
     return '<div class="estcard"><div class="eh">追加のお見積り</div><div class="et">'+esc(x.title||"")+'</div>'+
       (pendingAmt ? '' : '<div class="ea">'+esc(estAmountText(x))+' <small>（税抜き）</small></div>')+st+act+'</div>';
   }
-  function noteBody(n, showPart, noOpen){
+  // 決定ボタンを出しているカードに、まだ返事のない（金額入り・減額でない）追加見積りが付いているとき、その見積り
+  function comboEstOf(x){
+    if(!x || x.type!=="note" || x.partial || !x.showDecide || (x.cardStatus||"検討中")==="決定") return null;
+    var e = noteEstOf(x); if(!e) return null;
+    var pendingAmt = e.estimateState ? e.estimateState==="金額確認中" : !String(e.amount||"").trim();
+    if(pendingAmt || estIsMinus(e) || (e.customerResponse||"未回答")!=="未回答") return null;
+    return e;
+  }
+  // 追加見積り付きのカードのボタン（1組）：この内容と金額で決定する／変更を依頼／見送る
+  function comboDecHtml(e, ra, chgLabel, key){
+    return '<div class="combo">'+(e.title ? '<div class="combo-ttl">追加のお見積り：'+esc(e.title)+'</div>' : '')+'<div class="combo-amt">追加金額<b>'+esc(estAmountText(e))+'</b><small>（税抜き）</small></div>'+
+      '<button class="btn ol pdec combo-go" data-combodecide="'+esc(e.id)+'"'+ra+'>✅ この内容と金額で決定する</button>'+
+      '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabel)+'" data-chgkey="'+esc(key)+'">✏️ 変更を依頼</button><button class="btn ol" data-estresp="見送り" data-estid="'+esc(e.id)+'">見送る（追加しない）</button></div></div>';
+  }
+  function noteBody(n, showPart, noOpen, noEst){
     if(hasLines(n)){
       return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+qStampHtml(n)+'</div>'+
         (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
         linesHtml(n, noOpen, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:'')))+
         (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
-        noteEstHtml(n)+
+        (noEst ? '' : noteEstHtml(n))+
         ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
     }
     return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+qStampHtml(n)+'</div>'+
@@ -1994,7 +2013,7 @@ function homeHtml(){ return homeParts().main; }
       (n.decided?'<div class="box dec"><div class="bl">打合せで仮決定したこと</div>'+esc(n.decided)+'</div>':'')+
       (n.open && !noOpen?'<div class="box opn"><div class="bl">ご検討いただきたいこと</div>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:''))):'')+
       (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
-      noteEstHtml(n)+
+      (noEst ? '' : noteEstHtml(n))+
       ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
   }
   // 統合した項目（トイレ・暖房換気・電気あかり）と、各部屋を含むインテリアは、
@@ -2138,8 +2157,14 @@ function homeHtml(){ return homeParts().main; }
           if(!hasLines(n) && n.open) html += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(n.open)+'</div>'+consBtnsHtml(n.open, c.name+'・'+(n.title||fmtD(n.date)));
           if(n.message) html += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(n.message)+'</div>';
           if(n.files&&n.files.length) html += '<div class="section-thumbs">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
-          html += noteEstHtml(n);
-          html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
+          var ce2 = comboEstOf(n);
+          if(ce2){
+            var ra2 = ' data-ckey="'+esc(n.key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(n.title || n.decided || n.open || "").slice(0,40))+'" data-ccat="'+esc(roomIdOfTab ? "rooms" : c.id)+'"';
+            html += comboDecHtml(ce2, ra2, chgLabelOf(c, n), n.key)+'</div>';
+          } else {
+            html += noteEstHtml(n);
+            html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
+          }
           return html;
         }).join("")+'</div>';
     }
@@ -2278,19 +2303,28 @@ function homeHtml(){ return homeParts().main; }
     if(ad){ var k = ad.dataset.famadd; if(fam[k].length>=20){ toast("これ以上は追加できません"); return; } fam[k].push(Object.assign({}, FAM_DEFS[k].blank)); famRender();
       var ins = document.querySelectorAll('#famBody [data-fam="'+k+'"]'); if(ins.length){ var last = document.querySelectorAll('#famBody .famsec')[Object.keys(FAM_DEFS).indexOf(k)].querySelectorAll('.famrow'); last = last[last.length-1]; if(last) last.querySelector("input").focus(); } }
   });
-  async function respondEstimate(id, response){
+  async function respondEstimate(id, response, quiet){
     var x = (data.estimates||[]).find(function(e){ return e.id===id; });
-    if(!x) return;
+    if(!x) return false;
     var msg = response==="承認" ? "追加見積り「"+x.title+"」を承認します。よろしいですか？" :
       (response==="見送り" ? "追加見積り「"+x.title+"」を見送ります。よろしいですか？" : "「"+x.title+"」の回答を取り消して、もう一度選べるようにします。よろしいですか？");
-    if(!window.confirm(msg)) return;
+    if(!quiet && !window.confirm(msg)) return false;
     try{
       var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"estimateRespond", id:id, response:response }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
       x.customerResponse = j.customerResponse; x.estimateState = j.estimateState;
+      if(quiet) return true;
       render(); toast(response==="未回答" ? "回答を取り消しました" : (response==="承認" ? "承認として住まいるハウジングにお伝えしました" : "見送りとして住まいるハウジングにお伝えしました"));
-    }catch(e){ toast("送信できませんでした。もう一度お試しください"); }
+    }catch(e){ toast("送信できませんでした。もう一度お試しください"); return false; }
+  }
+  // 追加見積り付きのカードの「この内容と金額で決定する」：追加見積りを承認して、カードに決定のはんこを押す
+  async function comboDecide(b){
+    var e = (data.estimates||[]).find(function(x){ return x.id===b.dataset.combodecide; }); if(!e) return;
+    if(!window.confirm("この内容と追加金額（"+estAmountText(e)+"・税抜き）で決定します。\n追加見積りを承認し、「決定」のはんこを押します。よろしいですか？")) return;
+    var ok = await respondEstimate(e.id, "承認", true);
+    if(!ok){ toast("送信できませんでした。もう一度お試しください"); return; }
+    await decideCard("決定", b.dataset.ckey, b.dataset.croom||"", b.dataset.clabel||"", b.dataset.ccat, true);
   }
   // 「インテリア」項目全体の状態（メイン＋各部屋。サーバーの mergeInteriorStatus と同じ）
   function interiorStatus(c){
@@ -2325,12 +2359,12 @@ function homeHtml(){ return homeParts().main; }
   }
 
   // カード1枚ごとの仮決定／決定
-  async function decideCard(status, key, roomId, label, catId){
+  async function decideCard(status, key, roomId, label, catId, quiet){
     var c = data.categories.find(function(x){ return x.id===(catId==="rooms" ? "interior" : catId); }); // 各部屋の決定は保存上 rooms、画面では「インテリア」の中
     if(!c) return;
     var msg = status==="決定" ? "この内容で「決定」のはんこを押します。よろしいですか？" :
       (status==="仮決定" ? "この内容を「仮決定」にします。よろしいですか？" : "この内容を「検討中」に戻します。よろしいですか？");
-    if(!window.confirm(msg)) return;
+    if(!quiet && !window.confirm(msg)) return;
     try{
       var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"decideCard", category:catId, cardKey:key, status:status, label:label, roomId:roomId||undefined }) });
       var j = await res.json();
@@ -2411,6 +2445,7 @@ function homeHtml(){ return homeParts().main; }
     if(e.target.closest("[data-hpopen]")){ hpOpen(); return; }
     var er = e.target.closest("[data-estresp]"); if(er){ respondEstimate(er.dataset.estid, er.dataset.estresp); return; }
     var dc = e.target.closest("[data-decide]"); if(dc){ decide(dc.dataset.decide, dc.dataset.room||""); return; }
+    var cmb = e.target.closest("[data-combodecide]"); if(cmb){ comboDecide(cmb); return; }
     var cd = e.target.closest("[data-cdecide]"); if(cd){ decideCard(cd.dataset.cdecide, cd.dataset.ckey, cd.dataset.croom||"", cd.dataset.clabel||"", cd.dataset.ccat); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
     var rt = e.target.closest("[data-rvtype]"); if(rt){ rv.type = rt.dataset.rvtype; rv.start = ""; if(rv.avail && rv.avail.durationMinutes !== rvNeedDur()){ rv.loaded = false; } render(); return; }
