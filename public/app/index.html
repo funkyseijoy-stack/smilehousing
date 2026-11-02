@@ -1548,7 +1548,7 @@
           <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
           <div class="addform" style="margin-block-start:12px; border-top:1px solid var(--border); padding-block-start:12px;">
             <label class="field">件名<input type="text" id="okaiEstTitle" placeholder="例：勝手口ドア変更"></label>
-            <label class="field">金額（税抜き）<input type="text" id="okaiEstAmount" placeholder="例：¥48,000"></label>
+            <label class="field">金額（税抜き）<input type="text" id="okaiEstAmount" placeholder="例：¥48,000（減額は -30,000）"></label>
             <label class="field">内容<textarea id="okaiEstNote" rows="2"></textarea></label>
             <button class="btn secondary" id="btnOkaiAddEstimate">追加見積りを送る</button>
           </div>
@@ -8889,8 +8889,12 @@
     }).join("");
   }
   function okaiEstimateAmountNumber(amount){
-    var n = Number(String(amount||"").replace(/[^0-9.]/g, ""));
-    return isFinite(n) ? n : 0;
+    // 減額（お客様がやめる分）は先頭に「-」「−」「▲」「△」を付けて入れる
+    var t = String(amount||"").replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-65248); }).trim();
+    var neg = /^[¥￥\s]*[-−－ー‐▲△]/.test(t);
+    var n = Number(t.replace(/[^0-9.]/g, ""));
+    if(/万/.test(t) && !/,/.test(t)) n = n * 10000;
+    return isFinite(n) ? (neg ? -n : n) : 0;
   }
   function okaiEstimateResponsePill(response){
     var r = response || "未回答";
@@ -8963,7 +8967,7 @@
         '<select data-okai-est-state="'+escapeOkai(it.id)+'" style="flex:1; min-width:140px;">'+OKAI_EST_STATES.map(function(st){ return '<option value="'+st+'"'+(st===estState?' selected':'')+'>'+st+'</option>'; }).join("")+'</select>'+
         '</div>'+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">'+
-        '<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" value="'+escapeOkai(it.amount||"")+'" placeholder="金額・税抜き（例：¥48,000）" style="flex:1; min-width:0;">'+
+        '<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" value="'+escapeOkai(it.amount||"")+'" placeholder="金額・税抜き（例：¥48,000／減額は -30,000）" style="flex:1; min-width:0;">'+
         '<button class="btn secondary small" data-okai-save-amount="'+escapeOkai(it.id)+'">'+(hasAmount?'金額を変更':'金額を入力')+'</button>'+
         '</div>'+
         '</div>';

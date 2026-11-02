@@ -387,6 +387,8 @@ export default async (req: Request, context: Context) => {
       if (!item) return json({ error: "not_found" }, 404);
       const pending = item.estimateState ? item.estimateState === "金額確認中" : !String(item.amount || "").trim();
       if (pending) return json({ error: "amount_pending" }, 400);
+      // 減額（金額の先頭が「-」「−」「▲」「△」）はお知らせだけで、承認／見送りは受け付けない
+      if (/^[\s¥￥]*[-−－ー‐▲△]/.test(String(item.amount || "")) && response !== "未回答") return json({ error: "minus_item" }, 400);
       const now = new Date().toISOString();
       item.customerResponse = response;
       item.customerRespondedAt = response === "未回答" ? "" : now;

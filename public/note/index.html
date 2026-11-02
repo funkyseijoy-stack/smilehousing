@@ -888,10 +888,20 @@
     return { total:cats.length, done:done, pct: cats.length ? Math.round(done*100/cats.length) : 0 };
   }
   // 追加見積りの合計（金額確認中・見送りは除く。「承認済み」は承認した分だけ）
+// 減額（お客様がやめる分）は金額の先頭に「-」「−」「▲」「△」を付けて入れる
 function estAmountNum(v){
   var t=String(v||"").replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);}).replace(/[,，\s円¥￥]/g,"");
+  var neg=/^[-−－ー‐▲△]/.test(t); if(neg) t=t.replace(/^[-−－ー‐▲△]+/,"").replace(/^[¥￥]/,"");
   var m=t.match(/^(\d+(?:\.\d+)?)(万)?/); if(!m) return null;
-  return Math.round(parseFloat(m[1])*(m[2]?10000:1));
+  var n=Math.round(parseFloat(m[1])*(m[2]?10000:1));
+  return neg ? -n : n;
+}
+function estIsMinus(x){ var n=estAmountNum(x && x.amount); return n!=null && n<0; }
+// 表示用：減額は「−30,000円」（ふつうの字）。それ以外は入力どおり
+function estAmountText(x){
+  var n=estAmountNum(x && x.amount);
+  if(n!=null && n<0) return "−"+Math.abs(n).toLocaleString("ja-JP")+"円";
+  return String((x && x.amount)||"");
 }
 function estTotalHtml(list){
   var all=0, ok=0, n=0, bad=0;
@@ -901,14 +911,14 @@ function estTotalHtml(list){
     if(pend || r==="見送り" || x.estimateState==="見送り") return;
     var a=estAmountNum(x.amount);
     if(a==null){ bad++; return; }
-    n++; all+=a; if(r==="承認") ok+=a;
+    n++; all+=a; if(r==="承認" || a<0) ok+=a;
   });
   if(!n) return "";
   var yen=function(v){ return v.toLocaleString("ja-JP")+"円"; };
   return '<div class="rv" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:8px;">'+
     '<div style="display:flex; justify-content:space-between;"><span class="ty">追加見積りの合計（税抜き）</span><span class="ty">'+yen(all)+'</span></div>'+
     '<div style="display:flex; justify-content:space-between;"><span class="tm">うち承認済み</span><span class="tm">'+yen(ok)+'</span></div>'+
-    '<div class="tm">※金額はすべて税抜き表示です。金額確認中・見送りの項目は含みません'+(bad?'（金額を数字で読み取れない'+bad+'件も含みません）':'')+'</div></div>';
+    '<div class="tm">※金額はすべて税抜き表示です。減額（−）の項目は差し引いています。金額確認中・見送りの項目は含みません'+(bad?'（金額を数字で読み取れない'+bad+'件も含みません）':'')+'</div></div>';
 }
 
 // ---------- ホームに出す写真（お客様が選ぶ） ----------
@@ -1174,14 +1184,15 @@ function homeHtml(){ return homeParts().main; }
         // 金額が決まるまでは「金額確認中」と表示する（スタッフが金額を入力すると自動で切り替わる）
         var label = pendingAmt ? "金額確認中" : (r==="承認" ? "承認済み" : (r==="未回答" ? "ご確認ください" : r));
         // 金額が決まったら、お客様がここで「承認」「見送り」を選べる
-        var act = "";
-        if(!pendingAmt && x.id){
+        var act = "", minus = !pendingAmt && estIsMinus(x);
+        if(minus) label = "減額";
+        if(!pendingAmt && x.id && !minus){
           act = r==="未回答"
             ? '<div style="display:flex; gap:8px; margin-top:10px;"><button class="btn dk" style="flex:1;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div>'
             : '<div style="margin-top:8px;"><button class="btn ol" style="padding:8px 14px; font-size:.8rem;" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
         }
-        return '<div class="rv" style="flex-wrap:wrap;"'+(x.id?' id="est-'+esc(x.id)+'"':'')+'><div style="flex:1; min-width:0;"><div class="ty">'+nwTag(x.createdAt)+esc(x.title)+(pendingAmt ? '' : '　'+esc(x.amount))+'</div>'+
-          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt ? "" : cls)+'">'+esc(label)+'</span></div>';
+        return '<div class="rv" style="flex-wrap:wrap;"'+(x.id?' id="est-'+esc(x.id)+'"':'')+'><div style="flex:1; min-width:0;"><div class="ty">'+nwTag(x.createdAt)+esc(x.title)+(pendingAmt ? '' : '　'+esc(estAmountText(x)))+'</div>'+
+          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt || minus ? "" : cls)+'">'+esc(label)+'</span></div>';
       }).join("")+'</div>'+estTotalHtml(data.estimates);
     }
 
@@ -1620,7 +1631,7 @@ function homeHtml(){ return homeParts().main; }
     });
     (data.estimates||[]).forEach(function(x){
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
-      if(pendingAmt || !x.id || (x.customerResponse||"未回答")!=="未回答") return;
+      if(pendingAmt || !x.id || estIsMinus(x) || (x.customerResponse||"未回答")!=="未回答") return;
       cards.push('<div class="pcard opt"><div class="pch"><span class="ptag">オプション（追加見積り）</span>'+nwTag(x.updated||x.createdAt)+'</div>'+
         '<div class="pct"><b>'+esc(x.title||"")+'</b>'+(x.note && x.note!==x.title ? '<br>'+esc(x.note).replace(/\n/g,"<br>") : '')+'</div>'+
         '<div class="pamt">'+esc(String(x.amount||""))+'<span class="tx">（税抜き）</span></div>'+
@@ -1690,7 +1701,7 @@ function homeHtml(){ return homeParts().main; }
     var rows = [], byCat = {}, order = [];
     var ests = (data.estimates||[]).filter(function(x){
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
-      return !pendingAmt && x.id && (x.customerResponse||"未回答")==="未回答";
+      return !pendingAmt && x.id && !estIsMinus(x) && (x.customerResponse||"未回答")==="未回答";
     });
     // 追加見積り・決定ボタンのカードは、上の「ご確認・ご決定ください」にカードで出すので、ここは💭（ご検討いただく事）だけ
     var add = function(key, name, kind, attr){
@@ -1729,7 +1740,7 @@ function homeHtml(){ return homeParts().main; }
     var rows = [], LIM = 4;
     (data.estimates||[]).forEach(function(x){
       var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
-      if(pendingAmt || !x.id || (x.customerResponse||"未回答")!=="未回答") return;
+      if(pendingAmt || !x.id || estIsMinus(x) || (x.customerResponse||"未回答")!=="未回答") return;
       rows.push('<div class="td"><div class="tdh"><span class="ptag">追加見積り</span><span class="tk">税抜き</span></div>'+
         '<div class="tt">'+esc(x.title||"")+'　'+esc(x.amount||"")+'</div>'+(x.note?'<div class="tk" style="margin-top:2px;">'+esc(String(x.note).slice(0,80))+'</div>':'')+
         '<div style="display:flex; gap:8px; margin-top:8px;"><button class="btn dk" style="flex:1; padding:10px 6px;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1; padding:10px 6px;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div></div>');
