@@ -1663,13 +1663,14 @@ function homeHtml(){ return homeParts().main; }
     return a;
   }
   // ② 最新の打合せ内容：いちばん新しい日の記録を全部
-  // 「反映する」を押した打合せ記録を、部位に関係なく反映した順（新しい順）に全部。上の「最新の打合せ記録」に出したものは除く
+  // スタッフが「おうちノートのホームに出す」にした打合せ記録（部位に関係なく、出した順）。上の「最新の打合せ記録」に出したものは除く
   var homeLatestIds = {};
   function reflectedNotesHtml(){
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.open||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
-    var list = (data.notes||[]).filter(function(n){ return hasBody(n) && !homeLatestIds[n.id]; });
+    // スタッフが「おうちノートのホームに出す」にした記録だけ。出した順（新しい順）
+    var list = (data.notes||[]).filter(function(n){ return n.homeShow && hasBody(n) && !homeLatestIds[n.id]; });
     if(!list.length) return "";
-    var at = function(n){ return Date.parse(n.reflectedAt||n.upd||n.createdAt||"")||0; };
+    var at = function(n){ return Date.parse(n.homeShowAt||n.upd||n.createdAt||"")||0; };
     list.sort(function(a,b){ return at(b)-at(a); });
     return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+list.map(function(n){
         var f = noteDecItem(n);

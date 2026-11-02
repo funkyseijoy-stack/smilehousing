@@ -6893,7 +6893,8 @@
       // 操作メニュー（写真・PDF・見積の書類のカードと同じ並び）
       var noteOps = uniOpsSections("n", n.id, drawMenuHtml ? '<div class="notemenu-draw">'+drawMenuHtml+'</div>' : "",
         '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
-        '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>',
+        '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>'+
+        '<button class="'+(n.homeShow?"on":"")+'" data-act="togglenotehome" data-id="'+n.id+'">'+(n.homeShow?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す")+'</button>',
         { estimate: sent.estimate, companytask: sent.companytask, estreq: sent.estreq },
         '<button data-act="editnote" data-id="'+n.id+'">✏️ 編集</button>'+
         '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>');
@@ -6909,6 +6910,7 @@
         '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         noteDecMarkHtml(n)+
+        (n.homeShow ? '<span class="nreflbadge">🏠 ホームに表示中</span>' : '')+
         (isChangeRequesting(n) ? '<span class="nchgbadge">変更依頼中</span>' : '')+
         sentBadgeHtml+
         chHtml+(specHtml ? specHtml : '')+
@@ -8677,7 +8679,8 @@
         var ns = noteSentInfo(relatedNote);
         return uniOpsSections("n", relatedNote.id, drawHtml,
           '<button class="'+(relatedNote.reflected?"on":"")+'" data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>'+
-          '<button class="'+(relatedNote.askDecision?"on":"")+'" data-spec-togglenoteask="'+relatedNote.id+'">'+(relatedNote.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>',
+          '<button class="'+(relatedNote.askDecision?"on":"")+'" data-spec-togglenoteask="'+relatedNote.id+'">'+(relatedNote.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>'+
+          '<button class="'+(relatedNote.homeShow?"on":"")+'" data-spec-togglenotehome="'+relatedNote.id+'">'+(relatedNote.homeShow?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す")+'</button>',
           { estimate: ns.estimate, companytask: ns.companytask, estreq: ns.estreq },
           '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
       }
@@ -8751,6 +8754,18 @@
     render();
     saveDoc("meetingNotes", n.id, n);
     toast(n.askDecision ? "お客様の画面に「仮決定／決定」ボタンを出します" : "お客様の画面の「仮決定／決定」ボタンを外しました");
+  }
+  // おうちノートのホームの「📝 打合せ記録」に出すかどうか（反映とは別。出すときは反映もする）
+  async function toggleMeetingHomeShow(id){
+    var n = state.meetingNotes.find(function(x){ return x.id===id; });
+    if(!n) return;
+    n.homeShow = !n.homeShow;
+    n.homeShowAt = n.homeShow ? nowIso() : null;
+    var reflNow = false;
+    if(n.homeShow && !n.reflected){ n.reflected = true; n.reflectedAt = nowIso(); reflNow = true; }
+    render();
+    if(await saveDoc("meetingNotes", n.id, n)===false){ toast("保存に失敗しました"); return; }
+    toast(n.homeShow ? ("おうちノートのホームに出しました"+(reflNow?"（あわせて反映しました）":"")) : "おうちノートのホームから外しました（反映はそのままです）");
   }
   function toggleTaskAskDecision(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
@@ -16807,6 +16822,8 @@
         if(sptask){ openSpecTaskMenu(sptask.dataset.specTaskmenu, sptask.dataset.sc, sptask.dataset.cat||null, sptask.dataset.room||null, sptask.dataset.side||null); return; }
         var spnoteask = e.target.closest("[data-spec-togglenoteask]");
         if(spnoteask){ toggleMeetingAskDecision(spnoteask.dataset.specTogglenoteask); return; }
+        var spnotehome = e.target.closest("[data-spec-togglenotehome]");
+        if(spnotehome){ toggleMeetingHomeShow(spnotehome.dataset.specTogglenotehome); return; }
         var spnoterefl = e.target.closest("[data-spec-togglenotereflect]");
         if(spnoterefl){ toggleMeetingReflected(spnoterefl.dataset.specTogglenotereflect); return; }
         var sptaskask = e.target.closest("[data-spec-toggletaskask]");
@@ -17222,6 +17239,7 @@
       else if(act==="delnote"){ if(confirm2()) deleteMeetingNote(id); }
       else if(act==="togglenotereflect"){ toggleMeetingReflected(id); }
       else if(act==="togglenoteask"){ toggleMeetingAskDecision(id); }
+      else if(act==="togglenotehome"){ toggleMeetingHomeShow(id); }
       else if(act==="chkdone"){ toggleNoteCheck(id, +btn.dataset.i); }
       else if(act==="chktask" || act==="chkgotask"){ noteCheckToTask(id, +btn.dataset.i); }
       else if(act==="notetotask"){ createTaskFromNote(id, btn.dataset.tasktype); }
