@@ -1659,7 +1659,7 @@ function homeHtml(){ return homeParts().main; }
         (body ? '<div class="pct">'+esc(body).replace(/\n/g,"<br>")+'</div>' : '')+
         (!ttl && !body && !(x.files||[]).length && !x.file ? '<div class="pct" style="color:var(--muted);">（内容は「'+esc(c.name)+'の記録を見る」でご確認ください）</div>' : '')+
         (files.length ? '<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>' : '')+
-        (x.type==="note" && !x.partial && !x.lineCard ? noteEstHtml(x) : '')+
+        (x.type==="note" && !x.partial ? noteEstHtml(x) : '')+
         (e.stamped
           ? '<div class="cdec" style="min-height:70px;"><div class="stamp'+(view.justStamped===x.key?' pop':'')+'" style="top:-30px;">決定<small>'+(function(){ var d=new Date(x.cardDecidedAt||Date.now()); return (d.getMonth()+1)+'/'+d.getDate(); })()+'</small></div>'+
             '<div class="cnow">✅ 決定のはんこを押しました</div><button class="linkbtn" data-cdecide="検討中"'+ra+'>🔴 はんこを外す（検討中に戻す）</button></div>'
@@ -1671,7 +1671,11 @@ function homeHtml(){ return homeParts().main; }
     asks.forEach(addCard);
     // 記録のカードの中に出した追加見積りは、ここには重ねて出さない（ホームに出ている記録・決定待ち・決定済みのカード）
     var onCard = {};
-    var markN = function(n){ if(n && n.estId && !n.partial && !n.lineCard) onCard[n.estId] = 1; };
+    var markN = function(n){
+      if(!n) return;
+      if(n.estId && !n.partial) onCard[n.estId] = 1;
+      (n.lines||[]).forEach(function(l){ if(l.estId) onCard[l.estId] = 1; });
+    };
     (data.notes||[]).forEach(function(n){ if(homeLatestIds[n.id] || n.homeShow) markN(n); });
     asks.concat(stamped).forEach(function(e){ if(e.x.type==="note") markN(e.x); });
     (data.estimates||[]).forEach(function(x){
@@ -1920,6 +1924,7 @@ function homeHtml(){ return homeParts().main; }
         '<div class="nlt">'+esc(l.t)+'</div>'+
         ((l.files||[]).length?'<div class="thumbs">'+l.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'')+
         (l.m==="o" && consCtx ? consBtnsHtml(l.t, consCtx) : '')+
+        (l.estId ? noteEstHtml(l) : '')+
         '</div>';
     }).join("")+'</div>';
   }

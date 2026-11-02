@@ -617,6 +617,12 @@ export default async (req: Request, context: Context) => {
   }
   // 行ごとの部位・ファイルを付けた記録は、スタッフの画面と同じく1行ずつ（文・印・部位・その行のファイル）で見せる。
   // 🔒社内（m:"c"）の行は出さない。印のない行は「お客様にも見せる」（talkPublic）のときだけ。
+  // 記録の行から作った追加見積り（行の「⋯」→「追加見積」。lineActs の type:"est"）
+  const lineEstId = (n: any, t: any) => {
+    const tx = String(t || "").trim();
+    const a = (Array.isArray(n.lineActs) ? n.lineActs : []).filter((x: any) => x && x.type === "est" && x.ref && String(x.t || "").trim() === tx).pop();
+    return a ? String(a.ref) : "";
+  };
   const linesOf = (n: any, only?: any[]) => {
     const src = only || (Array.isArray(n.noteLines) ? n.noteLines : []);
     const hasExtra = src.some((l: any) => l && ((l.p && l.p.scope) || (Array.isArray(l.f) && l.f.length)));
@@ -628,6 +634,7 @@ export default async (req: Request, context: Context) => {
         m: l.m || "",
         part: l.p && l.p.scope ? partLabel(project, l.p.scope, l.p.category, l.p.roomId) : "",
         files: (Array.isArray(l.f) ? l.f : []).map(fileOf),
+        estId: lineEstId(n, l.t),
       }));
   };
   for (const n of reflectedNotes) {
@@ -687,6 +694,7 @@ export default async (req: Request, context: Context) => {
         changing: false,
         message: "",
         channel: n.channel || "",
+        estId: lineEstId(n, l.t),
       });
     }
     for (const l of n.noteLines || []) {
