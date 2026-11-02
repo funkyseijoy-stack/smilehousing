@@ -851,11 +851,15 @@
   .spectl-ops{ position:absolute; top:6px; inset-inline-end:8px; }
   .opspop-ov{ position:fixed; inset:0; z-index:200; background:rgba(20,16,12,.35); display:flex; align-items:center; justify-content:center; padding:12px; }
   .opspop-ov .opspop{ display:block; position:static; width:min(440px, 100%); max-height:80vh; }
+  /* Gmailから取り込む画面（操作メニューの見た目＝ボタン幅100%を使わない専用の枠） */
+  .gppop{ background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.14); padding:8px; width:min(720px,100%); max-height:85vh; overflow-y:auto; overscroll-behavior:contain; }
+  .gppop .gprow:hover{ background:var(--surface-2); }
   .opspop-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:4px 6px 8px; border-block-end:1px solid var(--border); margin-block-end:4px; }
   .opspop-head .notemenu-close{ width:auto !important; border:none !important; margin:0 !important; flex-shrink:0; }
   @media (max-width:760px){
     .opspop-ov{ align-items:stretch; padding:calc(env(safe-area-inset-top) + 64px) 12px calc(env(safe-area-inset-bottom) + 84px); }
     .opspop-ov .opspop{ max-height:none; width:100%; }
+    .opspop-ov .gppop{ max-height:none; width:100%; }
   }
   .spectl-ops > summary.btn{ list-style:none; }
   .spectl-ops[open] .opsmenu{ display:block; top:36px; }
@@ -12313,8 +12317,8 @@
     var vendors = (state.vendors||[]).filter(function(v){ return !v.deletedAt && v.email; }).sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""),"ja"); });
     var ov = document.createElement("div");
     ov.className = "opspop-ov";
-    ov.innerHTML = '<div class="notemenu opsmenu opspop" style="width:min(720px,100%);">'+
-      '<div class="opspop-head"><div><b>✉️ Gmailから取り込む</b><div class="muted" style="font-size:.85rem;">'+escapeHtml(title||"")+'</div></div><button type="button" class="notemenu-close" data-gpclose>✕ 閉じる</button></div>'+
+    ov.innerHTML = '<div class="gppop" role="dialog" aria-label="Gmailから取り込む">'+
+      '<div class="opspop-head"><div><b>✉️ Gmailから取り込む</b><div class="muted" style="font-size:.85rem;">'+escapeHtml(title||"")+'</div></div><button type="button" class="btn ghost small notemenu-close" data-gpclose>✕ 閉じる</button></div>'+
       '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center; padding:4px 6px;">'+
         '<select data-gpv style="flex:1 1 180px;"><option value="">業者を選ばない（すべてのメール）</option>'+vendors.map(function(v){ return '<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>'; }).join("")+'</select>'+
         '<input type="text" data-gpq placeholder="キーワード（お客様名・件名など）" style="flex:2 1 200px;">'+
