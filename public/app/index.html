@@ -366,6 +366,11 @@
   .notemenu button.on{ color:var(--accent-ink); font-weight:700; }
   .notemenu button.notemenu-close{ text-align:end; font-weight:700; color:var(--muted); border-block-end:1px solid var(--border); border-radius:7px 7px 0 0; margin-block-end:4px; }
   .notemenu-divider{ border-block-start:1px dashed var(--border); margin:5px 2px; }
+  /* 操作メニューは長いので、画面からはみ出さないよう中でスクロール。スマホは画面の中に固定して出す（下のタブに隠れないように） */
+  .notemenu{ max-height:70vh; overflow-y:auto; overscroll-behavior:contain; }
+  @media (max-width:760px){
+    .noteitem.notemenu-open .notemenu{ position:fixed; inset-inline:12px; top:calc(env(safe-area-inset-top) + 64px); bottom:calc(env(safe-area-inset-bottom) + 84px); max-height:none; z-index:120; }
+  }
 
   .lockbox{ display:flex; align-items:center; gap:8px; background:var(--gold-soft); color:var(--gold); border-radius:10px; padding:8px 10px; font-size:.85rem; font-weight:700; }
   .pinrow input{ width:110px; letter-spacing:.15em; }
@@ -6732,6 +6737,7 @@
       var menuOpen = openNoteMenuId === n.id;
       var menuHtml = '<div class="notemenu">'+
         '<button class="notemenu-close" data-act="togglenotemenu" data-id="'+n.id+'" title="閉じる">✕ 閉じる</button>'+
+        (drawMenuHtml ? '<div class="notemenu-h">✏️ 添付の図面・写真に書き込む</div><div class="notemenu-draw">'+drawMenuHtml+'</div><div class="notemenu-divider"></div>' : '')+
         '<div class="notemenu-h">🏠 お客様へ</div>'+
         '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
         '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>'+
@@ -6748,7 +6754,7 @@
         '<button data-act="linenote" data-id="'+n.id+'">LINEで送る</button>'+
         '<div class="notemenu-divider"></div><div class="notemenu-h">🗂 記録の整理</div>'+
         '<button data-act="editnote" data-id="'+n.id+'">編集（行ごとの部位・ファイル・決定のお願いも）</button>'+
-        (drawMenuHtml ? '<div class="notemenu-draw">'+drawMenuHtml+'</div>' : '')+
+
         '<button data-act="setnotespec" data-id="'+n.id+'">'+(n.specPart?"部位を変更":"部位を設定")+'</button>'+
         '<div class="notemenu-divider"></div>'+
         '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>'+
