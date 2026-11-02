@@ -6584,7 +6584,7 @@
       if(act==="task"){ askAssignee(function(who){ if(who===null) return; runNoteLineActs(n, [{text:t, type:"task", assignee:who}]); }); return; }
       if(act==="est"){
         if(hasAct("est")){ toast("この行はすでに追加見積に入っています"); return; }
-        askEstimateInput(t.length>30 ? t.slice(0,30) : t).then(function(v){ if(v) runNoteLineActs(n, [{text:t, type:"est", title:v.title, amount:v.amount}]); }); return;
+        askEstimateInput(t.length>30 ? t.slice(0,30) : t).then(function(v){ if(v) runNoteLineActs(n, [{text:t, type:"est", title:v.title, amount:v.amount, hold:v.hold}]); }); return;
       }
       if(act==="estreq"){
         askVendorForBadge(function(ids){
@@ -10301,6 +10301,8 @@
           var estId = uid("est"), title = a.title || (text.length>30 ? text.slice(0,30)+"…" : text), amt = String(a.amount||"").trim();
           var cust = await okaiUpdateList(proj.id, "customerEstimates", function(list){
             var row = { id: estId, title: title, amount: amt, note: text, status: "確認中", updated: nowIso(), createdAt: nowIso() };
+            // 「金額はまだお客様に出さない」：金額は社内で控え、お客様には「金額確認中」と出す
+            if(a.hold && amt) row.estimateState = "金額確認中";
             return list.concat([row]);
           });
           if(!((cust && cust.customerEstimates)||[]).some(function(x){ return x.id===estId; })) throw new Error("not saved");
@@ -13621,7 +13623,7 @@
         '</div>' : '')+
         (acts.length ? '<div class="mnlacts">'+acts.map(function(a, k){
           if(a.type==="taskmade") return '<span class="mnlchip" style="background:#e3f0e6;">📋 タスクを作りました'+(a.label?"："+escapeHtml(a.label):"")+' <button type="button" data-mnlrm="'+i+'|'+k+'" aria-label="記録とのつながりを外す（タスクは消えません）" title="記録とのつながりを外す（タスクは消えません）">×</button></span>';
-          var extra = a.type==="task" ? (a.assignee?"："+a.assignee:"") : a.type==="est" ? (a.title ? "："+a.title+"　"+(a.amount ? a.amount+"（税抜き）" : "金額は後で") : "") : a.type==="estreq" ? "："+a.vendorIds.map(function(id){ var v = vendorById(id); return v?v.name:""; }).filter(Boolean).join("、") : "";
+          var extra = a.type==="task" ? (a.assignee?"："+a.assignee:"") : a.type==="est" ? (a.title ? "："+a.title+"　"+(a.amount ? a.amount+"（税抜き）"+(a.hold ? "・🔒お客様には金額確認中" : "") : "金額は後で") : "") : a.type==="estreq" ? "："+a.vendorIds.map(function(id){ var v = vendorById(id); return v?v.name:""; }).filter(Boolean).join("、") : "";
           return '<span class="mnlchip">→ '+escapeHtml(MN_ACT_LABEL[a.type]+extra)+' <button type="button" data-mnlrm="'+i+'|'+k+'" aria-label="取り消す">×</button></span>';
         }).join("")+(acts.some(function(a){ return a.type!=="taskmade"; }) ? '<span class="muted" style="font-size:.85rem;">「記録する」で作ります</span>' : '')+'</div>' : '')+
       '</div>';
@@ -14903,6 +14905,7 @@
       ov.innerHTML = '<div class="taskform-card" style="max-width:520px; width:100%;"><h3 style="margin:0 0 6px;">＋ 追加見積り（おうちノート）</h3>'+
         '<label style="display:block; font-size:.9rem;">題名<input type="text" data-et maxlength="60" style="width:100%; box-sizing:border-box;"></label>'+
         '<label style="display:block; font-size:.9rem; margin-block-start:8px;">金額（税抜き）<input type="text" data-ea inputmode="numeric" placeholder="例 12,000　減額は -12,000　空欄なら「金額確認中」" style="width:100%; box-sizing:border-box;"></label>'+
+        '<label style="display:flex; gap:6px; align-items:flex-start; font-size:.9rem; margin-block-start:8px;"><input type="checkbox" data-eh style="margin-top:4px;"><span>🔒 金額はまだお客様に出さない<br><span class="muted" style="font-size:.85rem;">お客様には「金額確認中」と表示。金額は社内だけで控える（出すときは「おうちノート連携」タブの追加見積りで状態を「承認依頼」に）</span></span></label>'+
         '<div class="row" style="gap:8px; margin-block-start:10px;"><button type="button" class="btn" data-ok>決める</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
       document.body.appendChild(ov);
       var ti = ov.querySelector("[data-et]"), am = ov.querySelector("[data-ea]");
@@ -14913,7 +14916,7 @@
         if(e.target.closest("[data-ok]")){
           var t = ti.value.trim();
           if(!t){ toast("題名を入れてください"); ti.focus(); return; }
-          ov.remove(); resolve({ title: t, amount: am.value.trim().slice(0,30) });
+          ov.remove(); resolve({ title: t, amount: am.value.trim().slice(0,30), hold: !!ov.querySelector("[data-eh]").checked });
         }
       });
     });
@@ -16609,7 +16612,7 @@
           if(kind==="task"){ askAssignee(function(who){ if(who===null) return; push({type:"task", assignee:who}); }); }
           else if(kind==="est"){
             if((mnLineActs[lt]||[]).some(function(a){ return a.type==="est"; })){ toast("この行はすでに追加見積に入れる予定です"); return; }
-            askEstimateInput(lt.length>30 ? lt.slice(0,30) : lt).then(function(v){ if(v) push({type:"est", title:v.title, amount:v.amount}); });
+            askEstimateInput(lt.length>30 ? lt.slice(0,30) : lt).then(function(v){ if(v) push({type:"est", title:v.title, amount:v.amount, hold:v.hold}); });
           }
           else if(kind==="estreq"){
             askVendorForBadge(function(ids){

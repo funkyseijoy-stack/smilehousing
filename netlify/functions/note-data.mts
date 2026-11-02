@@ -935,7 +935,8 @@ export default async (req: Request, context: Context) => {
     // 「おうちノート連携」タブ（旧おうちノート本体と橋渡しされている項目）。表示のみで、
     // お客様からの回答・更新はまだ今の（旧）おうちノートの画面で行う。
     estimates: ((okaiCustomer && okaiCustomer.customerEstimates) || []).map((x: any) => ({
-      id: x.id || "", title: x.title || "", amount: x.amount || "", note: x.note || "",
+      // 状態が「金額確認中」のときは、金額が入っていてもお客様には渡さない（社内で控えている金額）
+      id: x.id || "", title: x.title || "", amount: x.estimateState === "金額確認中" ? "" : (x.amount || ""), note: x.note || "",
       customerResponse: x.customerResponse || "未回答", estimateState: x.estimateState || "", createdAt: x.createdAt || "",
     })),
     notifyEmail: (okaiCustomer && okaiCustomer.notifyEmail && okaiCustomer.notifyEmail.email) || "",
