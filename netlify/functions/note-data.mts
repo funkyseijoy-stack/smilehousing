@@ -506,7 +506,7 @@ export default async (req: Request, context: Context) => {
   }
 
   // ---------- お客様画面に表示するデータ ----------
-  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer, imageBoard, tasks] = await Promise.all([
+  const [specPhotos, notes, attachments, album, messages, reservations, decisions, notices, okaiCustomer, imageBoard, tasks, requests] = await Promise.all([
     listCollection(store, "specPhotos", projectId),
     listCollection(store, "meetingNotes", projectId),
     listCollection(store, "attachments", projectId),
@@ -518,12 +518,26 @@ export default async (req: Request, context: Context) => {
     getExtras(store, projectId),
     listCollection(store, "imageBoard", projectId),
     listCollection(store, "tasks", projectId),
+    listCollection(store, "requests", projectId),
   ]);
 
   // 「変更依頼中」: 打合せ記録・仕様履歴から作った業者タスクが、まだ完了していない間だけ true。
   // タスクの中身はお客様には渡さず、true/false だけ渡す。
   const liveTaskIds = new Set(tasks.filter((t: any) => !t.deletedAt && t.status !== "完了").map((t: any) => t.id));
-  const isChanging = (x: any) => !!(x && x.sent && x.sent.vendortask && x.sent.vendortask.ref && liveTaskIds.has(x.sent.vendortask.ref));
+  // スタッフが「⋮ 操作」で手で付けた／外したはんこ（stampOv.change / stampOv.estreq）は自動の判定より優先する。
+  const ovOf = (x: any, k: string) => (x && x.stampOv && typeof x.stampOv[k] === "boolean") ? x.stampOv[k] : null;
+  const isChanging = (x: any) => {
+    const o = ovOf(x, "change"); if (o !== null) return o;
+    return !!(x && x.sent && x.sent.vendortask && x.sent.vendortask.ref && liveTaskIds.has(x.sent.vendortask.ref));
+  };
+  // 「見積依頼中」: 記録・写真・書類から作った見積依頼（sent.estreq）のうち、まだ受領済みでないものがある間だけ true。
+  const openReqIds = new Set(requests.filter((r: any) => !r.deletedAt && r.status !== "受領済み").map((r: any) => r.id));
+  const isEstReq = (x: any) => {
+    const o = ovOf(x, "estreq"); if (o !== null) return o;
+    const e = x && x.sent && x.sent.estreq; if (!e) return false;
+    const refs = ([] as any[]).concat(e.refs || [], e.ref ? [e.ref] : []);
+    return refs.some((id) => openReqIds.has(id));
+  };
 
   const specBadge = (b: any) => ({ contract: !!(b && b.contract), quote: !!(b && b.quote) });
   const reflectedNotes = notes.filter((n) => n.reflected);
@@ -554,6 +568,7 @@ export default async (req: Request, context: Context) => {
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
       spec: specBadge(p.badges),
       changing: isChanging(p),
+      estReq: isEstReq(p),
       // 色見本カード（スタッフが「色見本カードで表示」を入れたものだけ。名前と色だけをお客様に渡す）
       swatch: swatchOf(p.swatch),
     });
@@ -612,7 +627,8 @@ export default async (req: Request, context: Context) => {
       file: fileOf(a),
       contentType: a.contentType || "",
       spec: specBadge(a.badges),
-      changing: false,
+      changing: isChanging(a),
+      estReq: isEstReq(a),
     });
   }
   // 行ごとの部位・ファイルを付けた記録は、スタッフの画面と同じく1行ずつ（文・印・部位・その行のファイル）で見せる。
@@ -658,6 +674,7 @@ export default async (req: Request, context: Context) => {
       files: (n.files || []).map(fileOf),
       spec: specBadge(n.badges),
       changing: isChanging(n),
+      estReq: isEstReq(n),
       message: cleanNoteMsg(n.message),
       talk: n.talkPublic ? (n.talk || "") : "", // スタッフが「お客様にも見せる」にした記録だけ
       channel: n.channel || "",
@@ -903,6 +920,7 @@ export default async (req: Request, context: Context) => {
         talk: n.talkPublic ? (n.talk || "") : "",
         channel: n.channel || "",
         changing: isChanging(n),
+        estReq: isEstReq(n),
         part: (n.specPart && n.specPart.label) || "",
         scope: (n.specPart && n.specPart.scope) || "",
         files: (n.files || []).map(fileOf),

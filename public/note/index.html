@@ -328,6 +328,10 @@
   .combo-amt{ font-size:.9rem; margin-bottom:8px; } .combo-amt b{ font-size:1.25rem; margin:0 4px 0 10px; } .combo-amt small{ color:var(--muted); }
   .combo-ttl{ font-size:.85rem; color:#a8682c; font-weight:700; margin-bottom:2px; }
   .combo-go{ width:100%; margin-bottom:8px; white-space:nowrap; }
+  .qstamps{ display:inline-flex; gap:4px; margin-left:auto; flex:0 0 auto; }
+  .qstamps .qstamp{ margin-left:0; }
+  .qstamp.req{ border-color:#d9731a; color:#d9731a; }
+  .qstamp.chgs{ border-color:#7b4bb3; color:#7b4bb3; }
   .qstamp{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; width:46px; height:46px; margin-left:auto; border:2.5px solid #2a63b8; border-radius:50%; color:#2a63b8; font-weight:900; font-size:.72rem; line-height:1.1; transform:rotate(-10deg); font-family:"Hiragino Mincho ProN","Yu Mincho",serif; background:rgba(255,255,255,.6); flex:0 0 auto; }
   .stamp{ position:absolute; right:6px; top:-62px; width:86px; height:86px; border:3.5px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.35rem; letter-spacing:.08em; line-height:1.05; background:rgba(255,255,255,.55); box-shadow:inset 0 0 0 2px rgba(210,60,50,.25); pointer-events:none; opacity:.92; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
   .stamp.pop{ animation:stampPop .55s cubic-bezier(.2,1.6,.4,1) both; }
@@ -1564,7 +1568,7 @@ function homeHtml(){ return homeParts().main; }
     var st = x.showDecide ? (x.cardStatus || "検討中") : "";
     var h = '<div class="fcard'+(st?' st-'+esc(st):'')+'"><div class="fhd"><span class="fd">'+fmtD(e.at)+'</span>'+
       (c ? '<button class="ptag fchip" data-bchip="'+esc(c.id)+'">'+esc(c.name)+'</button>' : '<span class="ptag">その他</span>')+
-      feedKindTag(x)+nwTag(x.upd)+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+'</div>';
+      feedKindTag(x)+nwTag(x.upd)+qStampHtml(x)+'</div>';
     if(x.type==="note"){
       if(x.title) h += '<div class="section-item-title">'+esc(x.title)+'</div>';
       if(x.decided) h += '<div class="section-item-desc"><strong>打合せで仮決定したこと：</strong>'+esc(x.decided)+'</div>';
@@ -1833,7 +1837,14 @@ function homeHtml(){ return homeParts().main; }
         : '<div class="cnow">✅ 決定のはんこを押しました</div><button class="linkbtn" data-cdecide="検討中"'+ra+'>🔴 はんこを外す（検討中に戻す）</button>')+'</div>';
   }
   // 見積もり仕様のはんこ（青い丸）。スタッフが「🔵 見積仕様のはんこ」を付けたカード
-  function qStampHtml(x){ return (x && x.spec && x.spec.quote) ? '<span class="qstamp">見積<br>仕様</span>' : ''; }
+  // カードの見出しの丸いはんこ：見積仕様（青）・見積依頼中（オレンジ）・変更依頼中（紫）
+  function qStampHtml(x){
+    if(!x) return '';
+    var h = (x.spec && x.spec.quote ? '<span class="qstamp">見積<br>仕様</span>' : '')+
+      (x.estReq ? '<span class="qstamp req">見積<br>依頼中</span>' : '')+
+      (x.changing ? '<span class="qstamp chgs">変更<br>依頼中</span>' : '');
+    return h ? '<span class="qstamps">'+h+'</span>' : '';
+  }
   function homeDecHtml(n, f){
     if(!f || !f.x.showDecide) return "";
     var status = f.x.cardStatus || "検討中", key = f.x.key;
@@ -2028,14 +2039,14 @@ function homeHtml(){ return homeParts().main; }
   }
   function noteBody(n, showPart, noOpen, noEst){
     if(hasLines(n)){
-      return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+qStampHtml(n)+'</div>'+
+      return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+qStampHtml(n)+'</div>'+
         (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
         linesHtml(n, noOpen, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:'')))+
         (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
         (noEst ? '' : noteEstHtml(n))+
         ((n.files||[]).length?'<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+n.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>':'');
     }
-    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+qStampHtml(n)+'</div>'+
+    return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+qStampHtml(n)+'</div>'+
       (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
       (n.talk?'<div class="box"><div class="bl">打合せの内容</div>'+esc(n.talk).replace(/\n/g,"<br>")+'</div>':'')+
       (n.decided?'<div class="box dec"><div class="bl">打合せで仮決定したこと</div>'+esc(n.decided)+'</div>':'')+
@@ -2169,7 +2180,7 @@ function homeHtml(){ return homeParts().main; }
           if(it.kind==="spec"){
             var x = it.x;
             return '<div class="fcard'+(it.plain?'':' st-'+esc(x.cardStatus||"検討中"))+'">'+
-              '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+nwTag(x.upd)+qStampHtml(x)+'</div>'+
+              '<div class="fhd"><span class="fd">'+fmtD(x.at)+'</span><span class="tag pdf">'+(it.quote ? ((x.quoteType||"プランボード")==="定価" ? "📄 お見積り（定価）" : "📐 プランボード（資料）") : (x.type==="planboard"?"📐 プランボード":"📷 写真・資料"))+'</span>'+newest+nwTag(x.upd)+qStampHtml(x)+'</div>'+
               (x.msg ? '<div class="section-item-desc" style="font-size:.9rem;"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>' : '')+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
               ((it.plain && (x.type==="planboard" || x.isQuote)) ? chgBtnHtml(c, x) : '')+
@@ -2177,7 +2188,7 @@ function homeHtml(){ return homeParts().main; }
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
-            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録'+((n.partial||n.lineCard)?'の一部':'')+'</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+(n.changing?'<span class="tag chg">変更依頼中</span>':'')+newest+qStampHtml(n)+'</div>';
+            '<div class="fhd"><span class="fd">'+fmtD(n.date)+'</span><span class="tag note">💬 打ち合わせ記録'+((n.partial||n.lineCard)?'の一部':'')+'</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(partOf(c, n)?'<span class="ptag">'+esc(partOf(c, n))+'</span>':'')+newest+qStampHtml(n)+'</div>';
           if(n.title) html += '<div class="section-item-title">'+esc(n.title)+'</div>';
           if(hasLines(n)) html += linesHtml(n, false, c.name+'・'+(n.title||fmtD(n.date)));
           else if(n.talk) html += '<div class="section-item-desc"><strong>内容：</strong>'+esc(n.talk)+'</div>';
@@ -2205,7 +2216,7 @@ function homeHtml(){ return homeParts().main; }
         if(x.type==="note") return '<div class="tli'+(latest?" latest":"")+'">'+noteBody(x,false).replace('<span class="tag note">打合せ記録</span>', '<span class="tag note">打合せ記録</span>'+(latest?'<span class="tag new">最新</span>':''))+'</div>';
         var tagCls = x.type==="planboard" ? "pb" : "ph";
         var tagLbl = x.type==="planboard" ? "プランボード" : "写真";
-        return '<div class="tli'+(latest?" latest":"")+'"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+tagCls+'">'+tagLbl+'</span>'+(x.changing?'<span class="tag chg">変更依頼中</span>':'')+(x.label&&x.label!==c.name?'<span class="tag">'+esc(x.label)+'</span>':'')+(latest?'<span class="tag new">最新</span>':'')+'</div>'+
+        return '<div class="tli'+(latest?" latest":"")+'"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+tagCls+'">'+tagLbl+'</span>'+qStampHtml(x)+(x.label&&x.label!==c.name?'<span class="tag">'+esc(x.label)+'</span>':'')+(latest?'<span class="tag new">最新</span>':'')+'</div>'+
           '<div class="thumbs one" style="max-width:150px;">'+thumbHtml(x.file,"")+'</div></div>';
       }).join("")+'</div>';
     } else if(!items.length && !swatches.length){

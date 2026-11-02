@@ -336,6 +336,10 @@
   .noteitem .nbox.talk{ background:var(--surface-2); }
   .noteitem .nbox.msg{ background:#f1ebf5; }
   .noteitem .nbox.msg .nboxlabel{ color:#6b4f86; }
+  .apstamps{ display:inline-flex; gap:4px; flex:0 0 auto; vertical-align:middle; }
+  .apstamp{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; width:48px; height:48px; border:2.5px solid #2a63b8; border-radius:50%; color:#2a63b8; font-weight:900; font-size:.85rem; line-height:1.05; transform:rotate(-10deg); font-family:"Hiragino Mincho ProN","Yu Mincho",serif; background:rgba(255,255,255,.6); letter-spacing:-.04em; }
+  .apstamp.r{ border-color:#d9731a; color:#d9731a; }
+  .apstamp.c{ border-color:#7b4bb3; color:#7b4bb3; }
   .nchgbadge{ font-size:.85rem; font-weight:700; background:#fbe9d6; color:#a8581c; border-radius:999px; padding:2px 10px; }
   .cdlist{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
   .cditem{ display:flex; gap:12px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:#fffaf8; }
@@ -1727,7 +1731,7 @@
             <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea><textarea id="meetingNoteInternal" hidden></textarea>
             <div id="meetingNoteExistingFiles" hidden></div>
             <div class="field"><span>資料を添付（記録全体）</span>
-              <div class="row mnfilerow" style="gap:8px; flex-wrap:wrap; align-items:center;"><label class="btn secondary small" style="cursor:pointer;">📎 ファイルを選ぶ<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*" hidden></label><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 図面から選ぶ</button></div></div>
+              <div class="row mnfilerow" style="gap:8px; flex-wrap:wrap; align-items:center;"><label class="btn secondary small" style="cursor:pointer;">📎 ファイルを選ぶ<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*" hidden></label><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 図面から選ぶ</button><button type="button" class="btn secondary small" id="btnMnGmail">✉️ Gmailから</button></div></div>
             <input type="file" id="mnLineFileInput" multiple accept=".pdf,image/*" hidden>
             <div id="mnFileList"></div>
             <div id="mnAiHint" class="muted" style="font-size:.85rem; margin-block:4px;" hidden></div>
@@ -6926,6 +6930,39 @@
     if(!rec || !rec.ref) return false;
     return state.tasks.some(function(t){ return t.id===rec.ref && !t.deletedAt && t.status!=="完了"; });
   }
+  // ---- カードの丸いはんこ：見積仕様（青）・見積依頼中（オレンジ）・変更依頼中（紫） ----
+  // 見積依頼中／変更依頼中は自動（依頼がまだ受領済みでない／業者タスクが完了していない）。
+  // 「⋮ 操作」で手で付けた／外した分は stampOv（{estreq,change}：true/false）に入り、自動より優先する。
+  function stampOvOf(x, k){ return (x && x.stampOv && typeof x.stampOv[k]==="boolean") ? x.stampOv[k] : null; }
+  function estReqAuto(x){
+    var e = x && x.sent && x.sent.estreq; if(!e) return false;
+    var refs = [].concat(e.refs||[], e.ref ? [e.ref] : []);
+    return refs.some(function(id){ var r = state.requests.find(function(q){ return q.id===id; }); return r && !r.deletedAt && r.status!=="受領済み"; });
+  }
+  function hasEstReqStamp(x){ var o = stampOvOf(x, "estreq"); return o!==null ? o : estReqAuto(x); }
+  function hasChangeStamp(x){ var o = stampOvOf(x, "change"); return o!==null ? o : isChangeRequesting(x); }
+  function stampsHtml(x){
+    if(!x) return "";
+    var h = (x.badges && x.badges.quote ? '<span class="apstamp q">見積<br>仕様</span>' : '')+
+      (hasEstReqStamp(x) ? '<span class="apstamp r">見積<br>依頼中</span>' : '')+
+      (hasChangeStamp(x) ? '<span class="apstamp c">変更<br>依頼中</span>' : '');
+    return h ? '<span class="apstamps">'+h+'</span>' : '';
+  }
+  async function toggleAutoStamp(kind, id, k){
+    var u = uniDocOf(kind, id); if(!u) return;
+    var cur = k==="estreq" ? hasEstReqStamp(u.doc) : hasChangeStamp(u.doc);
+    var auto = k==="estreq" ? estReqAuto(u.doc) : isChangeRequesting(u.doc);
+    var prev = u.doc.stampOv ? Object.assign({}, u.doc.stampOv) : null;
+    var ov = Object.assign({}, u.doc.stampOv||{});
+    if(!cur===auto) delete ov[k]; else ov[k] = !cur; // 自動と同じに戻るときは手動の印を消す（以後は自動に任せる）
+    u.doc.stampOv = Object.keys(ov).length ? ov : null;
+    u.doc.updatedAt = nowIso();
+    render();
+    var ok = await saveDoc(u.coll, u.doc.id, u.doc);
+    if(ok===false){ u.doc.stampOv = prev; render(); toast("保存できませんでした"); return; }
+    var nm = k==="estreq" ? "見積依頼中" : "変更依頼中";
+    toast(!cur ? (k==="estreq"?"🟠 ":"🟣 ")+nm+"のはんこを付けました" : nm+"のはんこを外しました");
+  }
   function renderDecidedSummary(){
     var card = document.getElementById("decidedSummaryCard");
     var box = document.getElementById("decidedSummaryList");
@@ -7084,7 +7121,7 @@
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         noteDecMarkHtml(n)+
         (n.homeShow ? '<span class="nreflbadge">🏠 ホームに表示中</span>' : '')+
-        (isChangeRequesting(n) ? '<span class="nchgbadge">変更依頼中</span>' : '')+
+        stampsHtml(n)+
         sentBadgeHtml+
         chHtml+(specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
@@ -8605,6 +8642,8 @@
       b("home", f.home?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す", !!f.home)+
       b("stamp", stamped?"✓ 🔴 決定のはんこ済み（押すと外す）":"🔴 決定のはんこを押す", stamped)+
       b("qspec", qspec?"✓ 🔵 見積仕様のはんこ（押すと外す）":"🔵 見積仕様のはんこを付ける", qspec)+
+      b("estreqst", hasEstReqStamp(u&&u.doc)?"✓ 🟠 見積依頼中のはんこ（押すと外す）":"🟠 見積依頼中のはんこを付ける", hasEstReqStamp(u&&u.doc))+
+      b("chgst", hasChangeStamp(u&&u.doc)?"✓ 🟣 変更依頼中のはんこ（押すと外す）":"🟣 変更依頼中のはんこを付ける", hasChangeStamp(u&&u.doc))+
       b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
       b("ctask", (sent.companytask?"✓ ":"")+"📋 社内タスク", !!sent.companytask)+
       b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へGmail（見積依頼＋下書き）", !!sent.estreq)+
@@ -8684,6 +8723,8 @@
       var r0 = null;
       if(act==="stamp") r0 = toggleStaffStamp(kind, id);
       else if(act==="qspec") r0 = toggleQuoteSpecStamp(kind, id);
+      else if(act==="estreqst") r0 = toggleAutoStamp(kind, id, "estreq");
+      else if(act==="chgst") r0 = toggleAutoStamp(kind, id, "change");
       else if(act==="refl") r0 = toggleMeetingReflected(id);
       else if(act==="ask") r0 = toggleMeetingAskDecision(id);
       else if(act==="home") r0 = toggleMeetingHomeShow(id);
@@ -8699,6 +8740,8 @@
     }
     if(act==="stamp") return toggleStaffStamp(kind, id);
     if(act==="qspec") return toggleQuoteSpecStamp(kind, id);
+    if(act==="estreqst") return toggleAutoStamp(kind, id, "estreq");
+    if(act==="chgst") return toggleAutoStamp(kind, id, "change");
     if(kind==="sp"){
       var sp = state.specPhotos.find(function(z){ return z.id===id; }); if(!sp) return;
       if(act==="refl"){ return togglePbReflected(id); }
@@ -8861,7 +8904,7 @@
       '<div class="spectl-meta"><div class="row" style="gap:5px;">'+
         '<span class="pill small spectl-type-vendor">見積から</span>'+quotePill(a.quoteType)+
         (drawCtx && drawCtx.showPart && a.specPart ? partChipHtml(a.specPart) : '')+
-        (a.reflected && sharable ? '<span class="pill reflect small on">✓反映済み</span>' : '')+
+        (a.reflected && sharable ? '<span class="pill reflect small on">✓反映済み</span>' : '')+stampsHtml(a)+
       '</div>'+
       '<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml((from?from+"より：":"")+(a.name||""))+'</div>'+
       (a.staffMemo ? '<div class="docmemo staff" style="margin-block-start:3px;">🔒 社内：'+escapeHtml(a.staffMemo)+'</div>' : '')+
@@ -8942,6 +8985,7 @@
       (showPart && p.scope ? partChipHtml({scope:p.scope, category:p.category||null, roomId:p.roomId||null, side:p.side||null}) : '')+
       (p.decided?'<span class="pill status-受領済み small">決定</span>':'')+
       (reflectedNow?'<span class="pill reflect small on">✓反映済み</span>':'')+
+      stampsHtml(p.kind==="note" ? relatedNote : p)+
       '</div>'+
       (snippet?'<div class="muted" style="font-size:.85rem; margin-block-start:1px;">'+escapeHtml(snippet)+'</div>':'');
     var decideBtnHtml = '<button class="pill'+(p.decided?' status-受領済み':' status-未依頼')+'" style="cursor:pointer; border:none; font-family:inherit; flex-shrink:0;" data-spec-decide="'+p.id+'">'+(p.decided?"決定を解除":"これを決定にする")+'</button>';
@@ -14425,6 +14469,17 @@
     }
     return out;
   }
+  // 「✉️ Gmailから」：Gmailの添付を、これから保存する記録の添付に入れる（「記録する／更新」で保存）
+  function mnPickGmail(){
+    var pid = state.currentProjectId;
+    if(!pid){ toast("案件を開いてから使ってください"); return; }
+    gmailPickFiles(pid, "この記録に添付します（「記録する／更新」で保存されます）", function(refs){
+      if(state.currentProjectId!==pid){ toast("案件が切り替わったため、取り込みをやめました"); return; }
+      (refs||[]).forEach(function(r){ mnExtras.push({ key: uid("mnx"), pid: pid, after:"x", ref: r }); });
+      renderMnFileList();
+      toast("Gmailの添付を "+(refs||[]).length+" 件、記録に添付しました（「記録する／更新」で保存されます）", 6000);
+    });
+  }
   // 「📐 この案件の図面から選ぶ」
   function mnPickPlan(){
     var pid = state.currentProjectId;
@@ -16970,6 +17025,7 @@
     document.getElementById("meetingNoteInput");
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
     document.getElementById("btnMnPickPlan").addEventListener("click", mnPickPlan);
+    document.getElementById("btnMnGmail").addEventListener("click", mnPickGmail);
     // タスクボードの横スクロールのバーを上にも出す（下のバーと連動）
     (function(){
       var top = document.getElementById("kanbanTopScroll"), board = document.getElementById("kanbanWrap");
