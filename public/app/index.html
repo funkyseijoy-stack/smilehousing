@@ -408,6 +408,8 @@
   #pbItemsLayer{ position:absolute; inset:0; pointer-events:none; }
   .pbitem{ position:absolute; pointer-events:auto; transform:translate(-50%,-50%); display:flex; align-items:center; gap:3px; background:var(--surface); border:1.5px solid var(--muted); border-radius:8px; padding:3px 7px; font-size:.85rem; font-weight:700; white-space:nowrap; cursor:grab; box-shadow: var(--shadow); user-select:none; touch-action:none; }
   .pbitem:active{ cursor:grabbing; }
+  .pbitem.sym{ background:none; border:none; box-shadow:none; padding:0; }
+  .pbitem.sym .pbitem-del{ position:absolute; top:-10px; right:-12px; background:var(--surface); border-radius:999px; box-shadow:0 0 0 1px var(--border); padding:0 4px; }
   .pbitem.stamp{ background:var(--gold-soft,#fff3d6); border-color:var(--gold,#c99a2e); color:#6b4e0c; }
   .pbitem.text{ background:none; border:none; box-shadow:none; padding:2px 4px; font-weight:700; white-space:pre-line; text-align:center; }
   .pbitem.text .pbitem-del{ background:var(--surface); border-radius:999px; box-shadow:0 0 0 1px var(--border); padding:0 4px; }
@@ -14843,14 +14845,47 @@
     touches:{}, pinchStartDist:null, pinchStartZoom:1,
     pdfDoc:null, pdfPage:1, pdfNumPages:1
   };
+  // 図面と同じ形の電気記号（40×40の枠の中、中心(20,20)）。p＝線（f:true は塗りつぶし）、t＝添える文字。
+  // 画面は SVG、保存は同じパスを Path2D で描く。色はいま選んでいるペンの色
+  function pbCirc(cx, cy, r){ return "M"+(cx-r)+" "+cy+" a"+r+" "+r+" 0 1 0 "+(2*r)+" 0 a"+r+" "+r+" 0 1 0 "+(-2*r)+" 0"; }
+  var PB_OUT = [{d:pbCirc(20,20,9)},{d:"M16.5 15 L16.5 25 M23.5 15 L23.5 25"}];
   var PB_SYMBOLS = [
-    {key:"outlet", label:"コンセント", glyph:"🔌"},
-    {key:"switch", label:"スイッチ", glyph:"🔘"},
-    {key:"light", label:"照明", glyph:"💡"},
-    {key:"vent", label:"換気扇", glyph:"🌀"},
-    {key:"tv", label:"TVコンセント", glyph:"📺"},
-    {key:"faucet", label:"水栓", glyph:"🚿"}
+    {key:"outlet", group:"コンセント", label:"コンセント", p:PB_OUT},
+    {key:"outlet2", group:"コンセント", label:"コンセント（2口）", p:PB_OUT, t:[{s:"2", x:33, y:8}]},
+    {key:"outletE", group:"コンセント", label:"コンセント（アース付き）", p:PB_OUT, t:[{s:"E", x:33, y:8}]},
+    {key:"outletWP", group:"コンセント", label:"コンセント（防水）", p:PB_OUT, t:[{s:"WP", x:20, y:36, z:9}]},
+    {key:"outletAC", group:"コンセント", label:"エアコン用コンセント", p:PB_OUT, t:[{s:"AC", x:34, y:8, z:9}]},
+    {key:"switch", group:"スイッチ", label:"スイッチ（片切）", p:[{d:pbCirc(20,20,5), f:true}]},
+    {key:"switch3", group:"スイッチ", label:"3路スイッチ", p:[{d:pbCirc(20,20,5), f:true}], t:[{s:"3", x:30, y:11}]},
+    {key:"sensor", group:"スイッチ", label:"人感センサー", p:[{d:pbCirc(20,20,5), f:true}], t:[{s:"S", x:30, y:11}]},
+    {key:"ceiling", group:"照明", label:"シーリングライト", p:[{d:pbCirc(20,20,10)}], t:[{s:"CL", x:20, y:20, z:9}]},
+    {key:"downlight", group:"照明", label:"ダウンライト", p:[{d:pbCirc(20,20,8)},{d:pbCirc(20,20,2.5), f:true}]},
+    {key:"vent", group:"換気・空調", label:"換気扇", p:[{d:pbCirc(20,20,11)},{d:pbCirc(15,20,4.5)},{d:pbCirc(25,20,4.5)}]},
+    {key:"aircon", group:"換気・空調", label:"エアコン", p:[{d:"M8 14 L32 14 L32 26 L8 26 Z"}], t:[{s:"AC", x:20, y:20, z:9}]},
+    {key:"tv", group:"TV・LAN・電話", label:"TV端子", p:[{d:pbCirc(20,20,10)},{d:pbCirc(20,20,5.5)}], t:[{s:"TV", x:35, y:8, z:9}]},
+    {key:"lan", group:"TV・LAN・電話", label:"LAN", p:[{d:pbCirc(20,20,10)},{d:"M14 20 L26 20 M20 14 L20 26"}], t:[{s:"LAN", x:20, y:37, z:8}]},
+    {key:"tel", group:"TV・LAN・電話", label:"電話", p:[{d:pbCirc(20,20,10)}], t:[{s:"T", x:20, y:20, z:11}]},
+    {key:"intercom", group:"インターホン・リモコン", label:"インターホン親機", p:[{d:"M10 10 L30 10 L30 30 L10 30 Z"}], t:[{s:"親", x:20, y:20, z:11}]},
+    {key:"intercomSub", group:"インターホン・リモコン", label:"インターホン子機（玄関）", p:[{d:"M10 10 L30 10 L30 30 L10 30 Z"}], t:[{s:"子", x:20, y:20, z:11}]},
+    {key:"remote", group:"インターホン・リモコン", label:"給湯リモコン", p:[{d:"M10 10 L30 10 L30 30 L10 30 Z"}], t:[{s:"R", x:20, y:20, z:11}]}
   ];
+  function pbSymSize(){ var w = (pb.baseCanvas && pb.baseCanvas.width) || 1000, h = (pb.baseCanvas && pb.baseCanvas.height) || 1000; return Math.max(28, Math.round(Math.max(w, h)/45)); }
+  function pbSymSvg(sym, color, px){
+    return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 40 40" style="overflow:visible; display:block;">'+
+      sym.p.map(function(q){ return '<path d="'+q.d+'" fill="'+(q.f?color:"none")+'" stroke="'+color+'" stroke-width="2.4"/>'; }).join("")+
+      (sym.t||[]).map(function(q){ return '<text x="'+q.x+'" y="'+q.y+'" fill="'+color+'" font-size="'+(q.z||10)+'" font-weight="700" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">'+escapeHtml(q.s)+'</text>'; }).join("")+
+      '</svg>';
+  }
+  function pbDrawSym(ctx, it){
+    var sym = PB_SYMBOLS.find(function(x){ return x.key===it.sym; }); if(!sym) return;
+    var k = (it.size||40)/40;
+    ctx.save();
+    ctx.translate(it.x-(it.size||40)/2, it.y-(it.size||40)/2); ctx.scale(k, k);
+    ctx.strokeStyle = it.color||"#d33"; ctx.fillStyle = it.color||"#d33"; ctx.lineWidth = 2.4;
+    sym.p.forEach(function(q){ var pth = new Path2D(q.d); if(q.f) ctx.fill(pth); ctx.stroke(pth); });
+    (sym.t||[]).forEach(function(q){ ctx.font = "700 "+(q.z||10)+"px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(q.s, q.x, q.y); });
+    ctx.restore();
+  }
   var PB_STAMPS = [
     {key:"contract", label:"契約時仕様", autoDate:false},
     {key:"quote_pending", label:"見積もり依頼中", autoDate:true}
@@ -14923,6 +14958,7 @@
   }
   function pbSetTool(tool){
     pb.tool = tool; pb.shape = null;
+    if(tool!=="item") pb.pendingItem = null; // 記号を続けて置くのは、別の道具を選ぶまで
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.classList.toggle("active", b.dataset.pbtool===tool); });
     document.querySelectorAll("#pbModal button[data-pbshape]").forEach(function(b){ b.classList.remove("active"); });
   }
@@ -14945,8 +14981,10 @@
     var symSel = document.getElementById("pbSymbolSelect");
     var stSel = document.getElementById("pbStampSelect");
     if(symSel && symSel.options.length===1){
+      var groups = {};
       PB_SYMBOLS.forEach(function(s){
-        var o = document.createElement("option"); o.value = s.key; o.textContent = s.glyph+" "+s.label; symSel.appendChild(o);
+        var g = groups[s.group]; if(!g){ g = groups[s.group] = document.createElement("optgroup"); g.label = s.group; symSel.appendChild(g); }
+        var o = document.createElement("option"); o.value = s.key; o.textContent = s.label; g.appendChild(o);
       });
     }
     if(stSel && stSel.options.length===1){
@@ -14990,6 +15028,11 @@
     var layer = document.getElementById("pbItemsLayer");
     if(!layer) return;
     layer.innerHTML = pb.items.map(function(it){
+      if(it.kind==="symbol" && it.sym){
+        var sym = PB_SYMBOLS.find(function(x){ return x.key===it.sym; });
+        if(sym) return '<div class="pbitem sym" data-itemid="'+it.id+'" title="'+escapeHtml(sym.label)+'（ドラッグで動かせます）" style="left:'+(it.x*pb.zoom)+'px; top:'+(it.y*pb.zoom)+'px;">'+
+          pbSymSvg(sym, it.color||"#d33", Math.round((it.size||40)*pb.zoom))+'<button class="pbitem-del" data-delitem="'+it.id+'">×</button></div>';
+      }
       var isText = it.kind==="text";
       var extraStyle = isText ? ("color:"+(it.color||"#000")+"; font-size:"+Math.round((it.fontPx||16)*pb.zoom)+"px;") : "";
       return '<div class="pbitem'+(it.kind==="stamp"?" stamp":"")+(isText?" text":"")+'" data-itemid="'+it.id+'" style="left:'+(it.x*pb.zoom)+'px; top:'+(it.y*pb.zoom)+'px; '+extraStyle+'">'+
@@ -15006,7 +15049,7 @@
     ctx.closePath();
   }
   function pbSetShape(shape){
-    pb.tool = "shape"; pb.shape = shape;
+    pb.tool = "shape"; pb.shape = shape; pb.pendingItem = null;
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.classList.remove("active"); });
     document.querySelectorAll("#pbModal button[data-pbshape]").forEach(function(b){ b.classList.toggle("active", b.dataset.pbshape===shape); });
   }
@@ -15268,6 +15311,7 @@
       ctx.drawImage(pb.baseCanvas, 0, 0);
       if(!pb.items || !pb.items.length){ tmp.toBlob(function(blob){ resolve(blob); }, format, quality); return; }
       pb.items.forEach(function(it){
+        if(it.kind==="symbol" && it.sym){ pbDrawSym(ctx, it); return; }
         if(it.kind==="text"){
           // Plain colored text, no chip box — matches how typed notes
           // looked before they became movable/deletable items. Centered
@@ -16834,9 +16878,12 @@
       if(pb.tool==="view") return;
       if(pb.tool==="item" && pb.pendingItem){
         var ipos = pbGetPos(e);
-        pb.items.push({ id: uid("pbi"), kind: pb.pendingItem.kind, text: pb.pendingItem.text, x: ipos.x, y: ipos.y });
-        pb.pendingItem = null;
+        var pi = pb.pendingItem;
+        pb.items.push({ id: uid("pbi"), kind: pi.kind, text: pi.text, sym: pi.sym, color: pi.sym ? pb.color : undefined, size: pi.sym ? pbSymSize() : undefined, x: ipos.x, y: ipos.y });
         pbRenderItems();
+        // 記号は続けて置ける（別の道具を選ぶか、別の記号を選ぶまで）
+        if(pi.sym){ return; }
+        pb.pendingItem = null;
         pbSetTool("pen");
         return;
       }
@@ -16906,7 +16953,7 @@
     document.getElementById("pbSymbolSelect").addEventListener("change", function(e){
       var key = e.target.value; if(!key) return;
       var sym = PB_SYMBOLS.find(function(s){ return s.key===key; });
-      if(sym){ pb.pendingItem = { kind:"symbol", text: sym.glyph+" "+sym.label }; pbSetTool("item"); toast("配置したい場所をクリックしてください"); }
+      if(sym){ pb.pendingItem = { kind:"symbol", sym: sym.key, text: sym.label }; pbSetTool("item"); toast("「"+sym.label+"」を置きたい場所を押してください（続けて置けます。やめるときはペンなど別の道具を選ぶ）", 6000); }
       e.target.value = "";
     });
     document.getElementById("pbStampSelect").addEventListener("change", function(e){
