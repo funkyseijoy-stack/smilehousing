@@ -1255,7 +1255,8 @@ function homeHtml(){ return homeParts().main; }
     if(ntcs.length) out += '<div class="sechd" id="sec-ntc"><h3>お知らせ・豆知識</h3></div><div class="ntc-grid">'+ntcs.map(noticeHtml).join("")+'</div>';
     var procs = data.notices.filter(function(n){ return n.kind==="process"; });
     if(procs.length) out += '<div class="sechd" id="sec-proc"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
-    return { main: mainOut, rest: out };
+    // 決定のはんこを押したものは、ホームのいちばん下にまとめる
+    return { main: mainOut + pendingCardsHtml("stamped"), rest: out };
   }
   function noticeHtml(n){
     return '<div class="ntc-wrap">'+(n.tag?'<span class="ntag'+(n.kind==="process"?" proc":"")+'">'+esc(n.tag)+'</span>':'')+
@@ -1646,7 +1647,8 @@ function homeHtml(){ return homeParts().main; }
   }
   // ホームの「ご確認・ご決定ください」：決定ボタンを出していて返事のないカードと、金額が入った追加見積り（オプション）。
   // 決定・変更のご依頼・承認・見送りをすると、ホームから外れる（各部位の項目にはそのまま残る）
-  function pendingCardsHtml(){
+  // mode が "stamped" のときは、決定のはんこを押したカードだけ（ホームのいちばん下「🔴 決定したもの」）
+  function pendingCardsHtml(mode){
     var cards = [];
     // 「決定」を押したカードは、はんこ付きでホームにずっと残す（決定待ちと追加見積りのあと、決定した新しい順。4件め以降は「ほか n件」）
     var stamped = [], seenSt = {};
@@ -1681,6 +1683,13 @@ function homeHtml(){ return homeParts().main; }
       if(!e.stamped) pendN++;
     };
     var asks = askItems();
+    if(mode==="stamped"){
+      stamped.forEach(addCard);
+      if(stHidden) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">ほか '+stHidden+'件を見る</button>');
+      else if(view.stampAll && stamped.length > ST_LIM) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">閉じる ▴</button>');
+      if(!cards.length) return "";
+      return '<div class="sechd"><h3>🔴 決定したもの</h3><span class="countpill">'+(stamped.length+stHidden)+'件</span></div><div class="pcards">'+cards.join("")+'</div>';
+    }
     asks.forEach(addCard);
     // 記録のカードの中に出した追加見積りは、ここには重ねて出さない（ホームに出ている記録・決定待ち・決定済みのカード）
     var onCard = {};
@@ -1701,11 +1710,9 @@ function homeHtml(){ return homeParts().main; }
         '<div class="pamt">'+esc(String(x.amount||""))+'<span class="tx">（税抜き）</span></div>'+
         '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
     });
-    stamped.forEach(addCard);
-    if(stHidden) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">決定したもの ほか '+stHidden+'件を見る</button>');
-    else if(view.stampAll && stamped.length > ST_LIM) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">閉じる ▴</button>');
+    // 決定のはんこを押したカードは、ホームのいちばん下の「🔴 決定したもの」にまとめる
     if(!cards.length) return "";
-    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">'+(pendN ? '決定待ち '+pendN+'件' : 'すべて決定済み')+'</span></div>'+
+    return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">決定待ち '+pendN+'件</span></div>'+
       '<p class="plead">こちらから、決定・変更のご依頼ができます。</p><div class="pcards">'+cards.join("")+'</div>';
   }
   // ---- ホームの「ご確認ください」：決定ボタンを出しているカードのうち、まだ検討中のもの ----
@@ -1726,11 +1733,12 @@ function homeHtml(){ return homeParts().main; }
     homeRefKeys = {};
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.open||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
     // スタッフが「おうちノートのホームに出す」にした記録・写真・資料だけ。出した順（新しい順）
-    var list = (data.notes||[]).filter(function(n){ return n.homeShow && hasBody(n) && !homeLatestIds[n.id]; }).map(function(n){ return { n:n, at:n.homeShowAt }; });
+    // 決定のはんこを押したものは、いちばん下の「🔴 決定したもの」にまとめるので、ここには出さない
+    var list = (data.notes||[]).filter(function(n){ if(!(n.homeShow && hasBody(n) && !homeLatestIds[n.id])) return false; var f0 = noteDecItem(n); return !(f0 && f0.x.cardStatus==="決定"); }).map(function(n){ return { n:n, at:n.homeShowAt }; });
     var seenDoc = {};
     (data.categories||[]).forEach(function(c){
       catAllItems(c).forEach(function(x){
-        if(!x.homeShow || x.type==="note" || !x.file || !x.file.url) return;
+        if(!x.homeShow || x.type==="note" || !x.file || !x.file.url || x.cardStatus==="決定") return;
         var k = x.docId || x.file.url; if(seenDoc[k]) return; seenDoc[k] = 1;
         list.push({ x:x, c:c, at:x.homeShowAt });
       });
