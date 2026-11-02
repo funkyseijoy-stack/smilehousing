@@ -13894,11 +13894,15 @@
       askChoice("保存のしかた", "書き込んだ図面をどう保存しますか？", [
         {label:"① 上書きで保存（元のファイルを書き込んだ版に入れ替える）", value:"over"},
         {label:"② 別で保存（元のファイルも残して、書き込んだ版を足す）", value:"new"}
-      ], function(v){ resolve(v||null); });
+      ].concat(pb.pdfDoc ? [{label:"③ 画像（写真）にして置き換える（PDFを、いま開いているページの絵1枚に）", value:"img"}] : []), function(v){
+        pb.forceImage = (v==="img");
+        resolve(v==="img" ? "over" : (v||null));
+      });
     });
   }
   // 上書き用：PDFは全ページ（書き込んだページは書き込み入り、ほかは元のまま）を1つのPDFに
   async function pbFullOutput(blob){
+    if(pb.forceImage){ pb.forceImage = false; return { blob: blob, type:"image/png", ext:"png" }; }
     if(pb.pdfDoc && pb.pdfNumPages>1){
       var bl = [];
       for(var pg=1; pg<=pb.pdfNumPages; pg++) bl.push(pg===pb.pdfPage ? blob : await pbRenderPdfPageToBlob(pg));
