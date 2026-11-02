@@ -513,7 +513,8 @@
   .notemenu .notemenu-draw button{ width:auto; display:inline-block; }
   .notemenu-h{ font-size:.85rem; color:var(--muted); font-weight:700; padding:6px 8px 2px; }
   .nlines-x{ margin:6px 0; }
-  .nlx{ border:1px solid var(--border); border-radius:10px; padding:8px 10px; margin-block-end:6px; background:var(--surface); }
+  .nlx{ position:relative; border:1px solid var(--border); border-radius:10px; padding:8px 96px 8px 10px; margin-block-end:6px; background:var(--surface); }
+  .nlx .nlxops{ position:absolute; top:6px; right:6px; }
   .nlx .nlxt{ white-space:pre-wrap; }
   .nlx .nlxs{ font-size:.85rem; margin-block-start:4px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
   .recview{ display:flex; gap:6px; flex-wrap:wrap; margin-block:0 10px; }
@@ -6282,7 +6283,7 @@
   function lineHash(t){ var h = 5381; t = String(t||""); for(var i=0;i<t.length;i++) h = ((h*33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); }
   // 行に付けたファイル・「お客様に決定してもらう」の行（記録カードに出す）
   function noteLineExtrasHtml(n){
-    var ls = (n.noteLines||[]).filter(function(l){ return l && String(l.t||"").trim() && (l.ask || (l.f && l.f.length)); });
+    var ls = (n.noteLines||[]).map(function(l, idx){ return l ? Object.assign({__i:idx}, l) : null; }).filter(function(l){ return l && String(l.t||"").trim() && (l.ask || (l.f && l.f.length)); });
     if(!ls.length) return "";
     return '<div class="nlines-x">'+ls.map(function(l){
       var t = String(l.t).trim(), st = "";
@@ -6294,10 +6295,130 @@
           : '<span class="pill" style="background:#fdecea; color:#b3261e;">🔘 決定待ち'+(n.reflected?'':'（未反映）')+'</span>';
       }
       var mk = l.m==="d"?"✅ ":l.m==="o"?"💭 ":"";
-      return '<div class="nlx"><div class="nlxt">'+mk+escapeHtml(t)+'</div><div class="nlxs">'+st+(l.p&&l.p.scope?partChipHtml(l.p):'')+'</div>'+
+      return '<div class="nlx"><button type="button" class="btn ghost small nlxops" data-nlxops="'+n.id+'|'+l.__i+'" title="この行の操作">⋮ 操作</button><div class="nlxt">'+mk+escapeHtml(t)+'</div><div class="nlxs">'+st+(l.p&&l.p.scope?partChipHtml(l.p):'')+'</div>'+
         (l.f && l.f.length ? '<div style="margin-block-start:4px;">'+fileThumbRowHtml(l.f, 84)+'</div>' : '')+'</div>';
     }).join("")+'</div>';
   }
+  // 保存済みの記録の「行ごとの小さなカード」の「⋮ 操作」（入力画面の行の「⋯」と同じ並び。押すとその場で記録に保存）
+  async function saveNoteLineChange(n, msg){
+    n.updatedAt = nowIso(); render();
+    var ok = await saveDoc("meetingNotes", n.id, n);
+    if(ok===false){ toast("保存に失敗しました"); return false; }
+    if(n.specPart) upsertNoteSpecEntry(n);
+    if(msg) toast(msg, 6000);
+    return true;
+  }
+  function noteLineOps(noteId, idx){
+    var n = state.meetingNotes.find(function(x){ return x.id===noteId; }); if(!n) return;
+    var l = (n.noteLines||[])[idx]; if(!l) return;
+    var t = String(l.t||"").trim(), files = l.f || [];
+    var fnm = function(f){ var x = f.name||"ファイル"; return x.length>20 ? x.slice(0,20)+"…" : x; };
+    var hasAct = function(tp){ return (n.lineActs||[]).some(function(a){ return a.t===t && a.type===tp; }); };
+    var hasPart = !!(l.p && l.p.scope);
+    var draws = files.map(function(f, i){ return {f:f, i:i}; }).filter(function(x){ return specDrawable(x.f); });
+    opsPopup("この行の操作", "「"+t.slice(0,40)+"」", [
+      ["✏️ 書き込む", draws.map(function(x){ return {label:"✏️ 「"+fnm(x.f)+"」に書き込む", value:"draw:"+x.i}; })],
+      ["📎 ファイル", files.map(function(f, i){ return {label:"👁 「"+fnm(f)+"」を見る", value:"view:"+i}; }).concat([
+        {label:"この行にファイルを付ける", value:"file"},
+        {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
+        {label:"✉️ Gmailから取り込む", value:"gmail"}]).concat(files.map(function(f, i){ return {label:"「"+fnm(f)+"」をこの行から外す", value:"rm:"+i, danger:true}; }))],
+      ["🏠 お客様へ", [{label: l.ask ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!l.ask}]],
+      ["🗂 整理", [{label: hasPart ? "✓部位："+partText(l.p)+"（変える）" : "この行の部位を付ける", value:"part", on: hasPart}].concat(hasPart ? [{label:"部位を外す", value:"partrm"}] : [])],
+      ["📋 タスク・依頼", [
+        {label:"📝 タスクを作る（入力画面で担当・業者・期限など）", value:"taskform"},
+        {label:(hasAct("task")?"✓ ":"")+"社内タスクにする（担当を選ぶ）", value:"task", on: hasAct("task")},
+        {label:(hasAct("est")?"✓ ":"")+"追加見積（おうちノート）に入れる", value:"est", on: hasAct("est")},
+        {label:(hasAct("estreq")?"✓ ":"")+"見積依頼（Gmail下書き・添付付き）", value:"estreq", on: hasAct("estreq")}]]
+    ], async function(v){
+      if(!v) return;
+      var k = v.split(":"), act = k[0], i = +k[1];
+      var addRefs = async function(refs){
+        refs = (refs||[]).filter(function(r){ return r && r.url && !(l.f||[]).some(function(f){ return f.url===r.url; }); });
+        if(!refs.length){ toast("付けるファイルがありません（すでに付いています）"); return; }
+        l.f = (l.f||[]).concat(refs);
+        await saveNoteLineChange(n, "この行に "+refs.length+" 件のファイルを付けました");
+      };
+      if(act==="view"){ var vf = files[i]; if(vf) window.open(vf.url, "_blank"); return; }
+      if(act==="draw"){
+        var df = files[i]; if(!df) return;
+        var sp = l.p || n.specPart || {scope:"general"}, rk = "nl:"+n.id+":"+idx+":"+i;
+        specDrawReg[rk] = { url:df.url, isPdf: String(df.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(df.name||""), name: df.name||"", scope:sp.scope, category:sp.category||null, roomId:sp.roomId||null, side:sp.side||null,
+          src:{kind:"noteline", noteId:n.id, idx:idx} };
+        openSpecDraw(rk); return;
+      }
+      if(act==="rm"){ (l.f||[]).splice(i, 1); await saveNoteLineChange(n, "この行からファイルを外しました（元のファイルは消えません）"); return; }
+      if(act==="file"){
+        var inp = document.createElement("input"); inp.type = "file"; inp.multiple = true; inp.accept = ".pdf,image/*";
+        inp.onchange = async function(){
+          var fs = Array.prototype.slice.call(inp.files||[]); if(!fs.length) return;
+          toast("アップロードしています…");
+          var refs = [], fail = 0;
+          for(var q=0;q<fs.length;q++){
+            try{ var r = await assets.upload(fs[q]); blobCache[r.id] = fs[q]; refs.push({ id:r.id, url:r.url, contentType:r.contentType||fs[q].type, name:fs[q].name }); }catch(e){ fail++; }
+          }
+          if(fail) toast(fail+" 件をアップロードできませんでした");
+          if(refs.length) await addRefs(refs);
+        };
+        inp.click(); return;
+      }
+      if(act==="pick"){ mnLinePickRegistered(t, { pid:n.projectId, onPick:addRefs }); return; }
+      if(act==="gmail"){ gmailPickFiles(n.projectId, "「"+t.slice(0,30)+"」に付けます", addRefs); return; }
+      if(act==="ask"){
+        if(l.m==="c"){ toast("🔒社内で確認の行は、お客様には出せません"); return; }
+        l.ask = !l.ask;
+        if(l.ask){
+          if(!n.reflected){ n.reflected = true; n.reflectedAt = nowIso(); }
+          if(!n.specPart) n.specPart = recLeafPart("general", "", projectById(n.projectId));
+        }
+        await saveNoteLineChange(n, l.ask ? "この行を、お客様に決定してもらうカードにしました（おうちノートに出ます）" : "決定のお願いを取り消しました");
+        return;
+      }
+      if(act==="part"){
+        askSpecPart(async function(part){
+          if(!part) return;
+          l.p = part;
+          if(!n.specPart) n.specPart = recLeafPart("general", "", projectById(n.projectId));
+          await saveNoteLineChange(n, "この行の部位を「"+partText(part)+"」にしました");
+        }, n.projectId);
+        return;
+      }
+      if(act==="partrm"){ delete l.p; await saveNoteLineChange(n, "この行の部位を外しました"); return; }
+      if(act==="taskform"){
+        openTaskForm();
+        var pp = projectById(n.projectId);
+        if(pp){ var d0 = deptOfProject(pp); document.getElementById("tfDept").value = d0; tfRenderProjects(d0, n.projectId); }
+        document.getElementById("tfContent").value = t;
+        var sp2 = l.p || n.specPart || null;
+        if(sp2){ taskFormVendorSpec = Object.assign({}, sp2, { label: partText(sp2) }); document.getElementById("tfVendorSpecLabel").textContent = partText(sp2); }
+        tfExtras = (l.f||[]).map(function(f){ return { key: uid("tfx"), ref: Object.assign({}, f) }; });
+        renderTfFileList();
+        taskFormOnSaved = function(tk){
+          n.lineActs = n.lineActs || [];
+          n.lineActs.push({ t:t, type:"task", ref:tk.id, at:nowIso() });
+          saveNoteLineChange(n);
+        };
+        return;
+      }
+      if(act==="task"){ askAssignee(function(who){ if(who===null) return; runNoteLineActs(n, [{text:t, type:"task", assignee:who}]); }); return; }
+      if(act==="est"){
+        if(hasAct("est")){ toast("この行はすでに追加見積に入っています"); return; }
+        runNoteLineActs(n, [{text:t, type:"est"}]); return;
+      }
+      if(act==="estreq"){
+        askVendorForBadge(function(ids){
+          if(ids===null) return;
+          ids = (ids||[]).filter(function(id){ return vendorById(id); });
+          if(!ids.length){ toast("依頼先の業者を1社以上選んでください"); return; }
+          runNoteLineActs(n, [{text:t, type:"estreq", vendorIds:ids}]);
+        });
+      }
+    });
+  }
+  document.addEventListener("click", function(e){
+    var b = e.target.closest("[data-nlxops]"); if(!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var q = b.dataset.nlxops.split("|"); noteLineOps(q[0], +q[1]);
+  });
   // 記録全体の決定ボタン：🔘 決定待ち／🔴 お客様が決定
   function noteDecMarkHtml(n){
     var d = (state.noteDecisions||[]).find(function(x){ return x.cardKey==="n:"+n.id && !x.deletedAt; });
@@ -13532,9 +13653,11 @@
     out.sort(function(a,b){ return b.at.localeCompare(a.at); });
     return out;
   }
-  function mnLinePickRegistered(line){
-    var pid = editingMeetingNoteProjectId();
+  function mnLinePickRegistered(line, opt){
+    opt = opt || {};
+    var pid = opt.pid || editingMeetingNoteProjectId();
     var rows = mnRegisteredFiles(pid);
+    if(opt.onPick) rows = rows.filter(function(r){ return !!r.ref; }); // 保存済みの記録へは、保存済みのファイルだけ
     if(!rows.length){ toast("この案件にはまだ登録済みのファイルがありません", 6000); return; }
     var groups = ["✏️ この画面で書き込んだもの","📐 図面","📄 見積の書類","📷 部位の写真・PDF","🗒 記録の添付","📋 タスクの添付"];
     var picked = {};
@@ -13568,6 +13691,7 @@
         return;
       }
       if(e.target.closest("[data-mnr-ok]")){
+        if(opt.onPick){ var refs = Object.keys(picked).map(function(k){ return rows[+k] && Object.assign({}, rows[+k].ref); }).filter(Boolean); ov.remove(); opt.onPick(refs); return; }
         if(mnLines().indexOf(line)<0){ ov.remove(); toast("行が見つかりません（文を書き換えた場合は、もう一度「⋯」から選んでください）"); return; }
         var arr = mnLineFiles[line] = mnLineFiles[line] || [], added = 0;
         Object.keys(picked).forEach(function(k){
@@ -15421,6 +15545,15 @@
         var ok = await saveDoc("meetingNotes", n.id, n);
         if(ok===false){ toast("保存に失敗しました"); return; }
         if(n.specPart) upsertNoteSpecEntry(n);
+      } else if(s.kind==="noteline"){
+        var nl = state.meetingNotes.find(function(x){ return x.id===s.noteId; });
+        var ln = nl && (nl.noteLines||[])[s.idx];
+        var fi = ln ? (ln.f||[]).findIndex(function(f){ return f.url===s.url; }) : -1;
+        if(fi<0){ toast("元のファイルが見つかりませんでした（「別で保存」をお使いください）"); return; }
+        var r3 = await assets.upload(out.blob, {type: out.type}); blobCache[r3.id] = out.blob;
+        ln.f[fi] = { id:r3.id, url:r3.url, contentType:r3.contentType||out.type, name:nm };
+        nl.updatedAt = nowIso(); render();
+        if(await saveDoc("meetingNotes", nl.id, nl)===false){ toast("保存に失敗しました"); return; }
       } else if(s.kind==="spec"){
         var p = state.specPhotos.find(function(x){ return x.id===s.photoId; });
         if(!p){ toast("元のファイルが見つかりませんでした（「別で保存」をお使いください）"); return; }
@@ -15432,6 +15565,24 @@
       } else return;
       logActivity("図面に書き込んで上書き保存しました");
       toast("上書きで保存しました（このカードのファイルが書き込んだ版になりました。元の図面・書類はそのままです）", 7000);
+      closePlanBoard();
+    }catch(e){ toast("保存に失敗しました"); }
+  }
+  // 記録の行のファイルに書き込んで「② 別で保存」：同じ行の、元のファイルのすぐ後ろに書き込んだ版を足す
+  async function pbSaveNoteLineNew(target, blob){
+    var out = await pbFullOutput(blob); if(!out) return;
+    var s = target.src, nm = String(target.fileName||"書き込み.png").replace(/\.png$/i, "."+out.ext);
+    var nl = state.meetingNotes.find(function(x){ return x.id===s.noteId; });
+    var ln = nl && (nl.noteLines||[])[s.idx];
+    if(!ln){ toast("記録の行が見つかりませんでした"); return; }
+    try{
+      var r = await assets.upload(out.blob, {type: out.type}); blobCache[r.id] = out.blob;
+      ln.f = ln.f || [];
+      var fi = ln.f.findIndex(function(f){ return f.url===s.url; });
+      ln.f.splice(fi<0 ? ln.f.length : fi+1, 0, { id:r.id, url:r.url, contentType:r.contentType||out.type, name:nm });
+      nl.updatedAt = nowIso(); render();
+      if(await saveDoc("meetingNotes", nl.id, nl)===false){ toast("保存に失敗しました"); return; }
+      toast("書き込んだ版をこの行に足しました（元のファイルも残っています）", 6000);
       closePlanBoard();
     }catch(e){ toast("保存に失敗しました"); }
   }
@@ -15490,6 +15641,7 @@
         } else if(target.asNewOnly && target.src){
           var mode2 = await pbAskSaveMode(); if(!mode2) return;
           if(mode2==="over") await pbSaveSpecCardOverwrite(target, blob);
+          else if(target.src.kind==="noteline") await pbSaveNoteLineNew(target, blob);
           else await pbSaveSpecAsNew(target, blob);
         } else {
           await pbSaveSpecAsNew(target, blob);
