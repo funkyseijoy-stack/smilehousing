@@ -66,6 +66,13 @@
 
   /* category list */
   .catlist{ display:flex; flex-direction:column; gap:12px; }
+  /* ホームの「📝 打合せ記録」：プランボード・写真・書類のカードが続くときは横に2枚ずつ */
+  .hgrid2{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+  .hgrid2 .tli{ padding:10px; min-width:0; }
+  .hgrid2 .tlh{ gap:5px; }
+  .hgrid2 .thumbs.one{ max-width:none !important; }
+  .hgrid2 .homelink{ text-align:left; margin-bottom:0; }
+  .hgrid2 .btn{ white-space:normal; }
   .cat{ display:flex; align-items:center; gap:14px; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:12px 14px; cursor:pointer; text-align:left; width:100%; }
   .cat .ic{ width:56px; height:56px; border-radius:12px; background:var(--chip); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--brown); }
   .cat .ic svg{ width:30px; height:30px; }
@@ -1775,7 +1782,7 @@ function homeHtml(){ return homeParts().main; }
     if(!list.length) return "";
     var at = function(e){ return Date.parse(e.at||(e.n ? (e.n.upd||e.n.createdAt) : (e.x.upd||e.x.at))||"")||0; };
     list.sort(function(a,b){ return at(b)-at(a); });
-    return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+list.map(function(e){
+    var cardsHtml = list.map(function(e){
         if(e.n){
           var f = noteDecItem(e.n);
           if(f && f.x.showDecide && f.x.key) homeRefKeys[f.x.key] = 1;
@@ -1792,7 +1799,13 @@ function homeHtml(){ return homeParts().main; }
           '<div class="thumbs one" style="max-width:220px;">'+thumbHtml(x.file,"")+'</div>'+
           homeDecHtml({ title: part }, { c:c, x:x, room:room })+
           '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>';
-      }).join("")+'</div>';
+      });
+    // 打合せ記録（文章のカード）は横いっぱい、続けて並ぶプランボード・写真・書類のカードは2列にまとめる
+    var out = "", buf = [];
+    var flush = function(){ if(!buf.length) return; out += buf.length>1 ? '<div class="hgrid2">'+buf.join("")+'</div>' : buf[0]; buf = []; };
+    list.forEach(function(e, i){ if(e.n){ flush(); out += cardsHtml[i]; } else buf.push(cardsHtml[i]); });
+    flush();
+    return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+out+'</div>';
   }
   function latestNotesHtml(){
     // ホームは「総合」（部位なしも含む）の記録だけ。部位ごとの記録は「家づくり」の各項目で見る。
