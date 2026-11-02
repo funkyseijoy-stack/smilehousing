@@ -6748,7 +6748,7 @@
       var dateLabel = n.date ? n.date : fmtTs(n.createdAt);
       var nsp = n.specPart || {scope:"general", category:null, roomId:null, side:null};
       var filesHtml = (n.files && n.files.length) ? '<div style="margin-block-start:2px; margin-block-end:8px;">'+fileThumbRowHtml(n.files, 120)+'</div>' : "";
-      var drawMenuHtml = (n.files && n.files.length) ? specDrawBtnsHtml("n:"+n.id, n.files, {scope:nsp.scope, category:nsp.category||null, roomId:nsp.roomId||null, side:nsp.side||null}, true) : "";
+      var drawMenuHtml = (n.files && n.files.length) ? specDrawBtnsHtml("n:"+n.id, n.files, {scope:nsp.scope, category:nsp.category||null, roomId:nsp.roomId||null, side:nsp.side||null, src:{kind:"note", noteId:n.id}}, true) : "";
       var chHtml = (n.channel && n.channel!=="打合せ") ? '<span class="pill" style="background:#06c755; color:#fff; font-weight:700;">'+escapeHtml(n.channel)+'</span> ' : "";
       var specHtml = n.specPart ?
         partChipHtml(n.specPart) : "";
@@ -8297,8 +8297,8 @@
     if(!list.length) return "";
     return (menu ? '' : '<div class="row" style="gap:6px; flex-wrap:wrap; margin-block-start:6px;">')+list.map(function(f, i){
       var k = key+":"+i;
-      specDrawReg[k] = { url:f.url, isPdf: String(f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||f.fileName||""), name: f.name||f.fileName||"", scope:ctx.scope, category:ctx.category, roomId:ctx.roomId, side:ctx.side };
-      return '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-draw="'+escapeHtml(k)+'" title="プランボードで書き込む（元の図面はそのまま残り、書き込んだ版が新しい変更履歴になります）">✏️ '+(list.length>1?(i+1)+'枚目に書き込む':'書き込む')+'</button>';
+      specDrawReg[k] = { url:f.url, isPdf: String(f.contentType||"").indexOf("pdf")>=0 || /\.pdf$/i.test(f.name||f.fileName||""), name: f.name||f.fileName||"", scope:ctx.scope, category:ctx.category, roomId:ctx.roomId, side:ctx.side, src: ctx.src||null };
+      return '<button class="pill tag small" style="cursor:pointer; border:none; font-family:inherit;" data-spec-draw="'+escapeHtml(k)+'" title="プランボードで書き込む（保存のときに「上書き」か「別で保存」を選べます）">✏️ '+(list.length>1?(i+1)+'枚目に書き込む':'書き込む')+'</button>';
     }).join("")+(menu ? '' : '</div>');
   }
   function openSpecDraw(k){
@@ -8309,7 +8309,8 @@
     pbUpdatePdfPageNav();
     var base = String(d.name||"").replace(/\.[^.]+$/,"") || "図面";
     pb.saveTarget = { type:"spec", scope:d.scope, category:d.category||null, roomId:d.roomId||null, side:d.side||null, kind:"planboard", asNewOnly:true,
-      fileName: base+"_書き込み_"+todayStr().slice(5).replace("-","")+".png" };
+      fileName: base.replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","")+".png",
+      src: d.src ? Object.assign({ url:d.url, name:d.name }, d.src) : null }; // src：上書きできる元（記録の添付・部位の写真）
     document.getElementById("pbMailTo").value = "";
     document.getElementById("pbMailSubject").value = "";
     document.getElementById("pbMailBody").value = "お世話になっております。住まいるハウジングでございます。\n添付のプランボードをご確認ください。";
@@ -8427,7 +8428,7 @@
         '</div>'+
         fileThumbRowHtml(noteFiles, 84)+
         memoHtml+
-        specOpsHtml(p.id, opsSections(specDrawBtnsHtml(p.id, noteFiles, drawCtx, true)), opsDel)+
+        specOpsHtml(p.id, opsSections(specDrawBtnsHtml(p.id, noteFiles, Object.assign({}, drawCtx, {src:{kind:"note", noteId:(p.source&&p.source.noteId)}}), true)), opsDel)+
         '</div>';
     }
     return '<div class="'+cardClass+'">'+
@@ -8435,7 +8436,7 @@
       '<div class="spectl-meta">'+metaHtml+'</div>'+
       sentBadgesHtml+
       memoHtml+
-      specOpsHtml(p.id, opsSections(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], drawCtx, true) : ''), opsDel)+
+      specOpsHtml(p.id, opsSections(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], Object.assign({}, drawCtx, {src:{kind:"spec", photoId:p.id}}), true) : ''), opsDel)+
       '</div>';
   }
   function renderSpecTimeline(scope, category, roomId, side){
@@ -13051,7 +13052,7 @@
     }
     var newFiles = [], localsNow = fileInput ? Array.prototype.slice.call(fileInput.files||[]) : [];
     for(var li=0; li<localsNow.length; li++){
-      var upl = await uploadFilesAsAttachmentsArray([localsNow[li]]);
+      var upl = await uploadFilesAsAttachmentsArray([localsNow[li]._mnRepl || localsNow[li]]);
       if(upl.length) newFiles.push(upl[0]);
       await pushExtras(newFiles, "l:"+li);
     }
@@ -13424,9 +13425,10 @@
       });
     }
     locals.forEach(function(f, i){
-      if(!f._mnUrl) f._mnUrl = URL.createObjectURL(f);
-      rows.push('<div class="mnfrow"><span class="notefiletile mnfthumb">'+mnThumb(f._mnUrl, f.type, f.name)+'</span>'+
-        '<span class="mnfname">'+escapeHtml(f.name)+'<small>これから添付</small></span>'+
+      var fv = f._mnRepl || f;
+      if(!fv._mnUrl) fv._mnUrl = URL.createObjectURL(fv);
+      rows.push('<div class="mnfrow"><span class="notefiletile mnfthumb">'+mnThumb(fv._mnUrl, fv.type, fv.name)+'</span>'+
+        '<span class="mnfname">'+(f._mnRepl?'✏️ ':'')+escapeHtml(fv.name)+'<small>'+(f._mnRepl?'これから添付（書き込んだ版に上書き）':'これから添付')+'</small></span>'+
         '<button type="button" class="btn small" data-mnf-draw="l:'+i+'">✏️ 書き込む</button></div>');
       exRows("l:"+i);
     });
@@ -13448,6 +13450,7 @@
     var blob = null, name = "", ct = "", after = key;
     if(key.indexOf("l:")===0){
       var f = mnLocalFiles()[+key.slice(2)]; if(!f) return;
+      if(f._mnRepl) f = f._mnRepl; // 上書きした版にさらに書き込む
       blob = f; name = f.name; ct = f.type;
     } else if(key.indexOf("e:")===0){
       var en = editNoteFiles[+key.slice(2)]; if(!en) return;
@@ -13461,6 +13464,8 @@
     }
     if(!blob) return;
     mnOpenDraw(blob, name, mnIsPdf(ct, name), after);
+    // 上書きで保存できるように、書き込む元を覚えておく
+    pb.saveTarget.src = key.indexOf("l:")===0 ? {kind:"local", i:+key.slice(2)} : (key.indexOf("e:")===0 ? {kind:"edit", i:+key.slice(2)} : {kind:"extra", key:key});
   }
   // この案件に登録済みのファイル（図面・見積の書類＝ロック中のNETは除く／記録・部位の履歴の写真・PDF）を選んで行に付ける。
   // アップロードし直さず同じファイルを参照する（{ref}）。同じファイル（url）は1つにまとめる
@@ -13560,6 +13565,7 @@
     if(!mnIsPdf(ct, name) && !/^image\//.test(ct||blob.type||"")){ toast("書き込めるのは写真とPDFだけです"); return; }
     mnOpenDraw(blob, name, mnIsPdf(ct, name), "x", "line");
     pb.saveTarget.line = line;
+    pb.saveTarget.src = {kind:"line", line: line, item: it};
   }
   function mnOpenDraw(blob, name, isPdf, after, sink){
     document.getElementById("pbModal").hidden = false;
@@ -13572,7 +13578,30 @@
     pbLoadFromBlob(blob, isPdf);
   }
   // プランボードの保存：記録の入力画面に「書き込み済み」の新しい版として足す（元のファイルはそのまま）
+  // 書き込んだ版の保存のしかたを聞く（①上書き／②別で保存）。やめたら null
+  function pbAskSaveMode(){
+    return new Promise(function(resolve){
+      askChoice("保存のしかた", "書き込んだ図面をどう保存しますか？", [
+        {label:"① 上書きで保存（元のファイルを書き込んだ版に入れ替える）", value:"over"},
+        {label:"② 別で保存（元のファイルも残して、書き込んだ版を足す）", value:"new"}
+      ], function(v){ resolve(v||null); });
+    });
+  }
+  // 上書き用：PDFは全ページ（書き込んだページは書き込み入り、ほかは元のまま）を1つのPDFに
+  async function pbFullOutput(blob){
+    if(pb.pdfDoc && pb.pdfNumPages>1){
+      var bl = [];
+      for(var pg=1; pg<=pb.pdfNumPages; pg++) bl.push(pg===pb.pdfPage ? blob : await pbRenderPdfPageToBlob(pg));
+      try{ var merged = await combinePngBlobsToPdf(bl); if(merged) return { blob: merged, type:"application/pdf", ext:"pdf" }; }catch(e){}
+      toast("PDFにまとめられませんでした。「別で保存」をお使いください"); return null;
+    }
+    return { blob: blob, type:"image/png", ext:"png" };
+  }
   async function pbSaveToNoteForm(target, blob){
+    if(target.src){
+      var mode = await pbAskSaveMode(); if(!mode) return;
+      if(mode==="over"){ await pbOverwriteInForm(target, blob); return; }
+    }
     var pages = await new Promise(function(resolve){
       if(pb.pdfDoc && pb.pdfNumPages>1){
         askPagePicker("記録に入れるページを選んでください（"+pb.pdfNumPages+"ページ中）", pb.pdfNumPages, pb.pdfPage, function(v){ resolve(v); });
@@ -13605,6 +13634,32 @@
     renderMnFileList();
     toast("書き込んだ図面を記録に足しました（元のファイルも残ります。「記録する／更新」で保存されます）", 7000);
   }
+  // 記録・タスクの入力画面で「① 上書きで保存」：その記録（タスク）の中のファイルだけを書き込んだ版に入れ替える
+  // （見積タブの図面・書類など、参照している元の場所のファイルはそのまま）。保存は「記録する／更新」「追加／保存」のとき
+  async function pbOverwriteInForm(target, blob){
+    var out = await pbFullOutput(blob); if(!out) return;
+    var base = String(target.name||"図面").replace(/\.[^.]+$/,"").replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","");
+    var nm = base+"."+out.ext, s = target.src;
+    var asFile = function(){ try{ return new File([out.blob], nm, {type: out.type}); }catch(e){ var b = out.blob; b.name = nm; return b; } };
+    if(s.kind==="local"){
+      var f = mnLocalFiles()[s.i]; if(!f){ toast("元のファイルが見つかりませんでした"); return; }
+      f._mnRepl = asFile(); closePlanBoard(); renderMnFileList();
+    } else if(s.kind==="edit"){
+      var en = editNoteFiles[s.i]; if(!en){ toast("元のファイルが見つかりませんでした"); return; }
+      en.repl = asFile(); en.removed = false; closePlanBoard(); renderEditNoteFiles();
+    } else if(s.kind==="extra" || s.kind==="task"){
+      var list = s.kind==="task" ? tfExtras : mnExtras;
+      var x = list.find(function(y){ return y.key===s.key; }); if(!x){ toast("元のファイルが見つかりませんでした"); return; }
+      delete x.ref; x.file = out.blob; x.name = nm; x.type = out.type; x.url = null;
+      closePlanBoard(); if(s.kind==="task") renderTfFileList(); else renderMnFileList();
+    } else if(s.kind==="line"){
+      var arr = mnLineFiles[s.line] = mnLineFiles[s.line] || [];
+      var idx = arr.indexOf(s.item), it2 = { file: out.blob, name: nm, type: out.type };
+      if(idx>=0) arr[idx] = it2; else arr.push(it2);
+      closePlanBoard(); mnRender();
+    } else return;
+    toast(s.kind==="task" ? "書き込んだ版に上書きしました（「追加／保存」で保存されます。元の図面・書類はそのままです）" : "書き込んだ版に上書きしました（「記録する／更新」で保存されます。元の図面・書類はそのままです）", 7000);
+  }
   // ---- タスクの入力画面：案件の図面・プランボードを選んで添付（書き込んでからも可） ----
   var tfExtras = []; // {key, ref?:{id,url,contentType,name}, file?:Blob, name, type}
   function tfPlanRows(pid){
@@ -13631,6 +13686,7 @@
     var blob = x.file || await mnBlobOfRef(x.ref); if(!blob) return;
     var nm = x.ref ? x.ref.name : x.name, ct = x.ref ? x.ref.contentType : x.type;
     mnOpenDraw(blob, nm, mnIsPdf(ct, nm), "x", "task");
+    if(x.key) pb.saveTarget.src = {kind:"task", key: x.key}; // 一覧に入る前（図面から選んですぐ書き込む）は足すだけ
   }
   function tfPickPlan(){
     var pid = document.getElementById("tfProject").value;
@@ -15274,6 +15330,37 @@
       closePlanBoard();
     }catch(e){ toast("保存に失敗しました"); }
   }
+  // 記録の一覧・変更履歴のカードから書き込んで「① 上書きで保存」：そのカード（記録の添付／部位の写真・PDF）の
+  // ファイルだけを書き込んだ版に入れ替える。見積タブの図面・書類など、元の場所のファイルはそのまま
+  async function pbSaveSpecCardOverwrite(target, blob){
+    var out = await pbFullOutput(blob); if(!out) return;
+    var s = target.src, nm = String(target.fileName||"書き込み.png").replace(/\.png$/i, "."+out.ext);
+    try{
+      if(s.kind==="note"){
+        var n = state.meetingNotes.find(function(x){ return x.id===s.noteId; });
+        var idx = n ? (n.files||[]).findIndex(function(f){ return f.url===s.url; }) : -1;
+        if(idx<0){ toast("元のファイルが見つかりませんでした（「別で保存」をお使いください）"); return; }
+        var r = await assets.upload(out.blob, {type: out.type}); blobCache[r.id] = out.blob;
+        n.files[idx] = Object.assign({}, n.files[idx], { id:r.id, url:r.url, contentType:r.contentType||out.type, name:nm });
+        n.updatedAt = nowIso();
+        render();
+        var ok = await saveDoc("meetingNotes", n.id, n);
+        if(ok===false){ toast("保存に失敗しました"); return; }
+        if(n.specPart) upsertNoteSpecEntry(n);
+      } else if(s.kind==="spec"){
+        var p = state.specPhotos.find(function(x){ return x.id===s.photoId; });
+        if(!p){ toast("元のファイルが見つかりませんでした（「別で保存」をお使いください）"); return; }
+        var r2 = await assets.upload(out.blob, {type: out.type}); blobCache[r2.id] = out.blob;
+        p.assetId = r2.id; p.url = r2.url; p.contentType = r2.contentType||out.type; p.fileName = nm; p.updatedAt = nowIso();
+        render();
+        var ok2 = await saveDoc("specPhotos", p.id, p);
+        if(ok2===false){ toast("保存に失敗しました"); return; }
+      } else return;
+      logActivity("図面に書き込んで上書き保存しました");
+      toast("上書きで保存しました（このカードのファイルが書き込んだ版になりました。元の図面・書類はそのままです）", 7000);
+      closePlanBoard();
+    }catch(e){ toast("保存に失敗しました"); }
+  }
   async function pbSaveSpecAsNew(target, blob){
     try{
       var res2 = await assets.upload(blob, {type:"image/png"});
@@ -15326,6 +15413,10 @@
               resolve();
             });
           });
+        } else if(target.asNewOnly && target.src){
+          var mode2 = await pbAskSaveMode(); if(!mode2) return;
+          if(mode2==="over") await pbSaveSpecCardOverwrite(target, blob);
+          else await pbSaveSpecAsNew(target, blob);
         } else {
           await pbSaveSpecAsNew(target, blob);
         }
