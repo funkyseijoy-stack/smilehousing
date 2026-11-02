@@ -2034,6 +2034,7 @@
         <button class="tbtn" id="pbRotL" type="button" title="左に90度回す"><span class="ic">↺</span><span class="label">左</span></button>
         <button class="tbtn" id="pbRotR" type="button" title="右に90度回す"><span class="ic">↻</span><span class="label">右</span></button>
         <button class="tbtn" id="pbCrop" type="button" title="残したい範囲をなぞって切り取る"><span class="ic">✂</span><span class="label">トリミング</span></button>
+        <button class="tbtn" id="pbPaint" type="button" title="写真を、実物に近い絵（塗り絵のようなタッチ）にする"><span class="ic">🎨</span><span class="label">絵にする</span></button>
       </div>
       <div class="tool-group" id="pbPdfPageNav" hidden style="align-items:center; gap:6px;">
         <button class="tbtn" id="pbPdfPrev"><span class="ic">◀</span></button>
@@ -13894,15 +13895,11 @@
       askChoice("保存のしかた", "書き込んだ図面をどう保存しますか？", [
         {label:"① 上書きで保存（元のファイルを書き込んだ版に入れ替える）", value:"over"},
         {label:"② 別で保存（元のファイルも残して、書き込んだ版を足す）", value:"new"}
-      ].concat(pb.pdfDoc ? [{label:"③ 画像（写真）にして置き換える（PDFを、いま開いているページの絵1枚に）", value:"img"}] : []), function(v){
-        pb.forceImage = (v==="img");
-        resolve(v==="img" ? "over" : (v||null));
-      });
+      ], function(v){ resolve(v||null); });
     });
   }
   // 上書き用：PDFは全ページ（書き込んだページは書き込み入り、ほかは元のまま）を1つのPDFに
   async function pbFullOutput(blob){
-    if(pb.forceImage){ pb.forceImage = false; return { blob: blob, type:"image/png", ext:"png" }; }
     if(pb.pdfDoc && pb.pdfNumPages>1){
       var bl = [];
       for(var pg=1; pg<=pb.pdfNumPages; pg++) bl.push(pg===pb.pdfPage ? blob : await pbRenderPdfPageToBlob(pg));
@@ -15541,6 +15538,81 @@
       pbReplaceWithCanvas(c);
       toast(dir>0 ? "右に回しました" : "左に回しました", 1500);
     }catch(e){ toast("回せませんでした"); }
+  }
+  // ---- 絵にする：写真を、実物に近い絵（細かいざらつきをならして色の面と輪郭を残す）にする ----
+  // 画面で計算（Kuwahara フィルター＋やわらかい輪郭線＋少しだけ鮮やかに）。サーバー・AIは使わない。
+  function pbPaintFilter(src){
+    var w = src.width, h = src.height, d = src.data, n = w*h;
+    var W = w+1, H = h+1;
+    var sr = new Uint32Array(W*H), sg = new Uint32Array(W*H), sb = new Uint32Array(W*H), sl = new Float64Array(W*H), sq = new Float64Array(W*H);
+    for(var y=0;y<h;y++){
+      var rr=0, rg=0, rb=0, rl=0, rq=0;
+      for(var x=0;x<w;x++){
+        var i = (y*w+x)*4, R = d[i], G = d[i+1], B = d[i+2], L = 0.299*R+0.587*G+0.114*B;
+        rr+=R; rg+=G; rb+=B; rl+=L; rq+=L*L;
+        var k = (y+1)*W+(x+1), u = y*W+(x+1);
+        sr[k]=sr[u]+rr; sg[k]=sg[u]+rg; sb[k]=sb[u]+rb; sl[k]=sl[u]+rl; sq[k]=sq[u]+rq;
+      }
+    }
+    var r = Math.max(2, Math.round(Math.max(w,h)/350));
+    var out = new Uint8ClampedArray(n*4), lum = new Float32Array(n);
+    function box(A, x0, y0, x1, y1){ return A[y1*W+x1]-A[y0*W+x1]-A[y1*W+x0]+A[y0*W+x0]; }
+    for(var y=0;y<h;y++){
+      for(var x=0;x<w;x++){
+        var best = Infinity, br=0, bg=0, bb=0;
+        for(var q=0;q<4;q++){
+          var x0 = q&1 ? x : x-r, y0 = q&2 ? y : y-r;
+          var x1 = x0+r+1, y1 = y0+r+1;
+          if(x0<0) x0=0; if(y0<0) y0=0; if(x1>w) x1=w; if(y1>h) y1=h;
+          var c = (x1-x0)*(y1-y0); if(c<=0) continue;
+          var m = box(sl,x0,y0,x1,y1)/c, v = box(sq,x0,y0,x1,y1)/c - m*m;
+          if(v<best){ best=v; br=box(sr,x0,y0,x1,y1)/c; bg=box(sg,x0,y0,x1,y1)/c; bb=box(sb,x0,y0,x1,y1)/c; }
+        }
+        // 少しだけ鮮やかに
+        var g0 = 0.299*br+0.587*bg+0.114*bb, s = 1.12;
+        br = g0+(br-g0)*s; bg = g0+(bg-g0)*s; bb = g0+(bb-g0)*s;
+        var o = (y*w+x)*4; out[o]=br; out[o+1]=bg; out[o+2]=bb; out[o+3]=255;
+        lum[y*w+x] = g0;
+      }
+    }
+    // やわらかい輪郭線（Sobel）
+    for(var y=1;y<h-1;y++){
+      for(var x=1;x<w-1;x++){
+        var p = y*w+x;
+        var gx = lum[p-w+1]+2*lum[p+1]+lum[p+w+1]-lum[p-w-1]-2*lum[p-1]-lum[p+w-1];
+        var gy = lum[p+w-1]+2*lum[p+w]+lum[p+w+1]-lum[p-w-1]-2*lum[p-w]-lum[p-w+1];
+        var mag = Math.sqrt(gx*gx+gy*gy)/4;
+        if(mag>18){
+          var f = 1 - Math.min(0.4, (mag-18)/180);
+          var o = p*4; out[o]*=f; out[o+1]*=f; out[o+2]*=f;
+        }
+      }
+    }
+    return new ImageData(out, w, h);
+  }
+  async function pbPaint(){
+    if(!pb.imageCanvas || !pb.imageCanvas.width) return;
+    if(pbCrop) pbCropCancel();
+    toast("絵にしています…（少し時間がかかります）", 4000);
+    try{
+      var im = await pbFlattenToCanvas();
+      await new Promise(function(r){ setTimeout(r, 30); });
+      var prev = document.createElement("canvas"); prev.width = im.width; prev.height = im.height;
+      prev.getContext("2d").drawImage(im, 0, 0);
+      var MAX = 1400, sc = Math.min(1, MAX/Math.max(im.width, im.height));
+      var c = document.createElement("canvas"); c.width = Math.round(im.width*sc); c.height = Math.round(im.height*sc);
+      var ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(im, 0, 0, c.width, c.height);
+      ctx.putImageData(pbPaintFilter(ctx.getImageData(0,0,c.width,c.height)), 0, 0);
+      pbReplaceWithCanvas(c);
+      setTimeout(function(){
+        askChoice("絵にしました", "この絵でよろしいですか？（このあと書き込み・保存ができます）", [
+          {label:"🎨 この絵にする", value:"ok"},
+          {label:"↩ 元の写真に戻す", value:"back"}
+        ], function(v){
+          if(v==="back"){ pbReplaceWithCanvas(prev); toast("元の写真に戻しました", 1500); }
+        }, {cancelLabel:"閉じる（この絵のまま）"});
+      }, 300);
+    }catch(e){ toast("絵にできませんでした"); }
   }
   var pbCrop = null;
   function pbCropCancel(){
@@ -17231,6 +17303,7 @@
     document.getElementById("pbRotL").addEventListener("click", function(){ pbRotate(-1); });
     document.getElementById("pbRotR").addEventListener("click", function(){ pbRotate(1); });
     document.getElementById("pbCrop").addEventListener("click", pbCropStart);
+    document.getElementById("pbPaint").addEventListener("click", pbPaint);
     document.getElementById("pbUndo").addEventListener("click", function(){ if(pb.historyIndex<=0) return; pb.historyIndex--; pbRestoreHistory(pb.historyIndex); pbUpdateHistoryButtons(); });
     document.getElementById("pbRedo").addEventListener("click", function(){ if(pb.historyIndex>=pb.history.length-1) return; pb.historyIndex++; pbRestoreHistory(pb.historyIndex); pbUpdateHistoryButtons(); });
     document.getElementById("pbClear").addEventListener("click", function(){
