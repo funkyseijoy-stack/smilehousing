@@ -1078,6 +1078,9 @@ function consItems(){
   function staffCommentHtml(){
     var sc = data.staffComment;
     if(!sc || !sc.text) return "";
+    // あとから写真だけ（ひとことなし）を送っていたら、前のひとことは出さない（以前に送った分も含めて）
+    var sp = data.sentPhotos;
+    if(sp && sp.at && !sp.text && sc.at && Date.parse(sp.at) > Date.parse(sc.at) + 30*60*1000) return "";
     var d = sc.at ? new Date(sc.at) : null;
     // 一緒に送った写真は上の「🆕 新しい写真」に出すので、ここは文章だけ
     return '<div class="scom"><div class="sh">💬 スタッフから'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div>'+

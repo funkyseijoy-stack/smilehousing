@@ -10984,6 +10984,12 @@
       proj.staffComment = {text:comment, at:nowIso(), by:state.currentUser||"", photoIds: okIds.slice()};
       var okc = await saveDoc("projects", proj.id, proj);
       if(okc===false){ proj.staffComment = prev; notes.push("ひとことは保存できませんでした"); }
+    } else if(okCount && !comment && proj.staffComment){
+      // ひとことなしで写真だけ送ったら、前のひとことは消す（古い文が新しい写真に付いて見えないように）
+      var prev2 = proj.staffComment;
+      proj.staffComment = null;
+      var okc2 = await saveDoc("projects", proj.id, proj);
+      if(okc2===false){ proj.staffComment = prev2; notes.push("前のひとことを消せませんでした"); }
     }
     var lineDone = false;
     if(okCount && lineOn){
