@@ -1787,7 +1787,7 @@ function homeHtml(){ return homeParts().main; }
         var kind = x.isQuote ? (x.quoteType==="定価" ? "お見積り" : "プランボード") : (x.type==="planboard" ? "プランボード" : "写真・資料");
         var part = partOf(c, x) || x.label || c.name;
         var room = ""; (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; return true; } return false; });
-        return '<div class="tli flat"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+(x.type==="planboard"||x.isQuote?"pb":"ph")+'">'+esc(kind)+'</span>'+nwTag(x.upd)+(part?'<span class="tag">'+esc(part)+'</span>':'')+'</div>'+
+        return '<div class="tli flat"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+(x.type==="planboard"||x.isQuote?"pb":"ph")+'">'+esc(kind)+'</span>'+nwTag(x.upd)+(part?'<span class="tag">'+esc(part)+'</span>':'')+qStampHtml(x)+'</div>'+
           (x.msg ? '<div class="box"><div class="bl">スタッフから</div>'+esc(x.msg).replace(/\n/g,"<br>")+'</div>' : '')+
           '<div class="thumbs one" style="max-width:220px;">'+thumbHtml(x.file,"")+'</div>'+
           homeDecHtml({ title: part }, { c:c, x:x, room:room })+
