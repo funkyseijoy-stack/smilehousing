@@ -396,6 +396,8 @@
   select.sizeSelect{ font-family:inherit; font-size:.85rem; padding:6px 7px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
   .pbstage{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:10px; overflow:auto; box-shadow: var(--shadow); margin-block-end:12px; display:flex; flex:1 1 auto; min-height:min(60vh,420px); max-height:none; touch-action:pan-x pan-y; }
   #pbStageInner{ position:relative; line-height:0; margin-inline:auto; flex:0 0 auto; }
+  #pbCropLayer{ position:absolute; inset:0; z-index:60; cursor:crosshair; touch-action:none; background:rgba(0,0,0,.08); }
+  #pbCropLayer .crect{ position:absolute; border:2px dashed #fff; box-shadow:0 0 0 9999px rgba(0,0,0,.45); outline:1px solid #333; pointer-events:none; }
   #pbImageCanvas, #pbOverlayCanvas{ border-radius:8px; max-width:100%; height:auto; display:block; }
   #pbImageCanvas{ background:var(--canvas-bg); }
   #pbBaseCanvas{ position:absolute; inset:0; max-width:100%; height:auto; border-radius:8px; background:transparent; }
@@ -2027,6 +2029,11 @@
         <button class="tbtn" id="pbUndo" disabled><span class="ic">↶</span></button>
         <button class="tbtn" id="pbRedo" disabled><span class="ic">↷</span></button>
         <button class="tbtn" id="pbClear"><span class="ic">🗑️</span></button>
+      </div>
+      <div class="tool-group pbEditOnly" hidden>
+        <button class="tbtn" id="pbRotL" type="button" title="左に90度回す"><span class="ic">↺</span><span class="label">左</span></button>
+        <button class="tbtn" id="pbRotR" type="button" title="右に90度回す"><span class="ic">↻</span><span class="label">右</span></button>
+        <button class="tbtn" id="pbCrop" type="button" title="残したい範囲をなぞって切り取る"><span class="ic">✂</span><span class="label">トリミング</span></button>
       </div>
       <div class="tool-group" id="pbPdfPageNav" hidden style="align-items:center; gap:6px;">
         <button class="tbtn" id="pbPdfPrev"><span class="ic">◀</span></button>
@@ -15367,6 +15374,8 @@
     requestAnimationFrame(function(){ pb.zoom = pbComputeFitZoom(w); pbApplyZoom(); });
     var keepMode = !!pb.pageSwitching && pb.tool && pb.tool !== "view"; pb.pageSwitching = false;
     var rs = pb.pendingRestore; pb.pendingRestore = null;
+    pb.imgChanged = !!(rs && rs.img) || !!pb.imgChangedNext; pb.imgChangedNext = false;
+    pbCropCancel();
     if(rs){
       pb.items = rs.items.slice(); pb.history = rs.history.slice(); pb.historyIndex = rs.historyIndex;
       var rimg = new Image();
@@ -15407,14 +15416,15 @@
   }
   // ページを移るときは、いまのページの書き込み（線・文字・記号・やり直しの履歴）を控えておき、
   // 戻ってきたら元どおりにする（以前はページを移ると書き込みが消えていた）。書き出し用の画像も控える。
-  function pbPageDirty(){ return pb.historyIndex > 0 || (pb.items && pb.items.length > 0); }
+  function pbPageDirty(){ return pb.imgChanged || pb.historyIndex > 0 || (pb.items && pb.items.length > 0); }
   async function pbStashPage(){
     if(!pb.pdfDoc || !pb.baseCanvas) return;
     if(pb.activeTextEditor) pbCommitTextEditor();
     pb.pageStates = pb.pageStates || {};
     if(!pbPageDirty()){ delete pb.pageStates[pb.pdfPage]; return; }
     var blob = await pbCanvasToBlob("image/png");
-    pb.pageStates[pb.pdfPage] = { base: pb.baseCanvas.toDataURL("image/png"), items: (pb.items||[]).slice(), history: pb.history.slice(), historyIndex: pb.historyIndex, blob: blob };
+    pb.pageStates[pb.pdfPage] = { base: pb.baseCanvas.toDataURL("image/png"), items: (pb.items||[]).slice(), history: pb.history.slice(), historyIndex: pb.historyIndex, blob: blob,
+      img: pb.imgChanged ? pb.imageCanvas.toDataURL("image/png") : null };
   }
   var pbPageBusy = false;
   async function pbGoPage(pageNum){
@@ -15433,6 +15443,13 @@
     pb.pdfPage = pageNum;
     pbUpdatePdfPageNav();
     pb.pendingRestore = (pb.pageStates && pb.pageStates[pageNum]) || null;
+    if(pb.pendingRestore && pb.pendingRestore.img){
+      // 回転・トリミングしたページは、その画像から開く
+      var rimg0 = new Image();
+      rimg0.onload = function(){ pbSetupCanvas(rimg0.naturalWidth, rimg0.naturalHeight, rimg0); };
+      rimg0.src = pb.pendingRestore.img;
+      return;
+    }
     if(pb.pdfNumPages > 1) toast(pageNum+"ページ目を開いています…", 1500);
     pb.pdfDoc.getPage(pageNum).then(function(page){
       // 大きな図面でも重くならないよう、長い辺が約2000pxになる大きさで描く（画面の上限と同じ）
@@ -15491,6 +15508,80 @@
     };
     reader.onerror = function(){ toast("ファイルの読み込みに失敗しました"); };
     reader.readAsArrayBuffer(file);
+  }
+  // ---- 回転・トリミング：いまの絵（元の図面＋書き込み）を1枚にまとめてから、回す／切り取る ----
+  // まとめたあとの書き込みは図面の一部になる（消しゴムでは消えない）。保存はいつもの「① 上書き／② 別で保存」。
+  function pbFlattenToCanvas(){
+    if(pb.activeTextEditor) pbCommitTextEditor();
+    return pbCanvasToBlob("image/png").then(function(blob){
+      return new Promise(function(res, rej){
+        var u = URL.createObjectURL(blob), im = new Image();
+        im.onload = function(){ URL.revokeObjectURL(u); res(im); };
+        im.onerror = function(){ URL.revokeObjectURL(u); rej(new Error("img")); };
+        im.src = u;
+      });
+    });
+  }
+  function pbReplaceWithCanvas(c){
+    var img = new Image();
+    img.onload = function(){ pb.pageSwitching = true; pb.imgChangedNext = true; pbSetupCanvas(c.width, c.height, img); };
+    img.src = c.toDataURL("image/png");
+  }
+  async function pbRotate(dir){
+    if(!pb.imageCanvas || !pb.imageCanvas.width) return;
+    try{
+      var im = await pbFlattenToCanvas();
+      var c = document.createElement("canvas"); c.width = im.height; c.height = im.width;
+      var ctx = c.getContext("2d");
+      ctx.translate(c.width/2, c.height/2); ctx.rotate(dir * Math.PI/2); ctx.drawImage(im, -im.width/2, -im.height/2);
+      pbReplaceWithCanvas(c);
+      toast(dir>0 ? "右に回しました" : "左に回しました", 1500);
+    }catch(e){ toast("回せませんでした"); }
+  }
+  var pbCrop = null;
+  function pbCropCancel(){
+    var l = document.getElementById("pbCropLayer"); if(l) l.remove();
+    pbCrop = null;
+    var b = document.getElementById("pbCrop"); if(b) b.classList.remove("active");
+  }
+  function pbCropStart(){
+    if(pbCrop){ pbCropCancel(); return; }
+    var inner = document.getElementById("pbStageInner"); if(!inner) return;
+    var layer = document.createElement("div"); layer.id = "pbCropLayer";
+    var rect = document.createElement("div"); rect.className = "crect"; rect.hidden = true; layer.appendChild(rect);
+    inner.appendChild(layer);
+    pbCrop = { layer: layer, rect: rect, start: null, end: null };
+    document.getElementById("pbCrop").classList.add("active");
+    toast("残したい範囲を、指やマウスでなぞって囲んでください（もう一度「トリミング」でやめる）", 4000);
+    var pos = function(e){ var r = layer.getBoundingClientRect(); return { x: Math.max(0, Math.min(r.width, e.clientX - r.left)), y: Math.max(0, Math.min(r.height, e.clientY - r.top)), w: r.width, h: r.height }; };
+    var draw = function(){
+      var a = pbCrop.start, b = pbCrop.end; if(!a || !b) return;
+      rect.hidden = false;
+      rect.style.left = Math.min(a.x,b.x)+"px"; rect.style.top = Math.min(a.y,b.y)+"px";
+      rect.style.width = Math.abs(b.x-a.x)+"px"; rect.style.height = Math.abs(b.y-a.y)+"px";
+    };
+    layer.addEventListener("pointerdown", function(e){ e.preventDefault(); layer.setPointerCapture(e.pointerId); pbCrop.start = pos(e); pbCrop.end = pos(e); draw(); });
+    layer.addEventListener("pointermove", function(e){ if(!pbCrop || !pbCrop.start) return; e.preventDefault(); pbCrop.end = pos(e); draw(); });
+    layer.addEventListener("pointerup", function(e){
+      if(!pbCrop || !pbCrop.start) return;
+      pbCrop.end = pos(e); draw();
+      var a = pbCrop.start, b = pbCrop.end;
+      if(Math.abs(b.x-a.x) < 12 || Math.abs(b.y-a.y) < 12){ pbCrop.start = null; rect.hidden = true; return; }
+      var sel = { x: Math.min(a.x,b.x)/a.w, y: Math.min(a.y,b.y)/a.h, w: Math.abs(b.x-a.x)/a.w, h: Math.abs(b.y-a.y)/a.h };
+      askChoice("トリミング", "囲んだ範囲だけを残しますか？", [{label:"✂ この範囲で切り取る", value:"go"},{label:"囲み直す", value:"redo"}], async function(v){
+        if(v==="redo"){ if(pbCrop){ pbCrop.start = null; rect.hidden = true; } return; }
+        if(v!=="go"){ pbCropCancel(); return; }
+        pbCropCancel();
+        try{
+          var im = await pbFlattenToCanvas();
+          var sx = Math.round(sel.x*im.width), sy = Math.round(sel.y*im.height), sw = Math.max(1, Math.round(sel.w*im.width)), sh = Math.max(1, Math.round(sel.h*im.height));
+          var c = document.createElement("canvas"); c.width = sw; c.height = sh;
+          c.getContext("2d").drawImage(im, sx, sy, sw, sh, 0, 0, sw, sh);
+          pbReplaceWithCanvas(c);
+          toast("切り取りました", 1500);
+        }catch(e){ toast("切り取れませんでした"); }
+      });
+    });
   }
   function pbLoadFromBlob(blob, isPdf){
     pb.pdfDoc = null; pb.pdfPage = 1; pb.pdfNumPages = 1;
@@ -17133,6 +17224,9 @@
       var sw = e.target.closest(".swatch"); if(!sw) return;
       pb.color = sw.dataset.color; pbRenderSwatches();
     });
+    document.getElementById("pbRotL").addEventListener("click", function(){ pbRotate(-1); });
+    document.getElementById("pbRotR").addEventListener("click", function(){ pbRotate(1); });
+    document.getElementById("pbCrop").addEventListener("click", pbCropStart);
     document.getElementById("pbUndo").addEventListener("click", function(){ if(pb.historyIndex<=0) return; pb.historyIndex--; pbRestoreHistory(pb.historyIndex); pbUpdateHistoryButtons(); });
     document.getElementById("pbRedo").addEventListener("click", function(){ if(pb.historyIndex>=pb.history.length-1) return; pb.historyIndex++; pbRestoreHistory(pb.historyIndex); pbUpdateHistoryButtons(); });
     document.getElementById("pbClear").addEventListener("click", function(){
