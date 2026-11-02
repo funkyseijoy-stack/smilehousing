@@ -6884,7 +6884,8 @@
       var menuOpen = openNoteMenuId === n.id;
       // 操作メニュー（写真・PDF・見積の書類のカードと同じ並び）
       var noteOps = uniOpsSections("n", n.id, drawMenuHtml ? '<div class="notemenu-draw">'+drawMenuHtml+'</div>' : "",
-        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>',
+        '<button class="'+(n.reflected?"on":"")+'" data-act="togglenotereflect" data-id="'+n.id+'">'+(n.reflected?"✓反映済み":"反映する")+'</button>'+
+        '<button class="'+(n.askDecision?"on":"")+'" data-act="togglenoteask" data-id="'+n.id+'">'+(n.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>',
         { estimate: sent.estimate, companytask: sent.companytask, estreq: sent.estreq },
         '<button data-act="editnote" data-id="'+n.id+'">✏️ 編集</button>'+
         '<button class="danger" data-act="delnote" data-id="'+n.id+'">削除</button>');
@@ -8667,12 +8668,14 @@
         if(!relatedNote) return [["", drawHtml]];
         var ns = noteSentInfo(relatedNote);
         return uniOpsSections("n", relatedNote.id, drawHtml,
-          '<button class="'+(relatedNote.reflected?"on":"")+'" data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>',
+          '<button class="'+(relatedNote.reflected?"on":"")+'" data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>'+
+          '<button class="'+(relatedNote.askDecision?"on":"")+'" data-spec-togglenoteask="'+relatedNote.id+'">'+(relatedNote.askDecision?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない")+'</button>',
           { estimate: ns.estimate, companytask: ns.companytask, estreq: ns.estreq },
           '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
       }
       return uniOpsSections("sp", p.id, drawHtml,
-        '<button class="'+(p.reflected?"on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>',
+        '<button class="'+(p.reflected?"on":"")+'" data-togglereflect="'+p.id+'">'+(p.reflected?"✓反映済み":"反映する")+'</button>'+
+          (askBtnHtml ? askBtnHtml.replace(/class="pill reflect small( on)?"/, function(m, on){ return 'class="'+(on?"on":"")+'"'; }).replace(/ style="[^"]*"/,"").replace(">お客様の決定ボタン：出さない<", ">🔘 お客様の決定ボタン：出さない<").replace(">✓お客様の決定ボタン：出す<", ">✓ お客様の決定ボタン：出す<") : ""),
         spSent,
         '<button data-spec-edit="'+p.id+'">✏️ 編集</button>');
     };
