@@ -1664,7 +1664,15 @@ function homeHtml(){ return homeParts().main; }
       var c = e.c, x = e.x, room = "", roomName = "";
       (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
       var part = roomName || partOf(c, x) || x.label || c.name;
-      var files = (x.files && x.files.length) ? x.files : (x.file ? [x.file] : []);
+      // 添付：カードのファイル＋行ごとに付けたファイル。決定してもらう行のカードにファイルが無ければ、その記録の添付を出す
+      var files = [], seenF = {};
+      var addF = function(f){ if(f && f.url && !seenF[f.url]){ seenF[f.url] = 1; files.push(f); } };
+      (x.files||[]).forEach(addF); if(x.file) addF(x.file);
+      (x.lines||[]).forEach(function(l){ (l.files||[]).forEach(addF); });
+      if(!files.length && x.lineCard && x.id){
+        var pn = (data.notes||[]).find(function(n){ return n.id===x.id; });
+        if(pn){ (pn.files||[]).forEach(addF); (pn.lines||[]).forEach(function(l){ (l.files||[]).forEach(addF); }); }
+      }
       // 題名だけだと何を決めるのか分からないので、題名＋中身（決まったこと・打合せの内容・ご検討いただきたいこと）を出す
       var ttl = String(x.title || "").trim();
       var body = [x.decided, x.talk, x.open, x.snippet, x.note, x.msg].map(function(v){ return String(v||"").trim(); }).filter(function(v, i, arr){ return v && v!==ttl && arr.indexOf(v)===i; }).join("\n");
@@ -1673,7 +1681,7 @@ function homeHtml(){ return homeParts().main; }
       cards.push('<div class="pcard"><div class="pch"><span class="ptag">'+esc(part)+'</span><span class="tk">'+fmtD(x.date||x.at)+'</span>'+nwTag(x.upd)+qStampHtml(x)+'</div>'+
         (ttl ? '<div class="pct"><b>'+esc(ttl)+'</b></div>' : '')+
         (body ? '<div class="pct">'+esc(body).replace(/\n/g,"<br>")+'</div>' : '')+
-        (!ttl && !body && !(x.files||[]).length && !x.file ? '<div class="pct" style="color:var(--muted);">（内容は「'+esc(c.name)+'の記録を見る」でご確認ください）</div>' : '')+
+        (!ttl && !body && !files.length ? '<div class="pct" style="color:var(--muted);">（内容は「'+esc(c.name)+'の記録を見る」でご確認ください）</div>' : '')+
         (files.length ? '<div class="thumbs" style="margin-top:8px; grid-template-columns:repeat(3,1fr);">'+files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>' : '')+
         (x.type==="note" && !x.partial ? noteEstHtml(x) : '')+
         (e.stamped
