@@ -9672,6 +9672,7 @@
     for(var i=0;i<acts.length;i++){
       var a = acts[i], text = a.text;
       try{
+        if(a.type==="taskmade"){ note.lineActs.push({ t:text, type:"task", ref:a.ref, at:nowIso() }); continue; }
         if(a.type==="task"){
           var t = { id: uid("task"), projectId: proj.id, content: text, assignee: a.assignee||"", instructor: "", creator: state.currentUser||"",
             hasDeadline:false, deadline:"", requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments:(note.files||[]).slice(),
@@ -12929,7 +12930,28 @@
   var mnLineActs = {};
   // 行ごとの部位（キーは行の文）。記録は「総合」のまま、行ごとに部位を付けると、その部位の一覧・おうちノートの項目にもその行が出る
   var mnLineParts = {};
-  var MN_ACT_LABEL = { task:"社内タスク", est:"追加見積", estreq:"見積依頼（Gmail）" };
+  // 行の「⋯」→「タスクを作る」：タスクの入力画面を、案件・部門・内容（行の文）・部位（行→記録）・行のファイルを入れた状態で開く。
+  // 「追加」でその場でタスクを保存し、行に「📋 タスクを作りました」を付ける（記録を保存すると記録の lineActs にもつながる）
+  function mnLineOpenTaskForm(lt){
+    var pid = editingMeetingNoteProjectId() || state.currentProjectId;
+    openTaskForm();
+    var pp = projectById(pid);
+    if(pp){ var d0 = deptOfProject(pp); document.getElementById("tfDept").value = d0; tfRenderProjects(d0, pid); }
+    document.getElementById("tfContent").value = lt;
+    var sp = mnLineParts[lt] || newMeetingNoteSpecPart || null;
+    if(sp){ taskFormVendorSpec = Object.assign({}, sp, { label: partText(sp) }); document.getElementById("tfVendorSpecLabel").textContent = partText(sp); }
+    tfExtras = (mnLineFiles[lt]||[]).map(function(f){
+      return f.ref ? { key: uid("tfx"), ref: Object.assign({}, f.ref) } : { key: uid("tfx"), file: f.file, name: f.name, type: f.type };
+    });
+    renderTfFileList();
+    taskFormOnSaved = function(t){
+      if(mnLines().indexOf(lt)<0) return;
+      (mnLineActs[lt] = mnLineActs[lt] || []).push({ type:"taskmade", ref: t.id, label: (t.assignee||"") + (t.requestTo ? (t.assignee?"・":"")+t.requestTo : "") });
+      mnRender();
+    };
+  }
+  var taskFormOnSaved = null;
+  var MN_ACT_LABEL = { task:"社内タスク", est:"追加見積", estreq:"見積依頼（Gmail）", taskmade:"タスク作成済み" };
   // 行ごとのファイル（キーは行の文。{file,name,type} か {ref}）と「お客様に決定してもらう」印
   var mnLineFiles = {};
   var mnLineAsk = {};
@@ -12949,9 +12971,10 @@
           (mnLineFiles[t]||[]).map(function(f, k){ var nm = f.ref ? (f.ref.name||"ファイル") : (f.name||"ファイル"); return '<span class="mnlchip"><button type="button" class="mnlfopen" data-mnlfopen="'+i+'|'+k+'" title="見る・書き込む">📎 '+escapeHtml(nm.length>18?nm.slice(0,18)+"…":nm)+'</button><button type="button" class="btn small mnlfdraw" data-mnlfdraw="'+i+'|'+k+'">✏️ 書き込む</button><button type="button" data-mnlfrm="'+i+'|'+k+'" aria-label="外す">×</button></span>'; }).join("")+
         '</div>' : '')+
         (acts.length ? '<div class="mnlacts">'+acts.map(function(a, k){
+          if(a.type==="taskmade") return '<span class="mnlchip" style="background:#e3f0e6;">📋 タスクを作りました'+(a.label?"："+escapeHtml(a.label):"")+' <button type="button" data-mnlrm="'+i+'|'+k+'" aria-label="記録とのつながりを外す（タスクは消えません）" title="記録とのつながりを外す（タスクは消えません）">×</button></span>';
           var extra = a.type==="task" ? (a.assignee?"："+a.assignee:"") : a.type==="estreq" ? "："+a.vendorIds.map(function(id){ var v = vendorById(id); return v?v.name:""; }).filter(Boolean).join("、") : "";
           return '<span class="mnlchip">→ '+escapeHtml(MN_ACT_LABEL[a.type]+extra)+' <button type="button" data-mnlrm="'+i+'|'+k+'" aria-label="取り消す">×</button></span>';
-        }).join("")+'<span class="muted" style="font-size:.85rem;">「記録する」で作ります</span></div>' : '')+
+        }).join("")+(acts.some(function(a){ return a.type!=="taskmade"; }) ? '<span class="muted" style="font-size:.85rem;">「記録する」で作ります</span>' : '')+'</div>' : '')+
       '</div>';
     }).join("");
     box.hidden = !lines.length;
@@ -13936,6 +13959,7 @@
     document.getElementById("tfPrivate").checked = false;
     document.getElementById("tfAttachment").value = "";
     tfExtras = []; renderTfFileList();
+    taskFormOnSaved = null;
     taskFormVendorSpec = null;
     document.getElementById("tfVendorSpecLabel").textContent = "未選択";
     document.getElementById("tfTitle").textContent = editing ? "タスクを編集" : "タスクを追加";
@@ -14118,9 +14142,11 @@
     closeTaskForm();
     render();
     await saveDoc("tasks", t.id, t);
+    var hk = taskFormOnSaved; taskFormOnSaved = null;
+    if(hk){ try{ hk(t); }catch(e){} }
     logActivity("タスクを追加しました（"+content.slice(0,20)+"）");
     toast(checkStatusFor(checker) ? "タスクを追加しました（「"+t.status+"」に入れました）" : "タスクを追加しました");
-    if(checkStatusFor(checker)) goToTaskBoard(t.id);
+    if(checkStatusFor(checker) && !hk) goToTaskBoard(t.id); // 記録の入力画面から作ったときは記録の画面のまま
   }
 
   // 確認者の承認／差し戻し。確認者本人（と朋子）だけがボタンを見られる。
@@ -15645,12 +15671,14 @@
           ["🗂 整理", [
             {label:(mnLineParts[lt] ? "✓部位："+partText(mnLineParts[lt])+"（変える・外す）" : "この行の部位を付ける"), value:"part", on: !!mnLineParts[lt]}]],
           ["📋 タスク・依頼", [
-            {label:(hasAct("task")?"✓ ":"")+"社内タスクにする", value:"task", on: hasAct("task")},
+            {label:(hasAct("taskmade")?"✓ ":"")+"📝 タスクを作る（入力画面で担当・業者・期限など）", value:"taskform", on: hasAct("taskmade")},
+            {label:(hasAct("task")?"✓ ":"")+"社内タスクにする（担当だけ選ぶ・「記録する」で作る）", value:"task", on: hasAct("task")},
             {label:(hasAct("est")?"✓ ":"")+"追加見積（おうちノート）に入れる", value:"est", on: hasAct("est")},
             {label:(hasAct("estreq")?"✓ ":"")+"見積依頼（Gmail下書き・添付付き）", value:"estreq", on: hasAct("estreq")}]]
         ], function(kind){
           if(!kind) return;
           if(kind==="pick"){ mnLinePickRegistered(lt); return; }
+          if(kind==="taskform"){ mnLineOpenTaskForm(lt); return; }
           if(kind==="gmail"){
             gmailPickFiles(editingMeetingNoteProjectId(), "「"+lt.slice(0,30)+"」に付けます", function(refs){
               if(mnLines().indexOf(lt)<0){ toast("行が見つかりません（文を書き換えた場合は、もう一度「⋯」から付けてください）"); return; }
