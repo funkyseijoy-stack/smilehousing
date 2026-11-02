@@ -3060,7 +3060,44 @@
     migrateExteriorNoteEntries();
     migrateAttachmentFolderParts();
     repairReflectedTaskCopies();
+    backfillOldChangeTasks();
     loadActivityBackground();
+  }
+  // 2026年11月：お客様の「変更のご依頼」から社内タスクを自動で作る機能（11/2公開）より前に届いた依頼（11/1〜）を、
+  // 1回だけ社内タスクにする。タスクIDは task_chg_<メッセージID> で固定（複数の端末で動いても重ならない）
+  function backfillOldChangeTasks(){
+    try{
+      state.messages.forEach(function(m){
+        if(!m || m.deletedAt || !m.fromCustomer || m.taskId) return;
+        var c = String(m.content||"");
+        if(c.indexOf("【変更のご依頼】")!==0) return;
+        var at = String(m.createdAt||"");
+        if(!(at >= "2026-10-31T15:00:00" && at < "2026-11-02T11:10:00")) return;
+        var tid = "task_chg_" + m.id;
+        if(state.tasks.some(function(t){ return t && t.id===tid; })) return;
+        var body = c.replace(/^【変更のご依頼】/, "");
+        var head = body.split("\n")[0].split("・")[0].replace(/[\s\u{1F300}-\u{1FAFF}]/gu, "");
+        var proj = state.projects.find(function(p){ return p.id===m.projectId; });
+        var part = null;
+        var cp = proj && (proj.customParts||[]).find(function(x){ return x && !x.deletedAt && String(x.name||"").replace(/[\s\u{1F300}-\u{1FAFF}]/gu, "")===head; });
+        if(cp) part = {scope:"custom", category:cp.id};
+        else if(FACILITY_CATS.indexOf(head)>=0) part = {scope:"facility", category:head};
+        var now = new Date().toISOString();
+        var t = {
+          id: tid, projectId: m.projectId, content: "【お客様から変更のご依頼】" + body,
+          assignee: "", instructor: "お客様", creator: "おうちノート",
+          hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+          attachmentAssetIds: [], attachments: [], vendorSpec: part, private: false,
+          reflected: false, reflectedAt: null, status: "未着手",
+          fromCustomerChange: { messageId: m.id, cardKey: "", backfill: true },
+          createdAt: m.createdAt || now, updatedAt: now
+        };
+        state.tasks.push(t);
+        saveDoc("tasks", tid, t).then(function(ok){
+          if(ok){ m.taskId = tid; saveDoc("messages", m.id, m); }
+        });
+      });
+    }catch(e){ console.error("backfillOldChangeTasks", e); }
   }
   // 「✓反映済み」なのに設備仕様に入っていない図面を、タスクの案件の設備仕様へ入れて直す（起動時に1回）。
   // 「ポスト」は外部仕様、「ランドリーバー」は設備仕様へ移した。以前に現場確認（siteCheck）へ入れたデータを新しい場所へ移す
