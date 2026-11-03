@@ -1,5 +1,5 @@
-import { sendMailTo } from "./google.mts";
-import { nowJst } from "./booking.mts";
+import { sendMailTo, getAccessToken } from "./google.mts";
+import { nowJst, dowOf, holidays } from "./booking.mts";
 import { sendWorksDM, worksConfigured } from "./lineworks.mts";
 
 // タスクの担当者・確認者へ、個人のメールで知らせる。
@@ -66,7 +66,7 @@ function taskLines(t: any, projectName: string): string[] {
 }
 
 // role: "assignee"（担当者になった）／"checker"（確認を頼まれた）
-export async function sendTaskAssignedMail(store: any, task: any, role: "assignee" | "checker", name: string, by: string) {
+async function buildAssignedMail(store: any, task: any, role: "assignee" | "checker", name: string, by: string) {
   let projectName = "";
   if (task.projectId) {
     const p: any = await store.get("projects/" + task.projectId, { type: "json" });
@@ -86,6 +86,10 @@ export async function sendTaskAssignedMail(store: any, task: any, role: "assigne
     "",
     "（このメールは住まいるアプリから自動で送っています）",
   ].join("\n");
+  return { subject, body };
+}
+export async function sendTaskAssignedMail(store: any, task: any, role: "assignee" | "checker", name: string, by: string) {
+  const { subject, body } = await buildAssignedMail(store, task, role, name, by);
   const ok = await notifyStaff(store, name, subject, body);
   await notifyAdminCopy(store, by, name, subject, body).catch(() => false);
   return ok;
@@ -110,6 +114,28 @@ export async function sendDeadlineDigest(store: any, name: string, when: "today"
   return await notifyStaff(store, name, subject, body);
 }
 
+// ---- 土日祝はお休みの人（2026年11月〜）：休みの日に入った担当・確認の通知は、次の平日の朝9時にまとめて送る ----
+// 名前を足せば同じ扱いになる。ともこ（朋子）への控えは、休みの日でもふだんどおりすぐ送る。
+export const OFF_DAY_HOLD_NAMES = ["山本"];
+export function holdsOnOffDays(name: string): boolean { return OFF_DAY_HOLD_NAMES.includes(name); }
+// 今日（日本時間）が土日・祝日か。祝日はGoogleカレンダーの祝日で判定（取れなければ土日だけで判定）。
+export async function isOffDayJst(date: string = nowJst().date): Promise<boolean> {
+  const dow = dowOf(date);
+  if (dow === 0 || dow === 6) return true;
+  try {
+    const t = await getAccessToken();
+    if (!t.ok) return false;
+    return (await holidays(t.accessToken, date, date)).has(date);
+  } catch { return false; }
+}
+// 休みの日の昼に入った分：本人の分だけためて、ともこへの控えはすぐ送る
+export async function holdTaskNoticeForWorkday(store: any, task: any, role: "assignee" | "checker", name: string, by: string) {
+  const key = QUEUE_PREFIX + task.id + "__" + role + "__" + encodeURIComponent(name);
+  await store.setJSON(key, { taskId: task.id, role, name, by, held: true, queuedAt: new Date().toISOString() });
+  const { subject, body } = await buildAssignedMail(store, task, role, name, by);
+  await notifyAdminCopy(store, by, name, subject, body).catch(() => false);
+}
+
 // ---- 夜（18:00〜翌9:00 日本時間）に入ったタスクは、翌朝9時にまとめて通知する ----
 export function isQuietHourJst(): boolean {
   const h = Math.floor(nowJst().min / 60);
@@ -129,6 +155,8 @@ export async function queueTaskNotice(store: any, task: any, role: "assignee" | 
 // 翌朝の定期実行から呼ぶ。たまっていた通知を、人ごとに1通へまとめて送る。
 export async function flushTaskQueue(store: any) {
   const { blobs } = await store.list({ prefix: QUEUE_PREFIX });
+  // 今日が土日祝なら、休みの人（OFF_DAY_HOLD_NAMES）の分は送らずに次の平日まで残す
+  const offToday = blobs.length ? await isOffDayJst() : false;
   const entries: any[] = [];
   for (const b of blobs) {
     const q: any = await store.get(b.key, { type: "json" });
@@ -138,12 +166,13 @@ export async function flushTaskQueue(store: any) {
   const dead: string[] = [];
   for (const { key, q } of entries) {
     if (!q) { dead.push(key); continue; }
+    if (offToday && holdsOnOffDays(q.name)) continue;
     const t: any = await store.get("tasks/" + q.taskId, { type: "json" });
     const stillMine = t && !t.deletedAt && !t.private && (t.status || "") !== "完了" &&
       (q.role === "admin" ? true : q.role === "checker" ? (t.checker === q.name || t.status === q.name + "確認依頼中" || t.status === q.name + "確認中") : t.assignee === q.name);
     if (!stillMine) { dead.push(key); continue; }
     if (!groups.has(q.name)) groups.set(q.name, []);
-    groups.get(q.name)!.push({ key, task: t, role: q.role, forName: q.forName, forRole: q.forRole } as any);
+    groups.get(q.name)!.push({ key, task: t, role: q.role, forName: q.forName, forRole: q.forRole, held: !!q.held || (Date.now() - Date.parse(q.queuedAt || "")) > 36 * 3600 * 1000 } as any);
   }
   for (const [name, list] of groups) {
     const items: string[] = [];
@@ -155,8 +184,9 @@ export async function flushTaskQueue(store: any) {
       const label = li.role === "admin" ? "【控え：" + (li.forName || "") + "さんが" + (li.forRole === "checker" ? "確認" : "担当") + "】" : li.role === "checker" ? "【確認のお願い】" : "【担当】";
       items.push((i + 1) + ". " + label + "\n   " + taskLines(t, projectName).join("\n   "));
     }
-    const body = [name + "さん", "", "昨日の夕方以降に届いたタスクをまとめてお知らせします。", "", ...items, "", "▼ 住まいるアプリを開く", APP_URL, "", "（このメールは住まいるアプリから自動で送っています）"].join("\n");
-    const ok = await notifyStaff(store, name, "【住まいる】夜のあいだに届いたタスクが" + list.length + "件あります", body);
+    const afterOff = list.some((x: any) => x.held);
+    const body = [name + "さん", "", (afterOff ? "お休みのあいだ（前の平日の夕方以降）に届いたタスクをまとめてお知らせします。" : "昨日の夕方以降に届いたタスクをまとめてお知らせします。"), "", ...items, "", "▼ 住まいるアプリを開く", APP_URL, "", "（このメールは住まいるアプリから自動で送っています）"].join("\n");
+    const ok = await notifyStaff(store, name, "【住まいる】" + (afterOff ? "お休みのあいだ" : "夜のあいだ") + "に届いたタスクが" + list.length + "件あります", body);
     // 送り先が1つも無い人（ワークスもメールも未登録）の分は、たまり続けないよう捨てる
     const hasDest = (worksConfigured() && (await staffWorksIdOf(store, name))) || (await staffEmailOf(store, name));
     if (ok || !hasDest) dead.push(...list.map((x) => x.key));
