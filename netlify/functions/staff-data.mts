@@ -1,6 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { sendTaskAssignedMail, sendTaskDoneMails, sendTaskReviewMail, queueTaskNotice, isQuietHourJst } from "../lib/task-mail.mts";
+import { sendTaskAssignedMail, sendTaskDoneMails, sendTaskReviewMail, queueTaskNotice, isQuietHourJst, holdsOnOffDays, isOffDayJst, holdTaskNoticeForWorkday } from "../lib/task-mail.mts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -124,9 +124,16 @@ export default async (req: Request, context: Context) => {
       const by = String(body.by || "");
       const jobs: Promise<any>[] = [];
       // 昼は都度メール、夜（18時〜翌9時）は翌朝9時にまとめて送る
+      // 土日祝がお休みの人（山本さん）は、休みの日に入った分を次の平日の朝9時にまとめて送る
       const quiet = isQuietHourJst();
-      const notify = (role: "assignee" | "checker", name: string) =>
-        (quiet ? queueTaskNotice(store, doc, role, name, by) : sendTaskAssignedMail(store, doc, role, name, by)).catch(() => false);
+      let offDay: Promise<boolean> | null = null;
+      const notify = async (role: "assignee" | "checker", name: string) => {
+        try {
+          if (quiet) return await queueTaskNotice(store, doc, role, name, by);
+          if (holdsOnOffDays(name) && await (offDay ||= isOffDayJst())) return await holdTaskNoticeForWorkday(store, doc, role, name, by);
+          return await sendTaskAssignedMail(store, doc, role, name, by);
+        } catch { return false; }
+      };
       if (doc.assignee && doc.assignee !== by && doc.assignee !== (prevTask && prevTask.assignee)) {
         jobs.push(notify("assignee", doc.assignee));
       }
