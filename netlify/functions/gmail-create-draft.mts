@@ -66,6 +66,8 @@ function buildMimeMessage(opts: {
   subject: string;
   body: string;
   attachments: Attachment[];
+  inReplyTo?: string;
+  references?: string;
 }) {
   const boundary = "smlHsg_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   const lines: string[] = [];
@@ -74,6 +76,9 @@ function buildMimeMessage(opts: {
     lines.push("To: " + opts.to.join(", "));
   }
   lines.push("Subject: " + encodeMimeHeader(opts.subject || ""));
+  // 返信のときは、元のメールにつながるように In-Reply-To / References を付ける
+  if (opts.inReplyTo) lines.push("In-Reply-To: " + opts.inReplyTo);
+  if (opts.references) lines.push("References: " + opts.references);
   lines.push("MIME-Version: 1.0");
   lines.push('Content-Type: multipart/mixed; boundary="' + boundary + '"');
   lines.push("");
@@ -144,14 +149,41 @@ export default async (req: Request, context: Context) => {
     return jsonResponse({ error: "invalid_json" }, 400);
   }
 
-  const to: string[] = Array.isArray(body.to) ? body.to : body.to ? [String(body.to)] : [];
-  const subject = String(body.subject || "");
+  let to: string[] = Array.isArray(body.to) ? body.to : body.to ? [String(body.to)] : [];
+  let subject = String(body.subject || "");
+  const replyThreadId = typeof body.replyThreadId === "string" && /^[A-Za-z0-9]{6,40}$/.test(body.replyThreadId) ? body.replyThreadId : "";
   const mailBody = String(body.body || "");
   const incoming: AttachmentIn[] = Array.isArray(body.attachments) ? body.attachments : [];
 
   const tokenResult = await getAccessToken();
   if (!tokenResult.ok) {
     return jsonResponse({ error: tokenResult.error }, tokenResult.error === "gmail_not_connected" ? 409 : 500);
+  }
+
+  // 返信：そのやりとりのいちばん新しい受信メール（自分が送った・下書きは除く。無ければ最後のメール）に返信する
+  let inReplyTo = "", references = "", replyTo = "";
+  if (replyThreadId) {
+    const tr = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" + replyThreadId +
+      "?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Reply-To",
+      { headers: { Authorization: "Bearer " + tokenResult.accessToken } });
+    if (!tr.ok) return jsonResponse({ error: "reply_source_not_found" }, 404);
+    const th: any = await tr.json();
+    const msgs: any[] = Array.isArray(th.messages) ? th.messages : [];
+    const incomingMsgs = msgs.filter((m) => !(m.labelIds || []).some((l: string) => l === "SENT" || l === "DRAFT"));
+    const src = incomingMsgs[incomingMsgs.length - 1] || msgs.filter((m) => !(m.labelIds || []).includes("DRAFT")).pop();
+    if (!src) return jsonResponse({ error: "reply_source_not_found" }, 404);
+    const hv = (n: string) => String(((src.payload && src.payload.headers) || []).find((h: any) => String(h.name).toLowerCase() === n.toLowerCase())?.value || "");
+    const mid = hv("Message-ID");
+    inReplyTo = mid;
+    references = (hv("References") + " " + mid).trim();
+    const from = hv("Reply-To") || hv("From");
+    const addr = (from.match(/<([^>]+)>/) || [])[1] || (from.match(/[^\s<>"',;]+@[^\s<>"',;]+/) || [])[0] || "";
+    if (!to.length && addr) to = [addr];
+    replyTo = addr;
+    if (!subject) {
+      const s0 = hv("Subject");
+      subject = /^\s*re\s*:/i.test(s0) ? s0 : "Re: " + s0;
+    }
   }
 
   try {
@@ -182,7 +214,7 @@ export default async (req: Request, context: Context) => {
       finalBody += "\n\n※メールに付けられなかった資料は、下のリンクから開いてください。\n" + withLinks.map((x) => "・" + x.name + "：" + x.url).join("\n");
     }
 
-    const raw = buildMimeMessage({ to, subject, body: finalBody, attachments });
+    const raw = buildMimeMessage({ to, subject, body: finalBody, attachments, inReplyTo, references });
     const rawBytes = Buffer.from(raw, "utf-8");
 
     let draftRes: Response;
@@ -203,7 +235,7 @@ export default async (req: Request, context: Context) => {
           Authorization: "Bearer " + tokenResult.accessToken,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: { raw: base64ToBase64Url(rawBytes.toString("base64")) } }),
+        body: JSON.stringify({ message: Object.assign({ raw: base64ToBase64Url(rawBytes.toString("base64")) }, replyThreadId ? { threadId: replyThreadId } : {}) }),
       });
     }
     const draftData: any = await draftRes.json();
@@ -212,7 +244,7 @@ export default async (req: Request, context: Context) => {
     }
     return jsonResponse({
       ok: true, id: draftData.id, messageId: draftData.message?.id || null, threadId: draftData.message?.threadId || null,
-      attachmentCount: attachments.length, attachedBytes: totalRaw, linked,
+      attachmentCount: attachments.length, attachedBytes: totalRaw, linked, replyTo, subject,
     });
   } catch (e: any) {
     return jsonResponse({ error: "unexpected_error", detail: e?.message || String(e) }, 500);

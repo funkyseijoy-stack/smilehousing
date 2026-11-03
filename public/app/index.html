@@ -4242,6 +4242,7 @@
         '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
         '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
         '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
+        (t.fromGmail && t.fromGmail.threadId ? '<button class="btn small secondary" data-taskact="gmailreply" data-id="'+t.id+'" title="Gmailから来たこのタスクの、届いたメールへの返信を下書きにする（送信はしない）">↩ このメールに返信（下書き）</button>' : '')+
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
         (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み（見る ›）':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
@@ -12036,13 +12037,18 @@
     var res = await fetch("/api/gmail-create-draft", {
       method:"POST",
       headers:{ "Content-Type":"application/json", "X-Staff-Token": getStaffToken()||"" },
-      body: JSON.stringify({ to: input.to || [], subject: input.subject || "", body: input.body || "", attachments: atts })
+      body: JSON.stringify({ to: input.to || [], subject: input.subject || "", body: input.body || "", attachments: atts, replyThreadId: input.replyThreadId || undefined })
     });
     if(res.status===409) throw new Error("Gmail連携がまだ設定されていません。設定画面の「Gmailと連携する」から連携してください");
     if(res.status===401) throw new Error("ログインの有効期限が切れました。ログインし直してください");
-    if(!res.ok) throw new Error("サーバーエラー（"+res.status+"）");
+    if(!res.ok){
+      var ej = null; try{ ej = await res.json(); }catch(_){}
+      if(ej && ej.error==="refresh_failed") throw new Error("Gmailとの連携が切れています。設定画面の「Gmailと連携する」からやり直してください");
+      if(ej && ej.error==="reply_source_not_found") throw new Error("返信先のメールがGmailで見つかりませんでした（削除された可能性があります）");
+      throw new Error("サーバーエラー（"+res.status+"）");
+    }
     var j = await res.json();
-    return { payload: { threadId: j.threadId || null, id: j.id || null, messageId: j.messageId || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[] } };
+    return { payload: { threadId: j.threadId || null, id: j.id || null, messageId: j.messageId || null, attachmentCount: j.attachmentCount||0, linked: j.linked||[], replyTo: j.replyTo||"", subject: j.subject||"" } };
   }
   // 下書きを作ったあと、Gmailでその下書きを開けるようにする（連携しているアカウントで開く）
   var gmailConnEmail = null;
@@ -13391,6 +13397,29 @@
       offerOpenDrafts("✅ Gmail下書きを作成しました", msg.replace(/^✅ Gmail下書きを作成しました/,"").replace(/^（(.*?)）/,"$1")+"\n送信はしていません。Gmailで確認して送ってください。", [dp.messageId]);
       logActivity("タスクのGmail下書きを作成しました");
     }catch(e){ toast("Gmail下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
+  }
+
+  // Gmailから来たタスク（fromGmail）の、届いたメールへの返信を下書きにする。
+  // 宛先・件名（Re:）・返信の印（In-Reply-To／References）はサーバーがそのやりとりのいちばん新しい受信メールから付ける。
+  // 添付：タスクの添付のうち、そのメールから取り込んだもの（slug=gmail）は送り返さない＝あとで自分で付けた資料だけ付ける。
+  async function taskGmailReply(id){
+    var t = state.tasks.find(function(x){ return x.id===id; });
+    if(!t || !t.fromGmail || !t.fromGmail.threadId){ toast("このタスクはGmailから来たものではありません"); return; }
+    var lines = ["お世話になっております。住まいるハウジングです。","","","","よろしくお願いいたします。","","株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798"];
+    var atts = (t.attachments||[]).filter(function(a){ return a && a.url && String(a.url).indexOf("slug=gmail&")<0; }).map(function(a){
+      return { filename:a.name||"添付", mimeType:a.contentType||"application/octet-stream", url:a.url };
+    });
+    try{
+      toast("返信の下書きを作っています…");
+      var dres = await gmailCreateDraft({ to:[], subject:"", body:lines.join("\n"), attachments:atts, replyThreadId:t.fromGmail.threadId });
+      var dp = (dres && dres.payload) || {};
+      var msg = (dp.replyTo ? "宛先："+dp.replyTo+"\n" : "")+(dp.subject ? "件名："+dp.subject+"\n" : "");
+      if(atts.length) msg += "添付："+(dp.attachmentCount!=null ? dp.attachmentCount : atts.length)+"件（このタスクにあとで付けた資料）\n";
+      else msg += "添付なし（届いたメールの添付は送り返しません）\n";
+      if(dp.linked && dp.linked.length) msg += "付けられなかった資料"+dp.linked.length+"件は本文にリンクを入れました\n";
+      offerOpenDrafts("✅ 返信の下書きを作成しました", msg+"送信はしていません。Gmailで本文を書いて送ってください。", [dp.messageId]);
+      logActivity("Gmailのタスクに返信の下書きを作成しました");
+    }catch(e){ toast("返信の下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
   }
 
   // ---- プランボードの書類をお客様に出す（部位を指定して反映）----
@@ -14937,6 +14966,10 @@
   // 指示者には「お客様」も選べる（スタッフではないので通知の宛先にはしない）
   var CUSTOMER_INSTRUCTOR = "お客様";
   function staffInstructor(t){ return t && t.instructor && t.instructor!==CUSTOMER_INSTRUCTOR ? t.instructor : ""; }
+  // スタッフ一覧にいる人か（「Gmail」「おうちノート」など自動で作ったタスクの作成者や、メールの送り主は人として扱わない）
+  function isStaffName(n){ return !!n && (state.settings.staffList||[]).indexOf(n)>=0; }
+  // 頼んだ人：指示者（スタッフ）→ 作成者（スタッフのときだけ）
+  function taskRequester(t){ var i = staffInstructor(t); if(i) return i; return isStaffName(t && t.creator) ? t.creator : ""; }
   // コメントして担当者へ戻す（担当者以外の全員）／担当者からのコメント（返事）。
   // やりとりは確認者の承認・返信と同じ t.reviews に result:"コメント"・to（届け先）で積み、
   // t.review を最新にする（サーバーが review.at の変化を見て to の人へ通知する）。
@@ -14956,8 +14989,8 @@
     var to;
     if(back) to = t.assignee;
     else {
-      var prev = taskReviewList(t).slice().reverse().find(function(r){ return r.by && r.by!==me; });
-      to = (prev && prev.by) || staffInstructor(t) || t.creator || "";
+      var prev = taskReviewList(t).slice().reverse().find(function(r){ return r.by && r.by!==me && isStaffName(r.by); });
+      to = (prev && prev.by) || taskRequester(t) || "";
       if(to===me) to = "";
     }
     var note = await askComment(back ? "💬 コメントして戻す" : "💬 コメント",
@@ -15053,7 +15086,7 @@
   function askReportTo(t){
     return new Promise(function(resolve){
       var me = state.currentUser || "";
-      var def = staffInstructor(t) || t.creator || "";
+      var def = taskRequester(t);
       var chk = t.checker || "";
       var staff = (state.settings.staffList||[]).filter(function(n){ return n!==me; });
       if(Array.isArray(t.reportTo)) def = null;
@@ -15206,13 +15239,14 @@
   function askAfterTaskAttach(id){
     var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
     var me = state.currentUser || "";
-    var req = staffInstructor(t) || t.creator || "";
+    var req = taskRequester(t);
     if(req===me) req = "";
     var forCustomer = t.instructor===CUSTOMER_INSTRUCTOR;
     var choices = [];
     var custOk = !!(t.projectId && !t.reflected);
     if(forCustomer && custOk) choices.push({label:"🏠 お客様に出す（おうちノートに反映）", value:"customer"});
     if(req) choices.push({label:"📨 依頼者（"+req+"さん）に送る", value:"requester"});
+    if(t.fromGmail && t.fromGmail.threadId) choices.push({label:"↩ 届いたメールに返信の下書きを作る", value:"reply"});
     if(taskVendors(t).length) choices.push({label:"✉️ 業者へのメールの下書きを作る", value:"vendor"});
     if(!forCustomer && custOk) choices.push({label:"🏠 お客様に出す（おうちノートに反映）", value:"customer"});
     if((t.status||"未着手")!=="完了") choices.push({label:"✅ 完了にする", value:"done"});
@@ -15221,6 +15255,7 @@
       if(!v || v==="later") return;
       if(v==="requester") return sendTaskToRequester(id, req);
       if(v==="vendor") return taskGmailDraft(id);
+      if(v==="reply") return taskGmailReply(id);
       if(v==="customer") return toggleTaskReflect(id);
       if(v==="done") return setTaskStatus(id, "完了");
     });
@@ -17561,6 +17596,7 @@
       else if(act==="duplicate") duplicateTask(id);
       else if(act==="setpart") setTaskSpecPart(id);
       else if(act==="gmaildraft") taskGmailDraft(id);
+      else if(act==="gmailreply") taskGmailReply(id);
       else if(act==="toestimate") taskToEstimate(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
       else if(act==="toggleask") toggleTaskAskDecision(id);
