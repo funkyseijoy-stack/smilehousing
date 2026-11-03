@@ -7153,6 +7153,7 @@
         (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
         noteDecMarkHtml(n)+
         (n.homeShow ? '<span class="nreflbadge">🏠 ホームに表示中</span>' : '')+
+        (n.homeHide ? '<span class="nreflbadge" style="background:#eee;color:#666;">🚫 ホームに出さない</span>' : '')+
         stampsHtml(n)+
         sentBadgeHtml+
         chHtml+(specHtml ? specHtml : '')+
@@ -8646,6 +8647,17 @@
     render();
     toast(on ? "🔴 決定のはんこを押しました"+(u.doc.reflected ? "" : "（お客様に出すには「反映する」も押してください）") : "決定のはんこを外しました");
   }
+  // 「ホームのどの欄にも出さない」（homeHide）。ご確認・ご決定ください／決定したもの／最新の打合せ記録などにも出さない（家づくりの各部位には残る）
+  async function toggleHomeHide(kind, id){
+    var u = uniDocOf(kind, id); if(!u) return;
+    var d = u.doc, prev = { h: d.homeHide, s: d.homeShow, a: d.homeShowAt };
+    d.homeHide = !d.homeHide;
+    if(d.homeHide){ d.homeShow = false; d.homeShowAt = null; }
+    d.updatedAt = nowIso();
+    render();
+    if(await saveDoc(u.coll, d.id, d)===false){ d.homeHide = prev.h; d.homeShow = prev.s; d.homeShowAt = prev.a; render(); toast("保存できませんでした"); return; }
+    toast(d.homeHide ? "おうちノートのホームのどの欄にも出さないようにしました（家づくりの各部位には残ります）" : "ホームに出さない設定を解除しました");
+  }
   // 「見積もり仕様」のはんこ（badges.quote。お客様画面に青い丸の「見積仕様」）
   async function toggleQuoteSpecStamp(kind, id){
     var u = uniDocOf(kind, id); if(!u) return;
@@ -8671,7 +8683,8 @@
     var main =
       (f.reflectNote ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", f.reflected?"✓反映済み":"反映する", !!f.reflected))+
       b("ask", f.ask?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない", !!f.ask)+
-      b("home", f.home?"✓ おうちノートのホームに出す":"🏠 おうちノートのホームに出す", !!f.home)+
+      b("home", f.home?"✓ おうちノートのホームに出す（押すと外す）":"🏠 おうちノートのホームに出す", !!f.home)+
+      b("hide", (u&&u.doc.homeHide)?"✓ 🚫 ホームのどの欄にも出さない（押すと解除）":"🚫 ホームのどの欄にも出さない", !!(u&&u.doc.homeHide))+
       b("stamp", stamped?"✓ 🔴 決定のはんこ済み（押すと外す）":"🔴 決定のはんこを押す", stamped)+
       b("qspec", qspec?"✓ 🔵 見積仕様のはんこ（押すと外す）":"🔵 見積仕様のはんこを付ける", qspec)+
       b("estreqst", hasEstReqStamp(u&&u.doc)?"✓ 🟠 見積依頼中のはんこ（押すと外す）":"🟠 見積依頼中のはんこを付ける", hasEstReqStamp(u&&u.doc))+
@@ -8714,11 +8727,12 @@
     if(!doc.homeShow && !canReflect){ toast("この種類はお客様に出せないので、ホームにも出せません"); return; }
     doc.homeShow = !doc.homeShow;
     doc.homeShowAt = doc.homeShow ? nowIso() : null;
+    doc.homeHide = !doc.homeShow; // 外したときは、ホームのどの欄（ご確認・決定したもの など）にも出さない
     var reflNow = false;
     if(doc.homeShow && !doc.reflected){ doc.reflected = true; doc.reflectedAt = nowIso(); reflNow = true; }
     render();
     if(await saveDoc(coll, doc.id, doc)===false){ toast("保存に失敗しました"); return; }
-    toast(doc.homeShow ? ("おうちノートのホームに出しました"+(reflNow?"（あわせて反映しました）":"")) : "おうちノートのホームから外しました（反映はそのままです）");
+    toast(doc.homeShow ? ("おうちノートのホームに出しました"+(reflNow?"（あわせて反映しました）":"")) : "おうちノートのホームのどの欄からも外しました（家づくりの各部位には残ります）");
   }
   async function toggleCardAsk(coll, doc){
     doc.askDecision = !doc.askDecision;
@@ -8754,6 +8768,7 @@
       openNoteMenuId = null;
       var r0 = null;
       if(act==="stamp") r0 = toggleStaffStamp(kind, id);
+      else if(act==="hide") r0 = toggleHomeHide(kind, id);
       else if(act==="qspec") r0 = toggleQuoteSpecStamp(kind, id);
       else if(act==="estreqst") r0 = toggleAutoStamp(kind, id, "estreq");
       else if(act==="chgst") r0 = toggleAutoStamp(kind, id, "change");
@@ -8771,6 +8786,7 @@
       return r0;
     }
     if(act==="stamp") return toggleStaffStamp(kind, id);
+    if(act==="hide") return toggleHomeHide(kind, id);
     if(act==="qspec") return toggleQuoteSpecStamp(kind, id);
     if(act==="estreqst") return toggleAutoStamp(kind, id, "estreq");
     if(act==="chgst") return toggleAutoStamp(kind, id, "change");
@@ -9153,11 +9169,12 @@
     if(!n) return;
     n.homeShow = !n.homeShow;
     n.homeShowAt = n.homeShow ? nowIso() : null;
+    n.homeHide = !n.homeShow; // 外したときは、ホームのどの欄（ご確認・決定したもの など）にも出さない
     var reflNow = false;
     if(n.homeShow && !n.reflected){ n.reflected = true; n.reflectedAt = nowIso(); reflNow = true; }
     render();
     if(await saveDoc("meetingNotes", n.id, n)===false){ toast("保存に失敗しました"); return; }
-    toast(n.homeShow ? ("おうちノートのホームに出しました"+(reflNow?"（あわせて反映しました）":"")) : "おうちノートのホームから外しました（反映はそのままです）");
+    toast(n.homeShow ? ("おうちノートのホームに出しました"+(reflNow?"（あわせて反映しました）":"")) : "おうちノートのホームのどの欄からも外しました（家づくりの各部位には残ります）");
   }
   function toggleTaskAskDecision(id){
     var t = state.tasks.find(function(x){ return x.id===id; });

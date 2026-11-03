@@ -1046,6 +1046,7 @@ function consItems(){
   var out = [], seen = {};
   var notes = (data.notes||[]).slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); });
   notes.forEach(function(n){
+    if(n.homeHide) return; // スタッフが「ホームのどの欄にも出さない」にした記録
     String(n.open||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean).forEach(function(t){
       if(seen[t]) return; seen[t] = 1;
       // お客様が「決めたことを伝える」を送った項目は、ホームの一覧から外す
@@ -1709,7 +1710,7 @@ function homeHtml(){ return homeParts().main; }
     // 「決定」を押したカードは、はんこ付きでホームにずっと残す（決定待ちと追加見積りのあと、決定した新しい順。4件め以降は「ほか n件」）
     var stamped = [], seenSt = {};
     (data.categories||[]).forEach(function(c){
-      catAllItems(c).forEach(function(x){ if(x.key && !x.partial && x.cardStatus==="決定" && !seenSt[x.key]){ seenSt[x.key] = 1; stamped.push({c:c, x:x, stamped:true}); } });
+      catAllItems(c).forEach(function(x){ if(x.key && !x.partial && !x.homeHide && x.cardStatus==="決定" && !seenSt[x.key]){ seenSt[x.key] = 1; stamped.push({c:c, x:x, stamped:true}); } });
     });
     stamped.sort(function(a,b){ return (Date.parse(b.x.cardDecidedAt||"")||0) - (Date.parse(a.x.cardDecidedAt||"")||0); });
     var ST_LIM = 3, stHidden = view.stampAll ? 0 : Math.max(0, stamped.length - ST_LIM);
@@ -1780,7 +1781,7 @@ function homeHtml(){ return homeParts().main; }
   function askItems(){
     var a = [];
     (data.categories||[]).forEach(function(c){
-      catAllItems(c).forEach(function(x){ if(x.showDecide && (x.cardStatus||"検討中")==="検討中" && !chgDone(c, x)) a.push({c:c, x:x, at:String(x.at||x.date||"")}); });
+      catAllItems(c).forEach(function(x){ if(x.showDecide && !x.homeHide && (x.cardStatus||"検討中")==="検討中" && !chgDone(c, x)) a.push({c:c, x:x, at:String(x.at||x.date||"")}); });
     });
     a.sort(function(p,q){ return (Date.parse(q.at)||0) - (Date.parse(p.at)||0); });
     return a;
@@ -1795,11 +1796,11 @@ function homeHtml(){ return homeParts().main; }
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.open||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
     // スタッフが「おうちノートのホームに出す」にした記録・写真・資料だけ。出した順（新しい順）
     // 決定のはんこを押したものは、いちばん下の「🔴 決定したもの」にまとめるので、ここには出さない
-    var list = (data.notes||[]).filter(function(n){ if(!(n.homeShow && hasBody(n) && !homeLatestIds[n.id])) return false; var f0 = noteDecItem(n); return !(f0 && f0.x.cardStatus==="決定"); }).map(function(n){ return { n:n, at:n.homeShowAt }; });
+    var list = (data.notes||[]).filter(function(n){ if(!(n.homeShow && !n.homeHide && hasBody(n) && !homeLatestIds[n.id])) return false; var f0 = noteDecItem(n); return !(f0 && f0.x.cardStatus==="決定"); }).map(function(n){ return { n:n, at:n.homeShowAt }; });
     var seenDoc = {};
     (data.categories||[]).forEach(function(c){
       catAllItems(c).forEach(function(x){
-        if(!x.homeShow || x.type==="note" || !x.file || !x.file.url || x.cardStatus==="決定") return;
+        if(!x.homeShow || x.homeHide || x.type==="note" || !x.file || !x.file.url || x.cardStatus==="決定") return;
         var k = x.docId || x.file.url; if(seenDoc[k]) return; seenDoc[k] = 1;
         list.push({ x:x, c:c, at:x.homeShowAt });
       });
@@ -1833,7 +1834,7 @@ function homeHtml(){ return homeParts().main; }
     // ホームは「総合」（部位なしも含む）の記録だけ。部位ごとの記録は「家づくり」の各項目で見る。
     // 総合の記録が無いお客様は何も出さない（部位ごとの記録が勝手にホームに出ないように）。中身（内容・決まったこと・メッセージ・資料）の無い記録は出さない
     var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
-    var all = (data.notes||[]).filter(hasBody);
+    var all = (data.notes||[]).filter(function(n){ return hasBody(n) && !n.homeHide; });
     var gen = all.filter(function(n){ return n.scope==="general" || (n.scope==null ? (n.part==="総合" || !n.part) : !n.scope); });
     // 下の「✅ ご確認・ご決定ください」（決定待ち）か「🔴 決定したもの」に出る記録は、ここには出さない（同じ記録を2回出さない）
     var notes = gen.filter(function(n){

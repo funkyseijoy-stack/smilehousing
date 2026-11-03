@@ -565,7 +565,7 @@ export default async (req: Request, context: Context) => {
       // タスク由来はタスク単位（t:）、手動追加などはこの写真・PDF単位（s:）でカードごとに仮決定／決定できる
       key: srcTask ? "t:" + srcTask.id : "s:" + String(p.id).slice(0, 78),
       askDecision: srcTask ? srcTask.askDecision : p.askDecision,
-      homeShow: !!p.homeShow, homeShowAt: p.homeShowAt || "", docId: p.id,
+      homeShow: !!p.homeShow, homeShowAt: p.homeShowAt || "", homeHide: !!p.homeHide, docId: p.id,
       source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
@@ -598,6 +598,8 @@ export default async (req: Request, context: Context) => {
         file: fileOf(att),
         key: "t:" + t.id,
         askDecision: t.askDecision,
+        // 「ホームのどの欄にも出さない」はタスクの写し（仕様写真）側で付けるので、写しのどれかに付いていれば出さない
+        homeHide: !!t.homeHide || specPhotos.some((p: any) => p && p.homeHide && p.source && p.source.taskId === t.id),
         source: { taskId: t.id, noteSnippet: String(t.content || "").slice(0, 60) },
         contentType: att.contentType || "",
         spec: { contract: false, quote: false },
@@ -620,7 +622,7 @@ export default async (req: Request, context: Context) => {
       // 見積の書類もカードごとに決定できる（a:）。ホームに出すかもスタッフが選ぶ
       key: "a:" + String(a.id).slice(0, 78),
       askDecision: a.askDecision,
-      homeShow: !!a.homeShow, homeShowAt: a.homeShowAt || "", docId: a.id,
+      homeShow: !!a.homeShow, homeShowAt: a.homeShowAt || "", homeHide: !!a.homeHide, docId: a.id,
       // スタッフが書いた「お客様へのひとこと」（社内コメント staffMemo は出さない）
       msg: String(a.customerNote || "").slice(0, 500),
       at: a.reflectedAt || a.uploadedAt || "",
@@ -664,6 +666,7 @@ export default async (req: Request, context: Context) => {
       type: "note",
       id: n.id,
       key: "n:" + n.id,
+      homeHide: !!n.homeHide,
       // 「最終決定のお願い」の文を入れた記録は、決定ボタンを出す設定にしていなくても出す（その文を入れた＝決定をお願いしたいため）
       askDecision: n.askDecision === false ? false : (n.askDecision === true || String(n.message || "").includes(FINAL_ASK_TEXT)),
       label: partLabel(project, sp.scope, sp.category, sp.roomId),
@@ -701,6 +704,7 @@ export default async (req: Request, context: Context) => {
         id: n.id,
         key: "l:" + n.id + "_" + lineHash(t),
         askDecision: true,
+        homeHide: !!n.homeHide,
         lineCard: true,
         label: partLabel(project, lp.scope, lp.category, lp.roomId),
         roomId: lp.roomId || null,
@@ -915,6 +919,7 @@ export default async (req: Request, context: Context) => {
         upd: updAt(n.reflectedAt, n.createdAt),
         homeShow: !!n.homeShow,
         homeShowAt: n.homeShowAt || "",
+        homeHide: !!n.homeHide,
         partName: n.specPart ? partLabel(project, n.specPart.scope, n.specPart.category, n.specPart.roomId) : "",
         title: n.title || "",
         decided: n.decided != null ? n.decided : n.content || "",
