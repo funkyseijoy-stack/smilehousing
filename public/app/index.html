@@ -573,6 +573,8 @@
   details.mnmore > summary{ cursor:pointer; font-size:.85rem; font-weight:700; color:var(--muted); padding:4px 0; }
   details.mnmore[open] > summary{ margin-block-end:6px; }
   /* 案件のタブ「その他 ▾」 */
+  .submsgbadge{ display:inline-block; min-width:1.4em; margin-inline-start:6px; padding:0 6px; border-radius:999px; background:#c9575a; color:#fff; font-size:.85rem; font-weight:700; line-height:1.5; text-align:center; }
+  .submsgbadge[hidden]{ display:none; }
   .sub-extra{ display:none; }
   .subtabs.showextra .sub-extra, .sub-extra.active{ display:inline-block; }
   .sub-morebtn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px dashed var(--border); background:none; color:var(--muted); cursor:pointer; flex-shrink:0; white-space:nowrap; }
@@ -1205,6 +1207,7 @@
       <div class="subtabs">
         <button class="sub-btn" data-sub="hearing">ヒアリング</button>
         <button class="sub-btn" data-sub="meeting">打合せ記録</button>
+        <button class="sub-btn" data-sub="message">💬 メッセージ<span class="submsgbadge" id="subMsgBadge" hidden></span></button>
         <button class="sub-btn" data-sub="tasks">タスク</button>
         <button class="sub-btn" data-sub="quote">見積</button>
         <button class="sub-btn" data-sub="photos">写真・アルバム</button>
@@ -1214,7 +1217,6 @@
         <button class="sub-btn sub-extra" data-sub="customer">お客様情報</button>
         <button class="sub-btn sub-extra" data-sub="confirm">お客様への確認</button>
         <button class="sub-btn sub-extra" data-sub="reservation">予約</button>
-        <button class="sub-btn sub-extra" data-sub="message">メッセージ</button>
         <button class="sub-btn sub-extra" data-sub="taskhistory">タスク履歴</button>
         <button class="sub-btn sub-extra" data-sub="okainote">おうちノート連携</button>
       </div>
@@ -7496,6 +7498,15 @@
       wrap.innerHTML = html;
       if(stick) wrap.scrollTop = wrap.scrollHeight;
     });
+    // タブの印：最後にスタッフが送ったあとに届いた、お客様からのメッセージの数
+    var badge = document.getElementById("subMsgBadge");
+    if(badge){
+      var n = 0;
+      for(var i=rows.length-1;i>=0;i--){ if(rows[i].fromCustomer) n++; else break; }
+      badge.hidden = !n;
+      badge.textContent = n ? String(n) : "";
+      badge.title = n ? "お客様からの新しいメッセージ "+n+"件（まだ返信していません）" : "";
+    }
     refreshMessageLine();
   }
   // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
