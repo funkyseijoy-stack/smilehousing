@@ -3132,10 +3132,31 @@
     migrateAttachmentFolderParts();
     repairReflectedTaskCopies();
     backfillOldChangeTasks();
+    renameQuoteMailTasks();
     loadActivityBackground();
   }
   // 2026年11月：お客様の「変更のご依頼」から社内タスクを自動で作る機能（11/2公開）より前に届いた依頼（11/1〜）を、
   // 1回だけ社内タスクにする。タスクIDは task_chg_<メッセージID> で固定（複数の端末で動いても重ならない）
+  // Gmailから来た見積のタスクは名前を「【メール】」→「【見積】」に（件名・添付の名前に 見積／定価／プランボード、または見積の書類として登録済み）。
+  // サーバー（gmail-label-tasks.mts の isQuoteMail）と同じ判定。何度動かしても同じ結果。
+  var QUOTE_MAIL_WORDS = /見積|定価|プランボード/;
+  function isQuoteMailTask(t){
+    if(!t || !t.fromGmail) return false;
+    if(t.quoteReg) return true;
+    if(QUOTE_MAIL_WORDS.test(t.fromGmail.subject||"")) return true;
+    return (t.attachments||[]).some(function(a){ return a && QUOTE_MAIL_WORDS.test(String(a.name||"")); });
+  }
+  function quoteMailRename(t){
+    if(!isQuoteMailTask(t) || !/^【メール】/.test(t.content||"")) return false;
+    t.content = String(t.content).replace(/^【メール】/, "【見積】");
+    return true;
+  }
+  async function renameQuoteMailTasks(){
+    var list = state.tasks.filter(function(t){ return !t.deletedAt && quoteMailRename(t); });
+    if(!list.length) return;
+    for(var i=0;i<list.length;i++){ list[i].updatedAt = nowIso(); await saveDoc("tasks", list[i].id, list[i]); }
+    render();
+  }
   function backfillOldChangeTasks(){
     try{
       state.messages.forEach(function(m){
@@ -13876,6 +13897,7 @@
         }
         t = state.tasks.find(function(x){ return x.id===id; }) || t;
         t.quoteReg = { projectId: pid, reqIds:[rq.id], attIds: attIds, at: nowIso(), by: me };
+        quoteMailRename(t);
         if(!t.projectId) t.projectId = pid;
         var done = ov.querySelector("#tqDone").checked;
         if(done && (t.status||"未着手")!=="完了"){ t.status = "完了"; t.completedAt = nowIso(); t.archivedAt = null; if(!Array.isArray(t.reportTo)) t.reportTo = []; }

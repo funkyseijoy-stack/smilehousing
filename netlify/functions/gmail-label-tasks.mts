@@ -71,6 +71,12 @@ function emailOf(from: string) {
 }
 const norm = (s: string) => String(s || "").replace(/[\s　様邸]/g, "");
 
+// 件名か添付の名前に「見積」「定価」「プランボード」が入っていれば見積のメール（タスクの名前を【見積】にする。住まいるアプリの isQuoteMailTask と同じ判定）
+const QUOTE_WORDS = /見積|定価|プランボード/;
+function isQuoteMail(subject: string, files: any[]): boolean {
+  return QUOTE_WORDS.test(subject || "") || (files || []).some((f: any) => QUOTE_WORDS.test(String(f?.name || "")));
+}
+
 export default async () => {
   const tok = await getAccessToken();
   if (!tok.ok) { console.error("gmail-label-tasks: token", tok); return; }
@@ -192,7 +198,7 @@ export default async () => {
       const now = new Date().toISOString();
       await store.setJSON(`tasks/${taskId}`, {
         id: taskId, projectId,
-        content: `【メール】${subject}（${who}・${mdOf(date)}）` + (body ? "\n" + body : ""),
+        content: `${isQuoteMail(subject, files) ? "【見積】" : "【メール】"}${subject}（${who}・${mdOf(date)}）` + (body ? "\n" + body : ""),
         assignee: "", instructor: "", creator: "Gmail",
         hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
         attachmentAssetIds: [], attachments: files, vendorSpec: null, private: false,
