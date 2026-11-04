@@ -3742,6 +3742,19 @@
       renderKanban();
     });
   }
+  // 完了して3日たったタスク（アーカイブ済み）でも、案件が「工事完了として保存」されるまでは、
+  // 「案件ごと」表示と案件の「タスク」タブの「✅ 完了」に残す（部門が「会社」「その他」の案件と、案件なしは除く）
+  var KEEP_DONE_EXCLUDE_DEPTS = ["会社","その他"];
+  function keptDoneTasks(){
+    return state.tasks.filter(function(t){
+      if(!t || t.deletedAt || !t.archivedAt || (t.status||"")!=="完了" || !t.projectId) return false;
+      if(!taskVisibleToMe(t)) return false;
+      if(t.private && t.creator && t.creator!==state.currentUser) return false;
+      var p = projectById(t.projectId);
+      if(!p || p.deletedAt || p.finishedAt) return false;
+      return KEEP_DONE_EXCLUDE_DEPTS.indexOf(deptOfProject(p))<0;
+    });
+  }
   function liveTasks(){
     return state.tasks.filter(function(t){
       if(t.deletedAt) return false;
@@ -4694,7 +4707,7 @@
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
     renderTaskFilters();
-    var tasks = liveTasks().filter(function(t){
+    var passFilter = function(t){
       if(state.taskDeptFilter && deptOfTask(t)!==state.taskDeptFilter) return false;
       if(state.taskProjectFilter==="__none" && t.projectId) return false;
       if(state.taskProjectFilter && state.taskProjectFilter!=="__none" && t.projectId!==state.taskProjectFilter) return false;
@@ -4704,12 +4717,13 @@
       if(state.taskKindFilter==="internal") return !t.requestTo;
       if(state.taskKindFilter==="check") return !!t.checker;
       return true;
-    });
+    };
+    var tasks = liveTasks().filter(passFilter);
     state.kanShowAll = state.kanShowAll || {};
     var scrollL = wrap.scrollLeft;
     kanSyncViewSw();
     if(kanView()==="project"){
-      wrap.innerHTML = kanProjectColsHtml(tasks);
+      wrap.innerHTML = kanProjectColsHtml(tasks.concat(keptDoneTasks().filter(passFilter)));
       wrap.scrollLeft = scrollL;
       if(state.currentProjectId) renderProjectTasks();
       return;
@@ -5201,7 +5215,7 @@
     var empty = document.getElementById("projTaskEmpty");
     var pid = state.currentProjectId;
     var ptMd = function(x){ x = String(x||""); var m = x.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? Number(m[2])+"/"+Number(m[3]) : x; };
-    var rows = liveTasks().filter(function(t){ return t.projectId===pid; });
+    var rows = liveTasks().concat(keptDoneTasks()).filter(function(t){ return t.projectId===pid; });
     empty.hidden = rows.length!==0;
     var reqs = liveRequests().filter(function(r){ return r.projectId===pid; })
       .sort(function(a,b){ return String(b.requestedAt||b.createdAt||"").localeCompare(String(a.requestedAt||a.createdAt||"")); });
