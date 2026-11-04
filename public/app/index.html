@@ -647,6 +647,10 @@
   .kwaititem{ margin-block-end:10px; }
   .kwaitsrc{ font-size:.85rem; color:var(--muted); font-weight:700; margin:0 2px 3px; }
   .kassignbtn{ display:block; width:100%; margin-block-start:4px; }
+  .kc-custreply{ margin-block:6px; }
+  .kcr-item{ background:#eef6ef; border-inline-start:4px solid #2f7a4a; border-radius:8px; padding:6px 10px; margin-block-end:4px; }
+  .kcr-h{ font-size:.85rem; font-weight:700; color:#2f5c3e; }
+  .kcr-b{ font-size:.9rem; white-space:pre-wrap; }
   .ktaxsec{ margin-block-end:12px; }
   .ktaxhead{ display:flex; align-items:center; gap:6px; font-weight:700; font-size:.9rem; color:#2f5592; background:#e8eff9; border-radius:8px; padding:4px 10px; margin-block-end:6px; }
   .ktaxhead .kn{ margin-inline-start:auto; color:#2f5592; }
@@ -4287,8 +4291,10 @@
       taskReviewsHtml(t)+
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
       taskQuoteLinkHtml(t)+
+      custRepliesHtml(t)+
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
+        (isCustomerTask(t)?'<button class="btn small" data-taskact="custreply" data-id="'+t.id+'" title="お客様のおうちノートのメッセージに返信する">💬 お客様に返信</button>':'')+
         (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
         (!canReviewTask(t) && canCommentBack(t)?'<button class="btn small" data-taskact="commentback" data-id="'+t.id+'" title="コメントを書いて担当者へ戻す（未着手へ）">💬 コメントして戻す</button>':'')+
         (canAssigneeComment(t)?'<button class="btn small secondary" data-taskact="comment" data-id="'+t.id+'" title="コメントを書いて、最後にコメントした人（いなければ作った人）へ知らせる">💬 コメント</button>':'')+
@@ -4393,6 +4399,7 @@
             var src = t.creator==="Gmail" ? "✉️ Gmailから" : (t.creator==="おうちノート" ? "🏠 おうちノートから" : (t.creator==="お打合せの記録ページ" ? "📝 お打合せの記録ページから" : (t.creator ? "作成："+t.creator : "")));
             return '<div class="kwaititem">'+(src?'<div class="kwaitsrc">'+escapeHtml(src)+'</div>':'')+kanCardHtml(t, t.status||"未着手")+
               '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
+              (isCustomerTask(t) ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="custreply" data-id="'+escapeHtml(t.id)+'">💬 お客様に返信</button>' : '')+
               (t.fromGmail && !t.quoteReg && (t.attachments||[]).length ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="toquote" data-id="'+escapeHtml(t.id)+'">📄 見積の書類として登録</button>' : '')+'</div>';
           }).join("")+'</div></div></div>';
       }
@@ -13686,6 +13693,65 @@
     });
   }
 
+  // お客様のメッセージ・変更のご依頼から来たタスク：カードから、案件のメッセージ（おうちノート・お打合せの記録ページと同じやりとり）へ返信できる
+  function isCustomerTask(t){ return !!(t && t.projectId && (t.fromCustomerMessage || t.fromCustomerChange)); }
+  function custRepliesHtml(t){
+    var list = (t && t.custReplies) || [];
+    if(!list.length) return "";
+    return '<div class="kc-custreply">'+list.map(function(r){
+      return '<div class="kcr-item"><div class="kcr-h">💬 お客様へ返信（'+escapeHtml(r.by||"")+'・'+escapeHtml(fmtTs(r.at))+(r.line?'・📱LINEでお知らせ済み':'')+'）</div><div class="kcr-b">'+escapeHtml(r.text||"")+'</div></div>';
+    }).join("")+'</div>';
+  }
+  function taskCustomerReply(id){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t || !t.projectId) return;
+    var proj = projectById(t.projectId);
+    var src = t.fromCustomerMessage || t.fromCustomerChange || {};
+    var orig = src.messageId ? state.messages.find(function(m){ return m.id===src.messageId; }) : null;
+    var origText = orig ? String(orig.content||"") : String(t.content||"").replace(/^【お客様[^】]*】\s*/, "");
+    var recips = prolineRecipients(proj);
+    var canLine = !!(recips.length && state.settings && state.settings.prolineBeaconUrl);
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+    ov.innerHTML = '<div class="taskform-card" style="max-width:560px; width:100%;"><h3 style="margin:0 0 6px;">💬 お客様に返信</h3>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">'+escapeHtml((proj&&proj.name)||"")+(proj&&proj.customer?'（'+escapeHtml(proj.customer)+'様）':'')+'</div>'+
+      '<div style="background:var(--surface-2); border-inline-start:4px solid #e8b04a; border-radius:8px; padding:8px 10px; font-size:.9rem; white-space:pre-wrap; max-height:30vh; overflow:auto;">'+escapeHtml(origText)+'</div>'+
+      '<label class="field" style="display:block; margin-block-start:10px;">返信<textarea data-cr rows="5" style="width:100%; box-sizing:border-box;" placeholder="お客様へのお返事を書いてください"></textarea></label>'+
+      '<label style="display:flex; gap:8px; align-items:flex-start; font-size:.9rem; margin-block-start:6px;"><input type="checkbox" data-crline'+(canLine?' checked':' disabled')+'> <span>'+(canLine ? 'お客様のLINEに「おうちノートが更新されました」を送って知らせる（'+escapeHtml(recips.map(function(r){ return r.name||r.uid; }).join("、"))+'）' : 'LINEのお知らせ：「おうちノート連携」タブでお客様のプロラインIDを登録すると送れます')+'</span></label>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-start:6px;">返信は案件の「💬 メッセージ」に入り、お客様のおうちノート・お打合せの記録ページのメッセージに出ます。タスクの進捗は変わりません。</div>'+
+      '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" data-ok>送る</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
+    document.body.appendChild(ov);
+    var ta = ov.querySelector("[data-cr]");
+    setTimeout(function(){ ta.focus(); }, 50);
+    var busy = false;
+    ov.addEventListener("click", async function(e){
+      if(e.target.closest("[data-cancel]") || e.target===ov){ if(!busy) ov.remove(); return; }
+      if(!e.target.closest("[data-ok]") || busy) return;
+      var text = ta.value.trim();
+      if(!text){ toast("返信を入力してください"); ta.focus(); return; }
+      var lineOn = canLine && ov.querySelector("[data-crline]").checked;
+      busy = true;
+      var m = { id:uid("msg"), projectId: t.projectId, content:text, sender: state.currentUser||"", createdAt: nowIso(), replyTo: src.messageId||"", fromTaskId: t.id };
+      state.messages.push(m);
+      var ok = await saveDoc("messages", m.id, m);
+      if(ok===false){ busy = false; state.messages = state.messages.filter(function(x){ return x!==m; }); toast("⚠ 返信を保存できませんでした"); return; }
+      ov.remove();
+      var rec = { by: state.currentUser||"", at: m.createdAt, text: text, msgId: m.id, line: false };
+      if(lineOn){
+        try{
+          var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message" }) });
+          var lj = await lres.json().catch(function(){ return {}; });
+          if(lres.ok && lj.ok){ m.lineNotifiedAt = nowIso(); rec.line = true; saveDoc("messages", m.id, m); }
+          else toast("返信は送りましたが、LINEのお知らせは送れませんでした");
+        }catch(err){ toast("返信は送りましたが、LINEのお知らせは送れませんでした"); }
+      }
+      t.custReplies = (t.custReplies||[]).concat([rec]);
+      t.updatedAt = nowIso();
+      await saveDoc("tasks", t.id, t);
+      toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":""));
+      logActivity("タスクからお客様に返信しました（"+((proj&&proj.customer)||(proj&&proj.name)||"")+"）");
+      render();
+    });
+  }
   // Gmailから来たタスク（fromGmail）の、届いたメールへの返信を下書きにする。
   // 宛先・件名（Re:）・返信の印（In-Reply-To／References）はサーバーがそのやりとりのいちばん新しい受信メールから付ける。
   // 添付：タスクの添付のうち、そのメールから取り込んだもの（slug=gmail）は送り返さない＝あとで自分で付けた資料だけ付ける。
@@ -18125,6 +18191,7 @@
       else if(act==="gmaildraft") taskGmailDraft(id);
       else if(act==="gmailreply") taskGmailReply(id);
       else if(act==="toquote") taskToQuoteSheet(id);
+      else if(act==="custreply") taskCustomerReply(id);
       else if(act==="openreq") openRequestsOfProject(id);
       else if(act==="toestimate") taskToEstimate(id);
       else if(act==="togglereflect") toggleTaskReflect(id);
