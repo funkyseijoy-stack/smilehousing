@@ -647,6 +647,10 @@
   .kwaititem{ margin-block-end:10px; }
   .kwaitsrc{ font-size:.85rem; color:var(--muted); font-weight:700; margin:0 2px 3px; }
   .kassignbtn{ display:block; width:100%; margin-block-start:4px; }
+  .ktaxsec{ margin-block-end:12px; }
+  .ktaxhead{ display:flex; align-items:center; gap:6px; font-weight:700; font-size:.9rem; color:#2f5592; background:#e8eff9; border-radius:8px; padding:4px 10px; margin-block-end:6px; }
+  .ktaxhead .kn{ margin-inline-start:auto; color:#2f5592; }
+  .ktaxmore > summary{ cursor:pointer; font-size:.85rem; font-weight:700; color:var(--muted); padding:4px 2px; }
   .kmst{ display:flex; align-items:center; gap:6px; margin:0 2px 3px; }
   .kmstpill{ display:inline-block; font-size:.85rem; font-weight:700; color:#fff; background:var(--c); border-radius:999px; padding:1px 10px; }
   .kmore{ display:block; width:100%; border:0; background:none; color:var(--muted); font-family:inherit; font-size:.85rem; font-weight:700; padding:8px 4px 2px; text-align:start; cursor:pointer; }
@@ -2162,6 +2166,7 @@
       <div class="row">
         <label class="field">確認者（確認依頼）<select id="tfChecker"></select></label>
       </div>
+      <label id="tfTaxRow" style="display:flex; align-items:center; gap:8px; margin-block:4px 8px; font-weight:700;"><input type="checkbox" id="tfTax"> 🧾 税理士（青田さん）からの依頼</label>
       <div class="row">
         <div class="field">依頼先（業者・任意・複数可）<div id="tfVendorBox" style="display:flex; flex-wrap:wrap; gap:6px 14px; padding:6px 0;"></div></div>
         <label class="field">依頼方法<select id="tfMethod"><option value="gmail">Gmail</option><option value="fax">FAX</option><option value="other">その他</option></select></label>
@@ -3614,8 +3619,20 @@
   // タスクの見え方（2026年10月〜・表示だけの絞り込み）：朋子は全部、ほかの人は「自分が作った」「自分が担当」「自分が確認者」のタスクだけ。
   // 作成者が入っていない古いタスクは、朋子と、担当・確認者になっている人にだけ見える。名前が未選択の端末は絞らない。
   var TASK_ADMIN = "朋子";
+  // 税理士（青田さん）からの依頼：青田さんのメールから来たタスク、またはタスクの「税理士からの依頼」にチェックしたもの。
+  // 社長・山本・朋子の画面の「🧾 税理士（青田さん）から」の列にまとめる（ほかの人には、本人が担当・確認者のものしか見えない）
+  var TAX_EMAIL = "aota.masayuki@tkcnf.or.jp";
+  var TAX_VIEWERS = ["社長","山本","朋子"];
+  function isTaxTask(t){
+    if(!t) return false;
+    if(t.taxReq===true) return true;
+    if(t.taxReq===false) return false;
+    return !!(t.fromGmail && String(t.fromGmail.from||"").toLowerCase().indexOf(TAX_EMAIL)>=0);
+  }
+  function canSeeTax(name){ return !name || TAX_VIEWERS.indexOf(name)>=0; }
   function taskVisibleToMe(t){
     var me = state.currentUser;
+    if(isTaxTask(t) && !canSeeTax(me) && t.assignee!==me && t.checker!==me) return false;
     if(!me || me===TASK_ADMIN) return true;
     if(isAssignWaiting(t)) return true; // 割り振り待ち（担当者なし）は全員に見せる
     return t.creator===me || t.assignee===me || t.checker===me;
@@ -4327,9 +4344,46 @@
     state.kanShowAll = state.kanShowAll || {};
     var scrollL = wrap.scrollLeft;
     // 担当の割り振り待ち（全員の画面）：担当者のいない・自分だけでない・完了でないタスクを、ボードの先頭の列にまとめる
-    var waitIds = {}, waitCol = "", mineCol = "";
+    var waitIds = {}, waitCol = "", mineCol = "", taxCol = "";
+    // 🧾 税理士（青田さん）から：未着手／着手／完了を縦に並べる（この列のタスクはほかの列には出さない）
+    if(canSeeTax(state.currentUser)){
+      var taxAll = tasks.filter(isTaxTask);
+      taxAll.forEach(function(t){ waitIds[t.id] = true; });
+      var since = Date.now() - 60*86400000;
+      var taxDone = state.tasks.filter(function(t){
+        if(t.deletedAt || !isTaxTask(t) || (t.status||"")!=="完了") return false;
+        if(!t.archivedAt && taxAll.indexOf(t)<0) return false;
+        return (Date.parse(t.completedAt||t.updatedAt||"")||0) >= since;
+      }).sort(function(a,b){ return (b.completedAt||b.updatedAt||"").localeCompare(a.completedAt||a.updatedAt||""); });
+      var taxNot = taxAll.filter(function(t){ return (t.status||"未着手")==="未着手"; });
+      var taxDoing = taxAll.filter(function(t){ var st = t.status||"未着手"; return st!=="未着手" && st!=="完了"; });
+      var byDl = function(a,b){
+        var da = (a.hasDeadline && a.deadline) ? a.deadline : "9999", db = (b.hasDeadline && b.deadline) ? b.deadline : "9999";
+        if(da!==db) return da.localeCompare(db);
+        return (b.createdAt||"").localeCompare(a.createdAt||"");
+      };
+      taxNot.sort(byDl); taxDoing.sort(byDl);
+      var taxCard = function(t){
+        var st = t.status||"未着手";
+        return '<div class="kwaititem">'+(st!=="未着手" && st!=="完了" ? '<div class="kmst"><span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span></div>' : '')+
+          kanCardHtml(t, st)+
+          (!t.assignee && st!=="完了" ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>' : '')+'</div>';
+      };
+      var sec = function(icon, label, list, empty, extra){
+        return '<div class="ktaxsec"><div class="ktaxhead">'+icon+' '+label+'<span class="kn tabular">'+list.length+'</span></div>'+
+          (list.length ? '<div class="klist">'+list.map(taxCard).join("")+'</div>' : '<div class="kempty">'+empty+'</div>')+(extra||"")+'</div>';
+      };
+      var doneShown = taxDone.slice(0, 5), doneMore = taxDone.slice(5);
+      taxCol = '<div class="kcol ktax" style="--sc:#3f6fb5">'+
+        '<div class="khead"><span class="kandot" style="background:#3f6fb5"></span><span>🧾 税理士（青田さん）から</span><span class="kn tabular">'+(taxNot.length+taxDoing.length)+'</span></div>'+
+        '<div class="kbody">'+
+          sec("⬜", "未着手", taxNot, "なし")+
+          sec("🔄", "着手（対応中・確認中など）", taxDoing, "なし")+
+          sec("✅", "完了（60日以内）", doneShown, "なし", doneMore.length ? '<details class="ktaxmore"><summary>ほか '+doneMore.length+'件</summary><div class="klist">'+doneMore.map(taxCard).join("")+'</div></details>' : "")+
+        '</div></div>';
+    }
     {
-      var waiting = tasks.filter(isAssignWaiting);
+      var waiting = tasks.filter(function(t){ return isAssignWaiting(t) && !waitIds[t.id]; });
       waiting.forEach(function(t){ waitIds[t.id] = true; });
       waiting.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
       if(waiting.length){
@@ -4365,7 +4419,7 @@
           return '<div class="kwaititem"><div class="kmst"><span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span>'+(role?'<span class="kwaitsrc">'+role+'</span>':'')+'</div>'+kanCardHtml(t, st)+'</div>';
         }).join("")+'</div>' : '<div class="kempty">いまはありません</div>')+'</div></div>';
     }
-    wrap.innerHTML = waitCol + mineCol + STATUS_ORDER.map(function(status){
+    wrap.innerHTML = waitCol + mineCol + taxCol + STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status && !waitIds[t.id]; });
       var body;
       if(status==="完了" && rows.length){
@@ -14988,6 +15042,8 @@
     document.getElementById("tfHasDeadline").checked = false;
     document.getElementById("tfDeadline").value = "";
     document.getElementById("tfPrivate").checked = false;
+    document.getElementById("tfTax").checked = false;
+    document.getElementById("tfTaxRow").hidden = !canSeeTax(state.currentUser);
     document.getElementById("tfAttachment").value = "";
     tfExtras = []; renderTfFileList();
     taskFormOnSaved = null;
@@ -15016,6 +15072,8 @@
       document.getElementById("tfHasDeadline").checked = !!editing.hasDeadline;
       document.getElementById("tfDeadline").value = editing.deadline || "";
       document.getElementById("tfPrivate").checked = !!editing.private;
+      document.getElementById("tfTax").checked = isTaxTask(editing);
+      if(isTaxTask(editing)) document.getElementById("tfTaxRow").hidden = false;
       taskFormVendorSpec = editing.vendorSpec || null;
       document.getElementById("tfVendorSpecLabel").textContent = editing.vendorSpec ? (editing.vendorSpec.label||"設定済み") : "未選択";
     }
@@ -15115,6 +15173,7 @@
       if(deptToSave) editTarget.dept = deptToSave; else delete editTarget.dept;
       editTarget.content = content;
       editTarget.memo = memo;
+      editTarget.taxReq = !!document.getElementById("tfTax").checked;
       editTarget.assignee = assignee||"";
       editTarget.instructor = instructor||"";
       var prevChecker = editTarget.checker || "";
@@ -15165,6 +15224,7 @@
       attachments: taskAttachments,
       vendorSpec: taskFormVendorSpec || null,
       private: isPrivate,
+      taxReq: !!document.getElementById("tfTax").checked,
       reflected: false, reflectedAt: null,
       status: checkStatusFor(checker) || "未着手", createdAt: nowIso(), updatedAt: nowIso()
     };
