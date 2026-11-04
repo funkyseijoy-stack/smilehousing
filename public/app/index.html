@@ -4418,6 +4418,93 @@
     if(!ok){ Object.assign(t, prev); renderKanban(); return; }
     toast("✅ 確認して閉じました（完了の列へ移しました）");
     renderKanban();
+    maybeCreateSendCheck(t, "「確認して閉じる」にしました");
+  }
+  // ---- Gmailから来たタスクを朋子以外が処理したら、朋子に「📤 お客様に送るか確認」のタスクを自動で作る ----
+  // 対象：fromGmail のタスク（税理士の分は除く）を、朋子以外が「完了」「確認して閉じる」「見積の書類として登録」にしたとき。1つのタスクにつき1回だけ（IDは task_sc_<元のタスクID>）。
+  async function maybeCreateSendCheck(t, how){
+    if(!t || !t.fromGmail || t.sendCheck || t.sendCheckId || t.private) return;
+    if(isTaxTask(t)) return;
+    var me = state.currentUser || "";
+    if(me===TASK_ADMIN) return;
+    var id = "task_sc_"+t.id;
+    if(state.tasks.some(function(x){ return x.id===id; })){ t.sendCheckId = id; return; }
+    var fg = t.fromGmail || {};
+    var sv = (typeof taskSenderVendor==="function") ? taskSenderVendor(t) : null;
+    var from = (sv && sv.name) || String(fg.from||"").replace(/<[^>]*>/g,"").replace(/"/g,"").trim() || "メール";
+    var qr = t.quoteReg || null;
+    var pid = t.projectId || (qr && qr.projectId) || "";
+    var pj = pid ? projectById(pid) : null;
+    var atts = [], seen = {};
+    var addAtt = function(a){ if(!a || !a.url || seen[a.url]) return; seen[a.url] = 1; atts.push(a); };
+    var quoteIds = (qr && qr.attIds) || [];
+    quoteIds.forEach(function(aid){
+      var a = state.attachments.find(function(x){ return x.id===aid; });
+      if(a) addAtt({ id: a.assetId||a.id, url: a.url, contentType: a.contentType||"", name: a.name||"書類" });
+    });
+    (t.attachments||[]).forEach(function(a){ addAtt({ id:a.id, url:a.url, contentType:a.contentType||"", name:a.name||"添付" }); });
+    var lines = ["📤 お客様に送るか確認："+(fg.subject||String(t.content||"").split("\n")[0]).slice(0,60)+"（"+from+"）",
+      (me||"だれか")+"さんが"+how+(pj ? "（案件："+pj.name+"）" : "（案件は未設定）")];
+    var nt = { id:id, content: lines.join("\n"), projectId: pid, assignee: TASK_ADMIN, checker:"", instructor:"", creator: me||"",
+      status:"未着手", createdAt: nowIso(), updatedAt: nowIso(), hasDeadline:false, deadline:"",
+      attachments: atts, attachmentAssetIds: atts.map(function(a){ return a.id; }),
+      sendCheck: { fromTaskId: t.id, how: how, by: me, at: nowIso(), quoteAttIds: quoteIds.slice() } };
+    state.tasks.push(nt);
+    var ok = await saveDoc("tasks", nt.id, nt);
+    if(ok===false){ state.tasks = state.tasks.filter(function(x){ return x!==nt; }); return; }
+    t.sendCheckId = id; t.updatedAt = nowIso();
+    await saveDoc("tasks", t.id, t);
+    toast("📤 朋子さんに「お客様に送るか確認」のタスクを送りました", 5000);
+    renderKanban();
+  }
+  function isSendCheck(t){ return !!(t && t.sendCheck); }
+  function sendCheckQuoteDocs(t){
+    var ids = (t && t.sendCheck && t.sendCheck.quoteAttIds) || [];
+    return ids.map(function(aid){ return state.attachments.find(function(x){ return x.id===aid && !x.deletedAt; }); }).filter(function(a){ return a && quoteSharable(a); });
+  }
+  async function finishSendCheck(t, result){
+    var prev = {status:t.status, completedAt:t.completedAt, reportTo:t.reportTo, sendCheck:Object.assign({}, t.sendCheck)};
+    t.status = "完了"; t.completedAt = nowIso(); t.archivedAt = null; t.reportTo = [];
+    t.sendCheck.result = result; t.sendCheck.doneBy = state.currentUser||""; t.sendCheck.doneAt = nowIso();
+    t.updatedAt = nowIso();
+    var ok = await saveDoc("tasks", t.id, t);
+    if(ok===false){ Object.assign(t, prev); toast("保存できませんでした。もう一度お試しください"); renderKanban(); return false; }
+    renderKanban();
+    return true;
+  }
+  async function sendCheckAct(id, act){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t || !t.sendCheck) return;
+    if(act==="none"){
+      if(!window.confirm("お客様には送らずに、このタスクを完了にしますか？")) return;
+      if(await finishSendCheck(t, "送らない")) toast("✅ 送らないで閉じました");
+      return;
+    }
+    if(act==="msg"){
+      if(!t.projectId){ toast("案件が決まっていません。「編集」で案件を選んでください"); return; }
+      taskCustomerReply(t.id, async function(){ if(await finishSendCheck(t, "メッセージ")) toast("✅ メッセージで送り、完了にしました"); });
+      return;
+    }
+    if(act==="note"){
+      var docs = sendCheckQuoteDocs(t).filter(function(a){ return !a.reflected; });
+      if(!docs.length){ toast("おうちノートに出せる書類（プランボード・定価）がありません"); return; }
+      var apply = async function(part){
+        var n = 0;
+        for(var i=0;i<docs.length;i++){
+          var a = docs[i];
+          if(!taskPartReflectable(a.specPart)){ if(!part) continue; a.specPart = part; delete a.specPartAuto; }
+          a.reflected = true; a.reflectedAt = nowIso();
+          if(await saveDoc("attachments", a.id, a)!==false) n++;
+        }
+        if(!n){ toast("おうちノートに出せませんでした"); render(); return; }
+        logActivity("お客様に送るか確認のタスクから、書類"+n+"件をおうちノートに出しました");
+        await finishSendCheck(t, "おうちノート");
+        render();
+        toast("✅ 書類"+n+"件をおうちノートに出して、完了にしました", 6000);
+      };
+      if(docs.some(function(a){ return !taskPartReflectable(a.specPart); })){
+        askSpecPart(function(part){ if(part) apply(part); }, t.projectId);
+      }else apply(null);
+    }
   }
   function renderKanban(){
     var wrap = document.getElementById("kanbanWrap");
@@ -4498,6 +4585,24 @@
           }).join("")+'</div></div></div>';
       }
     }
+    // 📤 お客様に送る？（朋子の画面）：Gmailのタスクをほかの人が処理したあとに自動でできる確認のタスク
+    var sendCol = "";
+    if(state.currentUser===TASK_ADMIN){
+      var scs = tasks.filter(function(t){ return isSendCheck(t) && !waitIds[t.id] && (t.status||"未着手")!=="完了"; });
+      scs.forEach(function(t){ waitIds[t.id] = true; });
+      scs.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
+      if(scs.length){
+        sendCol = '<div class="kcol ksend" style="--sc:#d9822b">'+
+          '<div class="khead"><span class="kandot" style="background:#d9822b"></span><span>📤 お客様に送る？</span><span class="kn tabular">'+scs.length+'</span></div>'+
+          '<div class="kbody"><div class="klist">'+scs.map(function(t){
+            var docs = sendCheckQuoteDocs(t).filter(function(a){ return !a.reflected; });
+            return '<div class="kwaititem"><div class="kwaitsrc">✉️ '+escapeHtml((t.sendCheck.by||"")+"さんが処理")+'</div>'+kanCardHtml(t, t.status||"未着手")+
+              (docs.length ? '<button type="button" class="btn small kassignbtn" data-taskact="scnote" data-id="'+escapeHtml(t.id)+'">🏠 おうちノートに出す（'+docs.length+'件）</button>' : '')+
+              (t.projectId ? '<button type="button" class="btn small'+(docs.length?' secondary':'')+' kassignbtn" data-taskact="scmsg" data-id="'+escapeHtml(t.id)+'">💬 メッセージで送る</button>' : '<div class="kwaitsrc">案件が未設定です（「編集」で案件を選ぶとメッセージで送れます）</div>')+
+              '<button type="button" class="btn small secondary kassignbtn" data-taskact="scnone" data-id="'+escapeHtml(t.id)+'">送らない（閉じる）</button></div>';
+          }).join("")+'</div></div></div>';
+      }
+    }
     // 私の担当：ログインしている人が担当・確認者の、完了でないタスク（進捗の列には出さない）
     var me = state.currentUser;
     if(me){
@@ -4521,7 +4626,7 @@
         }).join("")+'</div>' : '<div class="kempty">いまはありません</div>')+'</div></div>';
     }
     if(state.currentProjectId) setTimeout(renderProjectTasks, 0);
-    wrap.innerHTML = waitCol + mineCol + taxCol + STATUS_ORDER.map(function(status){
+    wrap.innerHTML = waitCol + sendCol + mineCol + taxCol + STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status && !waitIds[t.id]; });
       var body;
       if(status==="完了" && rows.length){
@@ -13779,6 +13884,7 @@
         logActivity("Gmailのタスクから見積の書類を"+attIds.length+"件登録しました（"+(pj?pj.name:"")+"）");
         close(); render();
         toast("見積の書類に"+attIds.length+"件登録し、"+((vendorById(vid)||{}).name||"業者")+"の見積依頼を受領済みにしました"+(done?"（タスクは完了にしました）":""), 8000);
+        maybeCreateSendCheck(t, "見積の書類に"+attIds.length+"件登録しました");
       }catch(e){ this.disabled = false; this.textContent = "登録する"; toast("登録できませんでした。もう一度お試しください"); }
     });
   }
@@ -13792,7 +13898,7 @@
       return '<div class="kcr-item"><div class="kcr-h">💬 お客様へ返信（'+escapeHtml(r.by||"")+'・'+escapeHtml(fmtTs(r.at))+(r.line?'・📱LINEでお知らせ済み':'')+'）</div><div class="kcr-b">'+escapeHtml(r.text||"")+'</div></div>';
     }).join("")+'</div>';
   }
-  function taskCustomerReply(id){
+  function taskCustomerReply(id, onSent){
     var t = state.tasks.find(function(x){ return x.id===id; }); if(!t || !t.projectId) return;
     var proj = projectById(t.projectId);
     var src = t.fromCustomerMessage || t.fromCustomerChange || {};
@@ -13807,7 +13913,7 @@
       '<div style="background:var(--surface-2); border-inline-start:4px solid #e8b04a; border-radius:8px; padding:8px 10px; font-size:.9rem; white-space:pre-wrap; max-height:30vh; overflow:auto;">'+escapeHtml(origText)+'</div>'+
       '<label class="field" style="display:block; margin-block-start:10px;">返信<textarea data-cr rows="5" style="width:100%; box-sizing:border-box;" placeholder="お客様へのお返事を書いてください"></textarea></label>'+
       '<label style="display:flex; gap:8px; align-items:flex-start; font-size:.9rem; margin-block-start:6px;"><input type="checkbox" data-crline'+(canLine?' checked':' disabled')+'> <span>'+(canLine ? 'お客様のLINEに「おうちノートが更新されました」を送って知らせる（'+escapeHtml(recips.map(function(r){ return r.name||r.uid; }).join("、"))+'）' : 'LINEのお知らせ：「おうちノート連携」タブでお客様のプロラインIDを登録すると送れます')+'</span></label>'+
-      '<div class="muted" style="font-size:.85rem; margin-block-start:6px;">返信は案件の「💬 メッセージ」に入り、お客様のおうちノート・お打合せの記録ページのメッセージに出ます。タスクの進捗は変わりません。</div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-start:6px;">返信は案件の「💬 メッセージ」に入り、お客様のおうちノート・お打合せの記録ページのメッセージに出ます。'+(onSent ? '送るとこのタスクは完了になります。' : 'タスクの進捗は変わりません。')+'</div>'+
       '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" data-ok>送る</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
     document.body.appendChild(ov);
     var ta = ov.querySelector("[data-cr]");
@@ -13840,6 +13946,7 @@
       toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":""));
       logActivity("タスクからお客様に返信しました（"+((proj&&proj.customer)||(proj&&proj.name)||"")+"）");
       render();
+      if(typeof onSent==="function") onSent();
     });
   }
   // Gmailから来たタスク（fromGmail）の、届いたメールへの返信を下書きにする。
@@ -15596,6 +15703,7 @@
     }, 80);
     await saveDoc("tasks", t.id, t);
     logActivity("タスクのステータスを「"+t.status+"」にしました");
+    if(newStatus==="完了") maybeCreateSendCheck(t, "完了にしました");
   }
   async function deleteTask(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
@@ -18291,6 +18399,9 @@
       else if(act==="togglereflect") toggleTaskReflect(id);
       else if(act==="toggleask") toggleTaskAskDecision(id);
       else if(act==="quickclose") closeTaskQuick(id);
+      else if(act==="scnote") sendCheckAct(id, "note");
+      else if(act==="scmsg") sendCheckAct(id, "msg");
+      else if(act==="scnone") sendCheckAct(id, "none");
     };
     var kanbanChange = function(e){
       var input = e.target.closest("input[type=file][data-kcattach]");
