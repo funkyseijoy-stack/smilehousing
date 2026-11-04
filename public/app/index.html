@@ -4314,6 +4314,7 @@
         (canAssigneeComment(t)?'<button class="btn small secondary" data-taskact="comment" data-id="'+t.id+'" title="コメントを書いて、最後にコメントした人（いなければ作った人）へ知らせる">💬 コメント</button>':'')+
         '<button class="btn small secondary" data-taskact="edit" data-id="'+t.id+'">✏️ 編集</button>'+
         '<button class="btn small secondary" data-kcmore="'+t.id+'">'+(state.taskMoreOpen&&state.taskMoreOpen[t.id]?'⋯ その他 ▴':'⋯ その他 ▾')+'</button>'+
+        '<button class="btn small secondary" data-kccollapse="'+t.id+'" title="カードを閉じる">▲ 閉じる</button>'+
       '</div>'+
       (state.taskMoreOpen&&state.taskMoreOpen[t.id] ? '<div class="kc-actions kc-more">'+
         '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
@@ -18228,6 +18229,8 @@
       if(opj){ var opid = opj.dataset.openproj; switchTab("projects"); openProjectDetail(opid); var tb = document.querySelector('.sub-btn[data-sub="tasks"]'); if(tb) tb.click(); return; }
       var delAttachBtn = e.target.closest("button[data-delattach]");
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
+      var kcol = e.target.closest("[data-kccollapse]");
+      if(kcol){ var cid = kcol.dataset.kccollapse; state.taskExpanded = state.taskExpanded || {}; state.taskExpanded[cid] = false; if(state.taskMenuId===cid) state.taskMenuId = null; if(state.taskMoreOpen) state.taskMoreOpen[cid] = false; renderKanban(); return; }
       var kmore = e.target.closest("[data-kcmore]");
       if(kmore){ state.taskMoreOpen = state.taskMoreOpen || {}; state.taskMoreOpen[kmore.dataset.kcmore] = !state.taskMoreOpen[kmore.dataset.kcmore]; renderKanban(); return; }
       var vlist = e.target.closest("[data-vendorlist]");
