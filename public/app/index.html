@@ -423,6 +423,10 @@
   #pbItemsLayer{ position:absolute; inset:0; pointer-events:none; }
   /* 貼った画像（元の図面の上・書き込みの線の下）。「画像を動かす」のときだけ触れる */
   #pbImgLayer{ position:absolute; inset:0; pointer-events:none; }
+  /* 入れた文字を押すと出る、大きさ・色を変えるバー */
+  .pbtextbar{ position:absolute; transform:translate(-50%,-100%); pointer-events:auto; display:flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:4px; box-shadow:var(--shadow); white-space:nowrap; z-index:5; line-height:1.2; }
+  .pbtextbar button{ appearance:none; border:1px solid var(--border); background:var(--surface-2); border-radius:8px; padding:6px 10px; font-size:.9rem; font-weight:700; cursor:pointer; color:var(--ink); }
+  .pbtextbar .pbtsz{ min-width:2.2em; text-align:center; font-size:.85rem; color:var(--muted); }
   .pbimg{ position:absolute; pointer-events:none; touch-action:none; }
   .pbimg img{ width:100%; height:100%; display:block; pointer-events:none; user-select:none; -webkit-user-drag:none; }
   #pbModal.imgmove #pbBaseCanvas, #pbModal.imgmove #pbOverlayCanvas{ pointer-events:none; }
@@ -4322,7 +4326,7 @@
         waitCol = '<div class="kcol kwait" style="--sc:#c0392b">'+
           '<div class="khead"><span class="kandot" style="background:#c0392b"></span><span>👤 割り振り待ち</span><span class="kn tabular">'+waiting.length+'</span></div>'+
           '<div class="kbody"><div class="klist">'+waiting.map(function(t){
-            var src = t.creator==="Gmail" ? "✉️ Gmailから" : (t.creator==="おうちノート" ? "🏠 おうちノートから" : (t.creator ? "作成："+t.creator : ""));
+            var src = t.creator==="Gmail" ? "✉️ Gmailから" : (t.creator==="おうちノート" ? "🏠 おうちノートから" : (t.creator==="お打合せの記録ページ" ? "📝 お打合せの記録ページから" : (t.creator ? "作成："+t.creator : "")));
             return '<div class="kwaititem">'+(src?'<div class="kwaitsrc">'+escapeHtml(src)+'</div>':'')+kanCardHtml(t, t.status||"未着手")+
               '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button></div>';
           }).join("")+'</div></div></div>';
@@ -15812,6 +15816,7 @@
   }
   function pbSetTool(tool){
     pb.tool = tool; pb.shape = null;
+    if(pb.textSel){ pb.textSel = null; try{ pbRenderItems(); }catch(e){} }
     var pbm = document.getElementById("pbModal"); if(pbm) pbm.classList.toggle("imgmove", tool==="imgmove");
     if(tool!=="item") pb.pendingItem = null; // 記号を続けて置くのは、別の道具を選ぶまで
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.classList.toggle("active", b.dataset.pbtool===tool); });
@@ -15887,14 +15892,20 @@
       return '<div class="pbimg" data-imgid="'+it.id+'" style="left:'+((it.x-it.w/2)*pb.zoom)+'px; top:'+((it.y-it.h/2)*pb.zoom)+'px; width:'+(it.w*pb.zoom)+'px; height:'+(it.h*pb.zoom)+'px;">'+
         '<img src="'+escapeHtml(it.src)+'" alt="" draggable="false"><button type="button" class="pbimg-del" data-delimg="'+it.id+'" title="この画像を消す">×</button><span class="pbimg-rs" data-rsimg="'+it.id+'" title="ドラッグで大きさを変える">⤡</span></div>';
     }).join("");
-    layer.innerHTML = pb.items.filter(function(it){ return it.kind!=="image"; }).map(function(it){
+    var selT = pb.textSel ? pb.items.find(function(x){ return x.id===pb.textSel && x.kind==="text"; }) : null;
+    if(!selT) pb.textSel = null;
+    layer.innerHTML = (selT ? '<div class="pbtextbar" style="left:'+(selT.x*pb.zoom)+'px; top:'+((selT.y - (selT.fontPx||16)*0.9)*pb.zoom)+'px;">'+
+        '<button type="button" data-tsz="-1" title="小さくする">A－</button><span class="pbtsz">'+Math.round(selT.fontPx||16)+'</span><button type="button" data-tsz="1" title="大きくする">A＋</button>'+
+        '<button type="button" data-tcol="1" title="いま選んでいるペンの色にする"><span style="display:inline-block; width:14px; height:14px; border-radius:999px; background:'+escapeHtml(pb.color)+'; vertical-align:middle;"></span> 色</button>'+
+        '<button type="button" data-tclose="1" title="閉じる">✓</button></div>' : '') +
+      pb.items.filter(function(it){ return it.kind!=="image"; }).map(function(it){
       if(it.kind==="symbol" && it.sym){
         var sym = PB_SYMBOLS.find(function(x){ return x.key===it.sym; });
         if(sym) return '<div class="pbitem sym" data-itemid="'+it.id+'" title="'+escapeHtml(sym.label)+'（ドラッグで動かせます）" style="left:'+(it.x*pb.zoom)+'px; top:'+(it.y*pb.zoom)+'px;">'+
           pbSymSvg(sym, it.color||"#d33", Math.round((it.size||40)*pb.zoom))+'<button class="pbitem-del" data-delitem="'+it.id+'">×</button></div>';
       }
       var isText = it.kind==="text";
-      var extraStyle = isText ? ("color:"+(it.color||"#000")+"; font-size:"+Math.round((it.fontPx||16)*pb.zoom)+"px;") : "";
+      var extraStyle = isText ? ("color:"+(it.color||"#000")+"; font-size:"+Math.round((it.fontPx||16)*pb.zoom)+"px;"+(pb.textSel===it.id?" outline:2px dashed var(--accent); outline-offset:2px;":"")) : "";
       return '<div class="pbitem'+(it.kind==="stamp"?" stamp":"")+(isText?" text":"")+'" data-itemid="'+it.id+'" style="left:'+(it.x*pb.zoom)+'px; top:'+(it.y*pb.zoom)+'px; '+extraStyle+'">'+
         '<span>'+escapeHtml(it.text)+'</span><button class="pbitem-del" data-delitem="'+it.id+'">×</button></div>';
     }).join("");
@@ -16613,7 +16624,7 @@
     var layer = document.getElementById("pbItemsLayer"); if(layer) layer.innerHTML = "";
     var il = document.getElementById("pbImgLayer"); if(il) il.innerHTML = "";
     document.getElementById("pbModal").classList.remove("imgmove");
-    pb.restoreLayer = null; pb.srcUrl = null; pb.layerCache = {};
+    pb.restoreLayer = null; pb.srcUrl = null; pb.layerCache = {}; pb.textSel = null;
   }
   async function pbSaveSpecOverwrite(target, blob){
     try{
@@ -18290,6 +18301,16 @@
       tgt.addEventListener("pointermove", onMove); tgt.addEventListener("pointerup", onUp); tgt.addEventListener("pointercancel", onUp);
     });
     document.getElementById("pbItemsLayer").addEventListener("click", function(e){
+      var tb = e.target.closest(".pbtextbar");
+      if(tb){
+        var tt = pb.items.find(function(x){ return x.id===pb.textSel; });
+        var b = e.target.closest("button");
+        if(!tt || !b){ return; }
+        if(b.dataset.tsz){ var f = tt.fontPx || 16; tt.fontPx = Math.max(10, Math.min(240, Math.round(b.dataset.tsz==="1" ? f*1.25 : f/1.25))); }
+        else if(b.dataset.tcol){ tt.color = pb.color; }
+        else if(b.dataset.tclose){ pb.textSel = null; }
+        pbRenderItems(); return;
+      }
       var del = e.target.closest(".pbitem-del");
       if(del){ pb.items = pb.items.filter(function(x){ return x.id!==del.dataset.delitem; }); pbRenderItems(); }
     });
@@ -18302,8 +18323,9 @@
       if(!it) return;
       var pointerId = e.pointerId;
       chip.setPointerCapture(pointerId);
-      var startClientX = e.clientX, startClientY = e.clientY, startX = it.x, startY = it.y;
+      var startClientX = e.clientX, startClientY = e.clientY, startX = it.x, startY = it.y, moved = false;
       function onMove(ev){
+        if(Math.abs(ev.clientX-startClientX)+Math.abs(ev.clientY-startClientY) > 6) moved = true;
         var rect = pb.overlayCanvas.getBoundingClientRect();
         var scale = pb.baseCanvas.width / rect.width;
         it.x = startX + (ev.clientX-startClientX)*scale;
@@ -18315,6 +18337,9 @@
         chip.removeEventListener("pointermove", onMove);
         chip.removeEventListener("pointerup", onUp);
         chip.removeEventListener("pointercancel", onUp);
+        // 文字を押した（動かしていない）ときは、大きさ・色を変えるバーを出す
+        if(!moved && it.kind==="text"){ pb.textSel = (pb.textSel===it.id ? null : it.id); pbRenderItems(); }
+        else if(moved && pb.textSel===it.id) pbRenderItems();
       }
       chip.addEventListener("pointermove", onMove);
       chip.addEventListener("pointerup", onUp);

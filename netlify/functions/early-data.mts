@@ -57,6 +57,20 @@ export default async (req: Request, context: Context) => {
       fromCustomer: true, createdAt: now, updatedAt: now,
     };
     await store.setJSON(`messages/${id}`, doc);
+    // お客様からのメッセージは、1通ずつ社内タスク（担当者なし＝朋子の「割り振り待ち」）にもする
+    try {
+      const taskId = "task_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      await store.setJSON(`tasks/${taskId}`, {
+        id: taskId, projectId, content: "【お客様からのメッセージ】" + text,
+        assignee: "", instructor: "お客様", creator: "お打合せの記録ページ",
+        hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+        attachmentAssetIds: [], attachments: [], private: false, reflected: false, reflectedAt: null,
+        status: "未着手", fromCustomerMessage: { messageId: id },
+        createdAt: now, updatedAt: now,
+      });
+      (doc as any).taskId = taskId;
+      await store.setJSON(`messages/${id}`, doc);
+    } catch (e) { console.error("message task failed", e); }
     // スタッフへ通知メール（失敗してもメッセージ送信自体は成功扱い）
     await sendNotifyMail(
       `【打合せ記録ページ】${project.customer || "お客様"}様からメッセージが届きました`,
