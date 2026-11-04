@@ -26,6 +26,8 @@ const ALLOWED_COLLECTIONS = [
   "imageBoard",
   // 現場写真（スタッフ限定・リフォーム案件。お客様画面には出さない）
   "sitePhotos",
+  // プランボードの書き込みデータ（元の絵・線・文字・貼った画像を分けて残し、保存したあとも直せるように）
+  "pbLayers",
 ];
 
 function genId() {
