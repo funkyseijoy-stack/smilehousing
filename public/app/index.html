@@ -645,6 +645,8 @@
   .kwaititem{ margin-block-end:10px; }
   .kwaitsrc{ font-size:.85rem; color:var(--muted); font-weight:700; margin:0 2px 3px; }
   .kassignbtn{ display:block; width:100%; margin-block-start:4px; }
+  .kmst{ display:flex; align-items:center; gap:6px; margin:0 2px 3px; }
+  .kmstpill{ display:inline-block; font-size:.85rem; font-weight:700; color:#fff; background:var(--c); border-radius:999px; padding:1px 10px; }
   .kmore{ display:block; width:100%; border:0; background:none; color:var(--muted); font-family:inherit; font-size:.85rem; font-weight:700; padding:8px 4px 2px; text-align:start; cursor:pointer; }
   .kboard .kancard{ border:0; border-radius:10px; padding:8px 10px; margin-block-end:6px; box-shadow:0 1px 2px rgba(43,36,32,.10); }
   .kboard .kancard.reflected{ border-inline-start:5px solid var(--accent); }
@@ -3613,6 +3615,7 @@
   function taskVisibleToMe(t){
     var me = state.currentUser;
     if(!me || me===TASK_ADMIN) return true;
+    if(isAssignWaiting(t)) return true; // 割り振り待ち（担当者なし）は全員に見せる
     return t.creator===me || t.assignee===me || t.checker===me;
   }
   // 担当の割り振り待ち：担当者がいない・自分だけのタスクでない・完了でない
@@ -4321,9 +4324,9 @@
     });
     state.kanShowAll = state.kanShowAll || {};
     var scrollL = wrap.scrollLeft;
-    // 担当の割り振り待ち（朋子の画面だけ）：担当者のいない・自分だけでない・完了でないタスクを、ボードの先頭の列にまとめる
-    var waitIds = {}, waitCol = "";
-    if(state.currentUser===TASK_ADMIN){
+    // 担当の割り振り待ち（全員の画面）：担当者のいない・自分だけでない・完了でないタスクを、ボードの先頭の列にまとめる
+    var waitIds = {}, waitCol = "", mineCol = "";
+    {
       var waiting = tasks.filter(isAssignWaiting);
       waiting.forEach(function(t){ waitIds[t.id] = true; });
       waiting.sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
@@ -4338,7 +4341,29 @@
           }).join("")+'</div></div></div>';
       }
     }
-    wrap.innerHTML = waitCol + STATUS_ORDER.map(function(status){
+    // 私の担当：ログインしている人が担当・確認者の、完了でないタスク（進捗の列には出さない）
+    var me = state.currentUser;
+    if(me){
+      var mine = tasks.filter(function(t){ return !waitIds[t.id] && (t.status||"未着手")!=="完了" && (t.assignee===me || t.checker===me); });
+      mine.forEach(function(t){ waitIds[t.id] = true; });
+      mine.sort(function(a,b){
+        var da = (a.hasDeadline && a.deadline) ? a.deadline : "", db = (b.hasDeadline && b.deadline) ? b.deadline : "";
+        if(da && !db) return -1;
+        if(!da && db) return 1;
+        if(da!==db) return da.localeCompare(db);
+        var ia = STATUS_ORDER.indexOf(a.status||"未着手"), ib = STATUS_ORDER.indexOf(b.status||"未着手");
+        if(ia!==ib) return ia - ib;
+        return (b.createdAt||"").localeCompare(a.createdAt||"");
+      });
+      mineCol = '<div class="kcol kmine" style="--sc:#2f7d5b">'+
+        '<div class="khead"><span class="kandot" style="background:#2f7d5b"></span><span>🙋 私の担当</span><span class="kn tabular">'+mine.length+'</span></div>'+
+        '<div class="kbody">'+(mine.length ? '<div class="klist">'+mine.map(function(t){
+          var st = t.status||"未着手";
+          var role = t.assignee===me ? "" : "（確認者）";
+          return '<div class="kwaititem"><div class="kmst"><span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span>'+(role?'<span class="kwaitsrc">'+role+'</span>':'')+'</div>'+kanCardHtml(t, st)+'</div>';
+        }).join("")+'</div>' : '<div class="kempty">いまはありません</div>')+'</div></div>';
+    }
+    wrap.innerHTML = waitCol + mineCol + STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status && !waitIds[t.id]; });
       var body;
       if(status==="完了" && rows.length){
