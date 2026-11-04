@@ -661,6 +661,29 @@
   .ptreq{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:6px 2px; border-bottom:1px dashed var(--border); font-size:.9rem; }
   .ptlate{ color:#c0392b; font-weight:700; }
   .kc-custreply{ margin-block:6px; }
+  .vfflt{ display:flex; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
+  .vfflt input{ flex:1 1 220px; min-width:0; font-size:1rem; padding:.5rem .7rem; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:inherit; }
+  .vfflt select{ flex:0 1 220px; }
+  .vfrow{ display:flex; gap:12px; align-items:flex-start; border-top:1px solid var(--border); padding-block:10px; }
+  .vfrow:first-child{ border-top:none; }
+  .vfname{ flex:0 0 170px; cursor:pointer; }
+  .vfname small{ display:block; color:var(--muted); font-size:.85rem; }
+  .vfname .mi, .vflb .mi{ color:#d9822b; font-weight:700; }
+  .vfdocs{ display:flex; gap:8px; overflow-x:auto; padding-block-end:4px; flex:1 1 auto; min-width:0; }
+  .vfgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:8px; }
+  .vfdoc{ flex:0 0 120px; width:120px; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface); cursor:pointer; }
+  .vfgrid .vfdoc{ width:auto; }
+  .vfdoc.new{ border:2px solid #2f7d5b; }
+  .vfdoc.mi{ border:2px dashed #d9822b; }
+  .vfdoc.lock{ height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.9rem; }
+  .vfth{ height:84px; display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; position:relative; }
+  .vfth img, .vfth canvas, .vfth video{ width:100%; height:100%; object-fit:cover; }
+  .vflb{ font-size:.85rem; padding:3px 5px; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+  .vflb .nw{ color:#2f7d5b; }
+  .vfmore{ flex:0 0 auto; align-self:center; background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; }
+  .vfreqs{ display:flex; flex-direction:column; gap:4px; }
+  .vfreq{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:.9rem; }
+  @media (max-width:760px){ .vfrow{ flex-direction:column; gap:6px; } .vfname{ flex:none; } }
   .erbox{ margin-block:6px; border:1px solid var(--border); border-radius:10px; padding:6px 8px; background:var(--surface-2); }
   .ertitle{ font-size:.9rem; margin-block-end:4px; }
   .erfolder{ border-top:1px dashed var(--border); padding-block:6px; }
@@ -1138,7 +1161,15 @@
 
   <!-- ========== 見積（全案件の見積り依頼） ========== -->
   <section class="panel" id="panel-estimates">
-    <div class="card" id="docsHubCard">
+    <div class="card" id="vfCard">
+      <h2 style="margin:0 0 8px;">📁 業者ごとの見積</h2>
+      <div class="vfflt">
+        <input type="search" id="vfQ" placeholder="🔍 業者・案件・ファイル名で探す">
+        <select id="vfProj"></select>
+      </div>
+      <div id="vfBody"></div>
+    </div>
+    <div class="card" id="docsHubCard" hidden>
       <div class="estviewbar" id="estViewBar">
         <button type="button" data-estview="docs">📄 登録済みの書類（全案件）</button>
         <button type="button" data-estview="gmail">📧 Gmailから取り込む</button>
@@ -6736,7 +6767,113 @@
     var fx = ATT_FIXED_FOLDERS.find(function(x){ return x.id===c; });
     return !!(fx && fx.parentId===cat);
   }
+  // ---- 見積タブ：業者ごとのフォルダー（2026年11月〜。以前の「登録済みの書類／Gmailから取り込む／見積依頼の状況」の3画面は隠した） ----
+  var vfState = { q:"", proj:"", open:"" };
+  function vfAllDocs(){
+    var map = {}, regUrls = {};
+    var push = function(vid, d){ if(!vid) return; (map[vid] = map[vid] || []).push(d); };
+    liveAttachments().forEach(function(a){ if(a && a.url) regUrls[a.url] = 1; });
+    liveAttachments().forEach(function(a){
+      if(!a || !a.url || !a.vendorId) return;
+      push(a.vendorId, { kind:"att", att:a, url:a.url, ct:a.contentType||"", name:a.name||"", pid:a.projectId||"",
+        d: String(a.receivedAt||a.uploadedAt||a.createdAt||"").slice(0,10), type: a.kind==="quote" ? quoteTypeNorm(a.quoteType) : (a.kind==="plan"?"図面":"") });
+    });
+    // 未整理：メール・見積依頼のカードに届いたまま、まだ見積の書類に登録していないファイル
+    state.tasks.forEach(function(t){
+      if(!t || t.deletedAt || t.private || t.sendCheck) return;
+      var sender = (t.fromGmail && !t.quoteReg && typeof taskSenderVendor==="function") ? taskSenderVendor(t) : null;
+      (t.attachments||[]).forEach(function(f){
+        if(!f || !f.url || regUrls[f.url]) return;
+        var vid = f.fromVendorId || (sender && sender.id) || "";
+        if(!vid) return;
+        push(vid, { kind:"pend", task:t, url:f.url, ct:f.contentType||"", name:f.name||"", pid:t.projectId||"",
+          d: String((t.fromGmail && t.fromGmail.date) || t.createdAt || "").slice(0,10), type:"未整理" });
+      });
+    });
+    Object.keys(map).forEach(function(k){ map[k].sort(function(a,b){ return String(b.d).localeCompare(String(a.d)); }); });
+    return map;
+  }
+  function vfMatch(d, v){
+    if(vfState.proj && d.pid!==vfState.proj) return false;
+    var q = String(vfState.q||"").trim().toLowerCase(); if(!q) return true;
+    var p = projectById(d.pid);
+    return [v && v.name, d.name, p && p.name, p && p.customer].some(function(x){ return String(x||"").toLowerCase().indexOf(q)>=0; });
+  }
+  function vfTile(d, i){
+    var md = d.d ? Number(d.d.slice(5,7))+"/"+Number(d.d.slice(8,10)) : "";
+    var p = projectById(d.pid);
+    if(d.kind==="att" && d.att.kind==="quote" && quoteLocked(d.att.quoteType) && !state.quoteUnlocked)
+      return '<div class="vfdoc lock lockbox" title="NETは暗証番号でロック中">🔒<span>NET '+escapeHtml(md)+'</span></div>';
+    var pname = p ? p.name : "（案件未定）";
+    var lab = (i===0 ? '<b class="nw">最新</b> ' : '')+(d.kind==="pend" ? '<b class="mi">未整理</b> ' : '')+escapeHtml(md)+'<br>'+escapeHtml(pname)+(d.kind==="att" && d.type ? ' '+escapeHtml(d.type) : '');
+    return '<div class="vfdoc'+(i===0?' new':'')+(d.kind==="pend"?' mi':'')+'" '+(d.kind==="pend" ? 'data-vfpend="'+escapeHtml(d.task.id)+'" title="押すと、案件・種類を選んで整理できます"' : 'data-openatt="'+escapeHtml(d.att.id)+'" title="'+escapeHtml(d.name)+'"')+'>'+
+      '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div><div class="vflb">'+lab+'</div></div>';
+  }
+  function renderVendorFolders(){
+    var body = document.getElementById("vfBody"); if(!body) return;
+    var ps = document.getElementById("vfProj");
+    if(ps && document.activeElement!==ps){
+      ps.innerHTML = '<option value="">案件：すべて</option>'+liveProjects().slice().sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""),"ja"); })
+        .map(function(p){ return '<option value="'+escapeHtml(p.id)+'"'+(p.id===vfState.proj?' selected':'')+'>'+escapeHtml(p.name||"")+'</option>'; }).join("");
+    }
+    var all = vfAllDocs();
+    if(vfState.open){
+      var v = vendorById(vfState.open);
+      var docs = (all[vfState.open]||[]).filter(function(d){ return vfMatch(d, null) || !vfState.q; });
+      var reqs = liveRequests().filter(function(r){ return r.vendorId===vfState.open && (!vfState.proj || r.projectId===vfState.proj); })
+        .sort(function(a,b){ return String(b.requestedAt||b.createdAt||"").localeCompare(String(a.requestedAt||a.createdAt||"")); });
+      var md = function(x){ x = String(x||""); return x.length>=10 ? Number(x.slice(5,7))+"/"+Number(x.slice(8,10)) : x; };
+      body.innerHTML = '<button type="button" class="btn small secondary" data-vfback>← 業者の一覧へ</button>'+
+        '<h3 style="margin:10px 0 6px;">📁 '+escapeHtml((v&&v.name)||"業者")+'<span class="muted" style="font-size:.85rem; font-weight:400;">　'+docs.length+'件</span></h3>'+
+        (docs.length ? '<div class="vfgrid">'+docs.map(vfTile).join("")+'</div>' : '<div class="empty">書類はまだありません。</div>')+
+        (reqs.length ? '<h4 style="margin:14px 0 6px;">📋 この業者への見積依頼</h4><div class="vfreqs">'+reqs.map(function(r){
+          var p = projectById(r.projectId), st = r.estClosed ? "⏹ 終わり" : r.status==="受領済み" ? "✅ 届いた "+md(r.receivedAt) : r.replyDetected ? "✉️ 返信あり" : r.status==="依頼済み" ? "⏳ 待ち（依頼 "+md(r.requestedAt)+"）" : "📝 まだ依頼していない";
+          return '<div class="vfreq"><span>'+escapeHtml((p&&p.name)||"案件")+(r.part?'　'+escapeHtml(partText(r.part, r.projectId)):'')+'</span><span>'+escapeHtml(st)+'</span></div>';
+        }).join("")+'</div>' : '');
+      return;
+    }
+    var rows = liveVendors().map(function(v){
+      var docs = (all[v.id]||[]).filter(function(d){ return vfMatch(d, v); });
+      return { v:v, docs:docs };
+    }).filter(function(x){ return x.docs.length; })
+      .sort(function(a,b){ return String(b.docs[0].d).localeCompare(String(a.docs[0].d)); });
+    if(!rows.length){ body.innerHTML = '<div class="empty">'+(vfState.q||vfState.proj ? '条件に合う書類はありません。' : 'まだ業者さんの書類はありません。')+'</div>'; return; }
+    var SHOW = 6;
+    body.innerHTML = rows.map(function(x){
+      var mi = x.docs.filter(function(d){ return d.kind==="pend"; }).length;
+      return '<div class="vfrow"><div class="vfname" data-vfopen="'+escapeHtml(x.v.id)+'">📁 <b>'+escapeHtml(x.v.name)+'</b><small>'+x.docs.length+'件'+(mi?'・<span class="mi">未整理'+mi+'</span>':'')+'</small></div>'+
+        '<div class="vfdocs">'+x.docs.slice(0,SHOW).map(vfTile).join("")+
+        (x.docs.length>SHOW ? '<button type="button" class="vfmore" data-vfopen="'+escapeHtml(x.v.id)+'">ほか'+(x.docs.length-SHOW)+'件 ›</button>' : '')+'</div></div>';
+    }).join("");
+  }
+  function vfInit(){
+    var body = document.getElementById("vfBody"); if(!body) return;
+    var q = document.getElementById("vfQ"), ps = document.getElementById("vfProj"), tm = null;
+    if(q) q.addEventListener("input", function(){ clearTimeout(tm); tm = setTimeout(function(){ vfState.q = q.value; renderVendorFolders(); }, 250); });
+    if(ps) ps.addEventListener("change", function(){ vfState.proj = ps.value; renderVendorFolders(); });
+    body.addEventListener("click", function(e){
+      var o = e.target.closest("[data-vfopen]");
+      if(o){ vfState.open = o.dataset.vfopen; renderVendorFolders(); window.scrollTo({top:0, behavior:"smooth"}); return; }
+      if(e.target.closest("[data-vfback]")){ vfState.open = ""; renderVendorFolders(); return; }
+      var pd = e.target.closest("[data-vfpend]");
+      if(pd){ taskToQuoteSheet(pd.dataset.vfpend); return; }
+      var oa = e.target.closest("[data-openatt]");
+      if(oa){ openAttachment(oa.dataset.openatt); return; }
+      if(e.target.closest(".lockbox")){
+        askPin(function(val){
+          if(val === state.settings.pin){ state.quoteUnlocked = true; render(); toast("解除しました"); scheduleQuoteAutoLock(); }
+          else if(val !== null){ toast("暗証番号が違います"); }
+        });
+      }
+    });
+  }
   function renderDocsHub(){
+    // 見積タブは「業者ごとのフォルダー」1画面だけにした（以前の3つの画面は隠す。関数・データは残してある）
+    ["docsHubCard","inboxCard","homeReqCard"].forEach(function(id){ var el = document.getElementById(id); if(el) el.hidden = true; });
+    renderVendorFolders();
+    return;
+  }
+  function renderDocsHubOld(){
     var host = document.getElementById("docsHub"); if(!host) return;
     var view = state.estView || "docs";
     document.querySelectorAll("#estViewBar [data-estview]").forEach(function(b){ b.classList.toggle("on", b.dataset.estview===view); });
@@ -18845,6 +18982,7 @@
     attInitDnD();
     inboxInit();
     dhInit();
+    vfInit();
     document.getElementById("attachmentList").addEventListener("click", function(e){
       if(docHandleClick(e)) return;
       var openEl = e.target.closest("[data-openatt]");
