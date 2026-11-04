@@ -5,11 +5,11 @@ import { listCollection } from "../lib/booking.mts";
 import { sendTaskReviewMail } from "../lib/task-mail.mts";
 
 // Gmail で「タスク」ラベル（LABEL_NAME）を付けたメール、および「メイン」に届いた人からのメール（AUTO_QUERY。
-// 広告・SNS・自動送信・自分が送ったメールは除く）を、15分おきに社内タスク（担当者なし・未着手＝朋子の「割り振り待ち」）にする定期関数。
+// 広告・SNS・自動送信・自分が送ったメールは除く）を、5分おきに社内タスク（担当者なし・未着手＝朋子の「割り振り待ち」）にする定期関数。
 // 同じスレッドに新しい返信が届いたら、そのタスクのやりとり（reviews）に追記し、完了していれば「未着手」に戻す（seenIds で既読を管理）。
 // 1つのスレッド（メールのやりとり）につき1件だけ作る（タスクIDは task_gm_<スレッドID> で固定。削除したタスクも作り直さない）。
 // Gmail の権限は読み取り＋下書きだけなので、ラベルは外さない（外さなくても二重には作らない）。
-// 定期実行の関数は、Netlify が本番デプロイに対してのみ実行する。
+// 5分おきに動く（前回から変わっていないやりとりは読み直さない）。定期実行の関数は、Netlify が本番デプロイに対してのみ実行する。
 
 const LABEL_NAME = "タスク";
 const LOOKBACK = "newer_than:30d";
@@ -126,9 +126,9 @@ export default async () => {
   const labelled = await listQ(`label:${LABEL_NAME} ${LOOKBACK}`);
   const autoThreads = await listQ(AUTO_QUERY);
   const seenTh = new Set<string>();
-  const jobs: { id: string; auto: boolean }[] = [];
-  labelled.forEach((t) => { if (!seenTh.has(t.id)) { seenTh.add(t.id); jobs.push({ id: t.id, auto: false }); } });
-  autoThreads.forEach((t) => { if (!seenTh.has(t.id)) { seenTh.add(t.id); jobs.push({ id: t.id, auto: true }); } });
+  const jobs: { id: string; auto: boolean; historyId: string }[] = [];
+  labelled.forEach((t) => { if (!seenTh.has(t.id)) { seenTh.add(t.id); jobs.push({ id: t.id, auto: false, historyId: String(t.historyId || "") }); } });
+  autoThreads.forEach((t) => { if (!seenTh.has(t.id)) { seenTh.add(t.id); jobs.push({ id: t.id, auto: true, historyId: String(t.historyId || "") }); } });
   if (!jobs.length) return;
 
   const store = getStore("staffData");
@@ -243,6 +243,8 @@ export default async () => {
       const existing: any = await store.get(`tasks/${taskId}`, { type: "json", consistency: "strong" }).catch(() => null);
       if (existing && existing.deletedAt && !existing.mergedInto) continue; // 削除したタスクは作り直さない・追記もしない
       if (existing && !existing.fromGmail) continue;
+      // 前回見たときから、このやりとりに変化が無ければ読み直さない（軽くするため。historyId はやりとりが変わると変わる）
+      if (existing && job.historyId && existing.fromGmail.historyId === job.historyId) continue;
       const full: any = await g("threads/" + job.id + "?format=full");
       const msgs: any[] = full.messages || [];
       if (!msgs.length) continue;
@@ -254,7 +256,7 @@ export default async () => {
         const seen = new Set<string>(fg.seenIds || []);
         const fresh = incoming.filter((m) => !seen.has(m.id) && !isAutomated(m.payload?.headers || [], emailOf(hv(m.payload?.headers || [], "From"))));
         msgs.forEach((m) => seen.add(m.id));
-        fg.seenIds = Array.from(seen).slice(-200);
+        fg.seenIds = Array.from(seen).slice(-200); fg.historyId = job.historyId;
         await store.setJSON(`tasks/${taskId}`, existing);
         if (!fresh.length) continue;
         const target: any = await store.get(`tasks/${existing.mergedInto}`, { type: "json", consistency: "strong" }).catch(() => null);
@@ -286,6 +288,7 @@ export default async () => {
         const fg = existing.fromGmail;
         if (!Array.isArray(fg.seenIds)) {
           fg.seenIds = msgs.map((m) => m.id);
+          fg.historyId = job.historyId;
           await store.setJSON(`tasks/${taskId}`, existing);
           continue;
         }
@@ -293,8 +296,8 @@ export default async () => {
         const before = seen.size;
         const fresh = incoming.filter((m) => !seen.has(m.id) && !isAutomated(m.payload?.headers || [], emailOf(hv(m.payload?.headers || [], "From"))));
         msgs.forEach((m) => seen.add(m.id));
-        fg.seenIds = Array.from(seen).slice(-200);
-        if (!fresh.length) { if (seen.size !== before) await store.setJSON(`tasks/${taskId}`, existing); continue; }
+        fg.seenIds = Array.from(seen).slice(-200); fg.historyId = job.historyId;
+        if (!fresh.length) { await store.setJSON(`tasks/${taskId}`, existing); continue; }
         const now = new Date().toISOString();
         existing.reviews = Array.isArray(existing.reviews) ? existing.reviews : (existing.review ? [existing.review] : []);
         for (const m of fresh) {
@@ -338,7 +341,7 @@ export default async () => {
       const isDl = !files.length && isDownloadMail(subject, body, links);
       const isPw = !files.length && !isDl && isPasswordMail(subject, body);
       const stub = (into: string) => ({ id: taskId, deletedAt: new Date().toISOString(), mergedInto: into,
-        fromGmail: { threadId: job.id, messageId: msg.id, from, subject, date, auto: job.auto, seenIds: msgs.map((m) => m.id) } });
+        fromGmail: { threadId: job.id, messageId: msg.id, from, subject, date, auto: job.auto, seenIds: msgs.map((m) => m.id), historyId: job.historyId } });
 
       // パスワードの別メール → 先に届いたリンクのタスクに追記する
       if (isPw) {
@@ -384,7 +387,7 @@ export default async () => {
         hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
         attachmentAssetIds: [], attachments: files, vendorSpec: null, private: false,
         reflected: false, reflectedAt: null, status: "未着手",
-        fromGmail: { threadId: job.id, messageId: msg.id, from, subject, date, auto: job.auto, seenIds: msgs.map((m) => m.id) },
+        fromGmail: { threadId: job.id, messageId: msg.id, from, subject, date, auto: job.auto, seenIds: msgs.map((m) => m.id), historyId: job.historyId },
         ...(isDl ? { downloads: [{ who, from: fromMail, links, at: date, subject, ...(pwFromTask ? { pw: pwFromTask, pwAt: date } : {}) }] } : {}),
         ...(isPw ? { pwOnly: { from: fromMail, at: date, pw: pwSnippet(body) } } : {}),
         createdAt: now, updatedAt: now,
@@ -396,5 +399,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: "*/15 * * * *",
+  schedule: "*/5 * * * *",
 };
