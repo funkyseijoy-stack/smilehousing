@@ -364,7 +364,7 @@
   .ersrct{ font-weight:700; margin-bottom:4px; }
   .ersrcsec{ font-size:.9rem; margin:4px 0; }
   .kancard.ordered{ border-color:#d23c32; min-height:88px; }
-  .cdstamps{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+  .cdstamps{ display:flex; flex-direction:row; gap:4px; flex-shrink:0; align-items:center; }
   .apstamp.o{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.8); }
   .cdbody{ flex:1; min-width:0; }
@@ -4530,8 +4530,9 @@
         (arr.length ? '<div class="klist">'+arr.map(kanStackCard).join("")+'</div>' : '<div class="kempty">なし</div>')+(extra||"")+'</div>';
     };
     var dShown = done.slice(0,3), dMore = done.slice(3);
-    return (dec.length ? sec("dec", "🔴", "お客様決定済み", dec) : "")+sec("n", "⬜", "未着手", not)+sec("", "🔄", "着手", doing)+
-      sec("d", "✅", "完了", dShown, dMore.length ? '<details class="ktaxmore"><summary>ほか '+dMore.length+'件</summary><div class="klist">'+dMore.map(kanStackCard).join("")+'</div></details>' : "");
+    return sec("n", "⬜", "未着手", not)+sec("", "🔄", "着手", doing)+
+      sec("d", "✅", "完了", dShown, dMore.length ? '<details class="ktaxmore"><summary>ほか '+dMore.length+'件</summary><div class="klist">'+dMore.map(kanStackCard).join("")+'</div></details>' : "")+
+      (dec.length ? sec("dec", "🔴", "お客様決定済み", dec) : "");
   }
   function kanProjectColsHtml(tasks){
     var groups = {}, order = [];
