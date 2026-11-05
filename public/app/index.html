@@ -7501,6 +7501,24 @@
     var p = projectById(d.pid);
     return [v && v.name, d.name, p && p.name, p && p.customer].some(function(x){ return String(x||"").toLowerCase().indexOf(q)>=0; });
   }
+  // おうちノートに出ているファイルのURL（書類そのものの反映に加え、同じファイルを使った
+  // 反映済みの写真・PDFカード／打合せ記録／業者タスクから出ている分も含める）
+  var vfShownCache = null;
+  function vfShownUrls(){
+    if(vfShownCache) return vfShownCache;
+    var set = {}, add = function(u){ if(u) set[String(u)] = 1; };
+    liveSpecPhotos().forEach(function(sp){ if(sp.reflected && sp.kind!=="note"){ add(sp.url); } });
+    state.meetingNotes.forEach(function(n){ if(!n.deletedAt && n.reflected) noteAllFiles(n).forEach(function(f){ add(f.url); }); });
+    state.tasks.forEach(function(t){ if(!t.deletedAt && t.reflected && !t.private) (t.attachments||[]).forEach(function(f){ add(f && f.url); }); });
+    vfShownCache = set; setTimeout(function(){ vfShownCache = null; }, 0);
+    return set;
+  }
+  function vfAttShown(a){
+    if(!a) return false;
+    if(a.kind==="quote" && quoteLocked(a.quoteType)) return false;
+    if(a.reflected && quoteSharable(a)) return true;
+    return !!(a.url && vfShownUrls()[String(a.url)]);
+  }
   function vfTile(d, i){
     var md = d.d ? Number(d.d.slice(5,7))+"/"+Number(d.d.slice(8,10)) : "";
     var p = projectById(d.pid);
@@ -7512,7 +7530,7 @@
       return '<div class="vfdoc lock lockbox reg" title="NETは暗証番号でロック中（押すと暗証番号）"><span class="vfstamp">登録<br>済</span>🔒<span>NET '+escapeHtml(md)+'<br>'+escapeHtml(p ? p.name : "（案件未定）")+fromLab+'</span></div>';
     var pname = p ? p.name : "（案件未定）";
     var lab = (i===0 ? '<b class="nw">最新</b> ' : '')+(d.kind==="pend" ? '<b class="mi">未整理</b> ' : '')+escapeHtml(md)+'<br>'+escapeHtml(pname)+(d.kind==="att" && d.type ? ' '+escapeHtml(d.type) : '')+(via ? fromLab : '');
-    var homeOn = d.kind==="att" && d.att.reflected && quoteSharable(d.att);
+    var homeOn = d.kind==="att" && vfAttShown(d.att);
     var stamp = d.kind==="att" ? (homeOn ? '<span class="vfstamp home" title="おうちノートに出ています">おうち</span>' : '<span class="vfstamp" title="登録済み（タスクの業者ごとの変更履歴に入っています）">登録<br>済</span>') : '';
     return '<div class="vfdoc'+(i===0?' new':'')+(d.kind==="pend"?' mi':' reg')+'" '+(d.kind==="pend" ? 'data-vfpend="'+escapeHtml(d.task.id)+'" title="押すと、案件・種類を選んで整理できます"' : 'data-openatt="'+escapeHtml(d.att.id)+'" title="'+escapeHtml(d.name)+'"')+'>'+
       '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div>'+stamp+'<div class="vflb">'+lab+'</div></div>';
