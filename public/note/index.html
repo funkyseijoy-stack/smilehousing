@@ -477,7 +477,9 @@
   .chgthr .ct{ border-radius:10px; padding:7px 10px; font-size:.86rem; white-space:pre-wrap; line-height:1.5; }
   .chgthr .ct.me{ background:#fff6e5; border:1px solid #f0d9ad; }
   .chgthr .ct.st{ background:#eef6ef; border:1px solid #bcdcc3; }
-  .chgthr .ctrep{ align-self:flex-end; font-size:.85rem; }
+  .chgthr{ border-top:1px dashed var(--line2); padding-top:8px; }
+  .chgthr .cthh{ font-size:.78rem; color:var(--ink2); font-weight:700; }
+  .chgthr .ctrep{ align-self:stretch; background:#2f6b3f; color:#fff; border:0; border-radius:999px; padding:11px 14px; font:inherit; font-size:.92rem; font-weight:700; cursor:pointer; margin-top:2px; }
   .chgthr .cth{ font-weight:700; font-size:.8rem; margin-bottom:2px; }
   .msgs{ display:flex; flex-direction:column; gap:10px; }
   .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.88rem; white-space:pre-wrap; line-height:1.55; }
@@ -1093,6 +1095,8 @@ function consItems(){
     var rcats = [];
     (data.messages||[]).forEach(function(m){
       if(m.fromCustomer || !m.chgKey || !isNew(m.createdAt)) return;
+      // お客様がそのあと返事をしていれば、お知らせには出さない
+      if((data.messages||[]).some(function(o){ return o.fromCustomer && o.chgKey===m.chgKey && String(o.createdAt||"")>String(m.createdAt||""); })) return;
       (data.categories||[]).forEach(function(c){ if(rcats.indexOf(c)<0 && catAllItems(c).some(function(z){ return z.key===m.chgKey; })) rcats.push(c); });
     });
     if(rcats.length) rows.push({ ic:"✏️", t:"変更のご依頼にお返事があります"+namesText(rcats.map(function(c){ return c.name; })), a:'data-updcat="'+(rcats.length===1 ? esc(rcats[0].id) : "")+'"' });
@@ -1707,11 +1711,13 @@ function homeHtml(){ return homeParts().main; }
     var first = ms.find(function(m){ return m.fromCustomer && /^【変更のご依頼】/.test(String(m.content||"")); });
     if(first) label0 = String(first.content).split("\n")[0].replace(/^【変更のご依頼】/, "").trim();
     var hasStaff = ms.some(function(m){ return !m.fromCustomer; });
-    return '<div class="chgthr">'+ms.map(function(m){
+    // お客様が返事をしたら、それより前のスタッフのお返事には「NEW」を付けない（もう読んで答えたものなので）
+    var lastMine = ms.reduce(function(a,m){ return m.fromCustomer && String(m.createdAt||"")>a ? String(m.createdAt||"") : a; }, "");
+    return '<div class="chgthr"><div class="cthh">これまでのやりとり</div>'+ms.map(function(m){
       var txt = String(m.content||""), isRep = m.fromCustomer && /^【お返事】/.test(txt);
       if(m.fromCustomer) txt = txt.replace(/^【(変更のご依頼|お返事)】[^\n]*\n?/, "").trim() || txt;
-      return '<div class="ct '+(m.fromCustomer?'me':'st')+'"><div class="cth">'+(m.fromCustomer?(isRep?'💬 あなたのお返事':'✏️ 変更のご依頼'):'💬 スタッフからのお返事')+'（'+fmtD(m.createdAt)+'）'+(m.fromCustomer?'':nwTag(m.createdAt))+'</div>'+esc(txt)+'</div>';
-    }).join("")+(hasStaff ? '<button class="linkbtn ctrep" data-chgreply="'+esc(key)+'" data-chglabel="'+esc(label0)+'">💬 返信する</button>' : '')+'</div>';
+      return '<div class="ct '+(m.fromCustomer?'me':'st')+'"><div class="cth">'+(m.fromCustomer?(isRep?'💬 あなたのお返事':'✏️ 変更のご依頼'):'💬 スタッフからのお返事')+'（'+fmtD(m.createdAt)+'）'+(m.fromCustomer || String(m.createdAt||"")<lastMine ? '':nwTag(m.createdAt))+'</div>'+esc(txt)+'</div>';
+    }).join("")+(hasStaff ? '<button class="ctrep" data-chgreply="'+esc(key)+'" data-chglabel="'+esc(label0)+'">💬 このやりとりに返信する</button>' : '')+'</div>';
   }
   function chgDone(c, x){
     if(!x.key) return false;
