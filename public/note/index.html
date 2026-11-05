@@ -473,6 +473,11 @@
   .agrid .th{ border-radius:8px; }
 
   /* messages */
+  .chgthr{ margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+  .chgthr .ct{ border-radius:10px; padding:7px 10px; font-size:.86rem; white-space:pre-wrap; line-height:1.5; }
+  .chgthr .ct.me{ background:#fff6e5; border:1px solid #f0d9ad; }
+  .chgthr .ct.st{ background:#eef6ef; border:1px solid #bcdcc3; }
+  .chgthr .cth{ font-weight:700; font-size:.8rem; margin-bottom:2px; }
   .msgs{ display:flex; flex-direction:column; gap:10px; }
   .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.88rem; white-space:pre-wrap; line-height:1.55; }
   .msg .mm{ font-size:.66rem; opacity:.65; margin-bottom:3px; }
@@ -1081,8 +1086,15 @@ function consItems(){
   function updatesRows(){
     if(!seenSince) return [];
     var rows = [];
-    var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && isNew(m.createdAt); });
+    var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && !m.chgKey && isNew(m.createdAt); });
     if(msgs.length) rows.push({ ic:"💬", t:"メッセージがあります", a:'data-go="msg"' });
+    // 変更のご依頼へのお返事（そのカードがある項目へ）
+    var rcats = [];
+    (data.messages||[]).forEach(function(m){
+      if(m.fromCustomer || !m.chgKey || !isNew(m.createdAt)) return;
+      (data.categories||[]).forEach(function(c){ if(rcats.indexOf(c)<0 && catAllItems(c).some(function(z){ return z.key===m.chgKey; })) rcats.push(c); });
+    });
+    if(rcats.length) rows.push({ ic:"✏️", t:"変更のご依頼にお返事があります"+namesText(rcats.map(function(c){ return c.name; })), a:'data-updcat="'+(rcats.length===1 ? esc(rcats[0].id) : "")+'"' });
     // 設備仕様の写真・プランボード・資料（PDF・お見積り）は、種類ごとに分けて「どの項目か」を添える
     var kinds = { photo:{ic:"📷", t:"写真の追加があります", cats:[]}, pb:{ic:"📐", t:"プランボードの追加があります", cats:[]}, doc:{ic:"📄", t:"資料の追加があります", cats:[]} };
     (data.categories||[]).forEach(function(c){
@@ -1453,7 +1465,8 @@ function homeHtml(){ return homeParts().main; }
   }
   function msgHtml(){
     var out = '<h2 class="big">メッセージ</h2><p class="sub">ご質問・ご相談・ご予約の変更などはこちらからどうぞ。</p>'+nmHtml();
-    out += data.messages.length ? '<div class="msgs">'+data.messages.map(function(m){
+    var mlist = (data.messages||[]).filter(function(m){ return !m.chgKey; }); // 変更のご依頼とその返信はカードの下に出す
+    out += mlist.length ? '<div class="msgs">'+mlist.map(function(m){
       var me = m.fromCustomer;
       return '<div class="msg '+(me?"me":"staff")+'"><div class="mm">'+(me?"あなた":esc(m.sender||"住まいるハウジング"))+' ・ '+fmtD(m.createdAt)+(me?'':nwTag(m.createdAt))+'</div>'+esc(m.content)+'</div>';
     }).join("")+'</div>' : '<div class="empty">まだメッセージはありません。</div>';
@@ -1684,6 +1697,17 @@ function homeHtml(){ return homeParts().main; }
     return out;
   }
   // 「変更したい」を送ったカード（この端末で送った／お客様からのメッセージに同じカードの【変更のご依頼】がある）
+  // カードへの「変更のご依頼」と、スタッフからのお返事のやりとり（古い順）
+  function chgThreadHtml(key){
+    if(!key) return "";
+    var ms = (data.messages||[]).filter(function(m){ return m.chgKey===key; }).sort(function(a,b){ return String(a.createdAt||"").localeCompare(String(b.createdAt||"")); });
+    if(!ms.length) return "";
+    return '<div class="chgthr">'+ms.map(function(m){
+      var txt = String(m.content||"");
+      if(m.fromCustomer) txt = txt.replace(/^【変更のご依頼】[^\n]*\n?/, "").trim() || txt;
+      return '<div class="ct '+(m.fromCustomer?'me':'st')+'"><div class="cth">'+(m.fromCustomer?'✏️ 変更のご依頼':'💬 スタッフからのお返事')+'（'+fmtD(m.createdAt)+'）'+(m.fromCustomer?'':nwTag(m.createdAt))+'</div>'+esc(txt)+'</div>';
+    }).join("")+'</div>';
+  }
   function chgDone(c, x){
     if(!x.key) return false;
     if(chgSent[x.key]) return true;
@@ -2218,7 +2242,7 @@ function homeHtml(){ return homeParts().main; }
               '<div class="fhd"><span class="fd">'+fmtD(g.at)+'</span><span class="tag pdf">📄 変更後のPDF</span>'+newest+nwTag(g.upd)+'</div>'+
               (g.snippet ? '<div class="section-item-desc" style="font-size:.88rem;">'+esc(g.snippet)+'</div>' : '')+
               '<div class="section-thumbs">'+g.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>'+
-              cardDecHtml(g.key, g.cardStatus, g.snippet, g.showDecide)+'</div>';
+              cardDecHtml(g.key, g.cardStatus, g.snippet, g.showDecide)+chgThreadHtml(g.key)+'</div>';
           }
           if(it.kind==="spec"){
             var x = it.x;
@@ -2227,7 +2251,7 @@ function homeHtml(){ return homeParts().main; }
               (x.msg ? '<div class="section-item-desc" style="font-size:.9rem;"><strong>スタッフから：</strong>'+esc(x.msg)+'</div>' : '')+
               '<div class="section-thumbs">'+thumbHtml(x.file,"")+'</div>'+
               ((it.plain && (x.type==="planboard" || x.isQuote)) ? chgBtnHtml(c, x) : '')+
-              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true, x))+'</div>';
+              (it.plain ? '' : cardDecHtml(x.key, x.cardStatus||"検討中", partOf(c, x) || "写真・資料", true, x))+chgThreadHtml(x.key)+'</div>';
           }
           var n = it.n;
           var html = '<div class="fcard'+(n.showDecide?' st-'+esc(n.cardStatus||"検討中"):'')+'">'+
@@ -2242,10 +2266,10 @@ function homeHtml(){ return homeParts().main; }
           var ce2 = comboEstOf(n);
           if(ce2){
             var ra2 = ' data-ckey="'+esc(n.key)+'" data-croom="'+esc(roomIdOfTab)+'" data-clabel="'+esc(String(n.title || n.decided || n.open || "").slice(0,40))+'" data-ccat="'+esc(roomIdOfTab ? "rooms" : c.id)+'"';
-            html += comboDecHtml(ce2, ra2, chgLabelOf(c, n), n.key)+'</div>';
+            html += comboDecHtml(ce2, ra2, chgLabelOf(c, n), n.key)+chgThreadHtml(n.key)+'</div>';
           } else {
             html += noteEstHtml(n);
-            html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+'</div>';
+            html += cardDecHtml(n.key, n.cardStatus||"検討中", n.title || n.decided || n.open, n.showDecide)+chgThreadHtml(n.key)+'</div>';
           }
           return html;
         }).join("")+'</div>';

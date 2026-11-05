@@ -137,6 +137,8 @@ export default async (req: Request, context: Context) => {
   const msgAll = await Promise.all(mblobs.map((bl) => store.get(bl.key, { type: "json" }).catch(() => null)));
   const messages = msgAll
     .filter((m: any) => m && m.projectId === projectId && !m.deletedAt)
+    // おうちノートのカードへの「変更のご依頼」とその返信は、おうちノートのカードの下に出すので、ここには出さない
+    .filter((m: any, _i: number, all: any[]) => !m.chgKey && !(m.replyTo && all.some((x: any) => x && x.id === m.replyTo && x.chgKey)))
     .map((m: any) => ({ content: String(m.content || ""), sender: String(m.sender || ""), fromCustomer: !!m.fromCustomer, createdAt: String(m.createdAt || "") }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 

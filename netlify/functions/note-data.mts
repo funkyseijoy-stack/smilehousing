@@ -984,8 +984,12 @@ export default async (req: Request, context: Context) => {
       .filter((x) => x.url)
       .map(imageOf)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    // 変更のご依頼（chgKey）と、それへのスタッフの返信（replyTo が変更のご依頼）は、カードの下にやりとりとして出す（メッセージの一覧には出さない）
     messages: messages
-      .map((m) => ({ content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || "" }))
+      .map((m) => {
+        const orig: any = !m.chgKey && m.replyTo ? messages.find((x: any) => x && x.id === m.replyTo) : null;
+        return { content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) };
+      })
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     reservations: resv,
     nextReservation: resv.find((r) => r.date >= today) || null,
