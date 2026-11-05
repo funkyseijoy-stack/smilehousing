@@ -7506,10 +7506,13 @@
   var vfShownCache = null;
   function vfShownUrls(){
     if(vfShownCache) return vfShownCache;
-    var set = {}, add = function(u){ if(u) set[String(u)] = 1; };
-    liveSpecPhotos().forEach(function(sp){ if(sp.reflected && sp.kind!=="note"){ add(sp.url); } });
-    state.meetingNotes.forEach(function(n){ if(!n.deletedAt && n.reflected) noteAllFiles(n).forEach(function(f){ add(f.url); }); });
-    state.tasks.forEach(function(t){ if(!t.deletedAt && t.reflected && !t.private) (t.attachments||[]).forEach(function(f){ add(f && f.url); }); });
+    // URLのほか、ファイルの中身の置き場（key）と「案件＋ファイル名」でも照らし合わせる
+    // （同じ書類を別に取り込み直してURLが違うときも「おうち」にするため）
+    var set = {}, keyOf = function(u){ var m = String(u||"").match(/[?&]key=([^&]+)/); return m ? "k:"+decodeURIComponent(m[1]) : ""; };
+    var add = function(u, pid, name){ if(u){ set[String(u)] = 1; var k = keyOf(u); if(k) set[k] = 1; } if(pid && name) set["n:"+pid+"|"+String(name).trim()] = 1; };
+    liveSpecPhotos().forEach(function(sp){ if(sp.reflected && sp.kind!=="note"){ add(sp.url, sp.projectId, sp.fileName||sp.name); } });
+    state.meetingNotes.forEach(function(n){ if(!n.deletedAt && n.reflected) noteAllFiles(n).forEach(function(f){ add(f.url, n.projectId, f.name); }); });
+    state.tasks.forEach(function(t){ if(!t.deletedAt && t.reflected && !t.private) (t.attachments||[]).forEach(function(f){ if(f) add(f.url, t.projectId, f.name); }); });
     vfShownCache = set; setTimeout(function(){ vfShownCache = null; }, 0);
     return set;
   }
@@ -7517,7 +7520,8 @@
     if(!a) return false;
     if(a.kind==="quote" && quoteLocked(a.quoteType)) return false;
     if(a.reflected && quoteSharable(a)) return true;
-    return !!(a.url && vfShownUrls()[String(a.url)]);
+    var set = vfShownUrls(), m = String(a.url||"").match(/[?&]key=([^&]+)/);
+    return !!((a.url && set[String(a.url)]) || (m && set["k:"+decodeURIComponent(m[1])]) || (a.projectId && a.name && set["n:"+a.projectId+"|"+String(a.name).trim()]));
   }
   function vfTile(d, i){
     var md = d.d ? Number(d.d.slice(5,7))+"/"+Number(d.d.slice(8,10)) : "";
