@@ -15331,6 +15331,9 @@
       mnOpenDraw(blob, "手書き", false, "x", line ? "line" : "note");
       pb.saveTarget.blank = true;
       if(line) pb.saveTarget.line = line;
+      // 白紙はペンを黒で始める（閉じたら元の色に戻す）
+      if(pb._preBlankColor==null) pb._preBlankColor = pb.color;
+      pb.color = "#111111"; pbRenderSwatches();
     });
   }
   function mnOpenDraw(blob, name, isPdf, after, sink){
@@ -17556,6 +17559,7 @@
   }
   function closePlanBoard(){
     document.getElementById("pbModal").hidden = true;
+    if(pb._preBlankColor!=null){ pb.color = pb._preBlankColor; pb._preBlankColor = null; try{ pbRenderSwatches(); }catch(e){} }
     pb.baseCtx && pb.baseCtx.clearRect(0,0,pb.baseCanvas.width, pb.baseCanvas.height);
     pb.imageCtx && pb.imageCtx.clearRect(0,0,pb.imageCanvas.width, pb.imageCanvas.height);
     pb.items = []; pb.pendingItem = null;
