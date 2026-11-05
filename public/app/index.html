@@ -364,6 +364,10 @@
   .kc-ordstamp.chg{ color:#7b4fb0; border-color:#7b4fb0; }
   .kc-ordstamp.chg small{ border-top-color:#7b4fb0; }
   .kc-ordstamp.off{ opacity:.35; }
+  .kc-ordstamp.rpl{ color:#2a63b8; border-color:#2a63b8; }
+  .kc-ordstamp.rpl small{ border-top-color:#2a63b8; }
+  .kc-ordstamp.rep{ color:#d9822b; border-color:#d9822b; }
+  .kc-ordstamp.rep small{ border-top-color:#d9822b; }
   .ktaxhead.dec{ color:#d23c32; }
   .kc-undone{ color:#b33; font-weight:700; font-size:.9rem; margin-bottom:4px; }
   .kdec .khead{ }
@@ -4511,6 +4515,13 @@
     } else if(!t.vendorCard && isChangeTask(t)){
       var chDone = (t.status||"")==="完了";
       stamps.push('<div class="kc-ordstamp chg'+(chDone?' off':'')+'" title="'+(chDone?'変更依頼（完了）':'変更依頼中')+'">'+(chDone?'変更<br>済':'変更<br>依頼')+'<small>'+escapeHtml(mdOf(chDone ? (t.completedAt||t.updatedAt) : t.createdAt))+'</small></div>');
+    }
+    if(isCustomerTask(t)){
+      var lastStaffR = "", lastCustR = "";
+      (Array.isArray(t.custReplies)?t.custReplies:[]).forEach(function(r){ if(r && r.at && r.at>lastStaffR) lastStaffR = r.at; });
+      taskReviewList(t).forEach(function(r){ if(r && r.fromCustomer && r.at && r.at>lastCustR) lastCustR = r.at; });
+      if(lastCustR && lastCustR>lastStaffR) stamps.push('<div class="kc-ordstamp rep" title="お客様からお返事があります">お返事<br>あり<small>'+escapeHtml(mdOf(lastCustR))+'</small></div>');
+      else if(lastStaffR) stamps.push('<div class="kc-ordstamp rpl" title="お客様へ返信済み">返信<br>済<small>'+escapeHtml(mdOf(lastStaffR))+'</small></div>');
     }
     if(t.ordered) stamps.push('<div class="kc-ordstamp" title="発注済み（'+escapeHtml((t.ordered.by||"")+" "+ordMd)+'）">発注済<small>'+escapeHtml(ordMd)+'</small></div>');
     return '<div class="kancard'+(t.reflected?" reflected":"")+(stamps.length?" ordered":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
