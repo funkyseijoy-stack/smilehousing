@@ -430,6 +430,14 @@
   .famrow .rm{ flex:none; border:none; background:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:0 6px; }
   .famadd{ border:1.5px dashed var(--line2); background:none; border-radius:12px; padding:10px; width:100%; font:inherit; font-weight:700; color:var(--ink2); cursor:pointer; }
   .famedit{ border:1.5px solid var(--line2); background:#fff; border-radius:999px; padding:6px 14px; font:inherit; font-size:.8rem; font-weight:700; color:var(--ink2); cursor:pointer; margin-left:auto; }
+  .smpl{ display:block; font-size:.86rem; font-weight:700; margin:10px 0 4px; }
+  .smpin{ display:block; width:100%; margin-top:4px; border:1.5px solid var(--line2); border-radius:12px; padding:10px 12px; font:inherit; font-size:.9rem; background:#fff; color:var(--ink); }
+  .smprd{ display:inline-flex; align-items:center; gap:6px; font-weight:400; margin:6px 14px 0 0; }
+  .smpbtn{ display:block; width:100%; margin:10px 0 4px; padding:11px 10px; border-radius:12px; border:1.5px dashed var(--line2); background:#fff; color:var(--ink); font:inherit; font-size:.9rem; font-weight:700; cursor:pointer; }
+  .smphd{ font-size:.86rem; font-weight:700; margin:18px 0 6px; padding-top:12px; border-top:1px solid var(--line2); }
+  .smpit{ border:1px solid var(--line2); border-radius:12px; padding:9px 11px; margin-bottom:7px; background:#fff; font-size:.86rem; line-height:1.6; }
+  .smpst{ display:inline-block; border-radius:999px; padding:0 9px; font-size:.78rem; font-weight:700; margin-right:6px; color:#fff; background:#8a7a66; }
+  .smpst.p{ background:#d08a2a; } .smpst.d{ background:#4f8a4a; }
   .meminput{ width:100%; border:1.5px solid var(--line2); border-radius:12px; padding:10px 12px; font:inherit; font-size:.86rem; line-height:1.6; resize:vertical; min-height:150px; background:#fff; color:var(--ink); }
   .ntc-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
   @media (min-width:420px){ .ntc-grid.two{ grid-template-columns:1fr 1fr; } }
@@ -713,6 +721,22 @@
   </div>
 </div>
 
+<div class="help" id="smpModal" hidden>
+  <div class="help-card">
+    <button class="x" id="smpX" aria-label="閉じる">×</button>
+    <h2>📦 サンプル請求</h2>
+    <p class="help-lead">見てみたい色見本・素材などのサンプルをお知らせください。準備ができたらお渡しします。</p>
+    <label class="smpl">項目<select id="smpCat" class="smpin"></select></label>
+    <label class="smpl">ほしいサンプル<textarea id="smpWhat" class="meminput" style="min-height:80px;" placeholder="例：外壁の色見本（グレー系）／キッチンの扉の色"></textarea></label>
+    <div class="smpl">受け取り方法<div>
+      <label class="smprd"><input type="radio" name="smpHow" value="次の打合せで受け取る" checked> 次の打合せで受け取る</label>
+      <label class="smprd"><input type="radio" name="smpHow" value="郵送"> 郵送</label>
+    </div></div>
+    <label class="smpl">ひとこと（なくても大丈夫です）<textarea id="smpNote" class="meminput" style="min-height:60px;" placeholder="例：2種類くらい比べてみたいです"></textarea></label>
+    <button class="btn dk full" id="smpSend" style="margin-top:6px;">この内容で請求する</button>
+    <div id="smpList"></div>
+  </div>
+</div>
 <div class="help" id="chgModal" hidden>
   <div class="help-card">
     <button class="x" id="chgX" aria-label="閉じる">×</button>
@@ -2391,6 +2415,7 @@ function homeHtml(){ return homeParts().main; }
     var out = '<button class="back" data-back="1">← 設備仕様の一覧へ</button>'+
       '<div class="dhd"><span class="ic">'+(ICONS[c.icon]||ICONS.house)+'</span><div><h2 class="big" style="margin:0;">'+esc(c.name)+'</h2><div class="sub" style="margin:2px 0 0;">'+esc(c.sub)+'</div></div>'+
       '<span class="status s-'+esc(c.status)+'">'+esc(c.status)+'</span></div>';
+    if(c.id!=="plan" && c.id!=="general") out += '<button class="smpbtn" data-sample="'+esc(c.id)+'">📦 この項目のサンプルを請求</button>';
 
     if(c.id==="plan"){
       out += '<div class="sechd"><h3>平面図</h3></div>';
@@ -2672,6 +2697,52 @@ function homeHtml(){ return homeParts().main; }
     openSheet("chgModal");
     setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
   }
+  // ---------- サンプル請求 ----------
+  function smpListHtml(){
+    var list = data.sampleRequests || [];
+    if(!list.length) return "";
+    return '<div class="smphd">これまでの請求</div>'+list.map(function(r){
+      var cls = r.state==="お渡し済み" ? " d" : (r.state==="準備中" ? " p" : "");
+      return '<div class="smpit"><span class="smpst'+cls+'">'+esc(r.state)+'</span>'+esc(fmtD(r.at))+(r.catName?'・'+esc(r.catName):'')+
+        '<div>'+esc(r.what)+'</div><div style="color:var(--sub,#8a7a66); font-size:.8rem;">受け取り：'+esc(r.how)+'</div></div>';
+    }).join("");
+  }
+  function smpOpen(catId){
+    var sel = document.getElementById("smpCat");
+    var cats = (data.categories||[]).filter(function(c){ return c.id!=="plan" && c.id!=="general"; });
+    sel.innerHTML = '<option value="">（選ばない）</option>'+cats.map(function(c){ return '<option value="'+esc(c.id)+'"'+(c.id===catId?' selected':'')+'>'+esc(c.name)+'</option>'; }).join("");
+    document.getElementById("smpWhat").value = "";
+    document.getElementById("smpNote").value = "";
+    document.getElementById("smpList").innerHTML = smpListHtml();
+    openSheet("smpModal");
+    setTimeout(function(){ document.getElementById("smpWhat").focus(); }, 60);
+  }
+  document.getElementById("smpX").addEventListener("click", function(){ closeSheet("smpModal"); });
+  document.getElementById("smpModal").addEventListener("click", function(e){ if(e.target.id==="smpModal") closeSheet("smpModal"); });
+  document.getElementById("smpSend").addEventListener("click", async function(){
+    var what = (document.getElementById("smpWhat").value||"").trim();
+    if(!what){ toast("ほしいサンプルを書いてください"); return; }
+    var sel = document.getElementById("smpCat");
+    var cat = sel.value, catName = cat ? sel.options[sel.selectedIndex].text : "";
+    var hw = document.querySelector('input[name="smpHow"]:checked');
+    var how = hw ? hw.value : "次の打合せで受け取る";
+    var note = (document.getElementById("smpNote").value||"").trim();
+    var btn = this; btn.disabled = true;
+    try{
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"sampleRequest", cat:cat, catName:catName, what:what, how:how, note:note }) });
+      var j = await res.json();
+      if(!res.ok) throw new Error(j.error||"error");
+      data.sampleRequests = [j.sample].concat(data.sampleRequests||[]);
+      document.getElementById("smpWhat").value = ""; document.getElementById("smpNote").value = "";
+      document.getElementById("smpList").innerHTML = smpListHtml();
+      toast("サンプル請求をスタッフに送りました");
+    }catch(e){ toast("送れませんでした。もう一度お試しください"); }
+    btn.disabled = false;
+  });
+  document.addEventListener("click", function(e){
+    var b = e.target.closest("[data-sample]"); if(!b) return;
+    e.preventDefault(); smpOpen(b.dataset.sample||"");
+  });
   function chgReplyOpen(label, key){
     chgCur = {label:label, key:key, prefix:"【お返事】"};
     chgSheet("💬 お返事", "「"+label+"」についてのやりとりに、お返事を書いてください。", "例：やっぱり手すりは付けてください", "スタッフに送る");
@@ -2899,6 +2970,7 @@ function homeHtml(){ return homeParts().main; }
       tile('data-go="resv"', emo("📅"), "ご予約")+
       tile('data-go="msg"', emo("💬"), "メッセージ")+
       tile('data-go="album"', emo("🌷"), "わが家のアルバム")+
+      tile('data-sample=""', emo("📦"), "サンプル請求")+
       '<a class="mtile" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener" style="text-decoration:none;"><span class="mpic">'+emo("🏡")+'</span><span class="mnm">施工事例・イメージ集</span></a>'+
       tile('data-menusheet="orderModal"', emo("🔢"), "決める順番")+
       tile('data-menusheet="memoModal"', emo("✏️"), "わたしのメモ")+

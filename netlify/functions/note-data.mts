@@ -454,6 +454,33 @@ export default async (req: Request, context: Context) => {
       return json({ ok: true, message: doc });
     }
     // お知らせメール（スタッフからメッセージが届いたときに知らせる宛先。お客様が自分で登録・変更・解除する）
+    // サンプル請求（お客様 → 社内タスク。担当者なし＝「割り振り待ち」。状態はタスクの進捗から出す）
+    if (body.action === "sampleRequest") {
+      const catName = String(body.catName || "").trim().slice(0, 40);
+      const what = String(body.what || "").trim().slice(0, 300);
+      const how = body.how === "郵送" ? "郵送" : "次の打合せで受け取る";
+      const note = String(body.note || "").trim().slice(0, 500);
+      if (!what) return json({ error: "empty" }, 400);
+      const mine = (await listCollection(store, "tasks", projectId)).filter((t: any) => t.fromSampleRequest && !t.deletedAt);
+      if (mine.length >= 100) return json({ error: "too_many" }, 429);
+      const now = new Date().toISOString();
+      const taskId = genId("task_smp_");
+      const content = "【サンプル請求】" + (catName ? catName + "：" : "") + what + "（受け取り：" + how + "）" + (note ? "\n" + note : "");
+      const task = {
+        id: taskId, projectId, content,
+        assignee: "", instructor: "お客様", creator: "おうちノート",
+        hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+        attachmentAssetIds: [], attachments: [], private: false, reflected: false, reflectedAt: null,
+        status: "未着手", fromSampleRequest: { cat: String(body.cat || "").slice(0, 40), catName, what, how, note, at: now },
+        createdAt: now, updatedAt: now,
+      };
+      await store.setJSON(`tasks/${taskId}`, task);
+      await sendNotifyMail(
+        `【おうちノート】${project.customer || "お客様"}様からサンプル請求が届きました`,
+        `${project.customer || "お客様"}様（${project.name || ""}）から、おうちノートでサンプル請求が届きました。\n\n項目：${catName || "（指定なし）"}\nほしいサンプル：${what}\n受け取り：${how}${note ? "\nひとこと：" + note : ""}\n\n住まいるアプリのホームのタスク（割り振り待ち）に入っています。`
+      );
+      return json({ ok: true, sample: { id: taskId, catName, what, how, note, at: now, state: "受付済み" } });
+    }
     if (body.action === "notifyEmailSave") {
       const email = String(body.email == null ? "" : body.email).trim().slice(0, 120);
       if (email && !/^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(email)) return json({ error: "invalid_email" }, 400);
@@ -1090,6 +1117,14 @@ export default async (req: Request, context: Context) => {
       })).filter((x: any) => x.name && x.group);
       return items.length ? { items } : null;
     })(),
+    // サンプル請求（お客様が送ったもの。状態はタスクの進捗：未着手＝受付済み／完了＝お渡し済み／それ以外＝準備中）
+    sampleRequests: tasks.filter((t: any) => t.fromSampleRequest && !t.deletedAt)
+      .map((t: any) => ({
+        id: t.id, catName: t.fromSampleRequest.catName || "", what: t.fromSampleRequest.what || "",
+        how: t.fromSampleRequest.how || "", note: t.fromSampleRequest.note || "", at: t.fromSampleRequest.at || t.createdAt || "",
+        state: t.status === "完了" ? "お渡し済み" : (t.status === "未着手" ? "受付済み" : "準備中"),
+      }))
+      .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at))).slice(0, 50),
     homePhotos: Array.isArray(okaiCustomer && okaiCustomer.homePhotos) ? okaiCustomer.homePhotos.filter((u: any) => typeof u === "string").slice(0, 3) : [],
     ace3dUrl: (okaiCustomer && okaiCustomer.customerLinks && okaiCustomer.customerLinks.ace3dUrl) || "",
   });

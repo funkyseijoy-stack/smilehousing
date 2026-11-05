@@ -4645,7 +4645,7 @@
   }
   function kanStackCard(t){
     var st = t.status||"未着手";
-    var src = t.fromGmail ? "✉️ メール" : (t.fromCustomerMessage||t.fromCustomerChange ? "🏠 お客様から" : (t.quoteReg ? "📄 見積" : ""));
+    var src = t.fromGmail ? "✉️ メール" : (t.fromSampleRequest ? "📦 サンプル請求" : (t.fromCustomerMessage||t.fromCustomerChange ? "🏠 お客様から" : (t.quoteReg ? "📄 見積" : "")));
     var waiting = isAssignWaiting(t);
     return '<div class="kwaititem">'+
       ((st!=="未着手" && st!=="完了") || src ? '<div class="kmst">'+(st!=="未着手" && st!=="完了" ? '<span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span>' : '')+(src?'<span class="kwaitsrc">'+src+'</span>':'')+'</div>' : '')+
@@ -15170,7 +15170,7 @@
   }
 
   // お客様のメッセージ・変更のご依頼から来たタスク：カードから、案件のメッセージ（おうちノート・お打合せの記録ページと同じやりとり）へ返信できる
-  function isCustomerTask(t){ return !!(t && t.projectId && (t.fromCustomerMessage || t.fromCustomerChange)); }
+  function isCustomerTask(t){ return !!(t && t.projectId && (t.fromCustomerMessage || t.fromCustomerChange || t.fromSampleRequest)); }
   function custRepliesHtml(t){
     var list = (t && t.custReplies) || [];
     if(!list.length) return "";
