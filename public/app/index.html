@@ -343,11 +343,11 @@
   .nchgbadge{ font-size:.85rem; font-weight:700; background:#fbe9d6; color:#a8581c; border-radius:999px; padding:2px 10px; }
   .cdlist{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
   .cditem{ display:flex; gap:12px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:#fffaf8; }
-  .cdstamp{ flex-shrink:0; width:58px; height:58px; border:3px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-12deg); font-weight:900; font-size:1rem; line-height:1.05; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
+  .cdstamp{ flex-shrink:0; width:48px; height:48px; border:2.5px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-12deg); font-weight:900; font-size:.85rem; line-height:1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
   .cdstamp.ord{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp.ord small{ border-top-color:#2e8b57; }
   .kancard{ position:relative; }
-  .kc-stamps{ position:absolute; right:44px; top:50%; margin-top:-38px; display:flex; gap:2px; pointer-events:none; z-index:1; }
+  .kc-stamps{ position:absolute; right:42px; top:50%; margin-top:-28px; display:flex; gap:2px; pointer-events:none; z-index:1; }
   .kancard.exp .kc-stamps{ top:6px; margin-top:0; }
   .kc-stamps .kc-ordstamp{ position:static; margin:0; }
   .kc-ordstamp.chg{ color:#7b4fb0; border-color:#7b4fb0; }
@@ -356,14 +356,14 @@
   .ktaxhead.dec{ color:#d23c32; }
   .kc-undone{ color:#b33; font-weight:700; font-size:.9rem; margin-bottom:4px; }
   .kdec .khead{ }
-  .kc-ordstamp{ position:absolute; right:44px; top:50%; margin-top:-38px; width:76px; height:76px; border:4px double #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.05rem; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:.05em; }
-  .kc-ordstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.85); }
+  .kc-ordstamp{ position:absolute; right:42px; top:50%; margin-top:-28px; width:56px; height:56px; border:3px double #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:.85rem; line-height:1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:0; }
+  .kc-ordstamp small{ font-size:.85rem; font-weight:700; border-top:1px solid #d23c32; padding-top:0; margin-top:1px; transform:scale(.7); line-height:1; }
   .kancard.exp .kc-ordstamp{ top:6px; margin-top:0; }
   .ersrc{ margin:0 0 6px; }
   .ersrcbox{ border:1px solid var(--border); border-left:4px solid #8a6bb8; border-radius:10px; padding:8px 10px; background:var(--surface); margin-top:4px; }
   .ersrct{ font-weight:700; margin-bottom:4px; }
   .ersrcsec{ font-size:.9rem; margin:4px 0; }
-  .kancard.ordered{ border-color:#d23c32; min-height:88px; }
+  .kancard.ordered{ border-color:#d23c32; min-height:66px; }
   .cdstamps{ display:flex; flex-direction:row; gap:4px; flex-shrink:0; align-items:center; }
   .apstamp.o{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.8); }
@@ -703,7 +703,8 @@
   .vfreq{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:.9rem; }
   @media (max-width:760px){ .vfrow{ flex-direction:column; gap:6px; } .vfname{ flex:none; } }
   .vclatest{ display:flex; gap:8px; align-items:center; margin-block:6px 2px; border:1px solid var(--border); border-radius:8px; padding:4px 6px; background:var(--surface-2); font-size:.85rem; line-height:1.35; min-width:0; }
-  .kancard.ordered .vclatest{ margin-inline-end:76px; }
+  .kancard.ordered .vclatest{ margin-inline-end:58px; }
+  .kancard.ordered:not(.exp) .kc-content{ padding-inline-end:56px; }
   .vclth{ flex:0 0 52px; height:40px; border-radius:6px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; }
   .vclth img, .vclth canvas{ width:100%; height:100%; object-fit:cover; }
   .vcltx{ min-width:0; overflow:hidden; } .vcltx b{ display:block; }
@@ -3231,7 +3232,7 @@
     repairReflectedTaskCopies();
     backfillOldChangeTasks();
     renameQuoteMailTasks();
-    renameEstSrcTasks();
+    renameEstSrcTasks().then(migrateEstReqToVendorCards);
     syncCustDecidedTasks();
     syncNoteCheckTasks();
     scheduleEstSync();
@@ -4706,6 +4707,70 @@
     }
     renderKanban();
     return first;
+  }
+  // 以前の「1回の依頼＝1枚」の見積依頼のカード（task_er_*）を、業者ごとのカードへまとめる（1回だけ・何度動かしても同じ結果）。
+  // 依頼・届いたファイル・やりとり・ダウンロードのリンク・発注済みのはんこ・担当を業者のカードへ移し、元のカードは deletedAt＋mergedIntoVc（ゴミ箱には出さない）。
+  var VC_STATUS_RANK = { "未着手":0, "対応中":1, "社長確認依頼中":2, "朋子確認依頼中":2, "発注済み":3, "お客様へ連絡済み":4, "完了":5 };
+  async function migrateEstReqToVendorCards(){
+    var olds = (state.tasks||[]).filter(function(t){ return t && !t.deletedAt && t.estReq && !t.vendorCard && (t.estReq.reqIds||[]).length && t.projectId; });
+    if(!olds.length) return;
+    var touched = {}, made = 0;
+    for(var i=0;i<olds.length;i++){
+      var o = olds[i], proj = projectById(o.projectId); if(!proj) continue;
+      var reqs = (o.estReq.reqIds||[]).map(function(rid){ return state.requests.find(function(r){ return r.id===rid && !r.deletedAt; }); }).filter(function(r){ return r && r.vendorId; });
+      if(!reqs.length) continue;
+      var ok = true;
+      var vids = []; reqs.forEach(function(r){ if(vids.indexOf(r.vendorId)<0) vids.push(r.vendorId); });
+      for(var j=0;j<vids.length;j++){
+        var vid = vids[j], id = vcTaskId(proj.id, vid);
+        var c = state.tasks.find(function(x){ return x.id===id; });
+        var isNew = !c;
+        if(!c){
+          c = { id:id, projectId: proj.id, content:"", assignee: o.assignee||"", instructor:"", checker:"", creator: o.creator||"", hasDeadline:false, deadline:"",
+            requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments:[], vendorSpec:null, private:false, reflected:false, reflectedAt:null,
+            status: o.status||"未着手", completedAt: o.completedAt||null, archivedAt: o.archivedAt||null,
+            vendorCard:{ projectId: proj.id, vendorId: vid }, estReq:{ reqIds:[], at: o.estReq.at||o.createdAt||nowIso() },
+            createdAt: o.createdAt||nowIso(), updatedAt: nowIso() };
+          state.tasks.push(c);
+        } else if(c.deletedAt){ c.deletedAt = null; }
+        c.estReq = c.estReq || { reqIds:[] };
+        reqs.filter(function(r){ return r.vendorId===vid; }).forEach(function(r){ if(c.estReq.reqIds.indexOf(r.id)<0) c.estReq.reqIds.push(r.id); });
+        if(o.estReq.src && !c.estReq.src) c.estReq.src = o.estReq.src;
+        if(!c.assignee && o.assignee) c.assignee = o.assignee;
+        // 進捗：まとめたうち、いちばん手前の進捗にそろえる（新しく作ったカードは元のまま）
+        if(!isNew && !touched[id+"|"+o.id]){
+          var rc = VC_STATUS_RANK[c.status||"未着手"], ro = VC_STATUS_RANK[o.status||"未着手"];
+          if(ro!==undefined && rc!==undefined && ro<rc){ c.status = o.status||"未着手"; c.completedAt = o.completedAt||null; c.archivedAt = o.archivedAt||null; }
+        }
+        if(o.ordered && !c.ordered) c.ordered = o.ordered;
+        var seenU = {}; (c.attachments||[]).forEach(function(a){ if(a && a.url) seenU[a.url] = 1; });
+        (o.attachments||[]).forEach(function(a){
+          if(!a || !a.url || seenU[a.url]) return;
+          if(a.fromVendorId ? a.fromVendorId!==vid : vids.length>1 && j>0) return;
+          seenU[a.url] = 1; c.attachments = (c.attachments||[]).concat([a]);
+        });
+        c.attachmentAssetIds = (c.attachments||[]).map(function(a){ return a.id; }).filter(Boolean);
+        var vnm = (vendorById(vid)||{}).name || "\u0000";
+        var vNames = vids.map(function(x){ return (vendorById(x)||{}).name || "\u0000"; });
+        var rv = (Array.isArray(o.reviews) ? o.reviews : (o.review ? [o.review] : [])).filter(function(r){
+          var by = String((r && r.by)||""), hit = vNames.filter(function(n){ return by.indexOf(n)>=0; })[0];
+          return hit ? hit===vnm : j===0;
+        });
+        if(rv.length){ c.reviews = (Array.isArray(c.reviews) ? c.reviews : []).concat(rv).sort(function(a,b){ return String(a.at||"").localeCompare(String(b.at||"")); }); c.review = c.reviews[c.reviews.length-1]; }
+        if(j===0){
+          if((o.downloads||[]).length) c.downloads = (c.downloads||[]).concat(o.downloads);
+          if(o.memo) c.memo = c.memo ? c.memo+"\n"+o.memo : o.memo;
+        }
+        c.content = vcTitle(c);
+        c.updatedAt = nowIso();
+        if(await saveDoc("tasks", c.id, c)===false){ ok = false; if(isNew) state.tasks = state.tasks.filter(function(x){ return x!==c; }); break; }
+        touched[id+"|"+o.id] = 1; made++;
+      }
+      if(!ok) continue;
+      o.deletedAt = nowIso(); o.mergedIntoVc = vids.map(function(v){ return vcTaskId(proj.id, v); }); o.mergedInto = o.mergedIntoVc[0]; o.updatedAt = nowIso();
+      await saveDoc("tasks", o.id, o);
+    }
+    if(made){ renderKanban(); scheduleEstSync(); }
   }
   function vcPartKey(p){ return (p && p.scope) ? [p.scope, p.category||"", p.scope==="room" ? (p.roomId||"") : ""].join("|") : "_none"; }
   function vcPartOfDoc(coll, d, lineHash_){
