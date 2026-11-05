@@ -3742,6 +3742,12 @@
     if(isAssignWaiting(t)) return true; // 割り振り待ち（担当者なし）は全員に見せる
     return t.creator===me || t.assignee===me || t.checker===me;
   }
+  // 「案件ごと」表示・案件の「タスク」タブでは、全員に全部のタスクを見せる（税理士の分の見える人の制限と「自分だけのタスク」は従来どおり）
+  function taskVisibleInProjectView(t){
+    var me = state.currentUser;
+    if(isTaxTask(t) && !canSeeTax(me) && t.assignee!==me && t.checker!==me) return false;
+    return true;
+  }
   // 担当の割り振り待ち：担当者がいない・自分だけのタスクでない・完了でない
   function isAssignWaiting(t){ return !!t && !t.assignee && !t.private && (t.status||"未着手")!=="完了"; }
   // 担当者と期限（空欄可）を選んで、そのタスクに入れる（朋子の「割り振り待ち」から）
@@ -3781,20 +3787,20 @@
   // 完了して3日たったタスク（アーカイブ済み）でも、案件が「工事完了として保存」されるまでは、
   // 「案件ごと」表示と案件の「タスク」タブの「✅ 完了」に残す（部門が「会社」「その他」の案件と、案件なしは除く）
   var KEEP_DONE_EXCLUDE_DEPTS = ["会社","その他"];
-  function keptDoneTasks(){
+  function keptDoneTasks(projectView){
     return state.tasks.filter(function(t){
       if(!t || t.deletedAt || !t.archivedAt || (t.status||"")!=="完了" || !t.projectId) return false;
-      if(!taskVisibleToMe(t)) return false;
+      if(!(projectView ? taskVisibleInProjectView(t) : taskVisibleToMe(t))) return false;
       if(t.private && t.creator && t.creator!==state.currentUser) return false;
       var p = projectById(t.projectId);
       if(!p || p.deletedAt || p.finishedAt) return false;
       return KEEP_DONE_EXCLUDE_DEPTS.indexOf(deptOfProject(p))<0;
     });
   }
-  function liveTasks(){
+  function liveTasks(projectView){
     return state.tasks.filter(function(t){
       if(t.deletedAt) return false;
-      if(!taskVisibleToMe(t)) return false;
+      if(!(projectView ? taskVisibleInProjectView(t) : taskVisibleToMe(t))) return false;
       if(t.archivedAt) return false; // アーカイブ済みは案件の「タスク履歴」で見る
       // 「自分だけのタスク」は作成した本人以外には見せない
       if(t.private && t.creator && t.creator!==state.currentUser) return false;
@@ -4774,7 +4780,7 @@
     var scrollL = wrap.scrollLeft;
     kanSyncViewSw();
     if(kanView()==="project"){
-      wrap.innerHTML = kanProjectColsHtml(tasks.concat(keptDoneTasks().filter(passFilter)));
+      wrap.innerHTML = kanProjectColsHtml(liveTasks(true).filter(passFilter).concat(keptDoneTasks(true).filter(passFilter)));
       wrap.scrollLeft = scrollL;
       if(state.currentProjectId) renderProjectTasks();
       return;
@@ -5266,7 +5272,7 @@
     var empty = document.getElementById("projTaskEmpty");
     var pid = state.currentProjectId;
     var ptMd = function(x){ x = String(x||""); var m = x.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? Number(m[2])+"/"+Number(m[3]) : x; };
-    var rows = liveTasks().concat(keptDoneTasks()).filter(function(t){ return t.projectId===pid; });
+    var rows = liveTasks(true).concat(keptDoneTasks(true)).filter(function(t){ return t.projectId===pid; });
     empty.hidden = rows.length!==0;
     var reqs = liveRequests().filter(function(r){ return r.projectId===pid; })
       .sort(function(a,b){ return String(b.requestedAt||b.createdAt||"").localeCompare(String(a.requestedAt||a.createdAt||"")); });
