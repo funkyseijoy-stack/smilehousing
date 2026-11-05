@@ -347,6 +347,14 @@
   .cdstamp.ord{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp.ord small{ border-top-color:#2e8b57; }
   .kancard{ position:relative; }
+  .kc-stamps{ position:absolute; right:44px; top:50%; margin-top:-38px; display:flex; gap:2px; pointer-events:none; z-index:1; }
+  .kancard.exp .kc-stamps{ top:6px; margin-top:0; }
+  .kc-stamps .kc-ordstamp{ position:static; margin:0; }
+  .kc-ordstamp.chg{ color:#7b4fb0; border-color:#7b4fb0; }
+  .kc-ordstamp.chg small{ border-top-color:#7b4fb0; }
+  .kc-ordstamp.off{ opacity:.35; }
+  .kc-undone{ color:#b33; font-weight:700; font-size:.9rem; margin-bottom:4px; }
+  .kdec .khead{ }
   .kc-ordstamp{ position:absolute; right:44px; top:50%; margin-top:-38px; width:76px; height:76px; border:4px double #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.05rem; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:.05em; }
   .kc-ordstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.85); }
   .kancard.exp .kc-ordstamp{ top:6px; margin-top:0; }
@@ -3205,6 +3213,7 @@
     backfillOldChangeTasks();
     renameQuoteMailTasks();
     renameEstSrcTasks();
+    syncCustDecidedTasks();
     scheduleEstSync();
     loadActivityBackground();
   }
@@ -3579,6 +3588,7 @@
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
       migrateLegacyTaskStatus();
       autoArchiveTasks();
+      syncCustDecidedTasks();
       if(state.currentProjectId && !state.projects.some(function(p){ return p.id===state.currentProjectId; })){
         var firstLive = state.projects.find(function(p){return !p.deletedAt;});
         state.currentProjectId = firstLive ? firstLive.id : null;
@@ -3905,7 +3915,7 @@
     }
     // カード1枚ごとの決定は、どの記録・図面か分かるよう内容を添える
     if(d.cardKey && d.label) nm += "「"+d.label+"」";
-    return nm;
+    return nm||"";
   }
   function noteDecisionPill(scope, category, roomId){
     var d = noteDecisionFor(noteCatIdFor(scope, category), roomId);
@@ -4399,8 +4409,18 @@
     var lastRv = taskReviewList(t).slice(-1)[0];
     if(lastRv && (lastRv.result==="返信" || lastRv.result==="コメント")) meta.push('<span class="chk" style="color:#3a6ea5;">💬 '+escapeHtml(lastRv.by||"")+'から'+(lastRv.result==="返信"?"返信":"コメント")+'</span>');
     var ordMd = t.ordered && t.ordered.at ? (function(d){ return (d.getMonth()+1)+"/"+d.getDate(); })(new Date(t.ordered.at)) : "";
-    return '<div class="kancard'+(t.reflected?" reflected":"")+(t.ordered?" ordered":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
-      (t.ordered ? '<div class="kc-ordstamp" title="発注済み（'+escapeHtml((t.ordered.by||"")+" "+ordMd)+'）">発注済<small>'+escapeHtml(ordMd)+'</small></div>' : '')+
+    var stamps = [];
+    if(t.custDecided){
+      var cdd = custDecisionOf(t), cdOn = !!(cdd && !cdd.deletedAt && cdd.status==="決定");
+      stamps.push('<div class="kc-ordstamp dec'+(cdOn?'':' off')+'" title="お客様が決定">決定<small>'+escapeHtml(mdOf(t.custDecided.at))+'</small></div>');
+    }
+    if(isChangeTask(t)){
+      var chDone = (t.status||"")==="完了";
+      stamps.push('<div class="kc-ordstamp chg'+(chDone?' off':'')+'" title="'+(chDone?'変更依頼（完了）':'変更依頼中')+'">'+(chDone?'変更<br>済':'変更<br>依頼')+'<small>'+escapeHtml(mdOf(chDone ? (t.completedAt||t.updatedAt) : t.createdAt))+'</small></div>');
+    }
+    if(t.ordered) stamps.push('<div class="kc-ordstamp" title="発注済み（'+escapeHtml((t.ordered.by||"")+" "+ordMd)+'）">発注済<small>'+escapeHtml(ordMd)+'</small></div>');
+    return '<div class="kancard'+(t.reflected?" reflected":"")+(stamps.length?" ordered":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
+      (stamps.length ? '<div class="kc-stamps">'+stamps.join("")+'</div>' : '')+
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
         (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
@@ -4422,6 +4442,12 @@
       taskReviewsHtml(t)+
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
       estReqHtml(t)+
+      (!t.estReq && (t.custDecided || t.fromCustomerChange) ? (function(){
+        var cd = custDecisionOf(t);
+        var undone = t.custDecided && (!cd || cd.deletedAt || cd.status!=="決定");
+        var sh = estSrcHtml(t);
+        return (undone || sh) ? '<div class="erbox">'+(undone ? '<div class="kc-undone">⚠️ お客様が決定のはんこを外しました'+(cd && cd.decidedAt ? '（'+escapeHtml(mdOf(cd.decidedAt))+'）' : '')+'</div>' : '')+sh+'</div>' : '';
+      })() : '')+
       taskDownloadsHtml(t)+
       taskQuoteLinkHtml(t)+
       custRepliesHtml(t)+
@@ -4653,7 +4679,10 @@
     return null;
   }
   function estSrcOf(t){
-    if(!t || !t.estReq) return null;
+    if(!t) return null;
+    if(t.custDecided) return t.custDecided.src || null;
+    if(t.fromCustomerChange && t.fromCustomerChange.cardKey) return decisionInfo({cardKey:t.fromCustomerChange.cardKey}).src;
+    if(!t.estReq) return null;
     return t.estReq.src || estSrcFromReqs(estReqReqs(t));
   }
   function estSrcDoc(src){
@@ -4890,6 +4919,21 @@
           sec("✅", "完了（60日以内）", doneShown, "なし", doneMore.length ? '<details class="ktaxmore"><summary>ほか '+doneMore.length+'件</summary><div class="klist">'+doneMore.map(taxCard).join("")+'</div></details>' : "")+
         '</div></div>';
     }
+    // 🔴 お客様決定済み：おうちノートでお客様が「決定」を押したもの（完了にすると外れる）
+    var decCol = "";
+    {
+      var decs = tasks.filter(function(t){ return t.custDecided && !waitIds[t.id] && (t.status||"未着手")!=="完了"; });
+      decs.forEach(function(t){ waitIds[t.id] = true; });
+      decs.sort(function(a,b){ return ((b.custDecided.at||"")).localeCompare(a.custDecided.at||""); });
+      if(decs.length){
+        decCol = '<div class="kcol kdec" style="--sc:#d23c32">'+
+          '<div class="khead"><span class="kandot" style="background:#d23c32"></span><span>🔴 お客様決定済み</span><span class="kn tabular">'+decs.length+'</span></div>'+
+          '<div class="kbody"><div class="klist">'+decs.map(function(t){
+            return '<div class="kwaititem">'+kanCardHtml(t, t.status||"未着手")+
+              (!t.assignee ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>' : '<div class="kwaitsrc">担当：'+escapeHtml(t.assignee)+'　進捗：'+escapeHtml(t.status||"未着手")+'</div>')+'</div>';
+          }).join("")+'</div></div></div>';
+      }
+    }
     {
       var waiting = tasks.filter(function(t){ return isAssignWaiting(t) && !waitIds[t.id]; });
       waiting.forEach(function(t){ waitIds[t.id] = true; });
@@ -4948,7 +4992,7 @@
         }).join("")+'</div>' : '<div class="kempty">いまはありません</div>')+'</div></div>';
     }
     if(state.currentProjectId) setTimeout(renderProjectTasks, 0);
-    wrap.innerHTML = waitCol + sendCol + mineCol + taxCol + STATUS_ORDER.map(function(status){
+    wrap.innerHTML = waitCol + sendCol + decCol + mineCol + taxCol + STATUS_ORDER.map(function(status){
       var rows = tasks.filter(function(t){ return (t.status||"未着手")===status && !waitIds[t.id]; });
       var body;
       if(status==="完了" && rows.length){
@@ -7739,6 +7783,75 @@
   }
   // お客様が「決定」のはんこを押したもの（noteDecisions の status:"決定"）を、記録タブの決定事項のまとめの上に一覧で出す
   var custDecidedAll = false;
+  // お客様の決定（noteDecisions）のカードの中身：表示する文・ファイル・元の記録
+  function decisionInfo(d){
+    var key = String((d && d.cardKey)||""), text = "", files = [], src = null;
+    if(key.indexOf("n:")===0){
+      var n = state.meetingNotes.find(function(x){ return x.id===key.slice(2); });
+      src = {coll:"meetingNotes", id:key.slice(2)};
+      if(n){ text = [n.title, n.decided || n.talk || n.content || ""].filter(Boolean).join("："); files = n.files||[]; }
+    } else if(key.indexOf("l:")===0){
+      var nid = key.slice(2, key.lastIndexOf("_")), lh = key.slice(key.lastIndexOf("_")+1);
+      var ln = state.meetingNotes.find(function(x){ return x.id===nid; });
+      src = {coll:"meetingNotes", id:nid};
+      var ll = ln && (ln.noteLines||[]).find(function(l){ return l && lineHash(String(l.t||"").trim())===lh; });
+      if(ll){ text = String(ll.t||""); files = ll.f||[]; }
+      else if(ln) text = ln.title||"";
+    } else if(key.indexOf("t:")===0){
+      var t = state.tasks.find(function(x){ return x.id===key.slice(2); });
+      if(t){ text = t.content||""; files = t.attachments||[]; }
+    } else if(key.indexOf("s:")===0){
+      var sp = state.specPhotos.find(function(x){ return x.id===key.slice(2); });
+      src = {coll:"specPhotos", id:key.slice(2)};
+      if(sp){ text = sp.title || sp.memo || sp.fileName || sp.name || ""; if(sp.url) files = [{url:sp.url, contentType:sp.contentType, name:sp.fileName||sp.name}]; }
+    } else if(key.indexOf("a:")===0){
+      var ad = state.attachments.find(function(x){ return x.id===key.slice(2); });
+      src = {coll:"attachments", id:key.slice(2)};
+      if(ad){ text = ad.name || ""; if(ad.url) files = [{url:ad.url, contentType:ad.contentType, name:ad.name}]; }
+    }
+    return { text: text, files: files, src: src };
+  }
+  // お客様がおうちノートで「決定」を押したもの → タスクのカード（「🔴 お客様決定済み」の列）。
+  // ID は決定ごとに固定（task_dec_<決定のID>）なので、何度動かしても・何台の端末で動かしても1枚だけ。消したカードは作り直さない。
+  var custDecSyncBusy = false;
+  async function syncCustDecidedTasks(){
+    if(custDecSyncBusy) return; custDecSyncBusy = true;
+    try{
+      var made = 0;
+      var ds = (state.noteDecisions||[]).filter(function(d){ return d && !d.deletedAt && d.status==="決定" && d.cardKey && (!d.by || d.by==="お客様") && d.projectId; });
+      for(var i=0;i<ds.length;i++){
+        var d = ds[i];
+        var id = "task_dec_"+String(d.id).replace(/[^A-Za-z0-9_-]/g, "_");
+        if(state.tasks.some(function(x){ return x.id===id; })) continue;
+        var proj = projectById(d.projectId); if(!proj || proj.deletedAt) continue;
+        var di = decisionInfo(d);
+        var name = String(noteDecisionName(proj, d)||"").replace(/「.*」$/, "");
+        var txt = String(di.text || d.label || "").trim();
+        var t = { id:id, projectId: proj.id,
+          content: "【お客様が決定】"+(name && txt.indexOf(name)!==0 ? name+(txt?"：":"") : "")+txt.slice(0,80),
+          assignee:"", instructor:"お客様", checker:"", creator:"おうちノート", hasDeadline:false, deadline:"",
+          requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments: (di.files||[]).filter(function(f){ return f && f.url; }).slice(0,8).map(function(f){ return {id:f.id||uid("att"), url:f.url, contentType:f.contentType||"", name:f.name||""}; }),
+          vendorSpec: (function(){ var sd = di.src ? estSrcDoc(di.src) : null; if(!sd) return null;
+            if(di.src.coll==="specPhotos") return sd.scope ? {scope:sd.scope, category:sd.category||null, roomId:sd.roomId||null, side:sd.side||null} : null;
+            return (sd.specPart && sd.specPart.scope) ? sd.specPart : null; })(),
+          private:false, reflected:false, reflectedAt:null, status:"未着手",
+          custDecided: { decisionId: d.id, cardKey: d.cardKey, at: d.decidedAt||nowIso(), src: di.src },
+          createdAt: d.decidedAt||nowIso(), updatedAt: nowIso() };
+        state.tasks.push(t);
+        var ok = await saveDoc("tasks", t.id, t);
+        if(ok===false){ state.tasks = state.tasks.filter(function(x){ return x!==t; }); continue; }
+        made++;
+      }
+      if(made) renderKanban();
+    } finally { custDecSyncBusy = false; }
+  }
+  function custDecisionOf(t){
+    if(!t || !t.custDecided) return null;
+    return (state.noteDecisions||[]).find(function(d){ return d.id===t.custDecided.decisionId; }) || null;
+  }
+  // 変更のタスク（記録から出した見積変更依頼・お客様の変更のご依頼）
+  function isChangeTask(t){ return !!(t && (t.fromCustomerChange || (t.estReq && estSrcOf(t)))); }
+  function mdOf(iso){ var d = iso ? new Date(iso) : null; return d && !isNaN(d) ? (d.getMonth()+1)+"/"+d.getDate() : ""; }
   function renderCustDecided(){
     var card = document.getElementById("custDecidedCard"), box = document.getElementById("custDecidedList");
     if(!card || !box) return;
@@ -7749,26 +7862,7 @@
     if(!ds.length){ box.innerHTML = ""; return; }
     var LIM = 5, show = custDecidedAll ? ds : ds.slice(0, LIM);
     box.innerHTML = '<div class="cdlist">'+show.map(function(d){
-      var key = String(d.cardKey||""), text = "", files = [];
-      if(key.indexOf("n:")===0){
-        var n = state.meetingNotes.find(function(x){ return x.id===key.slice(2); });
-        if(n){ text = [n.title, n.decided || n.talk || n.content || ""].filter(Boolean).join("："); files = n.files||[]; }
-      } else if(key.indexOf("l:")===0){
-        var nid = key.slice(2, key.lastIndexOf("_")), lh = key.slice(key.lastIndexOf("_")+1);
-        var ln = state.meetingNotes.find(function(x){ return x.id===nid; });
-        var ll = ln && (ln.noteLines||[]).find(function(l){ return l && lineHash(String(l.t||"").trim())===lh; });
-        if(ll){ text = String(ll.t||""); files = ll.f||[]; }
-        else if(ln) text = ln.title||"";
-      } else if(key.indexOf("t:")===0){
-        var t = state.tasks.find(function(x){ return x.id===key.slice(2); });
-        if(t){ text = t.content||""; files = t.attachments||[]; }
-      } else if(key.indexOf("s:")===0){
-        var sp = state.specPhotos.find(function(x){ return x.id===key.slice(2); });
-        if(sp){ text = sp.title || sp.memo || sp.name || ""; if(sp.url) files = [{url:sp.url, contentType:sp.contentType, name:sp.name}]; }
-      } else if(key.indexOf("a:")===0){
-        var ad = state.attachments.find(function(x){ return x.id===key.slice(2); });
-        if(ad){ text = ad.name || ""; if(ad.url) files = [{url:ad.url, contentType:ad.contentType, name:ad.name}]; }
-      }
+      var di = decisionInfo(d), text = di.text, files = di.files;
       var dd = d.decidedAt ? new Date(d.decidedAt) : null;
       var md = dd && !isNaN(dd) ? (dd.getMonth()+1)+"/"+dd.getDate() : "";
       var od = d.ordered && d.ordered.at ? new Date(d.ordered.at) : null;
