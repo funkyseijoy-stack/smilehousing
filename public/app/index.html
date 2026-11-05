@@ -332,6 +332,17 @@
   .partchip b{ font-weight:700; }
   .kc-part{ display:inline-block; background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent); border-radius:999px; padding:3px 12px; margin-block:2px 8px; font-size:.9rem; }
   .kc-part.none{ background:none; border:1px dashed var(--border); color:var(--muted); }
+  .kc-steps{ border:1px solid var(--border); border-radius:8px; padding:6px 8px; margin-block-start:6px; background:var(--surface); }
+  .kc-stepsh{ font-weight:700; font-size:.9rem; margin-block-end:4px; }
+  .kc-step{ display:flex; align-items:flex-start; gap:6px; padding-block:3px; border-top:1px dashed var(--border); }
+  .kc-step:first-of-type{ border-top:none; }
+  .kc-stepchk{ flex:0 0 auto; background:none; border:none; font-size:1.2rem; line-height:1; cursor:pointer; padding:0 2px; color:var(--text); }
+  .kc-stept{ flex:1; min-width:0; overflow-wrap:anywhere; font-size:.9rem; }
+  .kc-stept small{ color:var(--muted); font-size:.85rem; margin-inline-start:4px; }
+  .kc-stept s{ text-decoration:none; } .kc-step.done .kc-stept{ color:var(--muted); } .kc-step.done .kc-stept s{ text-decoration:line-through; }
+  .kc-stepdel{ flex:0 0 auto; background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; }
+  .kc-stepadd{ display:flex; gap:6px; margin-block-start:6px; }
+  .kc-stepadd input{ flex:1; min-width:0; font-size:.9rem; }
   .kc-memo{ background:var(--surface-2); border-radius:8px; padding:6px 8px; margin-block-start:6px; font-size:.85rem; white-space:pre-wrap; color:var(--text); }
   .noteitem .nbox.talk{ background:var(--surface-2); }
   .noteitem .nbox.msg{ background:#f1ebf5; }
@@ -4260,6 +4271,7 @@
     t.reflected = false; t.reflectedAt = null;
     delete t.askDecision;
     delete t.sent; delete t.estimateRef;
+    if(Array.isArray(t.steps)) t.steps = t.steps.map(function(x){ return Object.assign({}, x, { id: uid("st"), done: null }); }); // やることはチェックを外して引き継ぐ
     state.tasks.push(t);
     state.taskMenuId = null;
     goToTaskBoard(t.id);
@@ -4413,6 +4425,51 @@
         '<button class="pill small" data-vendorcycle="'+t.id+'" data-vidx="'+vi+'" title="押すと次の状態へ" style="cursor:pointer; border:none; font-family:inherit; '+(d?'background:var(--accent); color:#fff;':'background:var(--gray-soft); color:var(--muted);')+'">'+escapeHtml(st)+'</button></div>';
     }).join("")+'</div>';
   }
+  // ---- タスクの中の「やること」（チェックリスト）：tasks.steps=[{id,t,done:{by,at}|null,by,at}] ----
+  // カードを増やさずに、1枚のカードの中で「書いてもらう → 届ける」のように順番にチェックしていく。全部チェックしたら完了にするか聞く。
+  function taskStepsHtml(t){
+    var st = (t.steps||[]).filter(function(x){ return x && x.t; });
+    var n = st.filter(function(x){ return x.done; }).length;
+    return '<div class="kc-steps"><div class="kc-stepsh">✅ やること'+(st.length?'（'+n+'/'+st.length+'）':'')+'</div>'+
+      st.map(function(x){
+        return '<div class="kc-step'+(x.done?' done':'')+'"><button type="button" class="kc-stepchk" data-stepchk="'+escapeHtml(t.id)+'" data-sid="'+escapeHtml(x.id)+'" aria-label="済み">'+(x.done?'☑':'☐')+'</button>'+
+          '<span class="kc-stept"><s>'+escapeHtml(x.t)+'</s>'+(x.done?'<small>（'+escapeHtml(x.done.by||"")+'・'+escapeHtml(mdOf(x.done.at))+'）</small>':'')+'</span>'+
+          '<button type="button" class="kc-stepdel" data-stepdel="'+escapeHtml(t.id)+'" data-sid="'+escapeHtml(x.id)+'" aria-label="消す" title="このやることを消す">×</button></div>';
+      }).join("")+
+      '<div class="kc-stepadd"><input type="text" data-stepin="'+escapeHtml(t.id)+'" maxlength="80" placeholder="＋ やることを足す（例：銀行へ届ける）"><button type="button" class="btn small" data-stepadd="'+escapeHtml(t.id)+'">足す</button></div></div>';
+  }
+  async function taskStepAdd(id, text){
+    var t = state.tasks.find(function(x){ return x.id===id; }); text = String(text||"").trim();
+    if(!t || !text) return;
+    var prev = (t.steps||[]).slice();
+    t.steps = prev.concat([{ id: uid("st"), t: text.slice(0,80), done: null, by: state.currentUser||"", at: nowIso() }]);
+    t.updatedAt = nowIso();
+    state.taskExpanded = state.taskExpanded || {}; state.taskExpanded[id] = true;
+    renderKanban();
+    if(await saveDoc("tasks", t.id, t)===false){ t.steps = prev; renderKanban(); toast("保存できませんでした"); }
+  }
+  async function taskStepToggle(id, sid){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var prev = JSON.parse(JSON.stringify(t.steps||[]));
+    var x = (t.steps||[]).find(function(y){ return y.id===sid; }); if(!x) return;
+    x.done = x.done ? null : { by: state.currentUser||"", at: nowIso() };
+    t.updatedAt = nowIso();
+    renderKanban();
+    if(await saveDoc("tasks", t.id, t)===false){ t.steps = prev; renderKanban(); toast("保存できませんでした"); return; }
+    var all = (t.steps||[]).filter(function(y){ return y && y.t; });
+    if(x.done && all.length && all.every(function(y){ return y.done; }) && (t.status||"未着手")!=="完了"){
+      askChoice("やることが全部済みました", "このタスクを「完了」にしますか？", [{label:"✅ 完了にする", value:"done"}], function(v){ if(v==="done") setTaskStatus(id, "完了"); }, {cancelLabel:"まだ完了にしない"});
+    }
+  }
+  async function taskStepDel(id, sid){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var x = (t.steps||[]).find(function(y){ return y.id===sid; }); if(!x) return;
+    if(!window.confirm("「"+x.t+"」を消しますか？")) return;
+    var prev = (t.steps||[]).slice();
+    t.steps = prev.filter(function(y){ return y.id!==sid; }); t.updatedAt = nowIso();
+    renderKanban();
+    if(await saveDoc("tasks", t.id, t)===false){ t.steps = prev; renderKanban(); toast("保存できませんでした"); }
+  }
   function kanCardHtml(t, status){
     var proj = projectById(t.projectId);
     var isVendor = !!t.requestTo;
@@ -4427,6 +4484,11 @@
     if(t.reflected) meta.push('<span class="refl">✓反映</span>');
     if(t.private) meta.push('<span>🔒</span>');
     if(t.memo) meta.push('<span>📝</span>');
+    var stps = (t.steps||[]).filter(function(x){ return x && x.t; });
+    if(stps.length){
+      var sDone = stps.filter(function(x){ return x.done; }).length, sNext = stps.find(function(x){ return !x.done; });
+      meta.push('<span class="'+(sDone>=stps.length?'refl':'chk')+'">✅ '+sDone+'/'+stps.length+(sNext && !exp ? '　次：'+escapeHtml(String(sNext.t).slice(0,20)) : '')+'</span>');
+    }
     if(nAtt) meta.push('<span>📎'+nAtt+'</span>');
     if(t.fromGmail){ if(t.quoteReg) meta.push('<span class="refl">📄見積登録済</span>'); else if(taskLinkedRequests(t).length) meta.push('<span class="chk">📋見積依頼あり</span>'); }
     if(t.estReq){ var erc = estReqCount(t); meta.push('<span class="'+(erc.done>=erc.all?'refl':'chk')+'">📋 '+(t.vendorCard ? '受領 '+erc.got+'/'+erc.all+'件' : erc.got+'/'+erc.all+'社 受領')+'</span>'); }
@@ -4471,6 +4533,7 @@
         fmtDeadline(t)+
       '</div>'+
       (t.memo ? '<div class="kc-memo">📝 '+escapeHtml(t.memo)+'</div>' : '')+
+      taskStepsHtml(t)+
       (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
       taskReviewsHtml(t)+
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
@@ -19381,6 +19444,12 @@
       }
       var asg = e.target.closest("[data-assigntask]");
       if(asg){ assignTaskQuick(asg.dataset.assigntask); return; }
+      var stc = e.target.closest("[data-stepchk]");
+      if(stc){ taskStepToggle(stc.dataset.stepchk, stc.dataset.sid); return; }
+      var std = e.target.closest("[data-stepdel]");
+      if(std){ taskStepDel(std.dataset.stepdel, std.dataset.sid); return; }
+      var sta = e.target.closest("[data-stepadd]");
+      if(sta){ var sin = sta.parentNode.querySelector("[data-stepin]"); taskStepAdd(sta.dataset.stepadd, sin && sin.value); return; }
       var morek = e.target.closest("[data-kanshowall]");
       if(morek){ var ks = morek.dataset.kanshowall; state.kanShowAll = state.kanShowAll || {}; state.kanShowAll[ks] = !state.kanShowAll[ks]; renderKanban(); return; }
       var head = e.target.closest("[data-taskstatustoggle]");
@@ -19444,6 +19513,13 @@
         if(t && t.downloads && t.downloads[+dlIdx]){ t.downloads[+dlIdx].done = true; t.downloads[+dlIdx].doneAt = nowIso(); t.updatedAt = nowIso(); await saveDoc("tasks", t.id, t); renderKanban(); }
       });
     };
+    var stepKey = function(e){
+      var inp = e.target.closest && e.target.closest("[data-stepin]");
+      if(!inp || e.key!=="Enter" || e.isComposing) return;
+      e.preventDefault(); taskStepAdd(inp.dataset.stepin, inp.value);
+    };
+    document.getElementById("kanbanWrap").addEventListener("keydown", stepKey);
+    document.getElementById("projTaskList").addEventListener("keydown", stepKey);
     document.getElementById("kanbanWrap").addEventListener("click", kanbanClick);
     document.getElementById("kanbanWrap").addEventListener("change", kanbanChange);
     document.getElementById("projTaskList").addEventListener("click", function(e){ if(e.target.closest("[data-projtaskedit]")) return; kanbanClick(e); });
