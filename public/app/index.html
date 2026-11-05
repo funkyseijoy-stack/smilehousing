@@ -346,6 +346,11 @@
   .cdstamp{ flex-shrink:0; width:58px; height:58px; border:3px solid #d23c32; border-radius:50%; color:#d23c32; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-12deg); font-weight:900; font-size:1rem; line-height:1.05; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
   .cdstamp.ord{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp.ord small{ border-top-color:#2e8b57; }
+  .kancard{ position:relative; }
+  .kc-ordstamp{ position:absolute; right:44px; top:50%; margin-top:-38px; width:76px; height:76px; border:4px double #2e8b57; border-radius:50%; color:#2e8b57; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.05rem; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:.05em; }
+  .kc-ordstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #2e8b57; padding-top:1px; margin-top:2px; transform:scale(.85); }
+  .kancard.exp .kc-ordstamp{ top:6px; margin-top:0; }
+  .kancard.ordered{ border-color:#2e8b57; min-height:88px; }
   .cdstamps{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
   .apstamp.o{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.8); }
@@ -4380,7 +4385,9 @@
     if((t.downloads||[]).some(function(d){ return !d.done; })) meta.push('<span class="due">🔗要ダウンロード</span>');
     var lastRv = taskReviewList(t).slice(-1)[0];
     if(lastRv && (lastRv.result==="返信" || lastRv.result==="コメント")) meta.push('<span class="chk" style="color:#3a6ea5;">💬 '+escapeHtml(lastRv.by||"")+'から'+(lastRv.result==="返信"?"返信":"コメント")+'</span>');
-    return '<div class="kancard'+(t.reflected?" reflected":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
+    var ordMd = t.ordered && t.ordered.at ? (function(d){ return (d.getMonth()+1)+"/"+d.getDate(); })(new Date(t.ordered.at)) : "";
+    return '<div class="kancard'+(t.reflected?" reflected":"")+(t.ordered?" ordered":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
+      (t.ordered ? '<div class="kc-ordstamp" title="発注済み（'+escapeHtml((t.ordered.by||"")+" "+ordMd)+'）">発注済<small>'+escapeHtml(ordMd)+'</small></div>' : '')+
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
         (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
@@ -4407,6 +4414,7 @@
       custRepliesHtml(t)+
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
+        '<button class="btn small '+(t.ordered?'secondary':'')+'" data-taskact="ordered" data-id="'+t.id+'" title="発注したら押す（社内だけ。もう一度押すと外す）" style="'+(t.ordered?'':'background:#2e8b57;border-color:#2e8b57;color:#fff;')+'">'+(t.ordered?'🟢 発注済みを外す':'🟢 発注済みのはんこ')+'</button>'+
         (isCustomerTask(t)?'<button class="btn small" data-taskact="custreply" data-id="'+t.id+'" title="お客様のおうちノートのメッセージに返信する">💬 お客様に返信</button>':'')+
         (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
         (!canReviewTask(t) && canCommentBack(t)?'<button class="btn small" data-taskact="commentback" data-id="'+t.id+'" title="コメントを書いて担当者へ戻す（未着手へ）">💬 コメントして戻す</button>':'')+
@@ -4505,6 +4513,18 @@
         '<div class="khead"><span class="kandot" style="background:#6b4f3a"></span><span>'+(proj?'🏠 ':'')+escapeHtml(name)+(proj ? ' <button type="button" class="linkbtn" data-openproj="'+escapeHtml(proj.id)+'" style="font-size:.85rem;">開く ›</button>' : '')+'</span><span class="kn tabular">'+openN(k)+'</span></div>'+
         '<div class="kbody">'+kanStackSecsHtml(groups[k], k)+'</div></div>';
     }).join("");
+  }
+  // タスクの「発注済み」のはんこ（社内だけ。tasks.ordered={by,at}。進捗は変えない）
+  async function toggleTaskOrdered(id){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var prev = t.ordered || null;
+    if(prev && !window.confirm("「発注済み」のはんこを外しますか？")) return;
+    t.ordered = prev ? null : { by: state.currentUser||"", at: nowIso() };
+    t.updatedAt = nowIso();
+    renderKanban();
+    var ok = await saveDoc("tasks", t.id, t);
+    if(ok===false){ t.ordered = prev; renderKanban(); return; }
+    toast(t.ordered ? "🟢 発注済みのはんこを押しました" : "発注済みのはんこを外しました");
   }
   async function closeTaskQuick(id){
     var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
@@ -18757,6 +18777,7 @@
       else if(act==="togglereflect") toggleTaskReflect(id);
       else if(act==="toggleask") toggleTaskAskDecision(id);
       else if(act==="quickclose") closeTaskQuick(id);
+      else if(act==="ordered") toggleTaskOrdered(id);
       else if(act==="erclose") estReqToggleClose(id, btn.dataset.req);
       else if(act==="scnote") sendCheckAct(id, "note");
       else if(act==="scmsg") sendCheckAct(id, "msg");
