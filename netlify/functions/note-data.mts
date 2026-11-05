@@ -477,6 +477,28 @@ export default async (req: Request, context: Context) => {
       item.estimateState = response === "承認" ? "承認済み" : response === "見送り" ? "見送り" : "承認依頼";
       item.updated = now;
       await saveExtras(store, extras);
+      // 返事を社内タスクに（住まいるアプリの「🔴 お客様決定済み」の列。承認→発注へ、見送り→確認して閉じる）。
+      // 1つの追加見積りにつき1枚（ID task_est_<案件ID>_<見積ID>）。回答をやり直したら同じカードを書き換える。
+      try {
+        const taskId = `task_est_${String(projectId).replace(/[^A-Za-z0-9_-]/g, "_")}_${String(estId).replace(/[^A-Za-z0-9_-]/g, "_")}`;
+        const ex: any = await store.get(`tasks/${taskId}`, { type: "json", consistency: "strong" }).catch(() => null);
+        if (response === "未回答") {
+          if (ex && !ex.deletedAt && ex.custEstimate) { ex.custEstimate.undone = true; ex.updatedAt = now; await store.setJSON(`tasks/${taskId}`, ex); }
+        } else if (!ex || !ex.deletedAt) {
+          const amt = String(item.amount || "").trim();
+          const t: any = ex || {
+            id: taskId, projectId, assignee: "", instructor: "お客様", checker: "", creator: "おうちノート",
+            hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+            attachmentAssetIds: [], attachments: [], private: false, reflected: false, reflectedAt: null, createdAt: now,
+          };
+          const changedAnswer = !ex || !ex.custEstimate || ex.custEstimate.response !== response;
+          t.content = `【追加見積り：${response === "承認" ? "承認" : "見送り"}】${item.title || "追加見積り"}${amt ? "　" + amt + "（税抜き）" : ""}`;
+          t.custEstimate = { estId, response, at: now, title: item.title || "", amount: amt };
+          if (changedAnswer) { t.status = "未着手"; t.completedAt = null; t.archivedAt = null; }
+          t.updatedAt = now;
+          await store.setJSON(`tasks/${taskId}`, t);
+        }
+      } catch (e) { console.error("estimate task failed", e); }
       if (response !== "未回答") {
         await sendNotifyMail(
           `【おうちノート】${project.customer || "お客様"}様が追加見積りを「${response === "承認" ? "承認" : "見送り"}」しました`,

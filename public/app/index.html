@@ -702,6 +702,23 @@
   .vfreqs{ display:flex; flex-direction:column; gap:4px; }
   .vfreq{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:.9rem; }
   @media (max-width:760px){ .vfrow{ flex-direction:column; gap:6px; } .vfname{ flex:none; } }
+  .vclatest{ display:flex; gap:8px; align-items:center; margin-block:6px 2px; border:1px solid var(--border); border-radius:8px; padding:4px 6px; background:var(--surface-2); font-size:.85rem; line-height:1.35; min-width:0; }
+  .kancard.ordered .vclatest{ margin-inline-end:76px; }
+  .vclth{ flex:0 0 52px; height:40px; border-radius:6px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; }
+  .vclth img, .vclth canvas{ width:100%; height:100%; object-fit:cover; }
+  .vcltx{ min-width:0; overflow:hidden; } .vcltx b{ display:block; }
+  .vclane{ margin-block:6px; } .vclh{ display:flex; justify-content:space-between; align-items:baseline; gap:6px; font-size:.9rem; } .vclh small{ color:var(--muted); font-size:.85rem; white-space:nowrap; }
+  .vctrack{ display:flex; gap:6px; overflow-x:auto; padding-block:8px 4px; }
+  .vcev{ flex:0 0 132px; position:relative; border:1px solid var(--border); border-radius:8px; padding:4px 6px; background:var(--surface); color:inherit; text-decoration:none; font-size:.85rem; line-height:1.3; cursor:default; }
+  a.vcev, .vcev[data-estsrcgo], .vcev[data-vclock]{ cursor:pointer; }
+  .vcev.newest{ border:2px solid #2f7d5b; padding-top:12px; }
+  .vcnew{ position:absolute; top:-9px; left:6px; background:#2f7d5b; color:#fff; font-size:.85rem; line-height:1.2; padding:0 6px; border-radius:999px; }
+  .vcd{ color:var(--muted); } .vch{ font-weight:700; }
+  .vcpic{ height:60px; margin-block:3px; border-radius:6px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; font-size:1.4rem; }
+  .vcpic img, .vcpic canvas, .vcpic video{ width:100%; height:100%; object-fit:cover; }
+  .vcwho{ display:inline-block; border:1px solid var(--border); border-radius:999px; padding:0 6px; } .vcwho.via{ border-color:#c98a3a; color:#a8681f; }
+  .vctx{ overflow-wrap:anywhere; } .vcst{ color:var(--muted); }
+  .vcev.note{ background:#eef5ff; } .vcev.chg{ background:#f4ecff; } .vcev.dec, .vcev.ord{ background:#fff0ee; } .vcev.net{ background:#f1f1f1; } .vcev.pend{ border-style:dashed; border-color:#e0a020; }
   .erbox{ margin-block:6px; border:1px solid var(--border); border-radius:10px; padding:6px 8px; background:var(--surface-2); }
   .ertitle{ font-size:.9rem; margin-block-end:4px; }
   .erfolder{ border-top:1px dashed var(--border); padding-block:6px; }
@@ -731,6 +748,7 @@
   .kc-dlpw span{ font-weight:700; }
   .kc-dlpw.none{ color:var(--muted); }
   @media (prefers-color-scheme: dark){ .kc-dlitem{ background:rgba(224,160,32,.12); } }
+  @media (prefers-color-scheme: dark){ .vcev.note{ background:rgba(58,110,165,.18); } .vcev.chg{ background:rgba(123,63,176,.18); } .vcev.dec, .vcev.ord{ background:rgba(210,60,50,.15); } .vcev.net{ background:rgba(255,255,255,.06); } }
   .kcr-item{ background:#eef6ef; border-inline-start:4px solid #2f7a4a; border-radius:8px; padding:6px 10px; margin-block-end:4px; }
   .kcr-h{ font-size:.85rem; font-weight:700; color:#2f5c3e; }
   .kcr-b{ font-size:.9rem; white-space:pre-wrap; }
@@ -2729,7 +2747,7 @@
   async function saveDoc(collection, id, data){
     pendingSaves++; saveStatusShow("saving");
     var ok = false;
-    try{ ok = await saveDocInner(collection, id, data); if(ok) rememberWrite(collection, id, data); if(ok && (collection==="requests" || collection==="attachments")) scheduleEstSync(); return ok; }
+    try{ ok = await saveDocInner(collection, id, data); if(ok) rememberWrite(collection, id, data); if(ok && (collection==="requests" || collection==="attachments")) scheduleEstSync(); if(ok && collection==="meetingNotes") scheduleNoteCheckSync(); return ok; }
     catch(e){ ok = false; throw e; }
     finally{
       pendingSaves--; lastSaveAt = Date.now();
@@ -3215,6 +3233,7 @@
     renameQuoteMailTasks();
     renameEstSrcTasks();
     syncCustDecidedTasks();
+    syncNoteCheckTasks();
     scheduleEstSync();
     loadActivityBackground();
   }
@@ -3590,6 +3609,7 @@
       migrateLegacyTaskStatus();
       autoArchiveTasks();
       syncCustDecidedTasks();
+      syncNoteCheckTasks();
       if(state.currentProjectId && !state.projects.some(function(p){ return p.id===state.currentProjectId; })){
         var firstLive = state.projects.find(function(p){return !p.deletedAt;});
         state.currentProjectId = firstLive ? firstLive.id : null;
@@ -4405,17 +4425,24 @@
     if(t.memo) meta.push('<span>📝</span>');
     if(nAtt) meta.push('<span>📎'+nAtt+'</span>');
     if(t.fromGmail){ if(t.quoteReg) meta.push('<span class="refl">📄見積登録済</span>'); else if(taskLinkedRequests(t).length) meta.push('<span class="chk">📋見積依頼あり</span>'); }
-    if(t.estReq){ var erc = estReqCount(t); meta.push('<span class="'+(erc.done>=erc.all?'refl':'chk')+'">📋 '+erc.got+'/'+erc.all+'社 受領</span>'); }
+    if(t.estReq){ var erc = estReqCount(t); meta.push('<span class="'+(erc.done>=erc.all?'refl':'chk')+'">📋 '+(t.vendorCard ? '受領 '+erc.got+'/'+erc.all+'件' : erc.got+'/'+erc.all+'社 受領')+'</span>'); }
     if((t.downloads||[]).some(function(d){ return !d.done; })) meta.push('<span class="due">🔗要ダウンロード</span>');
     var lastRv = taskReviewList(t).slice(-1)[0];
     if(lastRv && (lastRv.result==="返信" || lastRv.result==="コメント")) meta.push('<span class="chk" style="color:#3a6ea5;">💬 '+escapeHtml(lastRv.by||"")+'から'+(lastRv.result==="返信"?"返信":"コメント")+'</span>');
     var ordMd = t.ordered && t.ordered.at ? (function(d){ return (d.getMonth()+1)+"/"+d.getDate(); })(new Date(t.ordered.at)) : "";
     var stamps = [];
+    if(t.custEstimate){
+      var ceOk = t.custEstimate.response==="承認", ceUndo = !!t.custEstimate.undone;
+      stamps.push('<div class="kc-ordstamp '+(ceOk?'dec':'chg')+(ceUndo||!ceOk?' off':'')+'" title="お客様の追加見積りの返事">'+(ceOk?'承認':'見送<br>り')+'<small>'+escapeHtml(mdOf(t.custEstimate.at))+'</small></div>');
+    }
     if(t.custDecided){
       var cdd = custDecisionOf(t), cdOn = !!(cdd && !cdd.deletedAt && cdd.status==="決定");
       stamps.push('<div class="kc-ordstamp dec'+(cdOn?'':' off')+'" title="お客様が決定">決定<small>'+escapeHtml(mdOf(t.custDecided.at))+'</small></div>');
     }
-    if(isChangeTask(t)){
+    var vcs = t.vendorCard ? vcChangeState(t) : null;
+    if(vcs){
+      stamps.push('<div class="kc-ordstamp chg'+(vcs.on?'':' off')+'" title="'+(vcs.on?'変更依頼中':'変更依頼（届いた）')+'">'+(vcs.on?'変更<br>依頼':'変更<br>済')+'<small>'+escapeHtml(mdOf(vcs.at))+'</small></div>');
+    } else if(!t.vendorCard && isChangeTask(t)){
       var chDone = (t.status||"")==="完了";
       stamps.push('<div class="kc-ordstamp chg'+(chDone?' off':'')+'" title="'+(chDone?'変更依頼（完了）':'変更依頼中')+'">'+(chDone?'変更<br>済':'変更<br>依頼')+'<small>'+escapeHtml(mdOf(chDone ? (t.completedAt||t.updatedAt) : t.createdAt))+'</small></div>');
     }
@@ -4424,6 +4451,7 @@
       (stamps.length ? '<div class="kc-stamps">'+stamps.join("")+'</div>' : '')+
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
+        (t.vendorCard && !exp ? vcLatestHtml(t) : '')+
         (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
       '</div>'+
       (who ? '<div class="kc-av" style="background:'+avatarColor(who)+'" title="担当 '+escapeHtml(who)+'">'+escapeHtml(who.slice(0,1))+'</div>' : '<div class="kc-av none" title="担当未設定">？</div>')+
@@ -4431,7 +4459,7 @@
       '<div class="kc-full">'+
       '<div class="kc-state"><span class="kandot" style="background:'+(STATUS_COLORS[status]||"var(--muted)")+'"></span>いまの状態：<b>'+status+'</b></div>'+
       '<div class="kc-proj">'+(proj?escapeHtml(proj.name)+' <span class="muted" style="font-size:.85rem; font-weight:400;">'+escapeHtml(deptLabel(deptOfProject(proj)))+'</span>':"（案件なし）")+'</div>'+
-      (t.vendorSpec ? '<div class="kc-part">'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</div>' : '<div class="kc-part none">📍 部位：未設定</div>')+
+      (t.vendorSpec ? '<div class="kc-part">'+escapeHtml(partText(t.vendorSpec, t.projectId))+'</div>' : (t.vendorCard ? '' : '<div class="kc-part none">📍 部位：未設定</div>'))+
       '<div class="kc-meta">'+
         (t.assignee?'<span>担当 '+escapeHtml(t.assignee)+'</span>':'')+
         (t.instructor?'<span>指示 '+escapeHtml(t.instructor===CUSTOMER_INSTRUCTOR && proj && proj.customer ? CUSTOMER_INSTRUCTOR+'（'+proj.customer+'様）' : t.instructor)+'</span>':'')+
@@ -4442,8 +4470,9 @@
       (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
       taskReviewsHtml(t)+
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
-      estReqHtml(t)+
-      (!t.estReq && (t.custDecided || t.fromCustomerChange) ? (function(){
+      (t.vendorCard ? vcHtml(t) : estReqHtml(t))+
+      (t.custEstimate && t.custEstimate.undone ? '<div class="erbox"><div class="kc-undone">⚠️ お客様が回答をやり直しました（いまは未回答）</div></div>' : '')+
+      (!t.estReq && (t.custDecided || t.fromCustomerChange || t.noteCheck) ? (function(){
         var cd = custDecisionOf(t);
         var undone = t.custDecided && (!cd || cd.deletedAt || cd.status!=="決定");
         var sh = estSrcHtml(t);
@@ -4511,7 +4540,8 @@
       ((st!=="未着手" && st!=="完了") || src ? '<div class="kmst">'+(st!=="未着手" && st!=="完了" ? '<span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span>' : '')+(src?'<span class="kwaitsrc">'+src+'</span>':'')+'</div>' : '')+
       kanCardHtml(t, st)+
       (waiting ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
-        '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'">✅ 確認して閉じる</button>' : '')+
+        (t.custEstimate ? '' : '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'">✅ 確認して閉じる</button>') : '')+
+      custEstBtnsHtml(t)+
       '</div>';
   }
   function kanStackSecsHtml(list, key){
@@ -4521,9 +4551,9 @@
       return (b.createdAt||"").localeCompare(a.createdAt||"");
     };
     // お客様が決定したもの（完了でないもの）は、未着手・着手とは別の「🔴 お客様決定済み」にまとめる
-    var dec = list.filter(function(t){ return t.custDecided && (t.status||"未着手")!=="完了"; }).sort(function(a,b){ return (b.custDecided.at||"").localeCompare(a.custDecided.at||""); });
-    var not = list.filter(function(t){ return !t.custDecided && (t.status||"未着手")==="未着手"; }).sort(byDl);
-    var doing = list.filter(function(t){ var st=t.status||"未着手"; return !t.custDecided && st!=="未着手" && st!=="完了"; }).sort(function(a,b){ return STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || byDl(a,b); });
+    var dec = list.filter(function(t){ return isDecTask(t) && (t.status||"未着手")!=="完了"; }).sort(function(a,b){ return decAtOf(b).localeCompare(decAtOf(a)); });
+    var not = list.filter(function(t){ return !isDecTask(t) && (t.status||"未着手")==="未着手"; }).sort(byDl);
+    var doing = list.filter(function(t){ var st=t.status||"未着手"; return !isDecTask(t) && st!=="未着手" && st!=="完了"; }).sort(function(a,b){ return STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || byDl(a,b); });
     var done = list.filter(function(t){ return t.status==="完了"; }).sort(function(a,b){ return (b.completedAt||b.updatedAt||"").localeCompare(a.completedAt||a.updatedAt||""); });
     var sec = function(cls, icon, label, arr, extra){
       return '<div class="ktaxsec"><div class="ktaxhead '+cls+'">'+icon+' '+label+'<span class="kn tabular">'+arr.length+'</span></div>'+
@@ -4586,11 +4616,11 @@
   // 対象：fromGmail のタスク（税理士の分は除く）を、朋子以外が「完了」「確認して閉じる」「見積の書類として登録」にしたとき。1つのタスクにつき1回だけ（IDは task_sc_<元のタスクID>）。
   async function maybeCreateSendCheck(t, how, opts){
     opts = opts || {};
-    if(!t || (!t.fromGmail && !opts.force) || t.sendCheck || t.sendCheckId || t.private) return;
+    if(!t || (!t.fromGmail && !opts.force) || t.sendCheck || (t.sendCheckId && !opts.id) || t.private) return;
     if(isTaxTask(t)) return;
     var me = state.currentUser || "";
     if(me===TASK_ADMIN && !opts.force) return;
-    var id = "task_sc_"+t.id;
+    var id = opts.id || ("task_sc_"+t.id);
     if(state.tasks.some(function(x){ return x.id===id; })){ t.sendCheckId = id; return; }
     var fg = t.fromGmail || {};
     var sv = (typeof taskSenderVendor==="function") ? taskSenderVendor(t) : null;
@@ -4626,31 +4656,189 @@
   // ensureEstReqTask が「【見積依頼】部位（n社：業者名）」のタスクを作る（ID task_er_<最初の依頼ID>、担当＝作った人、estReq.reqIds）。
   // 業者から届いたメールはサーバー（gmail-label-tasks.mts）がこのカードに追記する。全社がそろう（受領済みか「この業者は終わり」）と
   // syncEstReqTasks がカードを完了にして、朋子に「📤 お客様に送る？」のタスクを作る。
+  // ---- 業者ごとのカード（2026年11月〜）：見積依頼は「案件×業者」1枚のカード（ID task_vc_<案件ID>_<業者ID>、vendorCard）に積む。
+  // 中は部位ごとの行で、見積依頼・届いた書類（NETは別の業者から届いても、そのメーカーの行）・変更依頼・打合せ記録・お客様の決定・発注を時系列（左が最新）に並べる。
+  // estReq.reqIds も持つので、サーバー（gmail-label-tasks.mts）の「届いたメールをカードに追記」はそのまま動く。
+  function vcTaskId(pid, vid){ return "task_vc_"+String(pid||"")+"_"+String(vid||"").replace(/[^A-Za-z0-9_-]/g, "_"); }
+  function vcTitle(t){
+    var v = vendorById(t.vendorCard && t.vendorCard.vendorId), seen = {}, parts = [];
+    estReqReqs(t).forEach(function(r){ if(r.part && r.part.scope){ var k = vcPartKey(r.part); if(!seen[k]){ seen[k] = 1; parts.push(partItemName(r.part, t.projectId)); } } });
+    return "【業者】"+((v && v.name) || "業者")+(parts.length ? "："+parts.slice(0,4).join("・")+(parts.length>4?" ほか":"") : "");
+  }
+  function partItemName(part, pid){ return String(partText(part, pid)||"").replace(/^[^\s]+\s/, "") || "部位"; }
   async function ensureEstReqTask(proj, reqIds, content, part){
     reqIds = (reqIds||[]).filter(Boolean);
     if(!proj || !reqIds.length) return null;
-    var id = "task_er_"+reqIds[0];
-    if(state.tasks.some(function(x){ return x.id===id; })) return null;
     var reqs = reqIds.map(function(rid){ return state.requests.find(function(r){ return r.id===rid; }); }).filter(Boolean);
     if(!reqs.length) return null;
-    var names = reqs.map(function(r){ return (vendorById(r.vendorId)||{}).name||"業者"; });
-    var first = String(content||"").split("\n")[0].trim();
-    var label = (part && part.scope ? partText(part, proj.id) : "") || (first ? first.slice(0,30) : "") || "見積";
-    var me = state.currentUser || "";
-    var src = estSrcFromReqs(reqs);
-    var t = { id:id, projectId: proj.id,
-      content: (src ? "【見積変更依頼】" : "【見積依頼】")+label+"（"+reqs.length+"社："+names.join("・")+"）"+(content && content!==label ? "\n"+String(content).slice(0,400) : ""),
-      assignee: me, instructor:"", checker:"", creator: me, hasDeadline:false, deadline:"",
-      requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments:[], vendorSpec: (part && part.scope) ? part : null,
-      private:false, reflected:false, reflectedAt:null,
-      status: reqs.some(function(r){ return r.status==="依頼済み"; }) ? "対応中" : "未着手",
-      estReq: { reqIds: reqs.map(function(r){ return r.id; }), at: nowIso(), src: src },
-      createdAt: nowIso(), updatedAt: nowIso() };
-    state.tasks.push(t);
-    var ok = await saveDoc("tasks", t.id, t);
-    if(ok===false){ state.tasks = state.tasks.filter(function(x){ return x!==t; }); return null; }
+    var me = state.currentUser || "", first = null;
+    var byV = {}, order = [];
+    reqs.forEach(function(r){ if(!r.vendorId) return; if(!byV[r.vendorId]){ byV[r.vendorId] = []; order.push(r.vendorId); } byV[r.vendorId].push(r); });
+    for(var i=0;i<order.length;i++){
+      var vid = order[i], vr = byV[vid], id = vcTaskId(proj.id, vid);
+      var t = state.tasks.find(function(x){ return x.id===id; });
+      var isNew = !t;
+      if(t && t.deletedAt){ t.deletedAt = null; t.status = "未着手"; t.archivedAt = null; }
+      if(!t){
+        t = { id:id, projectId: proj.id, content:"", assignee: me, instructor:"", checker:"", creator: me, hasDeadline:false, deadline:"",
+          requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments:[], vendorSpec: null,
+          private:false, reflected:false, reflectedAt:null, status:"未着手",
+          vendorCard: { projectId: proj.id, vendorId: vid },
+          estReq: { reqIds: [], at: nowIso(), src: null },
+          createdAt: nowIso(), updatedAt: nowIso() };
+        state.tasks.push(t);
+      }
+      var prev = JSON.parse(JSON.stringify(t));
+      t.estReq = t.estReq || { reqIds: [], at: nowIso() };
+      vr.forEach(function(r){ if(t.estReq.reqIds.indexOf(r.id)<0) t.estReq.reqIds.push(r.id); });
+      var src = estSrcFromReqs(vr);
+      if(src){ t.estReq.src = src; t.estReq.changeAt = nowIso(); }
+      t.estReq.at = nowIso();
+      // 新しい依頼（変更）が来たら、終わっていたカードも「対応中」に戻す
+      var st = t.status || "未着手";
+      if(vr.some(function(r){ return r.status==="依頼済み"; })){ if(st==="未着手" || st==="完了" || st==="発注済み" || st==="お客様へ連絡済み"){ t.status = "対応中"; t.archivedAt = null; t.completedAt = null; } }
+      else if(!isNew && st==="完了"){ t.status = "未着手"; t.archivedAt = null; t.completedAt = null; }
+      t.content = vcTitle(t);
+      t.updatedAt = nowIso();
+      var ok = await saveDoc("tasks", t.id, t);
+      if(ok===false){ if(isNew) state.tasks = state.tasks.filter(function(x){ return x!==t; }); else Object.assign(t, prev); continue; }
+      if(!first) first = t;
+    }
     renderKanban();
-    return t;
+    return first;
+  }
+  function vcPartKey(p){ return (p && p.scope) ? [p.scope, p.category||"", p.scope==="room" ? (p.roomId||"") : ""].join("|") : "_none"; }
+  function vcPartOfDoc(coll, d, lineHash_){
+    if(!d) return null;
+    if(coll==="specPhotos") return d.scope ? {scope:d.scope, category:d.category||null, roomId:d.roomId||null} : null;
+    if(coll==="meetingNotes" && lineHash_){
+      var ll = (d.noteLines||[]).find(function(l){ return l && lineHash(String(l.t||"").trim())===lineHash_; });
+      if(ll && ll.p && ll.p.scope) return ll.p;
+    }
+    return (d.specPart && d.specPart.scope) ? d.specPart : null;
+  }
+  // 別の業者（商社）から届いたNETなどで、メーカーのカードへ寄せる依頼か：その商社が「〇〇から」で届けた書類（viaVendorId）が同じ部位にある
+  function vcRedirectTo(r){
+    if(!r || !r.vendorId) return null;
+    var k = vcPartKey(r.part);
+    var a = liveAttachments().find(function(x){ return x.projectId===r.projectId && x.viaVendorId===r.vendorId && x.vendorId && x.vendorId!==r.vendorId && vcPartKey(x.specPart)===k; });
+    return a ? a.vendorId : null;
+  }
+  function vcDateOf(s){ return String(s||"").slice(0,10); }
+  function vcLanes(t){
+    var pid = t.projectId, vid = t.vendorCard && t.vendorCard.vendorId, me = vendorById(vid);
+    var lanes = {}, order = [];
+    var lane = function(part){ var k = vcPartKey(part); if(!lanes[k]){ lanes[k] = { key:k, part:(part && part.scope) ? part : null, ev:[] }; order.push(k); } return lanes[k]; };
+    // 見積依頼（自分あて＋商社あてでこのカードへ寄せたもの）
+    liveRequests().filter(function(r){ return r.projectId===pid; }).forEach(function(r){
+      var to = r.vendorId===vid ? (vcRedirectTo(r) ? null : vid) : (vcRedirectTo(r)===vid ? vid : null);
+      if(!to) return;
+      var chg = !!(r.sourceNoteId || r.sourceCard);
+      var other = r.vendorId!==vid ? ((vendorById(r.vendorId)||{}).name||"業者") : "";
+      var st = r.status==="受領済み" ? "✅ 届いた" : (r.estClosed ? "⏹ 終わり" : (r.status==="依頼済み" ? (r.replyDetected ? "✉️ 返信あり" : "⏳ 待ち") : "📝 まだ依頼していない"));
+      lane(r.part).ev.push({ d: vcDateOf(r.requestedAt || r.createdAt), kind: chg ? "chg" : "req", h: chg ? "🟣 変更依頼" : "✉️ 見積依頼",
+        who: other ? other+"へ" : "", text: String(r.content||"").split("\n")[0].slice(0,40), st: st });
+    });
+    // 届いた書類（このメーカーの分。商社から届いたものも）
+    liveAttachments().filter(function(a){ return a.projectId===pid && a.vendorId===vid && (a.kind==="quote" || a.kind==="plan"); }).forEach(function(a){
+      var via = a.viaVendorId && a.viaVendorId!==vid ? vendorById(a.viaVendorId) : null;
+      var qt = a.kind==="quote" ? quoteTypeNorm(a.quoteType) : "図面";
+      var locked = a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked;
+      lane(a.specPart).ev.push({ d: vcDateOf(a.receivedAt || a.uploadedAt || a.createdAt), kind: qt==="NET" ? "net" : "doc", h: (qt==="NET"?"🔒 ":"📄 ")+qt,
+        who: ((via && via.name) || (me && me.name) || "")+"から", att: a, locked: locked });
+    });
+    // カードに届いて、まだ登録していないファイル
+    var regUrls = {}; state.attachments.forEach(function(a){ if(a && !a.deletedAt && a.fromTaskId===t.id) regUrls[a.url] = 1; });
+    (t.attachments||[]).forEach(function(f){
+      if(!f || !f.url || regUrls[f.url] || !f.fromVendorId) return;
+      lane(null).ev.push({ d:"", kind:"pend", h:"📥 まだ登録していない", who: ((vendorById(f.fromVendorId)||{}).name||"")+"から", file:f });
+    });
+    // ここから下は、すでにある部位の行にだけ足す
+    var has = function(part){ return lanes[vcPartKey(part)] || null; };
+    (state.meetingNotes||[]).filter(function(n){ return n && !n.deletedAt && n.projectId===pid; }).forEach(function(n){
+      var L = has(n.specPart);
+      var firstLine = function(v){ return String(v||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean)[0] || ""; };
+      if(L){
+        var tx = n.decided ? "✅ "+firstLine(n.decided) : (n.open ? "💭 "+firstLine(n.open) : firstLine(n.talk || n.content));
+        L.ev.push({ d: vcDateOf(n.date || n.createdAt), kind:"note", h:"📝 打合せ記録", text: ((n.title?n.title+"：":"")+tx).slice(0,50), noteId: n.id });
+      }
+      var seenK = {};
+      (n.noteLines||[]).forEach(function(l){
+        if(!l || !l.p || !l.p.scope || vcPartKey(l.p)===vcPartKey(n.specPart)) return;
+        var L2 = has(l.p); if(!L2) return;
+        var mk = l.m==="d" ? "✅ " : (l.m==="o" ? "💭 " : (l.m==="c" ? "🔒 " : ""));
+        var k2 = L2.key+"|"+n.id;
+        if(seenK[k2]){ seenK[k2].text = (seenK[k2].text+" / "+mk+String(l.t||"")).slice(0,60); return; }
+        seenK[k2] = { d: vcDateOf(n.date || n.createdAt), kind:"note", h:"📝 打合せ記録", text: (mk+String(l.t||"")).slice(0,50), noteId: n.id };
+        L2.ev.push(seenK[k2]);
+      });
+    });
+    (state.noteDecisions||[]).filter(function(d){ return d && !d.deletedAt && d.projectId===pid && d.status==="決定" && d.cardKey; }).forEach(function(d){
+      var di = decisionInfo(d), key = String(d.cardKey);
+      var doc = di.src ? estSrcDoc(di.src) : null;
+      var lh = key.indexOf("l:")===0 ? key.slice(key.lastIndexOf("_")+1) : "";
+      var L = has(di.src ? vcPartOfDoc(di.src.coll, doc, lh) : null); if(!L) return;
+      var byStaff = d.by && d.by!=="お客様";
+      L.ev.push({ d: vcDateOf(d.decidedAt || d.updatedAt), kind:"dec", h: byStaff ? "🔴 決定（"+d.by+"）" : "🔴 お客様が決定", text: String(di.text||d.label||"").slice(0,40) });
+      if(d.ordered) L.ev.push({ d: vcDateOf(d.ordered.at), kind:"ord", h:"🔴 発注済み", text: d.ordered.by||"" });
+    });
+    (state.tasks||[]).filter(function(x){ return x && !x.deletedAt && x.projectId===pid && x.fromCustomerChange && x.vendorSpec; }).forEach(function(x){
+      var L = has(x.vendorSpec); if(!L) return;
+      L.ev.push({ d: vcDateOf(x.createdAt), kind:"chg", h:"🟣 変更のご依頼（お客様）", text: String(x.content||"").replace(/^【[^】]*】/, "").slice(0,40) });
+    });
+    var list = order.map(function(k){ return lanes[k]; }).filter(function(L){ return L.ev.length; });
+    list.forEach(function(L){ L.ev.sort(function(a,b){ if(!a.d && b.d) return -1; if(a.d && !b.d) return 1; return String(b.d).localeCompare(String(a.d)); }); L.last = L.ev[0] ? L.ev[0].d : ""; });
+    list.sort(function(a,b){ if(a.key==="_none" && b.key!=="_none") return 1; if(b.key==="_none" && a.key!=="_none") return -1; return String(b.last||"9").localeCompare(String(a.last||"9")); });
+    return list;
+  }
+  // 閉じたカードに出す「最新」：NET（鍵つき）は使わない
+  function vcLatest(t){
+    var all = []; vcLanes(t).forEach(function(L){ L.ev.forEach(function(e){ all.push({e:e, L:L}); }); });
+    all.sort(function(a,b){ return String(b.e.d||"9").localeCompare(String(a.e.d||"9")); });
+    return all.find(function(x){ return x.e.kind!=="net"; }) || null;
+  }
+  function vcLatestHtml(t){
+    var x = vcLatest(t); if(!x) return "";
+    var e = x.e, thumb = "";
+    if(e.att && !e.locked) thumb = '<div class="vclth">'+fileThumbInner(e.att.url, e.att.contentType, e.att.name)+'</div>';
+    else if(e.file) thumb = '<div class="vclth">'+fileThumbInner(e.file.url, e.file.contentType, e.file.name)+'</div>';
+    var partNm = x.L.part ? partItemName(x.L.part, t.projectId) : "";
+    return '<div class="vclatest">'+thumb+'<div class="vcltx"><b>最新：'+escapeHtml(e.h.replace(/^\S+\s/, ""))+(partNm?'（'+escapeHtml(partNm)+'）':'')+'</b>'+
+      escapeHtml([e.d ? e.d.slice(5).replace("-","/") : "", e.who||"", e.text||""].filter(Boolean).join("　"))+'</div></div>';
+  }
+  function vcHtml(t){
+    var lanes = vcLanes(t), c = estReqCount(t);
+    if(!lanes.length) return '<div class="erbox"><div class="muted" style="font-size:.85rem;">このお店への依頼は、メーカーのカードにまとめて表示しています。</div></div>';
+    var rows = lanes.map(function(L){
+      var tiles = L.ev.map(function(e, i){
+        var md = e.d ? e.d.slice(5).replace("-","/") : "";
+        var inner = '<div class="vcd">'+escapeHtml(md)+'</div><div class="vch">'+escapeHtml(e.h)+'</div>';
+        if(e.att){
+          if(e.locked) return '<div class="vcev net" data-vclock="1" role="button" tabindex="0" title="NETは暗証番号で開きます">'+(i===0?'<span class="vcnew">最新</span>':'')+inner+'<div class="vcpic">🔒</div><div class="vcwho via">'+escapeHtml(e.who)+'</div></div>';
+          return '<a class="vcev '+e.kind+(i===0?' newest':'')+'" href="'+escapeHtml(e.att.url)+'" target="_blank" rel="noopener" title="'+escapeHtml(e.att.name||"")+'">'+(i===0?'<span class="vcnew">最新</span>':'')+inner+
+            '<div class="vcpic">'+fileThumbInner(e.att.url, e.att.contentType, e.att.name)+'</div><div class="vcwho'+(/から$/.test(e.who) && e.att.viaVendorId && e.att.viaVendorId!==e.att.vendorId ? ' via' : '')+'">'+escapeHtml(e.who)+'</div></a>';
+        }
+        if(e.file) return '<a class="vcev pend" href="'+escapeHtml(e.file.url)+'" target="_blank" rel="noopener" title="'+escapeHtml(e.file.name||"")+'">'+inner+'<div class="vcpic">'+fileThumbInner(e.file.url, e.file.contentType, e.file.name)+'</div><div class="vcwho">'+escapeHtml(e.who)+'</div></a>';
+        var attr = e.noteId ? ' data-estsrcgo="'+escapeHtml(t.projectId||"")+'" role="button" tabindex="0"' : '';
+        return '<div class="vcev '+e.kind+(i===0?' newest':'')+'"'+attr+'>'+(i===0?'<span class="vcnew">最新</span>':'')+inner+
+          (e.who ? '<div class="vcwho">'+escapeHtml(e.who)+'</div>' : '')+(e.text ? '<div class="vctx">'+escapeHtml(e.text)+'</div>' : '')+(e.st ? '<div class="vcst">'+escapeHtml(e.st)+'</div>' : '')+'</div>';
+      }).join("");
+      var title = L.key==="_none" ? (L.ev.every(function(e){ return e.kind==="pend"; }) ? "📥 届いた書類（まだ登録していない）" : "（部位なし）") : partText(L.part, t.projectId);
+      return '<div class="vclane"><div class="vclh"><b>'+escapeHtml(title)+'</b><small>← 新しい　古い →</small></div><div class="vctrack">'+tiles+'</div></div>';
+    }).join("");
+    var pendN = 0; lanes.forEach(function(L){ L.ev.forEach(function(e){ if(e.kind==="pend") pendN++; }); });
+    var orphan = (t.attachments||[]).filter(function(f){ return f && f.url && !f.fromVendorId; }).length;
+    return '<div class="erbox vcbox"><div class="ertitle">📋 経緯（見積の受領 '+c.got+'/'+c.all+'件）</div>'+rows+
+      ((pendN || orphan) ? '<button type="button" class="btn small kc-qbtn" data-taskact="toquote" data-id="'+t.id+'">📄 届いた書類を登録（'+(pendN+orphan)+'件）</button>' : '')+
+      '<div class="muted" style="font-size:.85rem; margin-block-start:4px;">別の業者から届いたNETは、登録するとき「〇〇の分」でこのメーカーを選ぶと、ここに並びます。</div></div>';
+  }
+  // 変更依頼のはんこ：変更（記録から出した依頼）がまだ届いていない間は「変更依頼」、届いたら「変更済」
+  function vcChangeState(t){
+    var chg = estReqReqs(t).filter(function(r){ return r.sourceNoteId || r.sourceCard; });
+    if(!chg.length) return null;
+    var open = chg.filter(function(r){ return !estReqDone(r); });
+    var last = chg.slice().sort(function(a,b){ return String(b.requestedAt||b.createdAt||"").localeCompare(String(a.requestedAt||a.createdAt||"")); })[0];
+    return { on: open.length>0, at: open.length ? (open[0].requestedAt||open[0].createdAt) : (last.receivedAt||last.requestedAt||last.createdAt) };
   }
   function estReqReqs(t){
     var ids = (t && t.estReq && t.estReq.reqIds) || [];
@@ -4685,6 +4873,7 @@
   function estSrcOf(t){
     if(!t) return null;
     if(t.custDecided) return t.custDecided.src || null;
+    if(t.noteCheck && t.noteCheck.noteId) return {coll:"meetingNotes", id:t.noteCheck.noteId};
     if(t.fromCustomerChange && t.fromCustomerChange.cardKey) return decisionInfo({cardKey:t.fromCustomerChange.cardKey}).src;
     if(!t.estReq) return null;
     return t.estReq.src || estSrcFromReqs(estReqReqs(t));
@@ -4772,6 +4961,7 @@
       var changed = false;
       for(var i=0;i<list.length;i++){
         var t = list[i], st = t.status||"未着手", rs = estReqReqs(t);
+        if(t.vendorCard){ if(await vcSyncOne(t)) changed = true; continue; }
         if(!rs.length || st==="完了") continue;
         var allDone = rs.every(estReqDone);
         if(allDone){
@@ -4790,6 +4980,46 @@
       }
       if(changed) renderKanban();
     }finally{ estSyncBusy = false; }
+  }
+  // 業者ごとのカードの同期：①商社（NETだけ届けた業者）への依頼は、メーカーの行に届いたら「受領済み」に
+  // ②その回の依頼が全部そろったら、朋子に「📤 お客様に送る？」（回ごとに1回）③自分の行が無くなった商社のカードは完了にする
+  async function vcSyncOne(t){
+    var changed = false;
+    var rs = liveRequests().filter(function(r){ return r.projectId===t.projectId && r.vendorId===(t.vendorCard||{}).vendorId; });
+    for(var i=0;i<rs.length;i++){
+      var r = rs[i]; if(r.status==="受領済み" || r.estClosed) continue;
+      var mk = vcRedirectTo(r); if(!mk) continue;
+      var k = vcPartKey(r.part);
+      var a = liveAttachments().filter(function(x){ return x.projectId===r.projectId && x.viaVendorId===r.vendorId && x.vendorId===mk && vcPartKey(x.specPart)===k; })
+        .sort(function(x,y){ return String(y.receivedAt||y.uploadedAt||"").localeCompare(String(x.receivedAt||x.uploadedAt||"")); })[0];
+      if(!a) continue;
+      r.status = "受領済み"; r.receivedAt = vcDateOf(a.receivedAt || a.uploadedAt) || todayStr(); r.receivedBy = r.receivedBy || "";
+      await saveDoc("requests", r.id, r); changed = true;
+    }
+    var mine = estReqReqs(t);
+    if(mine.length && mine.every(estReqDone)){
+      var lastId = mine[mine.length-1].id;
+      if(t.estReq.sentRound!==lastId){
+        var got = mine.filter(function(r){ return r.status==="受領済み"; });
+        var since = t.estReq.sentAt || "";
+        var attIds = liveAttachments().filter(function(a){ return a.kind==="quote" && a.projectId===t.projectId && a.vendorId===t.vendorCard.vendorId && (!since || String(a.createdAt||a.uploadedAt||"")>=since.slice(0,10)); }).map(function(a){ return a.id; });
+        t.estReq.sentRound = lastId; t.estReq.sentAt = nowIso(); t.updatedAt = nowIso();
+        await saveDoc("tasks", t.id, t); changed = true;
+        if(got.length && attIds.length && vcLanes(t).length){
+          await maybeCreateSendCheck(t, "", { force:true, id:"task_sc_"+t.id+"_"+lastId, quoteAttIds: attIds, from: (vendorById(t.vendorCard.vendorId)||{}).name || "見積",
+            title: String(t.content||"").split("\n")[0].replace(/^【業者】/, "見積："), byLine: "見積がそろいました（"+got.length+"件受領）" });
+        }
+      }
+      if(!vcLanes(t).length && (t.status||"")!=="完了"){
+        t.status = "完了"; t.completedAt = nowIso(); t.archivedAt = null; t.reportTo = []; t.updatedAt = nowIso();
+        await saveDoc("tasks", t.id, t); changed = true;
+      }
+    } else if((t.status||"未着手")==="未着手" && mine.some(function(r){ return r.status==="依頼済み" || r.status==="受領済み"; })){
+      t.status = "対応中"; t.updatedAt = nowIso(); await saveDoc("tasks", t.id, t); changed = true;
+    }
+    var title = vcTitle(t);
+    if(title!==t.content){ t.content = title; t.updatedAt = nowIso(); await saveDoc("tasks", t.id, t); changed = true; }
+    return changed;
   }
   async function estReqToggleClose(taskId, reqId){
     var r = state.requests.find(function(x){ return x.id===reqId; }); if(!r) return;
@@ -4926,15 +5156,15 @@
     // 🔴 お客様決定済み：おうちノートでお客様が「決定」を押したもの（完了にすると外れる）
     var decCol = "";
     {
-      var decs = tasks.filter(function(t){ return t.custDecided && !waitIds[t.id] && (t.status||"未着手")!=="完了"; });
+      var decs = tasks.filter(function(t){ return isDecTask(t) && !waitIds[t.id] && (t.status||"未着手")!=="完了"; });
       decs.forEach(function(t){ waitIds[t.id] = true; });
-      decs.sort(function(a,b){ return ((b.custDecided.at||"")).localeCompare(a.custDecided.at||""); });
+      decs.sort(function(a,b){ return decAtOf(b).localeCompare(decAtOf(a)); });
       if(decs.length){
         decCol = '<div class="kcol kdec" style="--sc:#d23c32">'+
           '<div class="khead"><span class="kandot" style="background:#d23c32"></span><span>🔴 お客様決定済み</span><span class="kn tabular">'+decs.length+'</span></div>'+
           '<div class="kbody"><div class="klist">'+decs.map(function(t){
             return '<div class="kwaititem">'+kanCardHtml(t, t.status||"未着手")+
-              (!t.assignee ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>' : '<div class="kwaitsrc">担当：'+escapeHtml(t.assignee)+'　進捗：'+escapeHtml(t.status||"未着手")+'</div>')+'</div>';
+              (!t.assignee ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>' : '<div class="kwaitsrc">担当：'+escapeHtml(t.assignee)+'　進捗：'+escapeHtml(t.status||"未着手")+'</div>')+custEstBtnsHtml(t)+'</div>';
           }).join("")+'</div></div></div>';
       }
     }
@@ -7855,6 +8085,65 @@
   }
   // 変更のタスク（記録から出した見積変更依頼・お客様の変更のご依頼）
   function isChangeTask(t){ return !!(t && (t.fromCustomerChange || (t.estReq && estSrcOf(t)))); }
+  function isDecTask(t){ return !!(t && (t.custDecided || t.custEstimate)); }
+  function decAtOf(t){ return String((t.custDecided && t.custDecided.at) || (t.custEstimate && t.custEstimate.at) || ""); }
+  // お客様の追加見積りの返事のカード：承認 →「🔴 発注済みにする」、見送り →「✅ 確認して閉じる」
+  function custEstBtnsHtml(t){
+    if(!t || !t.custEstimate || (t.status||"")==="完了") return "";
+    if(t.custEstimate.response==="承認") return (t.status==="発注済み" ? '' : '<button type="button" class="btn small kassignbtn" data-taskact="toordered" data-id="'+escapeHtml(t.id)+'" style="background:#d23c32;border-color:#d23c32;color:#fff;">🔴 発注済みにする</button>')+
+      '<button type="button" class="btn small secondary kassignbtn" data-taskact="openest" data-id="'+escapeHtml(t.id)+'">追加見積りを見る ›</button>';
+    return '<button type="button" class="btn small kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'">✅ 確認して閉じる</button>'+
+      '<button type="button" class="btn small secondary kassignbtn" data-taskact="openest" data-id="'+escapeHtml(t.id)+'">追加見積りを見る ›</button>';
+  }
+  // ---- 記録の「🔒 社内で確認」の行 → 社内タスク（担当者なし＝「👤 割り振り待ち」）。ID は task_nc_<記録ID>_<行のハッシュ> で固定。
+  // タスクを完了にすると記録の行も確認済み（noteCheckItems が taskDone で判定）、記録で確認済みにするとタスクも完了にする。
+  var noteChkTimer = null, noteChkBusy = false;
+  function scheduleNoteCheckSync(){ clearTimeout(noteChkTimer); noteChkTimer = setTimeout(syncNoteCheckTasks, 900); }
+  async function syncNoteCheckTasks(){
+    if(noteChkBusy){ scheduleNoteCheckSync(); return; }
+    noteChkBusy = true;
+    try{
+      var changed = false;
+      var notes = (state.meetingNotes||[]).filter(function(n){ return n && !n.deletedAt && n.projectId && (n.noteLines||[]).some(function(l){ return l && l.m==="c"; }); });
+      for(var i=0;i<notes.length;i++){
+        var n = notes[i], proj = projectById(n.projectId); if(!proj || proj.deletedAt) continue;
+        var items = noteCheckItems(n), noteDirty = false;
+        for(var j=0;j<items.length;j++){
+          var it = items[j];
+          if(it.task){
+            // 記録で確認済みにした → タスクも完了
+            if(it.mark && (it.task.status||"未着手")!=="完了" && it.task.noteCheck){
+              it.task.status = "完了"; it.task.completedAt = nowIso(); it.task.archivedAt = null; it.task.reportTo = []; it.task.updatedAt = nowIso();
+              await saveDoc("tasks", it.task.id, it.task); changed = true;
+            }
+            continue;
+          }
+          if(it.mark) continue;
+          var id = "task_nc_"+String(n.id).replace(/[^A-Za-z0-9_-]/g, "_")+"_"+lineHash(it.t);
+          var ex = state.tasks.find(function(x){ return x.id===id; });
+          if(!ex){
+            var ln = (n.noteLines||[]).find(function(l){ return l && l.m==="c" && String(l.t||"").trim()===it.t; }) || {};
+            var part = (ln.p && ln.p.scope) ? ln.p : ((n.specPart && n.specPart.scope) ? n.specPart : null);
+            var files = (ln.f||[]).filter(function(f){ return f && f.url; }).slice(0,6).map(function(f){ return {id:f.id||uid("att"), url:f.url, contentType:f.contentType||"", name:f.name||""}; });
+            ex = { id:id, projectId: n.projectId,
+              content: "【社内で確認】"+it.t+"\n（"+(n.date ? String(n.date).slice(5).replace("-","/")+" " : "")+(n.title||"打合せ記録")+"）",
+              assignee:"", instructor:"", checker:"", creator: n.createdBy || n.author || "打合せ記録", hasDeadline:false, deadline:"",
+              requestTo:"", requestMethod:"", attachments: files, attachmentAssetIds: files.map(function(f){ return f.id; }), vendorSpec: part,
+              private:false, reflected:false, reflectedAt:null, status:"未着手",
+              noteCheck: { noteId: n.id, t: it.t }, createdAt: nowIso(), updatedAt: nowIso() };
+            state.tasks.push(ex);
+            if(await saveDoc("tasks", ex.id, ex)===false){ state.tasks = state.tasks.filter(function(x){ return x!==ex; }); continue; }
+            changed = true;
+          }
+          if(ex.deletedAt) continue;
+          n.lineActs = n.lineActs || [];
+          if(!n.lineActs.some(function(a){ return a.type==="task" && a.ref===id; })){ n.lineActs.push({ t: it.t, type:"task", ref:id }); noteDirty = true; }
+        }
+        if(noteDirty){ await saveDoc("meetingNotes", n.id, n); changed = true; }
+      }
+      if(changed){ renderKanban(); if(typeof renderMeetingNotes==="function" && state.currentProjectId) renderMeetingNotes(); }
+    } finally { noteChkBusy = false; }
+  }
   function mdOf(iso){ var d = iso ? new Date(iso) : null; return d && !isNaN(d) ? (d.getMonth()+1)+"/"+d.getDate() : ""; }
   function renderCustDecided(){
     var card = document.getElementById("custDecidedCard"), box = document.getElementById("custDecidedList");
@@ -14319,6 +14608,8 @@
     var files = (t.attachments||[]).filter(function(a){ return a && a.url && !regUrlsT[a.url]; });
     if(!files.length){ toast(isEst ? "まだ登録していない書類はありません" : "このタスクには添付がありません"); return; }
     var estVendors = isEst ? estReqReqs(t).map(function(r){ return vendorById(r.vendorId); }).filter(Boolean) : [];
+    if(isEst){ var evSeen = {}; estVendors = estVendors.filter(function(v){ if(evSeen[v.id]) return false; evSeen[v.id] = 1; return true; });
+      if(t.vendorCard) estVendors = estVendors.concat(liveVendors().filter(function(v){ return !evSeen[v.id]; })); }
     var sv = taskSenderVendor(t);
     if(isEst){ var vc = {}; files.forEach(function(f){ if(f.fromVendorId) vc[f.fromVendorId] = (vc[f.fromVendorId]||0)+1; }); var top = Object.keys(vc).sort(function(a,b){ return vc[b]-vc[a]; })[0]; sv = (top && vendorById(top)) || estVendors[0] || null; }
     var subj = (t.fromGmail && t.fromGmail.subject) || "";
@@ -14354,7 +14645,7 @@
         '<label class="field" style="flex:0 1 160px;">受領者<select id="tqBy">'+staffOpts+'</select></label>'+
       '</div>'+
       '<div id="tqRows">'+rowHtml(pj0)+'</div>'+
-      (isEst ? '<div class="muted" style="font-size:.85rem; margin-block-start:10px;">書類はそれぞれ「〇〇の分」で選んだ業者のフォルダーに入り、その業者は「届いた」になります。全社そろうとカードは自動で完了になり、朋子さんに「📤 お客様に送る？」が届きます。</div>' :
+      (isEst && t.vendorCard ? '<div class="muted" style="font-size:.85rem; margin-block-start:10px;">「〇〇の分」はメーカーを選んでください（例：長江建材から届いたTOTOのNET →「TOTOの分」）。書類はそのメーカーのカードの部位の行に並びます。依頼がそろうと朋子さんに「📤 お客様に送る？」が届きます。</div>' : isEst ? '<div class="muted" style="font-size:.85rem; margin-block-start:10px;">書類はそれぞれ「〇〇の分」で選んだ業者のフォルダーに入り、その業者は「届いた」になります。全社そろうとカードは自動で完了になり、朋子さんに「📤 お客様に送る？」が届きます。</div>' :
       '<label style="display:flex; align-items:center; gap:6px; margin-block-start:10px;"><input type="checkbox" id="tqDone" checked> 登録したらこのタスクを「完了」にする</label>')+
       '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" id="tqOk">登録する</button><button type="button" class="btn secondary" id="tqCancel">やめる</button></div>'+
     '</div>';
@@ -14406,6 +14697,7 @@
           var att = { id:uid("att"), projectId:pid, assetId: f.id||f.assetId||"", name: f.name||"添付", url: f.url, contentType: f.contentType||"",
             sizeBytes: f.sizeBytes||0, uploadedAt: todayStr(), kind:"quote", quoteType: pk.qt, requestId: rq.id, vendorId: vid, fromTaskId: t.id };
           if(sv && sv.id!==vid && !isEst) att.viaVendorId = sv.id;
+          else if(isEst && f.fromVendorId && f.fromVendorId!==vid) att.viaVendorId = f.fromVendorId;
           var part = inboxPartObj(pk.part, pj);
           if(part){ var fid = inboxFolderForPart(pj, part); if(fid) att.folderId = fid; delete part.roomName; att.specPart = part; }
           else if(pj){ try{ attApplyFolderPart(att, pj); }catch(e){} }
@@ -14419,6 +14711,7 @@
           await saveDoc("requests", rq.id, rq);
         }
         reqIdsDone.push(rq.id);
+        if(isEst && t.vendorCard && vid!==t.vendorCard.vendorId) await ensureEstReqTask(pj, [rq.id], "", null);
         }
         t = state.tasks.find(function(x){ return x.id===id; }) || t;
         if(!isEst) t.quoteReg = { projectId: pid, reqIds:reqIdsDone, attIds: attIds, at: nowIso(), by: me };
@@ -18926,6 +19219,7 @@
       if(kmore){ state.taskMoreOpen = state.taskMoreOpen || {}; state.taskMoreOpen[kmore.dataset.kcmore] = !state.taskMoreOpen[kmore.dataset.kcmore]; renderKanban(); return; }
       var esb = e.target.closest("[data-estsrc]");
       if(esb){ state.taskEstSrcOpen = state.taskEstSrcOpen || {}; state.taskEstSrcOpen[esb.dataset.estsrc] = !state.taskEstSrcOpen[esb.dataset.estsrc]; renderKanban(); return; }
+      if(e.target.closest("[data-vclock]")){ askPin(function(val){ if(val === state.settings.pin){ state.quoteUnlocked = true; render(); toast("解除しました"); scheduleQuoteAutoLock(); } else if(val !== null){ toast("暗証番号が違います"); } }); return; }
       var esg = e.target.closest("[data-estsrcgo]");
       if(esg){ var gp = esg.dataset.estsrcgo; if(gp && projectById(gp)){ switchTab("projects"); openProjectDetail(gp); setTimeout(function(){ var mb2 = document.querySelector('.sub-btn[data-sub="meeting"]'); if(mb2) mb2.click(); }, 30); } return; }
       var vlist = e.target.closest("[data-vendorlist]");
@@ -18986,6 +19280,8 @@
       else if(act==="togglereflect") toggleTaskReflect(id);
       else if(act==="toggleask") toggleTaskAskDecision(id);
       else if(act==="quickclose") closeTaskQuick(id);
+      else if(act==="toordered") setTaskStatus(id, "発注済み");
+      else if(act==="openest"){ var tce = state.tasks.find(function(x){ return x.id===id; }); if(tce && tce.projectId) goToOkaiEstimates(tce.projectId, tce.custEstimate && tce.custEstimate.estId); }
       else if(act==="ordered") toggleTaskOrdered(id);
       else if(act==="erclose") estReqToggleClose(id, btn.dataset.req);
       else if(act==="scnote") sendCheckAct(id, "note");
