@@ -4439,7 +4439,7 @@
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
         (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み（見る ›）':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
-        (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタン：出す':'決定ボタン：出さない')+'</button>':'')+
+        (!t.private && t.reflected?'<button class="pill reflect'+(t.askDecision?" on":"")+'" data-taskact="toggleask" data-id="'+t.id+'" style="cursor:pointer;" title="お客様のおうちノートで、この内容に「仮決定／決定」ボタンを出す">'+(t.askDecision?'✓決定ボタンを出しています（押すと出さない）':'🔘 決定ボタンを出す')+'</button>':'')+
         '<button class="btn small danger-ghost" data-taskact="del" data-id="'+t.id+'">削除</button>'+
       '</div>' : '')+
       (state.taskMenuId===t.id ? '<div class="kc-statusmenu">'+STATUS_ORDER.map(function(st){
@@ -9379,7 +9379,7 @@
     };
     var main =
       (f.reflectNote ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", f.reflected?"✓反映済み":"反映する", !!f.reflected))+
-      b("ask", f.ask?"✓ お客様の決定ボタン：出す":"🔘 お客様の決定ボタン：出さない", !!f.ask)+
+      b("ask", f.ask?"✓ お客様の決定ボタンを出しています（押すと出さない）":"🔘 お客様の決定ボタンを出す", !!f.ask)+
       b("home", f.home?"✓ おうちノートのホームに出す（押すと外す）":"🏠 おうちノートのホームに出す", !!f.home)+
       b("hide", (u&&u.doc.homeHide)?"✓ 🚫 ホームのどの欄にも出さない（押すと解除）":"🚫 ホームのどの欄にも出さない", !!(u&&u.doc.homeHide))+
       b("stamp", stamped?"✓ 🔴 決定のはんこ済み（押すと外す）":"🔴 決定のはんこを押す", stamped)+
@@ -9763,16 +9763,16 @@
       // 打合せ記録のカード：記録そのものの「出す／出さない」と「反映」をここからも操作できる
       if(relatedNote){
         askBtnHtml = '<button class="pill reflect small'+(relatedNote.reflected?" on":"")+'" '+askBtnStyle+' data-spec-togglenotereflect="'+relatedNote.id+'">'+(relatedNote.reflected?"✓反映済み":"反映する")+'</button>'+
-          '<button class="pill reflect small'+(relatedNote.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-togglenoteask="'+relatedNote.id+'" '+askTitle+'>'+(relatedNote.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>';
+          '<button class="pill reflect small'+(relatedNote.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-togglenoteask="'+relatedNote.id+'" '+askTitle+'>'+(relatedNote.askDecision?"✓お客様の決定ボタンを出しています（押すと出さない）":"🔘 お客様の決定ボタンを出す")+'</button>';
       }
     } else if(p.source && p.source.taskId){
       // 業者タスクから作ったコピー：決定ボタンはタスク側の設定と共通
       var srcTask = state.tasks.find(function(x){ return x.id===p.source.taskId; });
       if(srcTask){
-        askBtnHtml = '<button class="pill reflect small'+(srcTask.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-toggletaskask="'+srcTask.id+'" '+askTitle+'>'+(srcTask.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>';
+        askBtnHtml = '<button class="pill reflect small'+(srcTask.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-toggletaskask="'+srcTask.id+'" '+askTitle+'>'+(srcTask.askDecision?"✓お客様の決定ボタンを出しています（押すと出さない）":"🔘 お客様の決定ボタンを出す")+'</button>';
       }
     } else {
-      askBtnHtml = '<button class="pill reflect small'+(p.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-toggleask="'+p.id+'" '+askTitle+'>'+(p.askDecision?"✓お客様の決定ボタン：出す":"お客様の決定ボタン：出さない")+'</button>';
+      askBtnHtml = '<button class="pill reflect small'+(p.askDecision?" on":"")+'" '+askBtnStyle+' data-spec-toggleask="'+p.id+'" '+askTitle+'>'+(p.askDecision?"✓お客様の決定ボタンを出しています（押すと出さない）":"🔘 お客様の決定ボタンを出す")+'</button>';
     }
     // バッジ（打合せ記録は6種類すべて、写真・プランボードは分類用の2種類のみ、トグル可能）。
     var badgeRowHtml = (p.kind==="note")
