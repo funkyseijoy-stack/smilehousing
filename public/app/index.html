@@ -347,10 +347,10 @@
   .cdstamp.ord{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp.ord small{ border-top-color:#2e8b57; }
   .kancard{ position:relative; }
-  .kc-ordstamp{ position:absolute; right:44px; top:50%; margin-top:-38px; width:76px; height:76px; border:4px double #2e8b57; border-radius:50%; color:#2e8b57; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.05rem; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:.05em; }
-  .kc-ordstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #2e8b57; padding-top:1px; margin-top:2px; transform:scale(.85); }
+  .kc-ordstamp{ position:absolute; right:44px; top:50%; margin-top:-38px; width:76px; height:76px; border:4px double #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.05rem; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:.05em; }
+  .kc-ordstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.85); }
   .kancard.exp .kc-ordstamp{ top:6px; margin-top:0; }
-  .kancard.ordered{ border-color:#2e8b57; min-height:88px; }
+  .kancard.ordered{ border-color:#d23c32; min-height:88px; }
   .cdstamps{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
   .apstamp.o{ border-color:#2e8b57; color:#2e8b57; }
   .cdstamp small{ font-size:.85rem; font-weight:700; border-top:1.5px solid #d23c32; padding-top:1px; margin-top:2px; transform:scale(.8); }
@@ -4414,7 +4414,7 @@
       custRepliesHtml(t)+
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
-        '<button class="btn small '+(t.ordered?'secondary':'')+'" data-taskact="ordered" data-id="'+t.id+'" title="発注したら押す（社内だけ。もう一度押すと外す）" style="'+(t.ordered?'':'background:#2e8b57;border-color:#2e8b57;color:#fff;')+'">'+(t.ordered?'🟢 発注済みを外す':'🟢 発注済みのはんこ')+'</button>'+
+        '<button class="btn small '+(t.ordered?'secondary':'')+'" data-taskact="ordered" data-id="'+t.id+'" title="発注したら押す（社内だけ。もう一度押すと外す）" style="'+(t.ordered?'':'background:#d23c32;border-color:#d23c32;color:#fff;')+'">'+(t.ordered?'🔴 発注済みを外す':'🔴 発注済みのはんこ')+'</button>'+
         (isCustomerTask(t)?'<button class="btn small" data-taskact="custreply" data-id="'+t.id+'" title="お客様のおうちノートのメッセージに返信する">💬 お客様に返信</button>':'')+
         (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
         (!canReviewTask(t) && canCommentBack(t)?'<button class="btn small" data-taskact="commentback" data-id="'+t.id+'" title="コメントを書いて担当者へ戻す（未着手へ）">💬 コメントして戻す</button>':'')+
@@ -4524,7 +4524,7 @@
     renderKanban();
     var ok = await saveDoc("tasks", t.id, t);
     if(ok===false){ t.ordered = prev; renderKanban(); return; }
-    toast(t.ordered ? "🟢 発注済みのはんこを押しました" : "発注済みのはんこを外しました");
+    toast(t.ordered ? "🔴 発注済みのはんこを押しました" : "発注済みのはんこを外しました");
   }
   async function closeTaskQuick(id){
     var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
