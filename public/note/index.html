@@ -1117,7 +1117,37 @@ function consItems(){
     // 初めて開いた端末は、ここ3日以内に届いたものを「NEW」にする
     seenSince = prev || new Date(Date.now() - 3*86400000).toISOString(); seenInitAt = Date.now(); view.updDismissed = false;
   }
-  function isNew(t){ return !!(seenSince && t && String(t) > seenSince); }
+  // NEWは「前回開いてから届いたもの」に加えて、種類ごとに「いちばん新しく届いた日のもの」は次のものが届くまで残す
+  // （一度開いても消えない。ともこさんの希望：NEWは目につくので、できる限り付けておきたい）
+  var keepNew = null, keepNewData = null;
+  function jstDay(t){ var n = Date.parse(t||""); return isNaN(n) ? "" : new Date(n + 9*3600000).toISOString().slice(0,10); }
+  function buildKeepNew(){
+    keepNew = {}; keepNewData = data; if(!data) return;
+    var group = function(ts){
+      ts = ts.filter(function(t){ return t && jstDay(t); });
+      var last = ts.reduce(function(m,t){ var d = jstDay(t); return d>m ? d : m; }, "");
+      ts.forEach(function(t){ if(jstDay(t)===last) keepNew[String(t)] = 1; });
+    };
+    // 家づくり（各項目のカード・打合せ記録。ホームに出した時刻も含む）
+    var build = [];
+    (data.categories||[]).forEach(function(c){ catAllItems(c).forEach(function(x){ build.push(x.upd, x.homeShowAt); }); });
+    (data.notes||[]).forEach(function(n){ build.push(n.upd, n.homeShowAt); });
+    group(build);
+    group((data.album||[]).map(function(a){ return a.createdAt; }));
+    group((data.messages||[]).filter(function(m){ return !m.fromCustomer; }).map(function(m){ return m.createdAt; }));
+    group((data.plans||[]).map(function(f){ return f.upd; }));
+    group((data.images||[]).filter(function(x){ return x.by!=="customer"; }).map(function(x){ return x.createdAt; }));
+    group((data.estimates||[]).map(function(x){ return x.updated||x.createdAt; }).concat((data.estimates||[]).map(function(x){ return x.createdAt; })));
+    group((data.notices||[]).map(function(n){ return n.createdAt; }));
+  }
+  // 上の「NEW」のお知らせカード（届いたものの一覧）は、従来どおり前回開いてから届いたものだけ
+  function isNewSeen(t){ return !!(seenSince && t && String(t) > seenSince); }
+  function isNew(t){
+    if(!t) return false;
+    if(seenSince && String(t) > seenSince) return true;
+    if(keepNewData !== data) buildKeepNew();
+    return !!(keepNew && keepNew[String(t)]);
+  }
   function nwTag(t){ return isNew(t) ? '<span class="tag nw">NEW</span>' : ''; }
   function catAllItems(c){
     var a = (c.items||[]).concat(c.roomMisc||[]);
@@ -1129,12 +1159,12 @@ function consItems(){
   function updatesRows(){
     if(!seenSince) return [];
     var rows = [];
-    var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && !m.chgKey && isNew(m.createdAt); });
+    var msgs = (data.messages||[]).filter(function(m){ return !m.fromCustomer && !m.chgKey && isNewSeen(m.createdAt); });
     if(msgs.length) rows.push({ ic:"💬", t:"メッセージがあります", a:'data-go="msg"' });
     // 変更のご依頼へのお返事（そのカードがある項目へ）
     var rcats = [];
     (data.messages||[]).forEach(function(m){
-      if(m.fromCustomer || !m.chgKey || !isNew(m.createdAt)) return;
+      if(m.fromCustomer || !m.chgKey || !isNewSeen(m.createdAt)) return;
       // お客様がそのあと返事をしていれば、お知らせには出さない
       if((data.messages||[]).some(function(o){ return o.fromCustomer && o.chgKey===m.chgKey && String(o.createdAt||"")>String(m.createdAt||""); })) return;
       (data.categories||[]).forEach(function(c){ if(rcats.indexOf(c)<0 && catAllItems(c).some(function(z){ return z.key===m.chgKey; })) rcats.push(c); });
@@ -1144,7 +1174,7 @@ function consItems(){
     var kinds = { photo:{ic:"📷", t:"写真の追加があります", cats:[]}, pb:{ic:"📐", t:"プランボードの追加があります", cats:[]}, doc:{ic:"📄", t:"資料の追加があります", cats:[]} };
     (data.categories||[]).forEach(function(c){
       catAllItems(c).forEach(function(x){
-        if(x.type==="note" || !isNew(x.upd)) return;
+        if(x.type==="note" || !isNewSeen(x.upd)) return;
         var ct = String(x.contentType || (x.file && x.file.contentType) || "");
         var k = (x.type==="planboard" || (x.isQuote && x.quoteType!=="定価")) ? "pb" : ((x.isQuote || ct.indexOf("pdf")>=0) ? "doc" : "photo");
         if(kinds[k].cats.indexOf(c)<0) kinds[k].cats.push(c);
@@ -1154,19 +1184,19 @@ function consItems(){
       var g = kinds[k];
       if(g.cats.length) rows.push({ ic:g.ic, t:g.t+namesText(g.cats.map(function(c){ return c.name; })), a:'data-updcat="'+(g.cats.length===1 ? esc(g.cats[0].id) : "")+'"' });
     });
-    var album = (data.album||[]).filter(function(a){ return isNew(a.createdAt); });
+    var album = (data.album||[]).filter(function(a){ return isNewSeen(a.createdAt); });
     if(album.length) rows.push({ ic:"📷", t:"アルバムに写真の追加があります", a:'data-go="album"' });
-    var notes = (data.notes||[]).filter(function(n){ return isNew(n.upd); });
+    var notes = (data.notes||[]).filter(function(n){ return isNewSeen(n.upd); });
     if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録の追加があります"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
-    var plans = (data.plans||[]).filter(function(f){ return isNew(f.upd); });
+    var plans = (data.plans||[]).filter(function(f){ return isNewSeen(f.upd); });
     if(plans.length) rows.push({ ic:"📐", t:"平面図の追加があります", a:'data-openplans="1"' });
-    var imgs = (data.images||[]).filter(function(x){ return x.by!=="customer" && isNew(x.createdAt); });
+    var imgs = (data.images||[]).filter(function(x){ return x.by!=="customer" && isNewSeen(x.createdAt); });
     if(imgs.length) rows.push({ ic:"🖼", t:"お家のイメージに写真の追加があります", a:'data-go="image"' });
-    var ests = (data.estimates||[]).filter(function(x){ return isNew(x.createdAt); });
+    var ests = (data.estimates||[]).filter(function(x){ return isNewSeen(x.createdAt); });
     if(ests.length) rows.push({ ic:"🧾", t:"追加見積りがあります", a:'data-updjump="sec-est"' });
-    var resv = (data.reservations||[]).filter(function(r){ return r.date >= data.today && isNew(r.createdAt); });
+    var resv = (data.reservations||[]).filter(function(r){ return r.date >= data.today && isNewSeen(r.createdAt); });
     if(resv.length) rows.push({ ic:"📅", t:"ご予約が入りました（"+resv.map(function(r){ return md(r.date)+" "+(r.startTime||""); }).slice(0,2).join("、")+(resv.length>2?" ほか":"")+"）", a:'data-go="resv"' });
-    var ntcs = (data.notices||[]).filter(function(n){ return n.kind!=="service" && isNew(n.createdAt); });
+    var ntcs = (data.notices||[]).filter(function(n){ return n.kind!=="service" && isNewSeen(n.createdAt); });
     if(ntcs.length) rows.push({ ic:"📢", t:"お知らせがあります", a:'data-updjump="sec-ntc"' });
     return rows;
   }
