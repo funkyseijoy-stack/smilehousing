@@ -1,6 +1,7 @@
 import type { Context, Config } from "@netlify/functions";
 import { sendNotifyMail } from "../lib/google.mts";
 import { getExtras, saveExtras } from "../lib/note-extras.mts";
+import { sendTaskReviewMail } from "../lib/task-mail.mts";
 import { getStore } from "@netlify/blobs";
 
 // 新おうちノート（/note/）用のお客様向けAPI。
@@ -358,19 +359,45 @@ export default async (req: Request, context: Context) => {
       const id = genId("msg");
       const now = new Date().toISOString();
       // 「変更を依頼」：どのカードへの依頼かを覚える（ホームの「ご確認・ご決定ください」から外すため）
-      const chgKey = /^[ntsla]:[A-Za-z0-9_\-.]{1,120}$/.test(String(body.chgKey || "")) && text.startsWith("【変更のご依頼】") ? String(body.chgKey) : "";
+      const chgKey = /^[ntsla]:[A-Za-z0-9_\-.]{1,120}$/.test(String(body.chgKey || "")) && (text.startsWith("【変更のご依頼】") || text.startsWith("【お返事】")) ? String(body.chgKey) : "";
+      const isChgReply = !!chgKey && text.startsWith("【お返事】");
       const doc: any = {
         id, projectId, content: text, sender: (project.customer || "お客様") + "（おうちノート）",
         fromCustomer: true, createdAt: now, updatedAt: now,
       };
       if (chgKey) doc.chgKey = chgKey;
+      if (isChgReply) doc.chgReply = true;
       await store.setJSON(`messages/${id}`, doc);
+      // カードの下のやりとりへのお客様の「お返事」：新しいタスクは作らず、その依頼のタスク（いちばん新しいもの）に追記する
+      let appended = false;
+      if (isChgReply) {
+        try {
+          const { blobs: tb } = await store.list({ prefix: "tasks/" });
+          const all = await Promise.all(tb.map((bl: any) => store.get(bl.key, { type: "json", consistency: "strong" }).catch(() => null)));
+          const cands = all.filter((t: any) => t && !t.deletedAt && t.projectId === projectId && t.fromCustomerChange && t.fromCustomerChange.cardKey === chgKey)
+            .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+          const t: any = cands[0];
+          if (t) {
+            const who = (project.customer ? project.customer + "様" : "お客様") + "（お客様）";
+            const rv = { result: "返信", by: who, to: t.assignee || "", note: "【お客様からのお返事】" + text.replace(/^【お返事】[^\n]*\n?/, "").trim(), at: now, fromCustomer: true };
+            t.reviews = Array.isArray(t.reviews) ? t.reviews : (t.review ? [t.review] : []);
+            t.reviews.push(rv); t.review = rv;
+            if ((t.status || "") === "完了") { t.status = "未着手"; t.completedAt = null; t.archivedAt = null; }
+            t.updatedAt = now;
+            await store.setJSON(`tasks/${t.id}`, t);
+            doc.taskId = t.id;
+            await store.setJSON(`messages/${id}`, doc);
+            appended = true;
+            if (t.assignee && !t.private) await sendTaskReviewMail(store, t, who).catch(() => false);
+          }
+        } catch (e) { console.error("chg reply append failed", e); }
+      }
       // 変更のご依頼は、社内タスク（担当者なし・未着手）にも入れる。カードの図面・写真も付ける（同じファイルを参照）
-      if (chgKey) {
+      if (chgKey && !appended) {
         try {
           const card = await changeCardInfo(store, projectId, chgKey);
           const taskId = genId("task");
-          const body2 = text.replace(/^【変更のご依頼】/, "");
+          const body2 = text.replace(/^【(変更のご依頼|お返事)】/, "");
           await store.setJSON(`tasks/${taskId}`, {
             id: taskId, projectId, content: "【お客様から変更のご依頼】" + body2,
             assignee: "", instructor: "お客様", creator: "おうちノート",
@@ -988,7 +1015,7 @@ export default async (req: Request, context: Context) => {
     messages: messages
       .map((m) => {
         const orig: any = !m.chgKey && m.replyTo ? messages.find((x: any) => x && x.id === m.replyTo) : null;
-        return { content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) };
+        return { content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) || !!m.chgReply };
       })
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     reservations: resv,

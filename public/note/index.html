@@ -477,6 +477,7 @@
   .chgthr .ct{ border-radius:10px; padding:7px 10px; font-size:.86rem; white-space:pre-wrap; line-height:1.5; }
   .chgthr .ct.me{ background:#fff6e5; border:1px solid #f0d9ad; }
   .chgthr .ct.st{ background:#eef6ef; border:1px solid #bcdcc3; }
+  .chgthr .ctrep{ align-self:flex-end; font-size:.85rem; }
   .chgthr .cth{ font-weight:700; font-size:.8rem; margin-bottom:2px; }
   .msgs{ display:flex; flex-direction:column; gap:10px; }
   .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.88rem; white-space:pre-wrap; line-height:1.55; }
@@ -1702,11 +1703,15 @@ function homeHtml(){ return homeParts().main; }
     if(!key) return "";
     var ms = (data.messages||[]).filter(function(m){ return m.chgKey===key; }).sort(function(a,b){ return String(a.createdAt||"").localeCompare(String(b.createdAt||"")); });
     if(!ms.length) return "";
+    var label0 = "";
+    var first = ms.find(function(m){ return m.fromCustomer && /^【変更のご依頼】/.test(String(m.content||"")); });
+    if(first) label0 = String(first.content).split("\n")[0].replace(/^【変更のご依頼】/, "").trim();
+    var hasStaff = ms.some(function(m){ return !m.fromCustomer; });
     return '<div class="chgthr">'+ms.map(function(m){
-      var txt = String(m.content||"");
-      if(m.fromCustomer) txt = txt.replace(/^【変更のご依頼】[^\n]*\n?/, "").trim() || txt;
-      return '<div class="ct '+(m.fromCustomer?'me':'st')+'"><div class="cth">'+(m.fromCustomer?'✏️ 変更のご依頼':'💬 スタッフからのお返事')+'（'+fmtD(m.createdAt)+'）'+(m.fromCustomer?'':nwTag(m.createdAt))+'</div>'+esc(txt)+'</div>';
-    }).join("")+'</div>';
+      var txt = String(m.content||""), isRep = m.fromCustomer && /^【お返事】/.test(txt);
+      if(m.fromCustomer) txt = txt.replace(/^【(変更のご依頼|お返事)】[^\n]*\n?/, "").trim() || txt;
+      return '<div class="ct '+(m.fromCustomer?'me':'st')+'"><div class="cth">'+(m.fromCustomer?(isRep?'💬 あなたのお返事':'✏️ 変更のご依頼'):'💬 スタッフからのお返事')+'（'+fmtD(m.createdAt)+'）'+(m.fromCustomer?'':nwTag(m.createdAt))+'</div>'+esc(txt)+'</div>';
+    }).join("")+(hasStaff ? '<button class="linkbtn ctrep" data-chgreply="'+esc(key)+'" data-chglabel="'+esc(label0)+'">💬 返信する</button>' : '')+'</div>';
   }
   function chgDone(c, x){
     if(!x.key) return false;
@@ -2507,6 +2512,7 @@ function homeHtml(){ return homeParts().main; }
     var uc = e.target.closest("[data-updcat]"); if(uc){ view.tab="build"; view.buildSeg="spec"; view.plansOnly=false; view.cat = null; view.buildCat = uc.dataset.updcat || null; render(); window.scrollTo(0,0); return; }
     var bc = e.target.closest("[data-bchip]"); if(bc){ view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bc.dataset.bchip || null; render(); window.scrollTo(0,0); return; }
     var bcat = e.target.closest("[data-buildcat]"); if(bcat){ view.tab="build"; view.cat = null; view.buildSeg="spec"; view.plansOnly=false; view.buildCat = bcat.dataset.buildcat; render(); window.scrollTo(0,0); return; }
+    var chr = e.target.closest("[data-chgreply]"); if(chr){ chgReplyOpen(chr.dataset.chglabel || "このカード", chr.dataset.chgreply); return; }
     var chg = e.target.closest("[data-chg]"); if(chg){ chgOpen(chg.dataset.chg, chg.dataset.chgkey); return; }
     var cns = e.target.closest("[data-cons]"); if(cns){ consOpen(cns.dataset.cons, cns.dataset.ctext, cns.dataset.cctx); return; }
     var pt = e.target.closest("[data-progtoggle]"); if(pt){ view.progOpen = !view.progOpen; render(); return; }
@@ -2587,6 +2593,13 @@ function homeHtml(){ return homeParts().main; }
     openSheet("chgModal");
     setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
   }
+  function chgReplyOpen(label, key){
+    chgCur = {label:label, key:key, prefix:"【お返事】"};
+    chgSheet("💬 お返事", "「"+label+"」についてのやりとりに、お返事を書いてください。", "例：やっぱり手すりは付けてください", "スタッフに送る");
+    document.getElementById("chgInput").value = "";
+    openSheet("chgModal");
+    setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
+  }
   function chgOpen(label, key){
     chgCur = {label:label, key:key, prefix:"【変更のご依頼】"};
     chgSheet("✏️ 変更したいところ", "「"+label+"」について、変えたいところを書いてください。", "例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい", "スタッフに送る");
@@ -2602,10 +2615,10 @@ function homeHtml(){ return homeParts().main; }
     var btn = this; btn.disabled = true;
     var full = chgCur.prefix+chgCur.label+"\n"+text;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: (chgCur.prefix==="【変更のご依頼】" && chgCur.key && /^[ntsla]:/.test(chgCur.key)) ? chgCur.key : "" }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: ((chgCur.prefix==="【変更のご依頼】" || chgCur.prefix==="【お返事】") && chgCur.key && /^[ntsla]:/.test(chgCur.key)) ? chgCur.key : "" }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
-      data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:(j.message && j.message.chgKey)||"", createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
+      data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:(j.message && j.message.chgKey)||"", chgReply: chgCur.prefix==="【お返事】", createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
       chgSent[chgCur.key] = true;
       try{ var cs = JSON.parse(localStorage.getItem("okaiChg:"+P)||"{}"); cs[chgCur.key] = new Date().toISOString(); localStorage.setItem("okaiChg:"+P, JSON.stringify(cs)); }catch(er){}
       closeSheet("chgModal"); render(); toast("スタッフに送りました");
