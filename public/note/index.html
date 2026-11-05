@@ -1897,7 +1897,7 @@ function homeHtml(){ return homeParts().main; }
         var kind = x.isQuote ? (x.quoteType==="定価" ? "お見積り" : "プランボード") : (x.type==="planboard" ? "プランボード" : "写真・資料");
         var part = partOf(c, x) || x.label || c.name;
         var room = ""; (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; return true; } return false; });
-        return '<div class="tli flat"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+(x.type==="planboard"||x.isQuote?"pb":"ph")+'">'+esc(kind)+'</span>'+nwTag(x.upd)+(part?'<span class="tag">'+esc(part)+'</span>':'')+qStampHtml(x)+'</div>'+
+        return '<div class="tli flat"><div class="tlh"><span class="d">'+fmtD(x.at)+'</span><span class="tag '+(x.type==="planboard"||x.isQuote?"pb":"ph")+'">'+esc(kind)+'</span>'+nwTag(String(x.homeShowAt||"") > String(x.upd||"") ? x.homeShowAt : x.upd)+(part?'<span class="tag">'+esc(part)+'</span>':'')+qStampHtml(x)+'</div>'+
           (x.msg ? '<div class="box"><div class="bl">スタッフから</div>'+esc(x.msg).replace(/\n/g,"<br>")+'</div>' : '')+
           '<div class="thumbs one" style="max-width:220px;">'+thumbHtml(x.file,"")+'</div>'+
           homeDecHtml({ title: part }, { c:c, x:x, room:room })+
@@ -2159,7 +2159,7 @@ function homeHtml(){ return homeParts().main; }
   }
   function noteBody(n, showPart, noOpen, noEst){
     if(hasLines(n)){
-      return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+qStampHtml(n)+'</div>'+
+      return '<div class="tlh"><span class="d">'+fmtD(n.date)+'</span><span class="tag note">打合せ記録</span>'+nwTag(String(n.homeShowAt||"") > String(n.upd||"") ? n.homeShowAt : n.upd)+(n.channel&&n.channel!=="打合せ"?'<span class="tag">'+esc(n.channel)+'</span>':'')+(showPart&&n.part?'<span class="tag">'+esc(n.part)+'</span>':'')+qStampHtml(n)+'</div>'+
         (n.title?'<div class="tlt">'+esc(n.title)+'</div>':'')+
         linesHtml(n, noOpen, fmtD(n.date)+(n.part?'・'+n.part:(n.title?'・'+n.title:'')))+
         (n.message?'<div class="box msg"><div class="bl">スタッフからのメッセージ</div>'+esc(n.message)+'</div>':'')+
