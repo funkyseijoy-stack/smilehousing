@@ -1843,7 +1843,7 @@
             <textarea id="meetingNoteTalk" hidden></textarea><textarea id="meetingNoteDecided" hidden></textarea><textarea id="meetingNoteOpen" hidden></textarea><textarea id="meetingNoteInternal" hidden></textarea>
             <div id="meetingNoteExistingFiles" hidden></div>
             <div class="field"><span>資料を添付（記録全体）</span>
-              <div class="row mnfilerow" style="gap:8px; flex-wrap:wrap; align-items:center;"><label class="btn secondary small" style="cursor:pointer;">📎 ファイルを選ぶ<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*" hidden></label><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 図面から選ぶ</button><button type="button" class="btn secondary small" id="btnMnGmail">✉️ Gmailから</button></div></div>
+              <div class="row mnfilerow" style="gap:8px; flex-wrap:wrap; align-items:center;"><label class="btn secondary small" style="cursor:pointer;">📎 ファイルを選ぶ<input type="file" id="meetingNoteFile" multiple accept=".pdf,image/*" hidden></label><button type="button" class="btn secondary small" id="btnMnPickPlan">📐 図面から選ぶ</button><button type="button" class="btn secondary small" id="btnMnGmail">✉️ Gmailから</button><button type="button" class="btn secondary small" id="btnMnBlank">✍️ 白紙に手書き</button></div></div>
             <input type="file" id="mnLineFileInput" multiple accept=".pdf,image/*" hidden>
             <div id="mnFileList"></div>
             <div id="mnAiHint" class="muted" style="font-size:.85rem; margin-block:4px;" hidden></div>
@@ -15308,6 +15308,31 @@
     pb.saveTarget.line = line;
     pb.saveTarget.src = {kind:"line", line: line, item: it};
   }
+  // ✍️ 白紙に手書き（記録の入力画面・行の「⋯」）：紙（A4縦／A4横／方眼）を選んで、白紙をプランボードで開く。
+  // 保存すると「手書き_MMDD.png」を記録の添付（行から開いたときはその行）に足す（「記録する／更新」で保存）
+  function mnBlankPaper(kind){
+    var land = kind!=="a4p", w = land ? 1754 : 1240, h = land ? 1240 : 1754;
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"); g.fillStyle = "#ffffff"; g.fillRect(0, 0, w, h);
+    if(kind==="grid"){
+      for(var x=0; x<=w; x+=40){ g.strokeStyle = (x%200===0) ? "#c9d6e2" : "#e6edf3"; g.lineWidth = (x%200===0) ? 2 : 1; g.beginPath(); g.moveTo(x+.5, 0); g.lineTo(x+.5, h); g.stroke(); }
+      for(var y=0; y<=h; y+=40){ g.strokeStyle = (y%200===0) ? "#c9d6e2" : "#e6edf3"; g.lineWidth = (y%200===0) ? 2 : 1; g.beginPath(); g.moveTo(0, y+.5); g.lineTo(w, y+.5); g.stroke(); }
+    }
+    return new Promise(function(res){ c.toBlob(function(b){ res(b); }, "image/png"); });
+  }
+  function mnOpenBlank(line){
+    askChoice("✍️ 白紙に手書き", "紙を選んでください", [
+      {label:"📄 A4縦の白紙", value:"a4p"},
+      {label:"📄 A4横の白紙", value:"a4l"},
+      {label:"▦ 方眼（A4横）", value:"grid"}
+    ], async function(v){
+      if(!v) return;
+      var blob = await mnBlankPaper(v); if(!blob){ toast("白紙を用意できませんでした"); return; }
+      mnOpenDraw(blob, "手書き", false, "x", line ? "line" : "note");
+      pb.saveTarget.blank = true;
+      if(line) pb.saveTarget.line = line;
+    });
+  }
   function mnOpenDraw(blob, name, isPdf, after, sink){
     document.getElementById("pbModal").hidden = false;
     pb.currentAttachmentId = null;
@@ -15356,7 +15381,8 @@
     for(var i=0;i<pages.length;i++){
       if(pages[i]===pb.pdfPage || !pb.pdfDoc) blobs.push(blob); else blobs.push(await pbRenderPdfPageToBlob(pages[i]));
     }
-    var base = String(target.name||"図面").replace(/\.[^.]+$/,"").replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","");
+    var base = target.blank ? "手書き_"+todayStr().slice(5).replace("-","")
+      : String(target.name||"図面").replace(/\.[^.]+$/,"").replace(/_書き込み_\d{4}$/,"")+"_書き込み_"+todayStr().slice(5).replace("-","");
     var pid = state.currentProjectId;
     var toTask = target.sink==="task", toLine = target.sink==="line";
     function add(b, nm, type){
@@ -15375,6 +15401,7 @@
       add(blobs[0], base+".png", "image/png");
     }
     closePlanBoard();
+    if(target.blank){ if(toLine) mnRender(); else renderMnFileList(); toast("手書きを"+(toLine?"この行":"記録")+"に付けました（「記録する／更新」で保存されます）", 7000); return; }
     if(toLine){ mnRender(); toast("書き込んだ版をこの行に足しました（元のファイルも残ります。「記録する／更新」で保存されます）", 7000); return; }
     if(toTask){ renderTfFileList(); toast("書き込んだ図面をタスクの添付に足しました（元のファイルも残ります。「追加／保存」で保存されます）", 7000); return; }
     renderMnFileList();
@@ -17895,7 +17922,8 @@
           ["📎 ファイル", [
             {label:"この行にファイルを付ける"+(lfn?"（いま "+lfn+" 件）":""), value:"file"},
             {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
-            {label:"✉️ Gmailから取り込む", value:"gmail"}]],
+            {label:"✉️ Gmailから取り込む", value:"gmail"},
+            {label:"✍️ 白紙に手書きして付ける", value:"blank"}]],
           ["🏠 お客様へ", [
             {label: mnLineAsk[lt] ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!mnLineAsk[lt]}]],
           ["🗂 整理", [
@@ -17908,6 +17936,7 @@
         ], function(kind){
           if(!kind) return;
           if(kind==="pick"){ mnLinePickRegistered(lt); return; }
+          if(kind==="blank"){ mnOpenBlank(lt); return; }
           if(kind==="taskform"){ mnLineOpenTaskForm(lt); return; }
           if(kind==="gmail"){
             gmailPickFiles(editingMeetingNoteProjectId(), "「"+lt.slice(0,30)+"」に付けます", function(refs){
@@ -18288,6 +18317,7 @@
     document.getElementById("btnAddMeetingNote").addEventListener("click", addMeetingNote);
     document.getElementById("btnMnPickPlan").addEventListener("click", mnPickPlan);
     document.getElementById("btnMnGmail").addEventListener("click", mnPickGmail);
+    document.getElementById("btnMnBlank").addEventListener("click", function(){ mnOpenBlank(null); });
     // タスクボードの横スクロールのバーを上にも出す（下のバーと連動）
     (function(){
       var top = document.getElementById("kanbanTopScroll"), board = document.getElementById("kanbanWrap");
