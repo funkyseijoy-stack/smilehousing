@@ -13928,6 +13928,15 @@
     return "";
   }
   // 部位の選択：記録の部位（recBigs）と同じ並び。総合→外部→暖房設備〜あかりプラン→水まわり→各部屋→収納→その他の確認→追加した部位→社内だけ
+  // 部位（{scope,category,roomId}）→ 部位の選択欄の値（"scope|category"、部屋は "room|nr:<部屋名>"）
+  function partToInboxKey(p, proj){
+    if(!p || !p.scope) return "";
+    if(p.scope==="room"){
+      var r = p.roomId ? recRoomsOf(proj).find(function(x){ return x && x.id===p.roomId; }) : null;
+      return r && r.name ? "room|nr:"+r.name : "";
+    }
+    return p.scope+"|"+(p.category||"");
+  }
   function inboxPartSel(i, key, proj){
     if(key==="facility|脱衣室" || key==="facility|ランドリーバー") key = "room|nr:脱衣室";
     var opt = function(v, label){ return '<option value="'+escapeHtml(v)+'"'+(v===key?' selected':'')+'>'+escapeHtml(label)+'</option>'; };
@@ -14756,6 +14765,9 @@
       .map(function(p){ return '<option value="'+escapeHtml(p.id)+'"'+(p.id===pid0?' selected':'')+'>'+escapeHtml(p.name||"")+'</option>'; }).join("");
     var venOpts = '<option value="">（業者を選ぶ）</option>'+liveVendors().map(function(v){ return '<option value="'+escapeHtml(v.id)+'"'+(sv&&v.id===sv.id?' selected':'')+'>'+escapeHtml(v.name)+'</option>'; }).join("");
     var staffOpts = (state.settings.staffList||[]).map(function(n){ return '<option'+(n===me?' selected':'')+'>'+escapeHtml(n)+'</option>'; }).join("");
+    // 業者・見積依頼のカードなら、カードの依頼の部位を最初から選んでおく（部位が1つならそれ、複数ならファイル名から推測→最初の部位）
+    var cardPartKeys = [];
+    if(isEst) estReqReqs(t).forEach(function(r){ var k = partToInboxKey(r.part, projectById(r.projectId)); if(k && cardPartKeys.indexOf(k)<0) cardPartKeys.push(k); });
     var rowHtml = function(pj){
       return files.map(function(f, i){
         var isImg = /^image\//.test(f.contentType||"") || /\.(jpe?g|png|gif|webp)$/i.test(f.name||"");
@@ -14765,7 +14777,7 @@
           ' <a class="linkbtn" href="'+escapeHtml(f.url)+'" target="_blank" rel="noopener">👁 見る</a>'+
           (isEst ? '<select data-tqvend="'+i+'">'+estVendors.map(function(v){ return '<option value="'+escapeHtml(v.id)+'"'+(v.id===(f.fromVendorId||(sv&&sv.id))?' selected':'')+'>'+escapeHtml(v.name)+'の分</option>'; }).join("")+'</select>' : '')+
           '<select data-tqtype="'+i+'"><option value="">種類</option>'+QUOTE_TYPES.map(function(q){ return '<option'+(q===guessQt?' selected':'')+'>'+escapeHtml(q)+'</option>'; }).join("")+'</select>'+
-          inboxPartSel("tq"+i, inboxGuessPart((f.name||"")+" "+subj) || (sv&&sv.defaultPart) || "", pj)+
+          inboxPartSel("tq"+i, (cardPartKeys.length===1 ? cardPartKeys[0] : "") || inboxGuessPart((f.name||"")+" "+subj) || cardPartKeys[0] || (sv&&sv.defaultPart) || "", pj)+
         '</div>';
       }).join("");
     };
