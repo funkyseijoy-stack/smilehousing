@@ -726,7 +726,13 @@
   .vfgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:8px; }
   .vfdoc{ flex:0 0 120px; width:120px; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface); cursor:pointer; }
   .vfgrid .vfdoc{ width:auto; }
-  .vfdoc.new{ border:2px solid #2f7d5b; }
+  .vfdoc{ position:relative; }
+  .vfdoc.reg .vfth{ opacity:.55; }
+  .vfdoc.reg .vflb{ color:var(--muted); }
+  .vfstamp{ position:absolute; top:4px; right:4px; z-index:2; width:40px; height:40px; border:2px solid #2a63b8; color:#2a63b8; border-radius:50%; background:rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.85rem; line-height:1; transform:rotate(-12deg); pointer-events:none; letter-spacing:-.02em; }
+  .vfstamp.home{ border-color:#2f7d5b; color:#2f7d5b; }
+  .vflegend{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.85rem; color:var(--muted); margin-block-end:8px; align-items:center; }
+  .vflegend .vfstamp{ position:static; width:30px; height:30px; transform:none; display:inline-flex; font-size:.85rem; }
   .vfdoc.mi{ border:2px dashed #d9822b; }
   .vfdoc.lock{ min-height:120px; padding:6px; text-align:center; line-height:1.35; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.9rem; }
   .vfth{ height:84px; display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; position:relative; }
@@ -1246,6 +1252,7 @@
         <input type="search" id="vfQ" placeholder="🔍 業者・案件・ファイル名で探す">
         <select id="vfProj"></select>
       </div>
+      <div class="vflegend"><span><span class="vfstamp">登録<br>済</span> タスクに入って整理済み</span><span><span class="vfstamp home">おうち</span> おうちノートに出ている</span><span><b style="color:#d9822b;">📥 未整理</b>＝まだ登録していない（これだけ要対応）</span><span>🔒＝NET</span></div>
       <div id="vfBody"></div>
     </div>
     <div class="card" id="docsHubCard" hidden>
@@ -3274,7 +3281,7 @@
     repairReflectedTaskCopies();
     backfillOldChangeTasks();
     renameQuoteMailTasks();
-    renameEstSrcTasks().then(migrateEstReqToVendorCards);
+    renameEstSrcTasks().then(migrateEstReqToVendorCards).then(ensureVendorCardsForAll);
     syncCustDecidedTasks();
     syncNoteCheckTasks();
     scheduleEstSync();
@@ -4829,6 +4836,31 @@
   // 以前の「1回の依頼＝1枚」の見積依頼のカード（task_er_*）を、業者ごとのカードへまとめる（1回だけ・何度動かしても同じ結果）。
   // 依頼・届いたファイル・やりとり・ダウンロードのリンク・発注済みのはんこ・担当を業者のカードへ移し、元のカードは deletedAt＋mergedIntoVc（ゴミ箱には出さない）。
   var VC_STATUS_RANK = { "未着手":0, "対応中":1, "社長確認依頼中":2, "朋子確認依頼中":2, "発注済み":3, "お客様へ連絡済み":4, "完了":5 };
+  // 書類・見積依頼があるのに業者のカードが無い「案件×業者」に、カードを作る（全部届いていれば「完了」で作る。消したカードは作り直さない。何度動かしても同じ結果）
+  async function ensureVendorCardsForAll(){
+    var pairs = {}, add = function(pid, vid, at){ if(!pid || !vid || !projectById(pid) || !vendorById(vid)) return; var k = pid+"|"+vid; if(!pairs[k]) pairs[k] = { pid:pid, vid:vid, reqIds:[], at:"" }; if(at && (!pairs[k].at || at<pairs[k].at)) pairs[k].at = at; return pairs[k]; };
+    liveRequests().forEach(function(r){ if(vcRedirectTo(r)) return; var x = add(r.projectId, r.vendorId, r.requestedAt||r.createdAt); if(x) x.reqIds.push(r.id); });
+    liveAttachments().forEach(function(a){ if(a.kind==="quote" || a.kind==="plan") add(a.projectId, a.vendorId, a.receivedAt||a.uploadedAt||a.createdAt); });
+    var made = 0;
+    for(var k in pairs){
+      var x = pairs[k], id = vcTaskId(x.pid, x.vid);
+      if(state.tasks.some(function(t){ return t.id===id; })) continue;
+      var reqs = x.reqIds.map(function(rid){ return state.requests.find(function(r){ return r.id===rid; }); }).filter(Boolean);
+      var allDone = reqs.every(estReqDone);
+      var t = { id:id, projectId:x.pid, content:"", assignee:"", instructor:"", checker:"", creator:"", hasDeadline:false, deadline:"",
+        requestTo:"", requestMethod:"", attachmentAssetIds:[], attachments:[], vendorSpec:null, private:false, reflected:false, reflectedAt:null,
+        status: allDone ? "完了" : "対応中", completedAt: allDone ? nowIso() : null, reportTo: [],
+        vendorCard:{ projectId:x.pid, vendorId:x.vid }, estReq:{ reqIds: x.reqIds.slice(), at: x.at || nowIso(), auto:true },
+        createdAt: x.at || nowIso(), updatedAt: nowIso() };
+      if(allDone && reqs.length) { t.estReq.sentRound = reqs[reqs.length-1].id; t.estReq.sentAt = nowIso(); }
+      t.content = vcTitle(t);
+      state.tasks.push(t);
+      var ok = await saveDoc("tasks", t.id, t);
+      if(ok===false){ state.tasks = state.tasks.filter(function(z){ return z!==t; }); continue; }
+      made++;
+    }
+    if(made){ renderKanban(); console.log("業者のカードを作りました:", made); }
+  }
   async function migrateEstReqToVendorCards(){
     var olds = (state.tasks||[]).filter(function(t){ return t && !t.deletedAt && t.estReq && !t.vendorCard && (t.estReq.reqIds||[]).length && t.projectId; });
     if(!olds.length) return;
@@ -7477,11 +7509,13 @@
     var fromV = via || (d.kind==="att" ? vendorById(d.att.vendorId) : null);
     var fromLab = fromV ? '<br><span class="vffrom'+(via?' via':'')+'">'+escapeHtml(fromV.name)+'から</span>' : '';
     if(d.kind==="att" && d.att.kind==="quote" && quoteLocked(d.att.quoteType) && !state.quoteUnlocked)
-      return '<div class="vfdoc lock lockbox" title="NETは暗証番号でロック中（押すと暗証番号）">🔒<span>NET '+escapeHtml(md)+'<br>'+escapeHtml(p ? p.name : "（案件未定）")+fromLab+'</span></div>';
+      return '<div class="vfdoc lock lockbox reg" title="NETは暗証番号でロック中（押すと暗証番号）"><span class="vfstamp">登録<br>済</span>🔒<span>NET '+escapeHtml(md)+'<br>'+escapeHtml(p ? p.name : "（案件未定）")+fromLab+'</span></div>';
     var pname = p ? p.name : "（案件未定）";
     var lab = (i===0 ? '<b class="nw">最新</b> ' : '')+(d.kind==="pend" ? '<b class="mi">未整理</b> ' : '')+escapeHtml(md)+'<br>'+escapeHtml(pname)+(d.kind==="att" && d.type ? ' '+escapeHtml(d.type) : '')+(via ? fromLab : '');
-    return '<div class="vfdoc'+(i===0?' new':'')+(d.kind==="pend"?' mi':'')+'" '+(d.kind==="pend" ? 'data-vfpend="'+escapeHtml(d.task.id)+'" title="押すと、案件・種類を選んで整理できます"' : 'data-openatt="'+escapeHtml(d.att.id)+'" title="'+escapeHtml(d.name)+'"')+'>'+
-      '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div><div class="vflb">'+lab+'</div></div>';
+    var homeOn = d.kind==="att" && d.att.reflected && quoteSharable(d.att);
+    var stamp = d.kind==="att" ? (homeOn ? '<span class="vfstamp home" title="おうちノートに出ています">おうち</span>' : '<span class="vfstamp" title="登録済み（タスクの業者ごとの変更履歴に入っています）">登録<br>済</span>') : '';
+    return '<div class="vfdoc'+(i===0?' new':'')+(d.kind==="pend"?' mi':' reg')+'" '+(d.kind==="pend" ? 'data-vfpend="'+escapeHtml(d.task.id)+'" title="押すと、案件・種類を選んで整理できます"' : 'data-openatt="'+escapeHtml(d.att.id)+'" title="'+escapeHtml(d.name)+'"')+'>'+
+      '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div>'+stamp+'<div class="vflb">'+lab+'</div></div>';
   }
   function renderVendorFolders(){
     var body = document.getElementById("vfBody"); if(!body) return;
