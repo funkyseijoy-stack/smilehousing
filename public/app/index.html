@@ -686,6 +686,26 @@
   .ktaxhead.n{ background:#f1ece6; color:#6b5a4c; } .ktaxhead.n .kn{ color:#6b5a4c; }
   .ktaxhead.d{ background:#e8f2ea; color:#2f6b45; } .ktaxhead.d .kn{ color:#2f6b45; }
   #projTaskList .ptstack{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+  #projTaskList .ptstack.ptstack4{ grid-template-columns:repeat(4, minmax(0,1fr)); }
+  @media (max-width:1100px){ #projTaskList .ptstack.ptstack4{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  @media (max-width:760px){ #projTaskList .ptstack.ptstack4{ grid-template-columns:1fr; } }
+  .ptvends{ margin-block-start:16px; }
+  .ptvendh{ font-weight:800; font-size:1.05rem; margin-block-end:8px; display:flex; gap:10px; align-items:center; }
+  .ptvend{ background:var(--surface-2); border-radius:12px; padding:10px; margin-block-end:12px; }
+  .ptvend.done{ opacity:.75; }
+  .ptvhead{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-block-end:6px; }
+  .ptvhead b{ font-size:1rem; }
+  .ptvend .erbox{ margin:0 0 8px; }
+  .ptvops .kancard{ margin:0; }
+  .impcard{ background:#fff8e6; border:1px solid #e8c66a; border-radius:12px; padding:10px 12px; margin-block-end:14px; }
+  .imph{ display:flex; justify-content:space-between; gap:8px; align-items:center; font-weight:800; margin-block-end:6px; }
+  .impitem{ border-top:1px dashed #e0c78a; padding:8px 0; }
+  .impitem:first-of-type{ border-top:0; }
+  .impmeta{ color:var(--muted); font-size:.85rem; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .imptext{ white-space:pre-wrap; margin:4px 0; }
+  .impfiles{ display:flex; gap:6px; flex-wrap:wrap; }
+  .impfiles a{ width:72px; height:72px; border-radius:8px; overflow:hidden; display:block; background:#fff; border:1px solid var(--border); }
+  .impfiles a img, .impfiles a canvas{ width:100%; height:100%; object-fit:cover; }
   @media (max-width:760px){ #projTaskList .ptstack{ grid-template-columns:1fr; } }
   #projTaskList .ktaxsec{ background:var(--surface-2); border-radius:12px; padding:8px; margin:0; }
   #projTaskList .kancard{ border:0; border-radius:10px; padding:8px 10px; margin-block-end:6px; box-shadow:0 1px 2px rgba(43,36,32,.10); }
@@ -721,6 +741,10 @@
   .vclatest{ display:flex; gap:8px; align-items:center; margin-block:6px 2px; border:1px solid var(--border); border-radius:8px; padding:4px 6px; background:var(--surface-2); font-size:.85rem; line-height:1.35; min-width:0; }
   .kancard.ordered .vclatest{ margin-inline-end:58px; }
   .kancard.ordered:not(.exp) .kc-content{ padding-inline-end:56px; }
+  .kancard.ordered.st2:not(.exp) .kc-content{ padding-inline-end:118px; }
+  .kancard.ordered.st3:not(.exp) .kc-content{ padding-inline-end:178px; }
+  .kancard.ordered.st2 .vclatest{ margin-inline-end:120px; }
+  .kancard.ordered.st3 .vclatest{ margin-inline-end:180px; }
   .vclth{ flex:0 0 52px; height:40px; border-radius:6px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; }
   .vclth img, .vclth canvas{ width:100%; height:100%; object-fit:cover; }
   .vcltx{ min-width:0; overflow:hidden; } .vcltx b{ display:block; }
@@ -4524,11 +4548,11 @@
       else if(lastStaffR) stamps.push('<div class="kc-ordstamp rpl" title="お客様へ返信済み">返信<br>済<small>'+escapeHtml(mdOf(lastStaffR))+'</small></div>');
     }
     if(t.ordered) stamps.push('<div class="kc-ordstamp" title="発注済み（'+escapeHtml((t.ordered.by||"")+" "+ordMd)+'）">発注済<small>'+escapeHtml(ordMd)+'</small></div>');
-    return '<div class="kancard'+(t.reflected?" reflected":"")+(stamps.length?" ordered":"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
+    return '<div class="kancard'+(t.reflected?" reflected":"")+(stamps.length?" ordered st"+Math.min(stamps.length,3):"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
       (stamps.length ? '<div class="kc-stamps">'+stamps.join("")+'</div>' : '')+
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
-        (t.vendorCard && !exp ? vcLatestHtml(t) : '')+
+        (t.vendorCard && !exp && !kanVcInline ? vcLatestHtml(t) : '')+
         (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
       '</div>'+
       (who ? '<div class="kc-av" style="background:'+avatarColor(who)+'" title="担当 '+escapeHtml(who)+'">'+escapeHtml(who.slice(0,1))+'</div>' : '<div class="kc-av none" title="担当未設定">？</div>')+
@@ -4548,7 +4572,7 @@
       (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
       taskReviewsHtml(t)+
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
-      (t.vendorCard ? vcHtml(t) : estReqHtml(t))+
+      (t.vendorCard ? (kanVcInline ? '' : vcHtml(t)) : estReqHtml(t))+
       (t.custEstimate && t.custEstimate.undone ? '<div class="erbox"><div class="kc-undone">⚠️ お客様が回答をやり直しました（いまは未回答）</div></div>' : '')+
       (!t.estReq && (t.custDecided || t.fromCustomerChange || t.noteCheck) ? (function(){
         var cd = custDecisionOf(t);
@@ -4622,7 +4646,8 @@
       custEstBtnsHtml(t)+
       '</div>';
   }
-  function kanStackSecsHtml(list, key){
+  function kanStackSecsHtml(list, key, opts){
+    opts = opts || {};
     var byDl = function(a,b){
       var da = (a.hasDeadline && a.deadline) ? a.deadline : "9999", db = (b.hasDeadline && b.deadline) ? b.deadline : "9999";
       if(da!==db) return da.localeCompare(db);
@@ -4637,6 +4662,15 @@
       return '<div class="ktaxsec"><div class="ktaxhead '+cls+'">'+icon+' '+label+'<span class="kn tabular">'+arr.length+'</span></div>'+
         (arr.length ? '<div class="klist">'+arr.map(kanStackCard).join("")+'</div>' : '<div class="kempty">なし</div>')+(extra||"")+'</div>';
     };
+    var more = function(arr, label){ return arr.length ? '<details class="ktaxmore"><summary>'+label+' '+arr.length+'件</summary><div class="klist">'+arr.map(kanStackCard).join("")+'</div></details>' : ""; };
+    if(opts.four){
+      // 案件の「タスク」タブ：未着手／着手／完了／お客様決定 の4列（お客様決定は完了したものも、この列の下にたたむ）
+      var doneN = done.filter(function(t){ return !isDecTask(t); }), decDone = done.filter(function(t){ return isDecTask(t); });
+      var dS = doneN.slice(0,3);
+      return sec("n", "⬜", "未着手", not)+sec("", "🔄", "着手", doing)+
+        sec("d", "✅", "完了", dS, more(doneN.slice(3), "ほか"))+
+        sec("dec", "🔴", "お客様決定", dec, more(decDone, "処理済み"));
+    }
     var dShown = done.slice(0,3), dMore = done.slice(3);
     return sec("n", "⬜", "未着手", not)+sec("", "🔄", "着手", doing)+
       sec("d", "✅", "完了", dShown, dMore.length ? '<details class="ktaxmore"><summary>ほか '+dMore.length+'件</summary><div class="klist">'+dMore.map(kanStackCard).join("")+'</div></details>' : "")+
@@ -4689,6 +4723,7 @@
     toast("✅ 確認して閉じました（完了の列へ移しました）");
     renderKanban();
     maybeCreateSendCheck(t, "「確認して閉じる」にしました");
+    offerImportantFromTask(t);
   }
   // ---- Gmailから来たタスクを朋子以外が処理したら、朋子に「📤 お客様に送るか確認」のタスクを自動で作る ----
   // 対象：fromGmail のタスク（税理士の分は除く）を、朋子以外が「完了」「確認して閉じる」「見積の書類として登録」にしたとき。1つのタスクにつき1回だけ（IDは task_sc_<元のタスクID>）。
@@ -4945,6 +4980,7 @@
     all.sort(function(a,b){ return String(b.e.d||"9").localeCompare(String(a.e.d||"9")); });
     return all.find(function(x){ return x.e.kind!=="net"; }) || null;
   }
+  var kanVcInline = false; // 案件の「タスク」タブの業者ごとの欄では、経緯をカードの外に出すのでカードの中には出さない
   function vcLatestHtml(t){
     var x = vcLatest(t); if(!x) return "";
     var e = x.e, thumb = "";
@@ -5763,20 +5799,136 @@
     if(!wrap) return;
     var empty = document.getElementById("projTaskEmpty");
     var pid = state.currentProjectId;
+    var proj = projectById(pid);
     var ptMd = function(x){ x = String(x||""); var m = x.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? Number(m[2])+"/"+Number(m[3]) : x; };
-    var rows = liveTasks(true).concat(keptDoneTasks(true)).filter(function(t){ return t.projectId===pid; });
-    empty.hidden = rows.length!==0;
-    var reqs = liveRequests().filter(function(r){ return r.projectId===pid; })
-      .sort(function(a,b){ return String(b.requestedAt||b.createdAt||"").localeCompare(String(a.requestedAt||a.createdAt||"")); });
-    var reqHtml = reqs.length ? '<div class="ptreqs"><div class="ptreqh">📋 この案件の見積依頼 <button type="button" class="linkbtn" data-gosub="quote">見積タブを開く ›</button></div>'+reqs.map(function(r){
-      var v = vendorById(r.vendorId);
-      var st = r.status||"未依頼";
-      var right = st==="受領済み" ? '✅ 受領 '+escapeHtml(r.receivedAt?ptMd(r.receivedAt):"") :
-        st==="依頼済み" ? (function(){ var d = r.requestedAt ? Math.floor((Date.now()-Date.parse(r.requestedAt))/86400000) : null; return '依頼済み '+escapeHtml(r.requestedAt?ptMd(r.requestedAt):"")+(d!=null?' <span class="'+(d>=5?'ptlate':'')+'">⏳ '+d+'日</span>':''); })() : 'まだ依頼していない';
-      return '<div class="ptreq"><span>'+escapeHtml((v?v.name:"業者")+(r.part?"（"+partText(r.part, pid)+"）":""))+'</span><span>'+right+'</span></div>';
-    }).join("")+'</div>' : '';
-    wrap.innerHTML = (rows.length ? '<div class="ptstack">'+kanStackSecsHtml(rows, pid)+'</div>' : '') + reqHtml;
+    var seenT = {};
+    var all = liveTasks(true).concat(keptDoneTasks(true)).filter(function(t){ if(t.projectId!==pid || seenT[t.id]) return false; seenT[t.id]=1; return true; });
+    var vcards = all.filter(function(t){ return t.vendorCard; });
+    var rows = all.filter(function(t){ return !t.vendorCard; });
+    var reqs = liveRequests().filter(function(r){ return r.projectId===pid; });
+    empty.hidden = all.length!==0 || reqs.length!==0 || impNotesOf(proj).length!==0;
+    // 業者ごとの変更履歴（業者のカード＝経緯をそのまま見せる。カードは閉じた形で下に置き、押すと操作できる）
+    var vOpen = function(t){ return (t.status||"未着手")!=="完了"; };
+    vcards.sort(function(a,b){ var oa=vOpen(a), ob=vOpen(b); if(oa!==ob) return oa?-1:1; return String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")); });
+    var cardVendors = {};
+    var vendHtml = vcards.map(function(t){
+      cardVendors[t.vendorCard.vendorId] = 1;
+      var v = vendorById(t.vendorCard.vendorId), st = t.status||"未着手";
+      var card = "";
+      kanVcInline = true;
+      try{ card = kanCardHtml(t, st); } finally { kanVcInline = false; }
+      return '<div class="ptvend'+(vOpen(t)?'':' done')+'"><div class="ptvhead"><b>🏭 '+escapeHtml(v?v.name:"業者")+'</b><span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span></div>'+
+        vcHtml(t)+'<div class="ptvops">'+card+'</div></div>';
+    }).join("");
+    // 業者のカードが無い依頼（以前の依頼など）は、業者ごとに依頼の一覧だけを出す
+    var byV = {}, vOrder = [];
+    reqs.forEach(function(r){ if(cardVendors[r.vendorId]) return; var k = r.vendorId||"_"; if(!byV[k]){ byV[k]=[]; vOrder.push(k); } byV[k].push(r); });
+    vendHtml += vOrder.map(function(k){
+      var v = vendorById(k);
+      var list = byV[k].sort(function(a,b){ return String(b.requestedAt||b.createdAt||"").localeCompare(String(a.requestedAt||a.createdAt||"")); });
+      return '<div class="ptvend"><div class="ptvhead"><b>🏭 '+escapeHtml(v?v.name:"業者")+'</b></div>'+list.map(function(r){
+        var st = r.status||"未依頼";
+        var right = st==="受領済み" ? '✅ 受領 '+escapeHtml(r.receivedAt?ptMd(r.receivedAt):"") :
+          st==="依頼済み" ? (function(){ var d = r.requestedAt ? Math.floor((Date.now()-Date.parse(r.requestedAt))/86400000) : null; return '依頼済み '+escapeHtml(r.requestedAt?ptMd(r.requestedAt):"")+(d!=null?' <span class="'+(d>=5?'ptlate':'')+'">⏳ '+d+'日</span>':''); })() : 'まだ依頼していない';
+        return '<div class="ptreq"><span>'+escapeHtml(r.part?partText(r.part, pid):"（部位なし）")+'</span><span>'+right+'</span></div>';
+      }).join("")+'</div>';
+    }).join("");
+    wrap.innerHTML = impNotesHtml(proj)+
+      (rows.length || !vendHtml ? '<div class="ptstack ptstack4">'+kanStackSecsHtml(rows, pid, {four:true})+'</div>' : '')+
+      (vendHtml ? '<div class="ptvends"><div class="ptvendh">🏭 業者ごとの変更履歴 <button type="button" class="linkbtn" data-gosub="quote">見積タブを開く ›</button></div>'+vendHtml+'</div>' : '');
   }
+  // ---- 📌 お客様からの大事なこと（project.importantNotes。社内だけ・お客様画面には出さない）----
+  function impNotesOf(proj){ return ((proj && proj.importantNotes) || []).filter(function(n){ return n && !n.deletedAt; }); }
+  function impNotesHtml(proj){
+    var list = impNotesOf(proj).slice().sort(function(a,b){ return String(b.at||"").localeCompare(String(a.at||"")); });
+    return '<div class="impcard"><div class="imph"><span>📌 お客様からの大事なこと'+(list.length?'（'+list.length+'件）':'')+'</span><button type="button" class="btn small secondary" data-impadd="1">＋ 書き足す</button></div>'+
+      (list.length ? list.map(function(n){
+        return '<div class="impitem"><div class="impmeta"><span>'+escapeHtml(mdOf(n.at))+'</span><span>'+escapeHtml(n.by||"")+'が残しました</span>'+
+          (n.taskId ? '<span>（タスクから）</span>' : '')+
+          '<button type="button" class="linkbtn" data-impedit="'+escapeHtml(n.id)+'">✏️ 直す</button><button type="button" class="linkbtn" data-impdel="'+escapeHtml(n.id)+'">✕ 消す</button></div>'+
+          '<div class="imptext">'+escapeHtml(n.text||"")+'</div>'+
+          ((n.files||[]).length ? '<div class="impfiles">'+n.files.map(function(f){ return '<a href="'+escapeHtml(f.url)+'" target="_blank" rel="noopener" title="'+escapeHtml(f.name||"")+'">'+fileThumbInner(f.url, f.contentType, f.name)+'</a>'; }).join("")+'</div>' : '')+
+          '</div>';
+      }).join("") : '<div class="muted" style="font-size:.85rem;">お客様からのメッセージ・変更のご依頼のタスクを「完了」にするとき、工事に大事なことをここに残せます。</div>')+'</div>';
+  }
+  // 残す文・ファイルを選ぶ画面。やめる／残さない→null、残す→{text,files}
+  function askImportantNote(opts){
+    return new Promise(function(resolve){
+      var files = opts.files || [], picked = opts.picked || files.map(function(){ return true; });
+      var ov = document.createElement("div");
+      ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+      ov.innerHTML = '<div class="taskform-card" style="max-width:560px; width:100%;"><h3 style="margin:0 0 6px;">'+escapeHtml(opts.title||"📌 大事なこととして案件に残しますか？")+'</h3>'+
+        '<div class="muted" style="font-size:.85rem; margin-block-end:6px;">工事に大事なことは、案件の「タスク」タブの「📌 お客様からの大事なこと」にずっと残ります（社内だけ・お客様には出ません）。要点だけに書き直してもかまいません。</div>'+
+        '<textarea rows="7" style="width:100%; box-sizing:border-box;" maxlength="2000"></textarea>'+
+        (files.length ? '<div style="margin-block-start:8px; font-size:.9rem; font-weight:700;">一緒に残すファイル</div><div class="impfiles" style="margin-block-start:4px;">'+files.map(function(f, i){
+          return '<label style="display:flex; flex-direction:column; align-items:center; gap:2px; font-size:.85rem;"><span style="width:72px; height:72px; border-radius:8px; overflow:hidden; border:1px solid var(--border); display:block;">'+fileThumbInner(f.url, f.contentType, f.name)+'</span><input type="checkbox" data-impf="'+i+'"'+(picked[i]?' checked':'')+'></label>';
+        }).join("")+'</div>' : '')+
+        '<div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap;"><button type="button" class="btn" data-ok>'+escapeHtml(opts.okLabel||"📌 残す")+'</button><button type="button" class="btn secondary" data-cancel>'+escapeHtml(opts.cancelLabel||"残さない")+'</button></div></div>';
+      document.body.appendChild(ov);
+      var ta = ov.querySelector("textarea"); ta.value = opts.text || ""; setTimeout(function(){ ta.focus(); }, 50);
+      ov.addEventListener("click", function(e){
+        if(e.target.closest("[data-cancel]") || e.target===ov){ ov.remove(); resolve(null); return; }
+        if(e.target.closest("[data-ok]")){
+          var v = ta.value.trim();
+          if(!v){ toast("残す内容を書いてください"); ta.focus(); return; }
+          var fs = files.filter(function(f, i){ var c = ov.querySelector('[data-impf="'+i+'"]'); return c && c.checked; });
+          ov.remove(); resolve({ text: v.slice(0,2000), files: fs });
+        }
+      });
+    });
+  }
+  function custTaskText(t){
+    var body = String(t.content||"").replace(/^【[^】]*】\s*/, "");
+    var reps = taskReviewList(t).filter(function(r){ return r && r.fromCustomer && r.note; }).map(function(r){ return "（"+mdOf(r.at)+" お返事）"+String(r.note).replace(/^【お客様からのお返事】\s*/, ""); });
+    return [body].concat(reps).join("\n").trim();
+  }
+  // お客様から来たタスクを完了にしたとき：大事なこととして残すか聞く
+  async function offerImportantFromTask(t){
+    if(!t || !isCustomerTask(t)) return;
+    var proj = projectById(t.projectId); if(!proj) return;
+    if(impNotesOf(proj).some(function(n){ return n.taskId===t.id; })) return; // 残し済み
+    var files = (t.attachments||[]).filter(function(f){ return f && f.url; }).map(function(f){ return { url:f.url, contentType:f.contentType||"", name:f.name||"" }; });
+    var got = await askImportantNote({ text: custTaskText(t), files: files });
+    if(!got) return;
+    proj.importantNotes = (proj.importantNotes||[]).concat([{ id: uid("imp"), text: got.text, files: got.files, at: nowIso(), by: state.currentUser||"", taskId: t.id, src: String(t.content||"").slice(0,300) }]);
+    renderProjectTasks();
+    var ok = await saveDoc("projects", proj.id, proj);
+    if(ok!==false) toast("📌 大事なこととして案件に残しました（案件の「タスク」タブ）", 5000);
+  }
+  async function impAdd(){
+    var proj = projectById(state.currentProjectId); if(!proj) return;
+    var got = await askImportantNote({ title:"📌 大事なことを書き足す", text:"", okLabel:"📌 残す", cancelLabel:"やめる" });
+    if(!got) return;
+    proj.importantNotes = (proj.importantNotes||[]).concat([{ id: uid("imp"), text: got.text, files: [], at: nowIso(), by: state.currentUser||"" }]);
+    renderProjectTasks();
+    await saveDoc("projects", proj.id, proj);
+  }
+  async function impEdit(id){
+    var proj = projectById(state.currentProjectId); if(!proj) return;
+    var n = (proj.importantNotes||[]).find(function(x){ return x.id===id; }); if(!n) return;
+    var files = n.files||[];
+    var got = await askImportantNote({ title:"📌 大事なことを直す", text:n.text||"", files: files, okLabel:"保存", cancelLabel:"やめる" });
+    if(!got) return;
+    n.text = got.text; n.files = got.files; n.updatedAt = nowIso(); n.updatedBy = state.currentUser||"";
+    renderProjectTasks();
+    await saveDoc("projects", proj.id, proj);
+  }
+  async function impDel(id){
+    var proj = projectById(state.currentProjectId); if(!proj) return;
+    var n = (proj.importantNotes||[]).find(function(x){ return x.id===id; }); if(!n) return;
+    if(!window.confirm("この「大事なこと」を消しますか？")) return;
+    n.deletedAt = nowIso();
+    renderProjectTasks();
+    await saveDoc("projects", proj.id, proj);
+  }
+  document.addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest("[data-impadd],[data-impedit],[data-impdel]");
+    if(!b) return;
+    e.preventDefault(); e.stopPropagation();
+    if(b.hasAttribute("data-impadd")) impAdd();
+    else if(b.hasAttribute("data-impedit")) impEdit(b.getAttribute("data-impedit"));
+    else impDel(b.getAttribute("data-impdel"));
+  }, true);
   // ---- ヒアリング（どんな家にしたいか。スタッフ用・案件 project.hearing に保存） ----
   var HEARING_FIELDS = [
     {k:"family", label:"家族構成・暮らし方", ph:"人数、年齢、在宅時間、ペット、趣味、来客の多さなど"},
@@ -13690,8 +13842,14 @@
     if(!p) return;
     var name = document.getElementById("editProjectName").value.trim();
     if(!name){ toast("案件名を入力してください"); return; }
+    var newCust = document.getElementById("editProjectCustomer").value.trim();
+    // 案件名・お客様名を変えるときは確認（別のお客様を「編集」で上書きしてしまう事故を防ぐ）
+    var chgs = [];
+    if(name!==(p.name||"")) chgs.push("案件名「"+(p.name||"")+"」→「"+name+"」");
+    if(newCust!==(p.customer||"")) chgs.push("お客様名「"+(p.customer||"（なし）")+"」→「"+(newCust||"（なし）")+"」");
+    if(chgs.length && (p.name||p.customer) && !window.confirm(chgs.join("\n")+"\n\nに変えます。\n記録・タスク・写真・おうちノートは、この案件のまま名前だけが変わります。\n\n新しいお客様を登録したいときは、ここではなく「＋新規案件」から作ってください。\n\n名前を変えますか？")) return;
     p.name = name;
-    p.customer = document.getElementById("editProjectCustomer").value.trim();
+    p.customer = newCust;
     p.type = document.getElementById("editProjectType").value;
     var newFolder = document.getElementById("editProjectFolder").value;
     if(newFolder && newFolder!==pfOf(p)) p.folderId = newFolder;
@@ -15001,11 +15159,13 @@
         }catch(err){ toast("返信は送りましたが、LINEのお知らせは送れませんでした"); }
       }
       t.custReplies = (t.custReplies||[]).concat([rec]);
-      var movedToDoing = false;
+      var movedToDoing = false, selfAssigned = false;
       if(isCustomerTask(t) && (t.status||"未着手")==="未着手"){ t.status = "対応中"; movedToDoing = true; }
+      // 担当者のいないタスクに返信したら、返信した人を担当にする（割り振り待ちから「私の担当」へ）
+      if(isCustomerTask(t) && !t.assignee && state.currentUser && isStaffName(state.currentUser)){ t.assignee = state.currentUser; selfAssigned = true; }
       t.updatedAt = nowIso();
       await saveDoc("tasks", t.id, t);
-      toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":"")+(movedToDoing?"・進捗を「対応中」にしました":""));
+      toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":"")+(movedToDoing?"・進捗を「対応中」にしました":"")+(selfAssigned?"・担当を"+state.currentUser+"さんにしました":""));
       logActivity("タスクからお客様に返信しました（"+((proj&&proj.customer)||(proj&&proj.name)||"")+"）");
       render();
       if(typeof onSent==="function") onSent();
@@ -16797,6 +16957,7 @@
     await saveDoc("tasks", t.id, t);
     logActivity("タスクのステータスを「"+t.status+"」にしました");
     if(newStatus==="完了") maybeCreateSendCheck(t, "完了にしました");
+    if(newStatus==="完了") offerImportantFromTask(t);
   }
   async function deleteTask(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
