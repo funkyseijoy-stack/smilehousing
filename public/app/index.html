@@ -353,6 +353,7 @@
   .kc-ordstamp.chg{ color:#7b4fb0; border-color:#7b4fb0; }
   .kc-ordstamp.chg small{ border-top-color:#7b4fb0; }
   .kc-ordstamp.off{ opacity:.35; }
+  .ktaxhead.dec{ color:#d23c32; }
   .kc-undone{ color:#b33; font-weight:700; font-size:.9rem; margin-bottom:4px; }
   .kdec .khead{ }
   .kc-ordstamp{ position:absolute; right:44px; top:50%; margin-top:-38px; width:76px; height:76px; border:4px double #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.05rem; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; pointer-events:none; opacity:.9; z-index:1; letter-spacing:.05em; }
@@ -4519,15 +4520,17 @@
       if(da!==db) return da.localeCompare(db);
       return (b.createdAt||"").localeCompare(a.createdAt||"");
     };
-    var not = list.filter(function(t){ return (t.status||"未着手")==="未着手"; }).sort(byDl);
-    var doing = list.filter(function(t){ var st=t.status||"未着手"; return st!=="未着手" && st!=="完了"; }).sort(function(a,b){ return STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || byDl(a,b); });
+    // お客様が決定したもの（完了でないもの）は、未着手・着手とは別の「🔴 お客様決定済み」にまとめる
+    var dec = list.filter(function(t){ return t.custDecided && (t.status||"未着手")!=="完了"; }).sort(function(a,b){ return (b.custDecided.at||"").localeCompare(a.custDecided.at||""); });
+    var not = list.filter(function(t){ return !t.custDecided && (t.status||"未着手")==="未着手"; }).sort(byDl);
+    var doing = list.filter(function(t){ var st=t.status||"未着手"; return !t.custDecided && st!=="未着手" && st!=="完了"; }).sort(function(a,b){ return STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || byDl(a,b); });
     var done = list.filter(function(t){ return t.status==="完了"; }).sort(function(a,b){ return (b.completedAt||b.updatedAt||"").localeCompare(a.completedAt||a.updatedAt||""); });
     var sec = function(cls, icon, label, arr, extra){
       return '<div class="ktaxsec"><div class="ktaxhead '+cls+'">'+icon+' '+label+'<span class="kn tabular">'+arr.length+'</span></div>'+
         (arr.length ? '<div class="klist">'+arr.map(kanStackCard).join("")+'</div>' : '<div class="kempty">なし</div>')+(extra||"")+'</div>';
     };
     var dShown = done.slice(0,3), dMore = done.slice(3);
-    return sec("n", "⬜", "未着手", not)+sec("", "🔄", "着手", doing)+
+    return (dec.length ? sec("dec", "🔴", "お客様決定済み", dec) : "")+sec("n", "⬜", "未着手", not)+sec("", "🔄", "着手", doing)+
       sec("d", "✅", "完了", dShown, dMore.length ? '<details class="ktaxmore"><summary>ほか '+dMore.length+'件</summary><div class="klist">'+dMore.map(kanStackCard).join("")+'</div></details>' : "");
   }
   function kanProjectColsHtml(tasks){
