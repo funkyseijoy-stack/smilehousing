@@ -727,6 +727,8 @@
   .vfdoc{ flex:0 0 120px; width:120px; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface); cursor:pointer; }
   .vfgrid .vfdoc{ width:auto; }
   .vfdoc{ position:relative; }
+  .vcev{ position:relative; }
+  .vcev .vcoh{ position:absolute; top:4px; right:4px; background:#2f7a4a; color:#fff; border-radius:999px; padding:0 7px; font-size:.85rem; font-weight:700; line-height:1.5; z-index:1; }
   .vfdoc.reg .vfth{ opacity:.55; }
   .vfdoc.reg .vflb{ color:var(--muted); }
   .vfstamp{ position:absolute; top:4px; right:4px; z-index:2; width:40px; height:40px; border:2px solid #2a63b8; color:#2a63b8; border-radius:50%; background:rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.85rem; line-height:1; transform:rotate(-12deg); pointer-events:none; letter-spacing:-.02em; }
@@ -1507,7 +1509,7 @@
         <div class="card">
           <div class="row" style="justify-content:space-between; margin-block-end:8px;">
             <h3 style="margin:0;">この案件のタスク</h3>
-            <button class="btn small" id="btnProjNewTask">＋ この案件のタスクを追加</button>
+            <span style="display:flex; gap:6px; flex-wrap:wrap;"><button class="btn small" id="btnProjNewNote">＋ 記録する</button><button class="btn small" id="btnProjNewTask">＋ この案件のタスクを追加</button></span>
           </div>
           <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">この案件のタスクを未着手／着手／完了に分けて出します。カードを押すと開いて、進捗の変更などができます。</p>
           <div id="projTaskList"></div>
@@ -4975,7 +4977,7 @@
       var firstLine = function(v){ return String(v||"").split("\n").map(function(x){ return x.trim(); }).filter(Boolean)[0] || ""; };
       if(L){
         var tx = n.decided ? "✅ "+firstLine(n.decided) : (n.open ? "💭 "+firstLine(n.open) : firstLine(n.talk || n.content));
-        L.ev.push({ d: vcDateOf(n.date || n.createdAt), kind:"note", h:"📝 打合せ記録", text: ((n.title?n.title+"：":"")+tx).slice(0,50), noteId: n.id });
+        L.ev.push({ d: vcDateOf(n.date || n.createdAt), kind:"note", h:"📝 打合せ記録", text: ((n.title?n.title+"：":"")+tx).slice(0,50), noteId: n.id, home: !!n.reflected });
       }
       var seenK = {};
       (n.noteLines||[]).forEach(function(l){
@@ -4984,7 +4986,7 @@
         var mk = l.m==="d" ? "✅ " : (l.m==="o" ? "💭 " : (l.m==="c" ? "🔒 " : ""));
         var k2 = L2.key+"|"+n.id;
         if(seenK[k2]){ seenK[k2].text = (seenK[k2].text+" / "+mk+String(l.t||"")).slice(0,60); return; }
-        seenK[k2] = { d: vcDateOf(n.date || n.createdAt), kind:"note", h:"📝 打合せ記録", text: (mk+String(l.t||"")).slice(0,50), noteId: n.id };
+        seenK[k2] = { d: vcDateOf(n.date || n.createdAt), kind:"note", h:"📝 打合せ記録", text: (mk+String(l.t||"")).slice(0,50), noteId: n.id, home: !!n.reflected && l.m!=="c" };
         L2.ev.push(seenK[k2]);
       });
     });
@@ -5028,7 +5030,9 @@
     var rows = lanes.map(function(L){
       var tiles = L.ev.map(function(e, i){
         var md = e.d ? e.d.slice(5).replace("-","/") : "";
-        var inner = '<div class="vcd">'+escapeHtml(md)+'</div><div class="vch">'+escapeHtml(e.h)+'</div>';
+        // おうちノートに出ているものには緑の「おうち」の印（書類は見積タブと同じ判定、打合せ記録は反映済み）
+        var homeOn = e.att ? (!e.locked && vfAttShown(e.att)) : !!e.home;
+        var inner = (homeOn ? '<span class="vcoh" title="おうちノートに出ています">おうち</span>' : '')+'<div class="vcd">'+escapeHtml(md)+'</div><div class="vch">'+escapeHtml(e.h)+'</div>';
         if(e.att){
           if(e.locked) return '<div class="vcev net" data-vclock="1" role="button" tabindex="0" title="NETは暗証番号で開きます">'+(i===0?'<span class="vcnew">最新</span>':'')+inner+'<div class="vcpic">🔒</div><div class="vcwho via">'+escapeHtml(e.who)+'</div></div>';
           return '<a class="vcev '+e.kind+(i===0?' newest':'')+'" href="'+escapeHtml(e.att.url)+'" target="_blank" rel="noopener" title="'+escapeHtml(e.att.name||"")+'">'+(i===0?'<span class="vcnew">最新</span>':'')+inner+
@@ -16499,6 +16503,8 @@
   }
   function openMnSheet(){
     var c = document.getElementById("mnFormCard"); if(!c) return;
+    // 記録タブ以外（案件の「タスク」タブなど）からも開けるよう、入力画面は body の直下に置く（閉じているときは見えない）
+    if(c.parentNode !== document.body) document.body.appendChild(c);
     var t = document.getElementById("mnSheetTitle"); if(t) t.textContent = editingMeetingNoteId ? "記録を編集" : "打合せ内容を記録";
     var d = document.getElementById("meetingNoteDate"); if(d && !d.value) d.value = todayStr();
     c.classList.add("open"); document.body.classList.add("mnlock"); c.scrollTop = 0;
@@ -19271,6 +19277,8 @@
     document.getElementById("recFileInput").addEventListener("change", function(e){ var fl = Array.prototype.slice.call(e.target.files||[]); e.target.value = ""; if(fl.length) openRecImportSheet(fl); });
     document.getElementById("btnCancelEditMeetingNote").addEventListener("click", cancelEditMeetingNote);
     document.getElementById("btnOpenMnSheet").addEventListener("click", openMnSheet);
+    // 案件の「タスク」タブからも記録できる（記録タブと同じ入力画面。タブは移らない）
+    document.getElementById("btnProjNewNote").addEventListener("click", function(){ if(state.currentProjectId) openMnSheet(); });
     // 「＋ 〜」ボタン：対応する入力欄を開く／閉じる
     document.addEventListener("click", function(e){
       var b = e.target.closest("[data-reveal]");
