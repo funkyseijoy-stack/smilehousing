@@ -367,6 +367,23 @@ export default async (req: Request, context: Context) => {
       };
       if (chgKey) doc.chgKey = chgKey;
       if (isChgReply) doc.chgReply = true;
+      // お客様が図面・写真に書き込んだ絵（「✏️ 書き込んで送る」）。カードへの依頼・お返事のときだけ受け付ける
+      let drawFile: any = null;
+      if (chgKey && body.drawing) {
+        const dm = /^data:(image\/(?:jpeg|png));base64,(.+)$/.exec(String(body.drawing || ""));
+        if (!dm) return json({ error: "invalid_image" }, 400);
+        let bytes: Uint8Array;
+        try { bytes = Uint8Array.from(Buffer.from(dm[2], "base64")); } catch { return json({ error: "invalid_base64" }, 400); }
+        if (!bytes.length) return json({ error: "invalid_image" }, 400);
+        if (bytes.length > IMAGE_MAX_BYTES) return json({ error: "too_large" }, 413);
+        const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        await getStore("customerPhotos").set(`${projectId}/${key}`, bytes, { metadata: { contentType: dm[1] } });
+        const md = now.slice(5, 10).replace("-", "");
+        drawFile = { id: genId("att"), url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
+          contentType: dm[1], name: `お客様の書き込み_${md}.${dm[1] === "image/png" ? "png" : "jpg"}`, fromCustomer: true };
+        doc.files = [drawFile];
+        doc.drawing = true;
+      }
       await store.setJSON(`messages/${id}`, doc);
       // カードの下のやりとりへのお客様の「お返事」：新しいタスクは作らず、その依頼のタスク（いちばん新しいもの）に追記する
       let appended = false;
@@ -381,6 +398,7 @@ export default async (req: Request, context: Context) => {
             const who = (project.customer ? project.customer + "様" : "お客様") + "（お客様）";
             const rv = { result: "返信", by: who, to: t.assignee || "", note: "【お客様からのお返事】" + text.replace(/^【お返事】[^\n]*\n?/, "").trim(), at: now, fromCustomer: true };
             t.reviews = Array.isArray(t.reviews) ? t.reviews : (t.review ? [t.review] : []);
+            if (drawFile) { (rv as any).files = [drawFile]; t.attachments = (Array.isArray(t.attachments) ? t.attachments : []).concat([drawFile]); }
             t.reviews.push(rv); t.review = rv;
             // お客様からお返事が来たら、どの進捗からでも「未着手」に戻す（こちらが動く番）
             if ((t.status || "") !== "未着手") { t.status = "未着手"; t.completedAt = null; t.archivedAt = null; }
@@ -400,10 +418,10 @@ export default async (req: Request, context: Context) => {
           const taskId = genId("task");
           const body2 = text.replace(/^【(変更のご依頼|お返事)】/, "");
           await store.setJSON(`tasks/${taskId}`, {
-            id: taskId, projectId, content: "【お客様から変更のご依頼】" + body2,
+            id: taskId, projectId, content: "【お客様から変更のご依頼】" + (drawFile ? "（✏️ 図面に書き込みあり）" : "") + body2,
             assignee: "", instructor: "お客様", creator: "おうちノート",
             hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
-            attachmentAssetIds: [], attachments: card.files,
+            attachmentAssetIds: [], attachments: (drawFile ? [drawFile] : []).concat(card.files || []),
             vendorSpec: card.part, private: false, reflected: false, reflectedAt: null,
             status: "未着手", fromCustomerChange: { messageId: id, cardKey: chgKey },
             createdAt: now, updatedAt: now,
@@ -1016,7 +1034,8 @@ export default async (req: Request, context: Context) => {
     messages: messages
       .map((m) => {
         const orig: any = !m.chgKey && m.replyTo ? messages.find((x: any) => x && x.id === m.replyTo) : null;
-        return { content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) || !!m.chgReply };
+        return { content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) || !!m.chgReply,
+          files: Array.isArray(m.files) ? m.files.filter((f: any) => f && f.url).map((f: any) => ({ url: f.url, contentType: f.contentType || "", name: f.name || "" })) : [] };
       })
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     reservations: resv,

@@ -8922,7 +8922,7 @@
   function renderMessages(){
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     var html = rows.map(function(m){
-      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+msgTagged(m)+'</div></div>';
+      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+'</div>';
     }).join("");
     // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
