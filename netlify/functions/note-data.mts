@@ -382,7 +382,8 @@ export default async (req: Request, context: Context) => {
             const rv = { result: "返信", by: who, to: t.assignee || "", note: "【お客様からのお返事】" + text.replace(/^【お返事】[^\n]*\n?/, "").trim(), at: now, fromCustomer: true };
             t.reviews = Array.isArray(t.reviews) ? t.reviews : (t.review ? [t.review] : []);
             t.reviews.push(rv); t.review = rv;
-            if ((t.status || "") === "完了") { t.status = "未着手"; t.completedAt = null; t.archivedAt = null; }
+            // お客様からお返事が来たら、どの進捗からでも「未着手」に戻す（こちらが動く番）
+            if ((t.status || "") !== "未着手") { t.status = "未着手"; t.completedAt = null; t.archivedAt = null; }
             t.updatedAt = now;
             await store.setJSON(`tasks/${t.id}`, t);
             doc.taskId = t.id;

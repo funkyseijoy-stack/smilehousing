@@ -15001,9 +15001,11 @@
         }catch(err){ toast("返信は送りましたが、LINEのお知らせは送れませんでした"); }
       }
       t.custReplies = (t.custReplies||[]).concat([rec]);
+      var movedToDoing = false;
+      if(isCustomerTask(t) && (t.status||"未着手")==="未着手"){ t.status = "対応中"; movedToDoing = true; }
       t.updatedAt = nowIso();
       await saveDoc("tasks", t.id, t);
-      toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":""));
+      toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":"")+(movedToDoing?"・進捗を「対応中」にしました":""));
       logActivity("タスクからお客様に返信しました（"+((proj&&proj.customer)||(proj&&proj.name)||"")+"）");
       render();
       if(typeof onSent==="function") onSent();
