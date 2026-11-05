@@ -4811,7 +4811,7 @@
               '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
               (isCustomerTask(t) ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="custreply" data-id="'+escapeHtml(t.id)+'">💬 お客様に返信</button>' : '')+
               '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'" title="対応がいらないものを、確認したことにして完了の列へ移す">✅ 確認して閉じる</button>'+
-              (t.fromGmail && !t.quoteReg && (t.attachments||[]).length ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="toquote" data-id="'+escapeHtml(t.id)+'">📄 見積の書類として登録</button>' : '')+'</div>';
+              (t.fromGmail && !t.quoteReg && (t.attachments||[]).length ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="toquote" data-id="'+escapeHtml(t.id)+'">📄 案件の書類に登録</button>' : '')+'</div>';
           }).join("")+'</div></div></div>';
       }
     }
@@ -14117,7 +14117,7 @@
         out += '<div class="kc-qlink">📋 見積依頼の返事かも：'+escapeHtml((pj2?pj2.name:"案件")+"・"+(v?v.name:""))+'（依頼済み '+escapeHtml(r.requestedAt?fmtDate(r.requestedAt):"")+'）'+
           ' <button type="button" class="linkbtn" data-taskact="openreq" data-id="'+escapeHtml(r.projectId)+'">見る ›</button></div>';
       });
-      if((t.attachments||[]).length) out += '<button type="button" class="btn small kc-qbtn" data-taskact="toquote" data-id="'+t.id+'">📄 見積の書類として登録</button>';
+      if((t.attachments||[]).length) out += '<button type="button" class="btn small kc-qbtn" data-taskact="toquote" data-id="'+t.id+'">📄 案件の書類に登録</button>';
     }
     return out;
   }
@@ -14132,7 +14132,8 @@
     var sv = taskSenderVendor(t);
     if(isEst){ var vc = {}; files.forEach(function(f){ if(f.fromVendorId) vc[f.fromVendorId] = (vc[f.fromVendorId]||0)+1; }); var top = Object.keys(vc).sort(function(a,b){ return vc[b]-vc[a]; })[0]; sv = (top && vendorById(top)) || estVendors[0] || null; }
     var subj = (t.fromGmail && t.fromGmail.subject) || "";
-    var pid0 = t.projectId || inboxGuessProject(subj + " " + files.map(function(f){ return f.name||""; }).join(" ")) || "";
+    // 案件：ファイル名に案件名・お客様名があればそれを優先（例「東康太郎様邸 配線プラン.pdf」）→ カードの案件 → 件名から
+    var pid0 = inboxGuessProject(files.map(function(f){ return f.name||""; }).join(" ")) || t.projectId || inboxGuessProject(subj) || "";
     var pj0 = projectById(pid0);
     var me = state.currentUser || "";
     var ov = document.createElement("div");
@@ -14155,7 +14156,7 @@
       }).join("");
     };
     ov.innerHTML = '<div class="card" style="max-width:720px; width:calc(100% - 24px); max-height:88vh; overflow:auto;">'+
-      '<h3 style="margin:0 0 4px;">📄 見積の書類として登録</h3>'+
+      '<h3 style="margin:0 0 4px;">📄 案件の書類に登録</h3>'+
       '<div class="muted" style="margin-block-end:8px;">'+escapeHtml(subj||t.content||"").slice(0,80)+'</div>'+
       '<div class="row" style="gap:8px; flex-wrap:wrap;">'+
         '<label class="field" style="flex:1 1 200px;">案件<select id="tqProj">'+projOpts+'</select></label>'+
@@ -14239,8 +14240,9 @@
         await saveDoc("tasks", t.id, t);
         logActivity("Gmailのタスクから見積の書類を"+attIds.length+"件登録しました（"+(pj?pj.name:"")+"）");
         close(); render();
-        toast("見積の書類に"+attIds.length+"件登録し、"+gOrder.map(function(x){ return (vendorById(x)||{}).name||"業者"; }).join("・")+"の見積依頼を受領済みにしました"+(done?"（タスクは完了にしました）":""), 8000);
-        maybeCreateSendCheck(t, "見積の書類に"+attIds.length+"件登録しました");
+        toast("案件の書類に"+attIds.length+"件登録し（部位があれば記録にも入ります）、"+gOrder.map(function(x){ return (vendorById(x)||{}).name||"業者"; }).join("・")+"の見積依頼を受領済みにしました"+(done?"（タスクは完了にしました）":""), 8000);
+        // 登録した書類は記録に入る（部位あり）。お客様に出すかは朋子さんの「📤 お客様に送る？」で決める（朋子さん本人が登録したときも作る）
+        if(!isEst) maybeCreateSendCheck(t, "案件の書類に"+attIds.length+"件登録しました", { force:true });
       }catch(e){ this.disabled = false; this.textContent = "登録する"; toast("登録できませんでした。もう一度お試しください"); }
     });
   }
