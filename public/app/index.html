@@ -693,11 +693,12 @@
   .vfgrid .vfdoc{ width:auto; }
   .vfdoc.new{ border:2px solid #2f7d5b; }
   .vfdoc.mi{ border:2px dashed #d9822b; }
-  .vfdoc.lock{ height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.9rem; }
+  .vfdoc.lock{ min-height:120px; padding:6px; text-align:center; line-height:1.35; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.9rem; }
   .vfth{ height:84px; display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; position:relative; }
   .vfth img, .vfth canvas, .vfth video{ width:100%; height:100%; object-fit:cover; }
   .vflb{ font-size:.85rem; padding:3px 5px; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
   .vflb .nw{ color:#2f7d5b; }
+  .vffrom{ display:inline-block; font-size:.85rem; color:var(--muted); } .vffrom.via{ color:#a8681f; font-weight:700; }
   .vfmore{ flex:0 0 auto; align-self:center; background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; }
   .vfreqs{ display:flex; flex-direction:column; gap:4px; }
   .vfreq{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:.9rem; }
@@ -7245,10 +7246,14 @@
   function vfTile(d, i){
     var md = d.d ? Number(d.d.slice(5,7))+"/"+Number(d.d.slice(8,10)) : "";
     var p = projectById(d.pid);
+    // 届けた業者（商社から届いたNETなど）：書類の viaVendorId。無ければ書類の業者（この行の業者）
+    var via = d.kind==="att" && d.att.viaVendorId && d.att.viaVendorId!==d.att.vendorId ? vendorById(d.att.viaVendorId) : null;
+    var fromV = via || (d.kind==="att" ? vendorById(d.att.vendorId) : null);
+    var fromLab = fromV ? '<br><span class="vffrom'+(via?' via':'')+'">'+escapeHtml(fromV.name)+'から</span>' : '';
     if(d.kind==="att" && d.att.kind==="quote" && quoteLocked(d.att.quoteType) && !state.quoteUnlocked)
-      return '<div class="vfdoc lock lockbox" title="NETは暗証番号でロック中">🔒<span>NET '+escapeHtml(md)+'</span></div>';
+      return '<div class="vfdoc lock lockbox" title="NETは暗証番号でロック中（押すと暗証番号）">🔒<span>NET '+escapeHtml(md)+'<br>'+escapeHtml(p ? p.name : "（案件未定）")+fromLab+'</span></div>';
     var pname = p ? p.name : "（案件未定）";
-    var lab = (i===0 ? '<b class="nw">最新</b> ' : '')+(d.kind==="pend" ? '<b class="mi">未整理</b> ' : '')+escapeHtml(md)+'<br>'+escapeHtml(pname)+(d.kind==="att" && d.type ? ' '+escapeHtml(d.type) : '');
+    var lab = (i===0 ? '<b class="nw">最新</b> ' : '')+(d.kind==="pend" ? '<b class="mi">未整理</b> ' : '')+escapeHtml(md)+'<br>'+escapeHtml(pname)+(d.kind==="att" && d.type ? ' '+escapeHtml(d.type) : '')+(via ? fromLab : '');
     return '<div class="vfdoc'+(i===0?' new':'')+(d.kind==="pend"?' mi':'')+'" '+(d.kind==="pend" ? 'data-vfpend="'+escapeHtml(d.task.id)+'" title="押すと、案件・種類を選んで整理できます"' : 'data-openatt="'+escapeHtml(d.att.id)+'" title="'+escapeHtml(d.name)+'"')+'>'+
       '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div><div class="vflb">'+lab+'</div></div>';
   }
