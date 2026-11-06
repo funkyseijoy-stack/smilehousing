@@ -34,6 +34,43 @@ function genId() {
   return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
+// ---- 3者マージ：base＝その端末が最後に受け取った内容、patch＝その端末が変えた項目、existing＝いまのサーバーの内容 ----
+const js = (v: any) => (v === undefined ? "__undef__" : JSON.stringify(v));
+const isIdArr = (a: any) => Array.isArray(a) && a.every((x) => x && typeof x === "object" && !Array.isArray(x) && x.id != null);
+function merge3Arr(base: any[], mine: any[], theirs: any[]) {
+  const bm = new Map(base.map((x) => [String(x.id), x]));
+  const tm = new Map(theirs.map((x) => [String(x.id), x]));
+  const out: any[] = [];
+  const seen = new Set<string>();
+  for (const m of mine) {
+    const k = String(m.id); seen.add(k);
+    const b = bm.get(k), t = tm.get(k);
+    if (b && js(m) === js(b)) {
+      // 自分は変えていない：ほかで消されていれば消す、ほかで変わっていればそちらを使う
+      if (!t) continue;
+      out.push(t);
+    } else out.push(m);
+  }
+  // ほかの端末で足されたもの（自分の元にも、自分の今にも無い）は残す
+  for (const t of theirs) { const k = String(t.id); if (!seen.has(k) && !bm.has(k)) { out.push(t); seen.add(k); } }
+  return out;
+}
+function mergePatch(existing: any, patch: any, base: any, removed: string[]) {
+  const doc: any = { ...existing };
+  for (const k of Object.keys(patch)) {
+    if (k === "id" || k === "updatedAt") continue;
+    const mine = patch[k], b = base[k], t = existing[k];
+    if (js(t) === js(b) || t === undefined) doc[k] = mine;
+    else if (isIdArr(mine) && isIdArr(t) && (b === undefined || isIdArr(b))) doc[k] = merge3Arr(b || [], mine, t);
+    else doc[k] = mine; // 同じ項目をほかの端末も変えていた：これまでどおり後から保存したほうを使う
+  }
+  for (const k of removed) {
+    if (k === "id") continue;
+    if (js(existing[k]) === js(base[k])) delete doc[k]; // ほかで変わっていなければ消す
+  }
+  return doc;
+}
+
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -115,7 +152,13 @@ export default async (req: Request, context: Context) => {
     // タスクの担当者・確認者が新しく決まったら、その人へ個人のメールで知らせる（自分で自分に入れたときは送らない）。
     const prevTask: any = collection === "tasks" ? await store.get(key, { type: "json" }) : null;
     let doc;
-    if (body.replace) {
+    if (body.patch && typeof body.patch === "object") {
+      // 変えた項目だけを送ってもらい、サーバーの最新に重ねる（3者マージ）。
+      // 古い画面のまま保存して、ほかの端末で足した内容（初期の打合せ記録など）を消してしまう事故の対策。
+      const existing: any = (await store.get(key, { type: "json", consistency: "strong" } as any)) || { id };
+      doc = mergePatch(existing, body.patch, body.base || {}, Array.isArray(body.removed) ? body.removed : []);
+      doc.id = id; doc.updatedAt = new Date().toISOString();
+    } else if (body.replace) {
       doc = { ...(body.data || {}), id, updatedAt: new Date().toISOString() };
     } else {
       const existing = (await store.get(key, { type: "json" })) || { id };

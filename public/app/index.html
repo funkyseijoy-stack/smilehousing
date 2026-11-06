@@ -2772,8 +2772,13 @@
       throw new Error('unauthorized');
     }
     var j = await res.json();
-    return j.items||[];
+    var items = j.items||[];
+    if(collection!=="activity") items.forEach(function(x){ if(x && x.id!=null){ try{ serverBase[collection+"/"+x.id] = JSON.stringify(x); }catch(e){} } });
+    return items;
   }
+  // サーバーから受け取ったときの各データの中身（"collection/id"→JSON）。保存するときはここと比べて「変えた項目だけ」を送り、
+  // サーバーが最新の内容に重ねる（古い画面のまま保存して、ほかの端末で足した内容を消してしまう事故の対策）。
+  var serverBase = {};
   // 保存中の件数（自動更新が、保存途中の画面を古いデータで上書きしないよう見張るため）
   var pendingSaves = 0, lastSaveAt = 0;
   // 保存した直後のデータを2分間覚えておく。サーバーの一覧は保存が反映されるまで数十秒遅れることがあり、
@@ -2888,9 +2893,36 @@
       (nq ? '<button type="button" data-ssretry="1" style="background:#fff;color:#b3261e;border:none;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer;">🔄 もう一度保存する</button>' : '')+
       '<button type="button" data-ssclose="1" style="background:transparent;color:#fff;border:1px solid #fff;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer;">閉じる</button>';
   }
+  // 前に受け取った内容（base）と比べて、変えた項目・消した項目を出す
+  function diffForPatch(baseObj, data){
+    var patch = {}, base = {}, removed = [], n = 0;
+    Object.keys(data||{}).forEach(function(k){
+      if(k==="id" || k==="updatedAt") return;
+      var a = data[k], b = baseObj[k];
+      var ja, jb; try{ ja = JSON.stringify(a); jb = JSON.stringify(b); }catch(e){ ja = "x"; jb = "y"; }
+      if(ja !== jb){ patch[k] = a; if(b!==undefined) base[k] = b; n++; }
+    });
+    Object.keys(baseObj).forEach(function(k){
+      if(k==="id" || k==="updatedAt") return;
+      if(!(k in (data||{})) || data[k]===undefined){ if(!(k in patch)){ removed.push(k); base[k] = baseObj[k]; n++; } }
+    });
+    return { patch:patch, base:base, removed:removed, n:n };
+  }
   async function saveDocInner(collection, id, data){
     saveLastNetFail = false;
-    var body = JSON.stringify({ collection:collection, id:id, data:data, replace:true, by: state.currentUser||"" });
+    var bkey = collection+"/"+id, baseObj = null, sentPatch = null;
+    if(serverBase[bkey]){ try{ baseObj = JSON.parse(serverBase[bkey]); }catch(e){ baseObj = null; } }
+    var payload;
+    if(baseObj){
+      var d = diffForPatch(baseObj, data);
+      sentPatch = d.patch;
+      payload = { collection:collection, id:id, patch:d.patch, base:d.base, removed:d.removed, by: state.currentUser||"" };
+    }else{
+      payload = { collection:collection, id:id, data:data, replace:true, by: state.currentUser||"" };
+    }
+    var body = JSON.stringify(payload);
+    var sentJson = {};
+    if(sentPatch) Object.keys(sentPatch).forEach(function(k){ try{ sentJson[k] = JSON.stringify(sentPatch[k]); }catch(e){} });
     var waits = [0, 1500, 4000];   // 通信が切れた・サーバーが一時的に失敗したときは、間を空けて最大3回まで送る
     var lastErr = "";
     for(var attempt=0; attempt<waits.length; attempt++){
@@ -2915,6 +2947,28 @@
         toast("保存に失敗しました（" + saveNameOf(collection) + (detail?"："+detail:"：HTTP "+res.status) + "）");
         return false;
       }
+      // サーバーが重ねた結果（ほかの端末で足された項目を含む）を受け取り、次の比べる元にする。
+      // 画面のデータにも、ほかの端末で足された項目を取り込む（送ったあとにこの画面で書き換えた項目は触らない）
+      try{
+        var merged = await res.json(), gotOthers = false;
+        if(merged && merged.id!=null){
+          serverBase[bkey] = JSON.stringify(merged);
+          if(data && typeof data==="object"){
+            Object.keys(merged).forEach(function(k){
+              if(k==="id") return;
+              var mj; try{ mj = JSON.stringify(merged[k]); }catch(e){ return; }
+              var cj; try{ cj = JSON.stringify(data[k]); }catch(e){ return; }
+              if(mj===cj) return;
+              if(sentPatch && (k in sentPatch)){ if(cj===sentJson[k]) data[k] = merged[k]; return; }
+              if(baseObj){ var bj; try{ bj = JSON.stringify(baseObj[k]); }catch(e){ return; } if(cj!==bj) return; }
+              data[k] = merged[k];
+              if(k!=="updatedAt") gotOthers = true;
+            });
+            // ほかの端末で足された内容を取り込んだら、画面を描き直す（少し待ってまとめて1回）
+            if(gotOthers){ clearTimeout(saveDocInner._rt); saveDocInner._rt = setTimeout(function(){ try{ render(); }catch(e){} }, 300); }
+          }
+        }
+      }catch(e){}
       return true;
     }
     saveLastNetFail = true;
@@ -2934,6 +2988,7 @@
       }
       if(!res.ok){ toast("削除に失敗しました（" + collection + "・状態 " + res.status + "）"); return false; }
       rememberWrite(collection, id, null, true);
+      delete serverBase[collection+"/"+id];
       return true;
     }catch(e){ toast("削除に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
   }
@@ -3644,7 +3699,10 @@
         return '<div class="fttile"><a class="ftthumb" href="'+escapeHtml(it.url)+'" target="_blank" rel="noopener">'+fileThumbInner(it.url, it.contentType, "")+'</a>'+
           '<div class="ftbody"><div class="ftname">'+escapeHtml(nm)+(it.used?' <span class="muted">（付いています）</span>':'')+'</div>'+
           '<div class="ftacts"><a class="btn small secondary" href="'+escapeHtml(it.url)+'" target="_blank" rel="noopener">👁 見る</a>'+
-          (it.registered ? '<span class="muted" style="font-size:.85rem;">✓ 図面に登録しました</span>' : '<button type="button" class="btn small" data-orfreg="'+escapeHtml(it.key)+'">📐 図面に登録</button>')+'</div></div></div>';
+          (it.registered ? '<span class="muted" style="font-size:.85rem;">✓ '+escapeHtml(it.registered===true?"図面に登録しました":it.registered)+'</span>' :
+            '<button type="button" class="btn small" data-orfreg="'+escapeHtml(it.key)+'">📐 図面に登録</button>'+
+            '<button type="button" class="btn small secondary" data-orfearly="'+escapeHtml(it.key)+'">📝 初期の打合せ記録に戻す</button>'+
+            '<button type="button" class="btn small secondary" data-orffin="'+escapeHtml(it.key)+'">📋 資金計画・お見積りに戻す</button>')+'</div></div></div>';
       }).join("")+'</div>';
   }
   async function orfRegister(key){
@@ -3661,6 +3719,29 @@
     it.registered = true; it.used = true;
     renderOrphanFiles();
     toast("図面に登録しました。記録の行の「⋯」→「📐 登録済みのファイルから選ぶ」で付け直せます");
+  }
+  // 消えてしまった「初期の打合せ記録」「資金計画・お見積り」を、保管場所に残っているファイルから戻す（日付はアップロードした日）
+  async function orfRestoreTo(key, where){
+    var it = (orf.items||[]).find(function(x){ return x.key===key; }); if(!it || it.registered) return;
+    var pid = orf.pid; var p = projectById(pid);
+    if(!p){ toast("案件を選んでから探してください"); return; }
+    var d = new Date(it.at), ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    var ct = it.contentType || "application/pdf";
+    var fname = (where==="early" ? "手書きメモ_" : "資料_")+(d.getMonth()+1)+"月"+d.getDate()+"日"+(/pdf/.test(ct)?".pdf":/png/.test(ct)?".png":".jpg");
+    var file = {url:it.url, contentType:ct, name:fname};
+    var now = nowIso(), who = state.currentUser||"";
+    if(where==="early"){
+      p.earlyMeetings = (p.earlyMeetings||[]).slice();
+      p.earlyMeetings.push({id:"em"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date:ds, title:"（復元）", memo:"", shared:false, files:[file], createdAt:now, createdBy:who, restoredFrom:it.key});
+    }else{
+      p.financeDocs = (p.financeDocs||[]).slice();
+      p.financeDocs.push({id:"fd"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), kind:FIN_KINDS[0], date:ds, memo:"（復元）", shared:false, file:file, createdAt:now, createdBy:who, restoredFrom:it.key});
+    }
+    var ok = await saveDoc("projects", p.id, p);
+    if(ok===false){ toast("戻せませんでした"); return; }
+    it.registered = where==="early" ? "初期の打合せ記録に戻しました" : "資金計画・お見積りに戻しました"; it.used = true;
+    renderOrphanFiles(); render();
+    toast(it.registered+"（ヒアリングタブ。題名・お客様に見せるは「編集」で直してください）");
   }
   async function runPerfCheck(){
     var out = document.getElementById("perfResult"), btn = document.getElementById("btnPerfCheck");
@@ -18957,7 +19038,9 @@
     document.getElementById("orfProject").addEventListener("focus", orfFillProjects);
     document.getElementById("btnOrfSearch").addEventListener("click", orfSearch);
     document.getElementById("orfAll").addEventListener("change", renderOrphanFiles);
-    document.getElementById("orfResult").addEventListener("click", function(e){ var b = e.target.closest("[data-orfreg]"); if(b) orfRegister(b.dataset.orfreg); });
+    document.getElementById("orfResult").addEventListener("click", function(e){ var b = e.target.closest("[data-orfreg]"); if(b) orfRegister(b.dataset.orfreg);
+      var be = e.target.closest("[data-orfearly]"); if(be) orfRestoreTo(be.dataset.orfearly, "early");
+      var bf = e.target.closest("[data-orffin]"); if(bf) orfRestoreTo(bf.dataset.orffin, "fin"); });
     document.getElementById("btnDemoProject").addEventListener("click", createDemoProject);
     startAutoRefresh();
     var fsBtn = document.getElementById("btnFullscreen");
