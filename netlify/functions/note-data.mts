@@ -705,6 +705,8 @@ export default async (req: Request, context: Context) => {
       key: srcTask ? "t:" + srcTask.id : "s:" + String(p.id).slice(0, 78),
       askDecision: srcTask ? srcTask.askDecision : p.askDecision,
       homeShow: !!p.homeShow, homeShowAt: p.homeShowAt || "", homeHide: !!p.homeHide, docId: p.id,
+      // 反映するときにスタッフが書いた「お客様へのひとこと」（社内メモ memo は出さない）
+      msg: String(p.customerNote || "").slice(0, 500),
       source: srcTask ? { taskId: srcTask.id, noteSnippet: String(srcTask.content || "").slice(0, 60) } : (p.source || null),
       contentType: p.contentType || "",
       // 「契約時仕様」「見積もり仕様」の分類（お客様画面のタブ用。社内タスクなどのバッジは渡さない）
