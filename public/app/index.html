@@ -305,21 +305,15 @@
 
   .notelist{ display:flex; flex-direction:column; gap:10px; }
   .noteitem{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
-  /* おうちノートに反映済みの打合せ記録は、黄色（蛍光ペン風）の背景＋太い枠＋バッジで一目で分かるようにする */
-  .noteitem.reflected{ background:#fff3b0; border:3px solid #e0a800; }
-  .noteitem.reflected .ndate{ color:#6b5300; }
-  .noteitem.reflected .ntitle{ color:#3d2f00; }
-  .noteitem .nreflbadge{ background:#e0a800; color:#2b2100; font-size:.85rem; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  /* 記録・書類・写真のカードは同じ見た目：左の線の色＝種類（記録＝青・業者の書類＝オレンジ・写真／PDF＝灰）、
+     おうちノートに出している（反映済みの）カードは薄い緑の背景＋緑の枠 */
+  .noteitem{ border-inline-start:5px solid var(--blue); }
+  .noteitem.reflected{ background:var(--accent-soft); border:2px solid var(--accent); border-inline-start:5px solid var(--blue); }
+  .noteitem .nreflbadge{ background:var(--surface-2); color:var(--ink); border:1px solid var(--border); font-size:.85rem; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .noteitem .nhead{ padding-inline-end:92px; }
+  .noteitem .notemenu-trigger{ position:absolute; top:8px; inset-inline-end:10px; }
   .noteitem .nsentbadge{ background:#e3efe6; color:#1f5a33; border:1px solid #9cc7a9; font-size:.85rem; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
   .notemenu button.on{ color:#1f5a33; }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]) .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
-    :root:not([data-theme="light"]) .noteitem.reflected .ndate{ color:#e8d27a; }
-    :root:not([data-theme="light"]) .noteitem.reflected .ntitle{ color:#fff6cf; }
-  }
-  :root[data-theme="dark"] .noteitem.reflected{ background:#4a3d0a; border-color:#e0a800; }
-  :root[data-theme="dark"] .noteitem.reflected .ndate{ color:#e8d27a; }
-  :root[data-theme="dark"] .noteitem.reflected .ntitle{ color:#fff6cf; }
   .noteitem .ndate{ font-size:.85rem; color:var(--muted); font-weight:700; }
   .noteitem .ntitle{ font-size:.92rem; font-weight:700; }
   .noteitem .nhead{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:8px; }
@@ -1048,10 +1042,13 @@
   .spectl-meta{ flex-grow:1; min-width:120px; }
   .spectl-actions{ display:flex; flex-wrap:wrap; gap:6px; max-width:100%; margin-inline-start:auto; }
   /* 変更履歴のカード：ボタン類は「⋯」の中（ふだんは閉じる） */
-  .spectl-card{ position:relative; padding-inline-end:96px !important; }
+  .spectl-card{ position:relative; border-inline-start-width:5px; }
+  .spectl-card .spectl-meta{ padding-inline-end:84px; }
+  .spectl-card.reflected{ background:var(--accent-soft); border-width:2px; border-inline-start-width:5px; border-block-color:var(--accent); border-inline-end-color:var(--accent); }
   .spectl-ops{ position:absolute; top:6px; inset-inline-end:8px; }
-  .qtg{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-inline-start:auto; }
-  .spectl-card .qtg{ flex-basis:100%; }
+  .qtg{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-start; margin-block-start:6px; }
+  .spectl-card .qtg{ flex-basis:100%; margin-block-start:0; }
+  @media (max-width:760px){ .qtg{ gap:4px; } .qtgbtn{ padding:3px 8px !important; } }
   .qtgbtn{ font:inherit; font-size:.85rem; font-weight:700; padding:3px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; white-space:nowrap; }
   .qtgbtn:hover{ border-color:var(--accent); color:var(--accent); }
   .qtgbtn.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -8807,7 +8804,7 @@
       var grp = function(m, label, cls){ var t = ls.filter(function(l){ return (l.m||"")===m; }).map(function(l){ return l.t; }); return t.length ? '<div class="nbox '+cls+'"><div class="nboxlabel">'+label+'</div><div class="ntext">'+escapeHtml(t.join("\n"))+'</div></div>' : ""; };
       return '<div class="noteitem partial'+(n.reflected?" reflected":"")+'">'+
         '<div class="nhead"><span class="ndate">'+escapeHtml(n.date || fmtTs(n.createdAt))+' ・ '+escapeHtml(n.author||"")+'</span>'+
-        (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
+        (n.reflected ? '<span class="pill reflect small on">✓反映済み</span>' : '')+
         '<span class="pill tag small">打合せ記録の一部</span>'+(n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
         '<button class="btn ghost small" data-act="editnote" data-id="'+n.id+'" title="記録全体を開いて行の部位を直す">✏️ 記録を開く</button></div>'+
         grp("", "打合せ内容", "talk")+grp("d", "✅ 仮決定（打合せで決めたこと）", "decided")+grp("o", "💭 お客様に検討いただくこと", "open")+grp("c", "🔒 社内で確認（お客様には出ません）", "chk")+
@@ -8842,16 +8839,14 @@
         return '<span class="nsentbadge">✓ '+t.badge+'</span>';
       }).join("");
       return '<div class="noteitem'+(menuOpen?" notemenu-open":"")+(n.reflected?" reflected":"")+'">'+
-        '<div class="nhead"><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
-        (n.reflected ? '<span class="nreflbadge">🌐 お客様に反映済み</span>' : '')+
+        '<div class="nhead"><span class="pill small spectl-type-note">📝 打合せ記録</span><span class="ndate">'+escapeHtml(dateLabel)+' ・ '+escapeHtml(n.author||"")+'</span>'+
+        (n.reflected ? '<span class="pill reflect small on">✓反映済み</span>' : '')+
         noteDecMarkHtml(n)+
-        (n.homeShow ? '<span class="nreflbadge">🏠 ホームに表示中</span>' : '')+
         (n.homeHide ? '<span class="nreflbadge" style="background:#eee;color:#666;">🚫 ホームに出さない</span>' : '')+
         stampsHtml(n)+
         sentBadgeHtml+
         chHtml+(specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
-        quickTogglesHtml("n", n.id, { reflected: n.reflected, ask: n.askDecision, home: n.homeShow })+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
         noteLinePartsChipsHtml(n)+
@@ -8862,6 +8857,7 @@
         noteLineExtrasHtml(n)+
         msgHtml+
         filesHtml+
+        quickTogglesHtml("n", n.id, { reflected: n.reflected, ask: n.askDecision, home: n.homeShow })+
         menuHtml+
         '</div>';
     };
@@ -10451,12 +10447,12 @@
     f = f || {};
     if(f.noShare) return "";
     var b = function(act, label, on, tip){
-      return '<button type="button" class="qtgbtn'+(on?" on":"")+'" data-qtg="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'" title="'+escapeHtml(tip)+'">'+(on?"✓ ":"")+label+'</button>';
+      return '<button type="button" class="qtgbtn'+(on?" on":"")+'" data-qtg="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'" title="'+escapeHtml(tip)+'">'+(on?"✓":"")+label+'</button>';
     };
     return '<div class="qtg">'+
       b("refl", "反映", !!f.reflected, f.reflected ? "おうちノートに出しています（押すと外す）" : "おうちノートの家づくりの項目に出す")+
-      b("home", "🏠 ホーム", !!f.home, f.home ? "おうちノートのホームに出しています（押すと外す）" : "おうちノートのホームに出す（反映もします）")+
-      b("ask", "🔘 決定ボタン", !!f.ask, f.ask ? "お客様の決定ボタンを出しています（押すと出さない）" : "お客様に決定ボタンを出す（反映もします）")+
+      b("home", "🏠ホーム", !!f.home, f.home ? "おうちノートのホームに出しています（押すと外す）" : "おうちノートのホームに出す（反映もします）")+
+      b("ask", "🔘決定ボタン", !!f.ask, f.ask ? "お客様の決定ボタンを出しています（押すと出さない）" : "お客様に決定ボタンを出す（反映もします）")+
       '</div>';
   }
   var qtgBusy = false;
@@ -10699,7 +10695,7 @@
     var ops = uniOpsSections("att", a.id, drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : "",
       { reflected: a.reflected && sharable, reflectNote: sharable ? "" : "この種類（"+(quoteTypeNorm(a.quoteType)||"")+"）はお客様には出ません", ask: a.askDecision, home: a.homeShow },
       specSentInfo(a));
-    return '<div class="spectl-card spectl-type-vendor-border">'+
+    return '<div class="spectl-card spectl-type-vendor-border'+(a.reflected && sharable ? ' reflected' : '')+'">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
       '<div class="spectl-meta"><div class="row" style="gap:5px;">'+
         '<span class="pill small spectl-type-vendor">見積から</span>'+quotePill(a.quoteType)+
@@ -10834,7 +10830,7 @@
     var badgeRowHtml = (p.kind==="note")
       ? (relatedNote ? '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("note:"+relatedNote.id, relatedNote.badges)+'</div>' : "")
       : '<div style="flex-basis:100%; margin-block-start:5px;">'+badgeTogglePillsHtml("sp:"+p.id, p.badges, "spec")+'</div>';
-    var cardClass = "spectl-card "+typeClass+"-border";
+    var cardClass = "spectl-card "+typeClass+"-border"+(reflectedNow ? " reflected" : "");
     // 操作メニューの並び（打合せ記録のカードと同じ順）：書き込む→お客様へ→タスク・依頼→整理→削除
     // 操作メニュー（記録・写真・PDF・見積の書類で同じ並び）：書き込む→反映→追加見積り→社内タスク→業者へGmail→Gmailから取り込み→部位の変更→編集・削除
     var opsSections = function(drawHtml){
