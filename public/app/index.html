@@ -360,6 +360,8 @@
   .kc-ordstamp.off{ opacity:.35; }
   .kc-ordstamp.rpl{ color:#2a63b8; border-color:#2a63b8; }
   .kc-ordstamp.rpl small{ border-top-color:#2a63b8; }
+  .kc-ordstamp.home{ color:#2e8b57; border-color:#2e8b57; }
+  .kc-ordstamp.home small{ border-top-color:#2e8b57; }
   .kc-ordstamp.rep{ color:#d9822b; border-color:#d9822b; }
   .kc-ordstamp.rep small{ border-top-color:#d9822b; }
   .ktaxhead.dec{ color:#d23c32; }
@@ -4681,6 +4683,14 @@
     if(lastRv && (lastRv.result==="返信" || lastRv.result==="コメント")) meta.push('<span class="chk" style="color:#3a6ea5;">💬 '+escapeHtml(lastRv.by||"")+'から'+(lastRv.result==="返信"?"返信":"コメント")+'</span>');
     var ordMd = t.ordered && t.ordered.at ? (function(d){ return (d.getMonth()+1)+"/"+d.getDate(); })(new Date(t.ordered.at)) : "";
     var stamps = [];
+    // 届いた書類の「登録済」（青）・「おうち」（緑）：Gmailから来たタスク＝案件の書類に登録したもの、「📤 お客様に送る？」＝確認した書類
+    if(t.quoteReg || t.sendCheck){
+      var qDocs = ((t.quoteReg ? t.quoteReg.attIds : t.sendCheck.quoteAttIds) || []).map(function(aid){ return state.attachments.find(function(x){ return x.id===aid && !x.deletedAt; }); }).filter(Boolean);
+      var shownDoc = qDocs.filter(vfAttShown)[0];
+      var homeOn = !!shownDoc || !!(t.sendCheck && t.sendCheck.result==="おうちノート");
+      if(homeOn){ var hAt = (shownDoc && shownDoc.reflectedAt) || (t.sendCheck && t.sendCheck.doneAt) || ""; stamps.push('<div class="kc-ordstamp home" title="おうちノートに出ています">おうち'+(hAt?'<small>'+escapeHtml(mdOf(hAt))+'</small>':'')+'</div>'); }
+      if(t.quoteReg) stamps.push('<div class="kc-ordstamp rpl" title="案件の書類に登録済み（'+qDocs.length+'件）">登録済<small>'+escapeHtml(mdOf(t.quoteReg.at))+'</small></div>');
+    }
     if(t.custEstimate){
       var ceOk = t.custEstimate.response==="承認", ceUndo = !!t.custEstimate.undone;
       stamps.push('<div class="kc-ordstamp '+(ceOk?'dec':'chg')+(ceUndo||!ceOk?' off':'')+'" title="お客様の追加見積りの返事">'+(ceOk?'承認':'見送<br>り')+'<small>'+escapeHtml(mdOf(t.custEstimate.at))+'</small></div>');
