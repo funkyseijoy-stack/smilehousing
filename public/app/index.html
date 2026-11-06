@@ -2798,18 +2798,52 @@
   }
   async function saveDoc(collection, id, data){
     pendingSaves++; saveStatusShow("saving");
-    var ok = false;
-    try{ ok = await saveDocInner(collection, id, data); if(ok) rememberWrite(collection, id, data); if(ok && (collection==="requests" || collection==="attachments")) scheduleEstSync(); if(ok && collection==="meetingNotes") scheduleNoteCheckSync(); return ok; }
+    var ok = false, key = collection+"/"+id;
+    try{
+      ok = await saveDocInner(collection, id, data);
+      if(ok){
+        // 同じものが前に保存できていなかったら、今回の保存で済んだので外す
+        if(saveFailQueue[key]) delete saveFailQueue[key];
+        rememberWrite(collection, id, data);
+        if(collection==="requests" || collection==="attachments") scheduleEstSync();
+        if(collection==="meetingNotes") scheduleNoteCheckSync();
+      }else if(saveLastNetFail){
+        // 通信が切れて届かなかったものは、あとで「もう一度保存する」で送り直せるよう控える（同じものは最新の内容で上書き）
+        saveFailQueue[key] = {collection:collection, id:id, data:data, at:Date.now()};
+      }
+      return ok;
+    }
     catch(e){ ok = false; throw e; }
     finally{
       pendingSaves--; lastSaveAt = Date.now();
       if(ok===false){ saveStatusFail(collection); }
       else if(pendingSaves>0){ saveStatusShow("saving"); }
-      else { saveStatusShow(saveFailCount>0 ? "failed" : "saved"); }
+      else { saveStatusShow(saveFailCount>0 || Object.keys(saveFailQueue).length ? "failed" : "saved"); }
     }
   }
   // ---- 保存の状態表示（画面の上に常時）：保存中… → ✓保存しました ／ 失敗は赤い帯を閉じるまで出す ----
   var saveFailCount = 0, saveFailNames = {}, saveStatusTimer = null;
+  var saveFailQueue = {};          // 通信が切れて保存できなかったもの（"collection/id" → {collection,id,data}）
+  var saveLastNetFail = false;     // 直前の saveDocInner の失敗が通信の問題だったか
+  var SAVE_NAMES = {meetingNotes:"打合せ記録", specPhotos:"写真・PDF", attachments:"書類・図面", tasks:"タスク", projects:"案件",
+    requests:"見積依頼", messages:"メッセージ", albumPhotos:"アルバムの写真", noteDecisions:"決定のはんこ", reservations:"予約",
+    vendors:"業者", settings:"設定", imageBoard:"お家のイメージ", sitePhotos:"現場写真", pbLayers:"書き込みの元データ", activity:"操作履歴"};
+  function saveNameOf(c){ return SAVE_NAMES[c] || c; }
+  window.addEventListener("beforeunload", function(e){
+    if(Object.keys(saveFailQueue).length || pendingSaves>0){ e.preventDefault(); e.returnValue = ""; return ""; }
+  });
+  async function retryFailedSaves(){
+    var keys = Object.keys(saveFailQueue);
+    if(!keys.length){ saveFailCount = 0; saveFailNames = {}; saveStatusShow("saved"); return; }
+    saveFailCount = 0; saveFailNames = {};
+    var left = 0;
+    for(var i=0;i<keys.length;i++){
+      var q = saveFailQueue[keys[i]]; if(!q) continue;
+      var ok = await saveDoc(q.collection, q.id, q.data);
+      if(!ok) left++;
+    }
+    if(!left){ toast("保存できていなかった内容を保存しました"); render(); }
+  }
   function saveStatusEl(){
     var el = document.getElementById("saveStatus");
     if(el) return el;
@@ -2819,7 +2853,11 @@
     el.style.cssText = "position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:98;max-width:94vw;display:none;align-items:center;gap:10px;padding:8px 16px;border-radius:999px;font-size:.95rem;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.25);";
     document.body.appendChild(el);
     el.addEventListener("click", function(e){
-      if(e.target.closest("[data-ssclose]")){ saveFailCount = 0; saveFailNames = {}; el.style.display = "none"; }
+      if(e.target.closest("[data-ssretry]")){ retryFailedSaves(); return; }
+      if(e.target.closest("[data-ssclose]")){
+        if(Object.keys(saveFailQueue).length && !confirm("保存できていない内容があります。送り直さずに閉じると、画面を閉じたときに消えます。閉じますか？")) return;
+        saveFailCount = 0; saveFailNames = {}; saveFailQueue = {}; el.style.display = "none";
+      }
     });
     return el;
   }
@@ -2841,33 +2879,47 @@
     if(collection){ saveFailCount++; saveFailNames[collection] = true; }
     var el = saveStatusEl();
     clearTimeout(saveStatusTimer);
-    el.style.cssText += ";display:flex;background:#b3261e;color:#fff;border-radius:14px;padding:10px 16px;";
-    el.innerHTML = '<span>⚠ 保存できていない内容があります（'+saveFailCount+'件）。もう一度操作してください</span>'+
-      '<button type="button" data-ssclose="1" style="background:#fff;color:#b3261e;border:none;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer;">閉じる</button>';
+    var names = {};
+    Object.keys(saveFailNames).forEach(function(c){ names[saveNameOf(c)] = 1; });
+    Object.keys(saveFailQueue).forEach(function(k){ names[saveNameOf(saveFailQueue[k].collection)] = 1; });
+    var nq = Object.keys(saveFailQueue).length;
+    el.style.cssText += ";display:flex;flex-wrap:wrap;justify-content:center;background:#b3261e;color:#fff;border-radius:14px;padding:10px 16px;";
+    el.innerHTML = '<span>⚠ 保存できていない内容があります（'+escapeHtml(Object.keys(names).join("・")||"")+'）。'+(nq ? '通信が切れたようです。' : 'もう一度操作してください')+'</span>'+
+      (nq ? '<button type="button" data-ssretry="1" style="background:#fff;color:#b3261e;border:none;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer;">🔄 もう一度保存する</button>' : '')+
+      '<button type="button" data-ssclose="1" style="background:transparent;color:#fff;border:1px solid #fff;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer;">閉じる</button>';
   }
   async function saveDocInner(collection, id, data){
-    try{
-      var res = await fetch('/api/staff-data', {
-        method:'PUT',
-        headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
-        body: JSON.stringify({ collection:collection, id:id, data:data, replace:true, by: state.currentUser||"" })
-      });
+    saveLastNetFail = false;
+    var body = JSON.stringify({ collection:collection, id:id, data:data, replace:true, by: state.currentUser||"" });
+    var waits = [0, 1500, 4000];   // 通信が切れた・サーバーが一時的に失敗したときは、間を空けて最大3回まで送る
+    var lastErr = "";
+    for(var attempt=0; attempt<waits.length; attempt++){
+      if(waits[attempt]) await new Promise(function(r){ setTimeout(r, waits[attempt]); });
+      var res;
+      try{
+        res = await fetch('/api/staff-data', {
+          method:'PUT',
+          headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()},
+          body: body
+        });
+      }catch(e){ lastErr = String(e && e.message || e); continue; }
       if(res.status===401){
         showLoginScreen("認証エラー（保存: " + collection + "）。もう一度ログインしてください");
         return false;
       }
-      // ステータスを確認せずtrueを返していたため、サーバー側で保存が失敗しても
-      // 画面上は「保存できた」ように見えてしまっていた（例：写真を追加した直後は
-      // 表示されるが、実際にはサーバーに保存されておらず、再読み込みすると消える）。
-      // 必ずres.okを確認し、失敗時はエラーを表示する。
+      // 必ずres.okを確認し、失敗時はエラーを表示する（以前はステータスを見ずに成功扱いしていた）。
       if(!res.ok){
+        if(res.status>=500 || res.status===429){ lastErr = "HTTP "+res.status; continue; }
         var detail = "";
         try{ var j = await res.json(); detail = j && j.error ? j.error : ""; }catch(e){}
-        toast("保存に失敗しました（" + collection + (detail?"："+detail:"：HTTP "+res.status) + "）");
+        toast("保存に失敗しました（" + saveNameOf(collection) + (detail?"："+detail:"：HTTP "+res.status) + "）");
         return false;
       }
       return true;
-    }catch(e){ toast("保存に失敗しました（詳細: " + String(e && e.message || e) + "）"); return false; }
+    }
+    saveLastNetFail = true;
+    toast("保存できませんでした（" + saveNameOf(collection) + "・通信が切れたようです" + (lastErr?"："+lastErr:"") + "）");
+    return false;
   }
   async function hardDeleteDoc(collection, id){
     try{

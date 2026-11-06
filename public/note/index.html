@@ -153,6 +153,7 @@
   .pcard .pamt{ font-size:1.15rem; font-weight:700; margin-top:6px; }
   .pcard .pamt .tx{ font-size:.75rem; font-weight:400; color:var(--muted); margin-left:4px; }
   .pcard .pcb{ display:flex; gap:8px; margin-top:10px; }
+  .btn.stopen{ width:100%; padding:13px 8px; border-color:#c0392b; color:#b3261e; font-size:.95rem; }
   .pcard .pcb .btn{ flex:1; white-space:nowrap; padding-left:6px; padding-right:6px; font-size:.88rem; }
   .pcard .pcb .btn.pdec{ border-color:#5a8a4a; color:#3f6b33; }
   .pcard .pwait{ font-size:.8rem; color:#a8581c; margin-top:8px; }
@@ -1876,11 +1877,15 @@ function homeHtml(){ return homeParts().main; }
     };
     var asks = askItems();
     if(mode==="stamped"){
+      // 長くなるので、ふだんはたたんで「決定事項を確認する」ボタンだけ出す（押すと全部開く）
+      var stTotal = stamped.length + stHidden;
+      if(!stTotal) return "";
+      var head = '<div class="sechd"><h3>🔴 決定したもの</h3><span class="countpill">'+stTotal+'件</span></div>';
+      if(!view.stampOpen) return head+'<button class="btn ol stopen" data-stampopen="1">🔴 決定事項を確認する（'+stTotal+'件）▾</button>';
+      if(stHidden){ view.stampAll = true; return pendingCardsHtml("stamped"); }
       stamped.forEach(addCard);
-      if(stHidden) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">ほか '+stHidden+'件を見る</button>');
-      else if(view.stampAll && stamped.length > ST_LIM) cards.push('<button class="btn ol" style="width:100%;" data-stampall="1">閉じる ▴</button>');
-      if(!cards.length) return "";
-      return '<div class="sechd"><h3>🔴 決定したもの</h3><span class="countpill">'+(stamped.length+stHidden)+'件</span></div><div class="pcards">'+cards.join("")+'</div>';
+      cards.push('<button class="btn ol stopen" data-stampopen="1">たたむ ▴</button>');
+      return head+'<div class="pcards">'+cards.join("")+'</div>';
     }
     // 打合せ記録の行を切り出したカード（決定してもらう行）は出さない：ホームの記録の中のその行で決定する（各部位の画面には独立したカードで出る）
     asks.filter(function(e){ return !e.x.lineCard; }).forEach(addCard);
@@ -2633,6 +2638,7 @@ function homeHtml(){ return homeParts().main; }
     var openplans = e.target.closest("[data-openplans]"); if(openplans){ view.tab="build"; view.buildSeg="docs"; view.plansOnly=true; render(); window.scrollTo(0,0); return; }
     var docsall = e.target.closest("[data-docsall]"); if(docsall){ view.plansOnly=false; render(); window.scrollTo(0,0); return; }
     var consall = e.target.closest("[data-consall]"); if(consall){ view.consAll = !view.consAll; render(); return; }
+    var stopen = e.target.closest("[data-stampopen]"); if(stopen){ view.stampOpen = !view.stampOpen; view.stampAll = view.stampOpen; render(); if(!view.stampOpen){ var hd = main.querySelector("[data-stampopen]"); if(hd) hd.scrollIntoView({block:"center"}); } return; }
     var stampall = e.target.closest("[data-stampall]"); if(stampall){ view.stampAll = !view.stampAll; render(); return; }
     var apprall = e.target.closest("[data-apprall]"); if(apprall){ view.apprAll = !view.apprAll; render(); return; }
     var onote = e.target.closest("[data-opennote]");
