@@ -827,6 +827,7 @@
   .kancard .kc-content{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-block-end:4px; }
   .kancard .kc-part{ font-size:.85rem; padding:1px 8px; margin-block-end:4px; }
   .kancard .kc-full{ display:none; }
+  .kancard .kc-qclosed{ margin-block-start:6px; }
   .kancard .kc-state{ display:flex; align-items:center; gap:6px; font-weight:700; margin-block-end:6px; }
   .kancard .kc-state .kandot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
   .kancard.exp{ grid-column:1 / -1; cursor:default; box-shadow:0 0 0 2px var(--accent); }
@@ -4708,6 +4709,7 @@
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
         (t.vendorCard && !exp ? vcNextLineHtml(t) : '')+
+        (!exp && t.fromGmail && !t.quoteReg && !t.estReq && (t.status||"未着手")!=="完了" && (t.attachments||[]).length ? '<button type="button" class="btn small kc-qbtn kc-qclosed" data-taskact="toquote" data-id="'+t.id+'">📄 案件の書類に登録（添付'+t.attachments.length+'件）</button>' : '')+
         (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
       '</div>'+
       (who ? '<div class="kc-av" style="background:'+avatarColor(who)+'" title="担当 '+escapeHtml(who)+'">'+escapeHtml(who.slice(0,1))+'</div>' : '<div class="kc-av none" title="担当未設定">？</div>')+
@@ -5496,10 +5498,13 @@
     if(act==="note"){
       var docs = sendCheckQuoteDocs(t).filter(function(a){ return !a.reflected; });
       if(!docs.length){ toast("おうちノートに出せる書類（プランボード・定価）がありません"); return; }
+      var cmt = await askReflectComment(docs[0].customerNote || "", docs.map(function(a){ return a.name || "書類"; }));
+      if(cmt===null) return;
       var apply = async function(part){
         var n = 0;
         for(var i=0;i<docs.length;i++){
           var a = docs[i];
+          if(cmt) a.customerNote = cmt; else delete a.customerNote;
           if(!taskPartReflectable(a.specPart)){ if(!part) continue; a.specPart = part; delete a.specPartAuto; }
           a.reflected = true; a.reflectedAt = nowIso();
           if(await saveDoc("attachments", a.id, a)!==false) n++;
@@ -5605,8 +5610,7 @@
             return '<div class="kwaititem">'+(src?'<div class="kwaitsrc">'+escapeHtml(src)+'</div>':'')+kanCardHtml(t, t.status||"未着手")+
               '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
               (isCustomerTask(t) ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="custreply" data-id="'+escapeHtml(t.id)+'">💬 お客様に返信</button>' : '')+
-              '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'" title="対応がいらないものを、確認したことにして完了の列へ移す">✅ 確認して閉じる</button>'+
-              (t.fromGmail && !t.quoteReg && (t.attachments||[]).length ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="toquote" data-id="'+escapeHtml(t.id)+'">📄 案件の書類に登録</button>' : '')+'</div>';
+              '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'" title="対応がいらないものを、確認したことにして完了の列へ移す">✅ 確認して閉じる</button>'+'</div>';
           }).join("")+'</div></div></div>';
       }
     }
@@ -17307,11 +17311,12 @@
     });
   }
   // 「反映」でおうちノートに出すとき、お客様へのひとことを書く小さな画面。反映する→文（空でも可）／やめる→null
-  function askReflectComment(prev){
+  function askReflectComment(prev, names){
     return new Promise(function(resolve){
       var ov = document.createElement("div");
       ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
       ov.innerHTML = '<div class="taskform-card rcpop" style="max-width:520px; width:100%;"><h3 style="margin:0 0 6px;">🏠 おうちノートに反映します</h3>'+
+        (names && names.length ? '<div style="font-size:.9rem; margin-block-end:6px;">'+names.map(function(n){ return '📄 '+escapeHtml(n); }).join('<br>')+'</div>' : '')+
         '<div class="muted" style="font-size:.85rem; margin-block-end:6px;">お客様へのひとこと（空欄のままでも反映できます）。カードに「スタッフから：〜」と出ます。</div>'+
         '<textarea rows="4" style="width:100%; box-sizing:border-box;" maxlength="500" placeholder="例：前回のご要望で、収納を広げた図面です。ご確認ください。"></textarea>'+
         '<div class="row" style="gap:8px; margin-block-start:10px;"><button type="button" class="btn" data-ok>反映する</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
