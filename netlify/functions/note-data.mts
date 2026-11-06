@@ -656,8 +656,36 @@ export default async (req: Request, context: Context) => {
   const specBadge = (b: any) => ({ contract: !!(b && b.contract), quote: !!(b && b.quote) });
   const reflectedNotes = notes.filter((n) => n.reflected);
   const timelineByCat: Record<string, any[]> = {};
+  // 同じファイルを「記録の添付」と「写真・PDF／見積の書類のカード」の両方で反映していると、お客様画面に2回出てしまう。
+  // カードとして出しているファイル（url・保管場所のkey・PDFのファイル名）を覚えておき、記録の添付からはそのファイルだけ省く
+  // （記録の文章はそのまま出す。データは書き換えない）。
+  const cardShown = { urls: new Set<string>(), keys: new Set<string>(), names: new Set<string>() };
+  const fileKeyOf = (u: string) => { const m = /[?&]key=([^&]+)/.exec(String(u || "")); try { return m ? decodeURIComponent(m[1]) : ""; } catch { return m ? m[1] : ""; } };
+  const pdfNameOf = (f: any) => {
+    const name = String((f && (f.name || f.fileName)) || "");
+    const isPdf = /pdf/i.test(String((f && f.contentType) || "")) || /\.pdf$/i.test(name);
+    if (!isPdf) return "";
+    const n = name.replace(/\.pdf$/i, "").replace(/[\s　]+/g, "").toLowerCase();
+    // 「scan」「document」のようなありふれた名前は別のファイルでも同じになりやすいので使わない
+    if (n.length < 6 || /^(scan|スキャン|document|file|image|img|doc|名称未設定|無題)/i.test(n)) return "";
+    return n;
+  };
+  const markShown = (f: any) => {
+    if (!f || !f.url) return;
+    cardShown.urls.add(f.url);
+    const k = fileKeyOf(f.url); if (k) cardShown.keys.add(k);
+    const nm = pdfNameOf(f); if (nm) cardShown.names.add(nm);
+  };
+  const notOnCard = (f: any) => {
+    if (!f || !f.url) return true;
+    if (cardShown.urls.has(f.url)) return false;
+    const k = fileKeyOf(f.url); if (k && cardShown.keys.has(k)) return false;
+    const nm = pdfNameOf(f); if (nm && cardShown.names.has(nm)) return false;
+    return true;
+  };
   const push = (cat: string | null, item: any) => {
     if (!cat) return;
+    if (item && item.type !== "note" && item.file) markShown(item.file);
     (timelineByCat[cat] = timelineByCat[cat] || []).push(item);
   };
 
@@ -765,7 +793,7 @@ export default async (req: Request, context: Context) => {
         t: String(l.t).trim(),
         m: l.m || "",
         part: l.p && l.p.scope ? partLabel(project, l.p.scope, l.p.category, l.p.roomId) : "",
-        files: (Array.isArray(l.f) ? l.f : []).map(fileOf),
+        files: (Array.isArray(l.f) ? l.f : []).map(fileOf).filter(notOnCard),
         estId: lineEstId(n, l.t),
         // 「この行をお客様に決定してもらう」の行：記録の中のその行に決定ボタンを出すためのカードの印（各部位の行のカードと同じ key）
         key: l.ask ? "l:" + n.id + "_" + lineHash(String(l.t).trim()) : "",
@@ -788,7 +816,7 @@ export default async (req: Request, context: Context) => {
       title: n.title || "",
       decided: n.decided != null ? n.decided : n.content || "",
       open: n.open || "",
-      files: (n.files || []).map(fileOf),
+      files: (n.files || []).map(fileOf).filter(notOnCard),
       spec: specBadge(n.badges),
       changing: isChanging(n),
       estReq: isEstReq(n),
@@ -1042,7 +1070,7 @@ export default async (req: Request, context: Context) => {
         estReq: isEstReq(n),
         part: (n.specPart && n.specPart.label) || "",
         scope: (n.specPart && n.specPart.scope) || "",
-        files: (n.files || []).map(fileOf),
+        files: (n.files || []).map(fileOf).filter(notOnCard),
         lines: linesOf(n),
         estId: (n.sent && n.sent.estimate && n.sent.estimate.ref) || "",
         spec: specBadge(n.badges),
