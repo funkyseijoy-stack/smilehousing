@@ -1755,7 +1755,7 @@
         <div class="card">
           <h3>追加見積り</h3>
           <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">追加見積りを登録して金額を入れると、お客様が新しいおうちノートで「承認／見送り」を選べます。お客様が回答すると、この画面の「状態」に反映され、通知メールも届きます。状態は、ここで手動でも変えられます。</p>
-          <p style="margin:0 0 8px; font-size:.85rem; font-weight:700; padding:6px 10px; border-radius:8px; background:var(--surface-2);">💡 金額は、各カードの「金額を入力」欄から入れます。空欄のままだと、お客様には「金額確認中」と表示されます。</p>
+          <p style="margin:0 0 8px; font-size:.85rem; font-weight:700; padding:6px 10px; border-radius:8px; background:var(--surface-2);">💡 金額は、各カードの「✏️ 直す」から入れます（件名・内容もここで直せます）。空欄のままだと、お客様には「金額確認中」と表示されます。</p>
           <p class="muted" id="okaiEstimateTotal" style="margin:0 0 8px; font-size:.85rem; font-weight:700;" hidden></p>
           <div id="okaiEstimateList" style="display:flex; flex-direction:column; gap:8px;"></div>
           <div class="empty" id="okaiEstimateEmpty" hidden>まだ追加見積りはありません。</div>
@@ -10259,7 +10259,9 @@
         var proj0 = projectById(c.projectId);
         if(!proj0){ toast("案件が見つかりません"); return; }
         var est0 = String(c.what||"").split("\n")[0].trim();
-        var estTitle = (label ? label+"：" : "")+est0;
+        // ファイル名（〜.pdf など）は件名に入れない（部位名だけにして、ファイル名は内容のほうへ）
+        var isFileName = /\.[a-z0-9]{2,5}$/i.test(est0) || (c.files||[]).some(function(f){ return f && f.name && f.name===est0; });
+        var estTitle = isFileName ? (label || "追加見積り") : (label ? label+"：" : "")+est0;
         if(estTitle.length>30) estTitle = estTitle.slice(0,30)+"…";
         askChoice("追加見積りに載せる", "「"+proj0.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が載ります（金額確認中）。\n金額は「おうちノート連携」タブの追加見積りで入れてください。", [{label:"載せる", value:"go"}], async function(v){
           if(v!=="go") return;
@@ -11130,15 +11132,30 @@
       totalEl.hidden = false;
       totalEl.textContent = "合計金額（税抜き）：¥" + total.toLocaleString("ja-JP") + "（" + items.length + "件" + (pending ? "・うち金額確認中" + pending + "件" : "") + "）";
     }
+    okaiEstLast = customer;
+    // 直している途中に描き直しても、入力中の文字を消さない
+    var keep = null, ec = okaiEstEdit && list.querySelector(".okai-est-editing");
+    if(ec && ec.dataset.estcard===okaiEstEdit) keep = { t: ec.querySelector("[data-okai-edit-title]").value, a: ec.querySelector("[data-okai-edit-amount]").value, n: ec.querySelector("[data-okai-edit-note]").value };
     list.innerHTML = items.map(function(it){
       var hasAmount = !!String(it.amount||"").trim();
+      if(okaiEstEdit===it.id){
+        return '<div class="card okai-est-editing" style="padding:8px 10px; border-color:var(--accent);" data-estcard="'+escapeOkai(it.id)+'">'+
+          '<div style="font-weight:700; margin-block-end:6px;">✏️ 追加見積りを直す</div>'+
+          '<label class="field">件名<input type="text" data-okai-edit-title value="'+escapeOkai(it.title||"")+'" placeholder="例：トイレ変更"></label>'+
+          '<label class="field">金額（税抜き）<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" data-okai-edit-amount value="'+escapeOkai(it.amount||"")+'" placeholder="例：¥48,000（減額は -30,000）。空欄なら「金額確認中」"></label>'+
+          '<label class="field">内容<textarea rows="3" data-okai-edit-note placeholder="お客様の画面に出る説明">'+escapeOkai(it.note||"")+'</textarea></label>'+
+          '<div class="row" style="gap:8px; margin-block-start:6px;"><button class="btn small" data-okai-edit-save="'+escapeOkai(it.id)+'">保存</button><button class="btn secondary small" data-okai-edit-cancel>やめる</button></div>'+
+          '</div>';
+      }
       var estState = okaiEstimateState(it);
       var fl = okaiFlash && okaiFlash.id===it.id && Date.now() < okaiFlash.until;
       return '<div class="card'+(fl?' okai-flash':'')+'" style="padding:8px 10px;" data-estcard="'+escapeOkai(it.id)+'">'+
         '<div class="row" style="justify-content:space-between; align-items:flex-start;">'+
         '<div style="font-weight:600;">'+escapeOkai(it.title)+'　'+(hasAmount ? escapeOkai(it.amount) : '')+'　<span class="pill '+(estState==="承認済み"?"estimate-承認":(estState==="見送り"?"estimate-見送り":"tag"))+'">'+escapeOkai(estState)+'</span></div>'+
-        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button>'+
+        '<span class="row" style="gap:6px; flex-wrap:nowrap;"><button class="btn secondary small" data-okai-edit-est="'+escapeOkai(it.id)+'">✏️ 直す</button>'+
+        '<button class="btn danger-ghost" style="padding:2px 8px; font-size:.85rem;" data-okai-del-estimate="'+escapeOkai(it.id)+'">削除</button></span>'+
         '</div>'+
+        (hasAmount ? '' : '<div class="muted" style="font-size:.85rem; margin-block-start:2px;">金額はまだ入っていません（お客様には「金額確認中」と表示）。「✏️ 直す」から入れてください。</div>')+
         (it.note?'<div class="muted" style="font-size:.85rem; margin-block-start:2px;">'+escapeOkai(it.note)+'</div>':'')+
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">お客様の回答：'+okaiEstimateResponsePill(it.customerResponse)+
         (it.customerRespondedAt?'<span class="muted" style="font-size:.85rem;">'+escapeOkai(new Date(it.customerRespondedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}))+'</span>':'')+
@@ -11146,12 +11163,40 @@
         '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">状態：'+
         '<select data-okai-est-state="'+escapeOkai(it.id)+'" style="flex:1; min-width:140px;">'+OKAI_EST_STATES.map(function(st){ return '<option value="'+st+'"'+(st===estState?' selected':'')+'>'+st+'</option>'; }).join("")+'</select>'+
         '</div>'+
-        '<div style="margin-block-start:6px; display:flex; align-items:center; gap:6px;">'+
-        '<input type="text" class="okai-est-amount-input" data-okai-amount-for="'+escapeOkai(it.id)+'" value="'+escapeOkai(it.amount||"")+'" placeholder="金額・税抜き（例：¥48,000／減額は -30,000）" style="flex:1; min-width:0;">'+
-        '<button class="btn secondary small" data-okai-save-amount="'+escapeOkai(it.id)+'">'+(hasAmount?'金額を変更':'金額を入力')+'</button>'+
-        '</div>'+
         '</div>';
     }).join("");
+    if(keep){ var nc = list.querySelector(".okai-est-editing"); if(nc){ nc.querySelector("[data-okai-edit-title]").value = keep.t; nc.querySelector("[data-okai-edit-amount]").value = keep.a; nc.querySelector("[data-okai-edit-note]").value = keep.n; } }
+  }
+  var okaiEstEdit = null, okaiEstLast = null;
+  function okaiOpenEstEdit(id, focusAmount){
+    okaiEstEdit = id;
+    if(okaiEstLast) renderOkaiEstimates(okaiEstLast);
+    var card = document.querySelector('#okaiEstimateList [data-estcard="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
+    if(!card) return;
+    var inp = card.querySelector(focusAmount ? "[data-okai-edit-amount]" : "[data-okai-edit-title]");
+    if(inp) setTimeout(function(){ try{ inp.focus({preventScroll:true}); }catch(e){} }, 50);
+  }
+  function okaiSaveEstimateEdit(id){
+    var proj = projectById(state.currentProjectId);
+    var card = document.querySelector('#okaiEstimateList [data-estcard="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
+    if(!proj || !card) return;
+    var title = card.querySelector("[data-okai-edit-title]").value.trim().slice(0,60);
+    var amount = card.querySelector("[data-okai-edit-amount]").value.trim();
+    var note = card.querySelector("[data-okai-edit-note]").value.trim().slice(0,2000);
+    if(!title){ toast("件名を入れてください"); return; }
+    var btn = card.querySelector("[data-okai-edit-save]"); if(btn) btn.disabled = true;
+    okaiUpdateList(proj.id, "customerEstimates", function(list){
+      return list.map(function(it){
+        return it.id === id ? Object.assign({}, it, { title: title, amount: amount, note: note, updated: new Date().toISOString() }) : it;
+      });
+    }).then(function(customer){
+      var saved = ((customer&&customer.customerEstimates)||[]).some(function(x){ return x.id===id && x.title===title && String(x.amount||"")===amount; });
+      if(!saved){ if(btn) btn.disabled = false; toast("保存されませんでした。もう一度お試しください"); return; }
+      okaiEstEdit = null;
+      renderOkaiEstimates(customer);
+      toast("✅ 追加見積りを直しました"+(amount ? "" : "（金額は空欄＝お客様には「金額確認中」）"));
+      logActivity("追加見積り「"+title.slice(0,20)+"」を直しました");
+    }).catch(function(){ if(btn) btn.disabled = false; toast("保存に失敗しました"); });
   }
   function okaiSaveEstimateAmount(id){
     var proj = projectById(state.currentProjectId);
@@ -15157,14 +15202,14 @@
     var tries = 0;
     (function look(){
       if(state.currentProjectId !== pid) return;
-      var del = estId ? document.querySelector('[data-okai-del-estimate="'+(window.CSS&&CSS.escape?CSS.escape(estId):estId)+'"]') : null;
-      var card = del ? del.closest(".card") : null;
+      var card = estId ? document.querySelector('#okaiEstimateList [data-estcard="'+(window.CSS&&CSS.escape?CSS.escape(estId):estId)+'"]') : null;
       var target = card || (tries > 25 ? document.getElementById("okaiEstimateList") : null);
       if(!target){ if(tries++ < 40) setTimeout(look, 200); return; }
       target.scrollIntoView({behavior:"smooth", block:"center"});
       if(card){
         card.classList.add("okai-flash");
-        var inp = card.querySelector(".okai-est-amount-input"); if(inp && !inp.value) setTimeout(function(){ try{ inp.focus({preventScroll:true}); }catch(e){} }, 600);
+        var est = ((okaiEstLast && okaiEstLast.customerEstimates)||[]).find(function(x){ return x.id===estId; });
+        if(est && !String(est.amount||"").trim() && okaiEstEdit!==estId) setTimeout(function(){ okaiOpenEstEdit(estId, true); }, 600);
       }
     })();
   }
@@ -15179,7 +15224,7 @@
     if(!content){ toast("内容が空のため載せられません"); return; }
     var firstLine = content.split("\n")[0].trim();
     var estTitle = firstLine.length>30 ? firstLine.slice(0,30)+"…" : firstLine;
-    askChoice("追加見積りに載せる", "「"+proj.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が載ります。\n\n金額を入れる場所：この案件の「おうちノート連携」タブ →「追加見積り」→ 各カードの「金額を入力」欄。\n空欄のままだと、お客様には「金額確認中」と表示されます。", [{label:"載せる", value:"go"}], async function(v){
+    askChoice("追加見積りに載せる", "「"+proj.name+"」のお客様のおうちノートに、追加見積り「"+estTitle+"」が載ります。\n\n金額を入れる場所：この案件の「おうちノート連携」タブ →「追加見積り」→ 各カードの「✏️ 直す」。\n空欄のままだと、お客様には「金額確認中」と表示されます。", [{label:"載せる", value:"go"}], async function(v){
       if(v!=="go") return;
       var pid = t.projectId;
       var estId = uid("est");
@@ -19342,6 +19387,9 @@
     document.getElementById("okaiEstimateList").addEventListener("click", function(e){
       var saveBtn = e.target.closest("[data-okai-save-amount]");
       if(saveBtn){ okaiSaveEstimateAmount(saveBtn.dataset.okaiSaveAmount); return; }
+      var eb = e.target.closest("[data-okai-edit-est]"); if(eb){ okaiOpenEstEdit(eb.dataset.okaiEditEst, false); return; }
+      var es = e.target.closest("[data-okai-edit-save]"); if(es){ okaiSaveEstimateEdit(es.dataset.okaiEditSave); return; }
+      if(e.target.closest("[data-okai-edit-cancel]")){ okaiEstEdit = null; if(okaiEstLast) renderOkaiEstimates(okaiEstLast); return; }
       var btn = e.target.closest("[data-okai-del-estimate]");
       if(!btn) return;
       okaiDeleteEstimate(btn.dataset.okaiDelEstimate);
