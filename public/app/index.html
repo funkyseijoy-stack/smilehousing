@@ -1050,6 +1050,11 @@
   /* 変更履歴のカード：ボタン類は「⋯」の中（ふだんは閉じる） */
   .spectl-card{ position:relative; padding-inline-end:96px !important; }
   .spectl-ops{ position:absolute; top:6px; inset-inline-end:8px; }
+  .qtg{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-inline-start:auto; }
+  .spectl-card .qtg{ flex-basis:100%; }
+  .qtgbtn{ font:inherit; font-size:.85rem; font-weight:700; padding:3px 10px; border-radius:999px; border:1.5px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; white-space:nowrap; }
+  .qtgbtn:hover{ border-color:var(--accent); color:var(--accent); }
+  .qtgbtn.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .opspop-ov{ position:fixed; inset:0; z-index:200; background:rgba(20,16,12,.35); display:flex; align-items:center; justify-content:center; padding:12px; }
   .opspop-ov .opspop{ display:block; position:static; width:min(440px, 100%); max-height:80vh; }
   /* Gmailから取り込む画面（操作メニューの見た目＝ボタン幅100%を使わない専用の枠） */
@@ -1369,6 +1374,7 @@
         <div class="tagbar" id="detailTagBar" style="margin-block-start:10px;"></div>
         <div class="row" style="gap:8px; margin-block-start:10px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--border); padding-block-start:10px;">
           <button class="btn small" id="btnSendPhotoProj" type="button">📷 写真を送る</button>
+          <button class="btn small secondary" id="btnStaffCommentProj" type="button">💬 ホームのひとこと</button>
           <button class="btn secondary small" id="btnViewOkaiNote">👁 おうちノートを見る</button>
           <span class="muted" id="okaiNoteStatusLabel" style="font-size:.85rem;"></span>
         </div>
@@ -6185,6 +6191,53 @@
     toast(text ? "✓ 保存しました（お客様の画面に出ます）" : "✓ ひとことを消しました");
     renderStaffComment();
   }
+  // 案件の上の「💬 ホームのひとこと」：どのタブからでも、おうちノートのホームの「スタッフから」を書き直す
+  function openStaffCommentPopup(){
+    var p = projectById(state.currentProjectId); if(!p) return;
+    var pid = p.id;
+    var sc = p.staffComment || {};
+    var canLine = prolineRecipients(p).length>0 && !!(state.settings && state.settings.prolineBeaconUrl);
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+    ov.innerHTML = '<div class="card" style="max-width:560px; width:calc(100% - 24px); max-height:86vh; overflow:auto;">'+
+      '<div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">💬 ホームのひとこと</h3><button type="button" class="btn small ghost" data-sc-close>✕ 閉じる</button></div>'+
+      '<div class="muted" style="margin:4px 0 8px; font-size:.85rem;">'+escapeHtml(p.customer||p.name||"")+'様のおうちノートのホームの「💬 スタッフから」に出ます。'+
+        (sc.text && sc.at ? '<br>いま表示中（'+String(sc.at).slice(5,10).replace("-","/")+(sc.by?"・"+escapeHtml(sc.by):"")+'）' : '<br>いまは表示していません')+'</div>'+
+      '<textarea id="scPopText" rows="5" maxlength="500" style="width:100%;" placeholder="例：今日はキッチンの仕様を決めました。次回は照明を決めましょう。">'+escapeHtml(sc.text||"")+'</textarea>'+
+      (canLine ? '<label class="row" style="gap:6px; margin-block-start:8px; align-items:center;"><input type="checkbox" id="scPopLine"> お客様のLINEに「おうちノートが更新されました」を知らせる</label>' : '')+
+      '<div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap;">'+
+        '<button type="button" class="btn" data-sc-save>保存する</button>'+
+        (sc.text ? '<button type="button" class="btn secondary" data-sc-clear>ひとことを消す</button>' : '')+
+      '</div></div>';
+    document.body.appendChild(ov);
+    var ta = ov.querySelector("#scPopText"); setTimeout(function(){ try{ ta.focus(); }catch(e){} }, 50);
+    var busy = false;
+    var close = function(){ ov.remove(); };
+    var save = async function(text){
+      if(busy) return; busy = true;
+      var proj = projectById(pid); if(!proj){ close(); return; }
+      var prev = proj.staffComment || null;
+      if(text === ((prev && prev.text) || "")){ busy = false; toast("変更はありません"); return; }
+      proj.staffComment = text ? {text:text, at:nowIso(), by:state.currentUser||""} : null;
+      var ok = await saveDoc("projects", proj.id, proj);
+      if(ok===false){ proj.staffComment = prev; busy = false; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
+      logActivity("案件「"+proj.name+"」のお客様へのひとことを"+(text?"保存":"消去")+"しました");
+      var line = text && ov.querySelector("#scPopLine") && ov.querySelector("#scPopLine").checked;
+      close();
+      renderStaffComment();
+      if(!line){ toast(text ? "✓ 保存しました（おうちノートのホームに出ます）" : "✓ ひとことを消しました"); return; }
+      try{
+        var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"comment" }) });
+        var data = {}; try{ data = await res.json(); }catch(e){}
+        toast(res.ok && data.ok ? "✓ 保存して、LINEでお知らせしました" : "✓ 保存しました（⚠ LINEのお知らせは送れませんでした）");
+      }catch(e){ toast("✓ 保存しました（⚠ LINEのお知らせは送れませんでした）"); }
+    };
+    ov.addEventListener("click", function(e){
+      if(e.target===ov || e.target.closest("[data-sc-close]")){ close(); return; }
+      if(e.target.closest("[data-sc-save]")){ save(ta.value.trim().slice(0,500)); return; }
+      if(e.target.closest("[data-sc-clear]")){ if(confirm("おうちノートのホームの「スタッフから」を消しますか？")) save(""); }
+    });
+  }
   function renderProjectHearing(){
     renderStaffComment();
     renderHearingNextRes();
@@ -8798,6 +8851,7 @@
         sentBadgeHtml+
         chHtml+(specHtml ? specHtml : '')+
         (n.title ? '<span class="ntitle">'+escapeHtml(n.title)+'</span>' : '')+
+        quickTogglesHtml("n", n.id, { reflected: n.reflected, ask: n.askDecision, home: n.homeShow })+
         '<button class="btn ghost small notemenu-trigger" data-act="togglenotemenu" data-id="'+n.id+'" title="操作">⋮ 操作</button>'+
         '</div>'+
         noteLinePartsChipsHtml(n)+
@@ -10389,6 +10443,53 @@
     if(await saveDoc(coll, doc.id, doc)===false){ doc.askDecision = !doc.askDecision; render(); toast("保存できませんでした"); return; }
     toast(doc.askDecision ? "お客様の画面に「決定」ボタンを出します（反映済みのとき）" : "お客様の画面の「決定」ボタンを出さないようにしました");
   }
+  // カードの「反映／ホーム／決定ボタン」を押すだけで切り替える（「⋮ 操作」を開かずに）
+  // f：{reflected, ask, home, noShare}（noShare＝お客様に出せない種類なので出さない）
+  function quickTogglesHtml(kind, id, f){
+    f = f || {};
+    if(f.noShare) return "";
+    var b = function(act, label, on, tip){
+      return '<button type="button" class="qtgbtn'+(on?" on":"")+'" data-qtg="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'" title="'+escapeHtml(tip)+'">'+(on?"✓ ":"")+label+'</button>';
+    };
+    return '<div class="qtg">'+
+      b("refl", "反映", !!f.reflected, f.reflected ? "おうちノートに出しています（押すと外す）" : "おうちノートの家づくりの項目に出す")+
+      b("home", "🏠 ホーム", !!f.home, f.home ? "おうちノートのホームに出しています（押すと外す）" : "おうちノートのホームに出す（反映もします）")+
+      b("ask", "🔘 決定ボタン", !!f.ask, f.ask ? "お客様の決定ボタンを出しています（押すと出さない）" : "お客様に決定ボタンを出す（反映もします）")+
+      '</div>';
+  }
+  var qtgBusy = false;
+  async function quickToggle(act, kind, id){
+    if(qtgBusy) return; qtgBusy = true;
+    try{
+      if(act!=="ask"){ await runUniOp(act, kind, id); return; }
+      // 決定ボタンを出すときは、まだ反映していなければ一緒に反映する
+      var doc = null, coll = "", askOn = false;
+      if(kind==="n"){ doc = state.meetingNotes.find(function(x){ return x.id===id; }); coll = "meetingNotes"; askOn = !!(doc && doc.askDecision); }
+      else if(kind==="sp"){
+        doc = state.specPhotos.find(function(x){ return x.id===id; }); coll = "specPhotos";
+        var st = doc && doc.source && doc.source.taskId ? state.tasks.find(function(t){ return t.id===doc.source.taskId; }) : null;
+        askOn = !!(st ? st.askDecision : (doc && doc.askDecision));
+      }
+      else if(kind==="att"){ doc = state.attachments.find(function(x){ return x.id===id; }); coll = "attachments"; askOn = !!(doc && doc.askDecision); }
+      if(!doc) return;
+      if(!askOn && !doc.reflected){
+        if(kind==="att"){
+          if(!quoteSharable(doc)){ toast("この種類はお客様に出せません"); return; }
+          if(!taskPartReflectable(doc.specPart)){ toast("先に「反映」を押して、部位を決めてください"); return; }
+        }
+        doc.reflected = true; doc.reflectedAt = nowIso();
+        if(kind==="sp" && doc.source && doc.source.taskId){
+          if(await saveDoc(coll, doc.id, doc)===false){ doc.reflected = false; doc.reflectedAt = null; render(); toast("保存できませんでした"); return; }
+        }
+      }
+      await runUniOp("ask", kind, id);
+    } finally { qtgBusy = false; }
+  }
+  document.addEventListener("click", function(e){
+    var q = e.target.closest("[data-qtg]"); if(!q) return;
+    e.preventDefault(); e.stopPropagation();
+    quickToggle(q.dataset.qtg, q.dataset.uk, q.dataset.uid);
+  }, true);
   // 見積の書類の「✏️ 編集」：書類の一覧の「直す・コメント」と同じ中身を小さな画面で
   function openAttEditPopup(id){
     var a = state.attachments.find(function(x){ return x.id===id; }); if(!a) return;
@@ -10607,6 +10708,7 @@
       (a.staffMemo ? '<div class="docmemo staff" style="margin-block-start:3px;">🔒 社内：'+escapeHtml(a.staffMemo)+'</div>' : '')+
       (a.customerNote && sharable ? '<div class="docmemo cust" style="margin-block-start:3px;">💬 お客様へ：'+escapeHtml(a.customerNote)+'</div>' : '')+
       '</div>'+
+      quickTogglesHtml("att", a.id, { reflected: a.reflected && sharable, ask: a.askDecision, home: a.homeShow, noShare: !sharable })+
       specOpsHtml(opsId, ops)+
       '</div>';
   }
@@ -10748,6 +10850,11 @@
         spSent);
     };
     var opsDel = "";
+    var qtgHtml = (function(){
+      if(p.kind==="note") return relatedNote ? quickTogglesHtml("n", relatedNote.id, { reflected: relatedNote.reflected, ask: relatedNote.askDecision, home: relatedNote.homeShow }) : "";
+      var st = p.source && p.source.taskId ? state.tasks.find(function(t){ return t.id===p.source.taskId; }) : null;
+      return quickTogglesHtml("sp", p.id, { reflected: p.reflected, ask: st ? st.askDecision : p.askDecision, home: p.homeShow });
+    })();
     // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
     // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
     // サムネイル1枚＋テキストを横並びで表示する。
@@ -10757,7 +10864,7 @@
         '<div class="spectl-meta">'+metaHtml+'</div>'+
         '</div>'+
         fileThumbRowHtml(noteFiles, 84)+
-        memoHtml+
+        memoHtml+qtgHtml+
         specOpsHtml(p.id, opsSections(specDrawBtnsHtml(p.id, noteFiles, Object.assign({}, drawCtx, {src:{kind:"note", noteId:(p.source&&p.source.noteId)}}), true)), opsDel)+
         '</div>';
     }
@@ -10765,7 +10872,7 @@
       thumbHtml+
       '<div class="spectl-meta">'+metaHtml+'</div>'+
       sentBadgesHtml+
-      memoHtml+
+      memoHtml+qtgHtml+
       specOpsHtml(p.id, opsSections(p.kind!=="note" ? specDrawBtnsHtml(p.id, [{url:p.url, contentType:p.contentType, name:p.fileName}], Object.assign({}, drawCtx, {src:{kind:"spec", photoId:p.id}}), true) : ''), opsDel)+
       '</div>';
   }
@@ -19098,6 +19205,7 @@
     document.getElementById("btnViewOkaiNote").addEventListener("click", viewOkaiNote);
     document.getElementById("btnSendPhotoHome").addEventListener("click", function(){ openSendPhoto(null); });
     document.getElementById("btnSendPhotoProj").addEventListener("click", function(){ openSendPhoto(state.currentProjectId); });
+    document.getElementById("btnStaffCommentProj").addEventListener("click", openStaffCommentPopup);
     document.getElementById("spsClose").addEventListener("click", closeSendPhoto);
     document.getElementById("spsProject").addEventListener("change", function(){ spsRenderCats(""); spsRenderLine(); });
     document.getElementById("spsCat").addEventListener("change", function(e){
