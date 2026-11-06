@@ -4738,8 +4738,10 @@
       taskDownloadsHtml(t)+
       taskQuoteLinkHtml(t)+
       custRepliesHtml(t)+
+      mailRepliesHtml(t)+
       '<div class="kc-actions">'+
         '<button class="btn small" data-taskact="statusmenu" data-id="'+t.id+'">進捗を変更する ▾</button>'+
+        (t.fromGmail && t.fromGmail.threadId ? '<button class="btn small" data-taskact="gmailreply" data-id="'+t.id+'" title="届いたメールへの返信を書いて、Gmailの下書きにする（送信はしない）">✉️ Gmailで返信</button>' : '')+
         '<button class="btn small '+(t.ordered?'secondary':'')+'" data-taskact="ordered" data-id="'+t.id+'" title="発注したら押す（社内だけ。もう一度押すと外す）" style="'+(t.ordered?'':'background:#d23c32;border-color:#d23c32;color:#fff;')+'">'+(t.ordered?'🔴 発注済みを外す':'🔴 発注済みのはんこ')+'</button>'+
         (isCustomerTask(t)?'<button class="btn small" data-taskact="custreply" data-id="'+t.id+'" title="お客様のおうちノートのメッセージに返信する">💬 お客様に返信</button>':'')+
         (canReviewTask(t)?'<button class="btn small" data-taskact="reply" data-id="'+t.id+'" title="答えを書いて担当者へ戻す（対応中へ）">💬 返信して戻す</button><button class="btn small" data-taskact="approve" data-id="'+t.id+'" title="承認して担当者へ進めてもらう（コメントも書けます）">✅ 承認する</button><button class="btn small secondary" data-taskact="reject" data-id="'+t.id+'" title="コメントを付けて担当者へ戻す">↩ 差し戻す</button>':'')+
@@ -4753,7 +4755,6 @@
         '<label class="btn small secondary" for="kcattach_'+t.id+'" style="cursor:pointer;">📎 '+(isVendor?"受領内容を添付":"資料を添付")+'</label><input type="file" id="kcattach_'+t.id+'" accept="application/pdf,image/*,video/*" multiple hidden data-kcattach="'+t.id+'">'+
         '<button class="btn small secondary" data-taskact="duplicate" data-id="'+t.id+'" title="このタスクをそのまま複製する">📋 複製</button>'+
         '<button class="btn small secondary" data-taskact="setpart" data-id="'+t.id+'">'+(t.vendorSpec?"部位を変更":"部位を設定")+'</button>'+
-        (t.fromGmail && t.fromGmail.threadId ? '<button class="btn small secondary" data-taskact="gmailreply" data-id="'+t.id+'" title="Gmailから来たこのタスクの、届いたメールへの返信を下書きにする（送信はしない）">↩ このメールに返信（下書き）</button>' : '')+
         '<button class="btn small secondary" data-taskact="gmaildraft" data-id="'+t.id+'" title="このタスクの内容でGmailの下書きを作る">✉ Gmail下書き</button>'+
         (!t.private && t.projectId?'<button class="btn small secondary" data-taskact="toestimate" data-id="'+t.id+'" title="お客様のおうちノートの「追加見積り」に載せる（金額は案件の「おうちノート連携」タブで入力。空欄なら「金額確認中」と表示）">'+(t.estimateRef?'✓追加見積り済み（見る ›）':'＋ 追加見積りへ')+'</button>':'')+
         (!t.private?'<button class="pill reflect'+(t.reflected?" on":"")+'" data-taskact="togglereflect" data-id="'+t.id+'" style="cursor:pointer;">'+(t.reflected?'✓反映済み':'反映する')+'</button>':'')+
@@ -15585,24 +15586,64 @@
   // Gmailから来たタスク（fromGmail）の、届いたメールへの返信を下書きにする。
   // 宛先・件名（Re:）・返信の印（In-Reply-To／References）はサーバーがそのやりとりのいちばん新しい受信メールから付ける。
   // 添付：タスクの添付のうち、そのメールから取り込んだもの（slug=gmail）は送り返さない＝あとで自分で付けた資料だけ付ける。
-  async function taskGmailReply(id){
+  // Gmailから来たタスクの「✉️ Gmailで返信」：届いたメールを見ながらアプリで本文を書き、同じやりとりの中に下書きを作る（送信はしない）
+  var GMAIL_REPLY_SIGN = ["株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798"];
+  function taskGmailReply(id){
     var t = state.tasks.find(function(x){ return x.id===id; });
     if(!t || !t.fromGmail || !t.fromGmail.threadId){ toast("このタスクはGmailから来たものではありません"); return; }
-    var lines = ["お世話になっております。住まいるハウジングです。","","","","よろしくお願いいたします。","","株式会社 住まいるハウジング","釧路市緑ケ岡２丁目38番5号","TEL:0154-68-5797 FAX:0154-68-5798"];
-    var atts = (t.attachments||[]).filter(function(a){ return a && a.url && String(a.url).indexOf("slug=gmail&")<0; }).map(function(a){
-      return { filename:a.name||"添付", mimeType:a.contentType||"application/octet-stream", url:a.url };
+    var atts = (t.attachments||[]).filter(function(a){ return a && a.url && String(a.url).indexOf("slug=gmail&")<0; });
+    var from = String(t.fromGmail.from||"").replace(/<[^>]*>/g,"").trim();
+    var orig = String(t.content||"").slice(0, 3000);
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+    ov.innerHTML = '<div class="card" style="max-width:680px; width:calc(100% - 24px); max-height:90vh; overflow:auto;">'+
+      '<div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">✉️ Gmailで返信</h3><button type="button" class="btn small ghost" data-gr-close>✕ 閉じる</button></div>'+
+      '<div class="muted" style="margin:4px 0 6px; font-size:.85rem;">返信先：'+escapeHtml(from||"届いたメールの送り主")+(t.fromGmail.subject?'　件名：Re: '+escapeHtml(t.fromGmail.subject):'')+'</div>'+
+      '<details style="margin-block-end:8px;"><summary style="cursor:pointer; font-weight:700;">📩 届いたメールを見る</summary><div style="white-space:pre-wrap; font-size:.85rem; background:var(--surface-2); border-radius:8px; padding:8px; margin-block-start:6px; max-height:240px; overflow:auto;">'+escapeHtml(orig)+'</div></details>'+
+      '<label class="field">返信の本文<textarea id="grBody" rows="12" style="width:100%;">'+escapeHtml(["お世話になっております。住まいるハウジングです。","","","","よろしくお願いいたします。",""].concat(GMAIL_REPLY_SIGN).join("\n"))+'</textarea></label>'+
+      (atts.length ? '<div class="muted" style="font-size:.85rem;">📎 このタスクにあとで付けた資料 '+atts.length+'件を添付します（届いたメールの添付は送り返しません）。</div>' : '')+
+      '<div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap;"><button type="button" class="btn" data-gr-go>下書きを作る（送信はしません）</button><button type="button" class="btn secondary" data-gr-close>やめる</button></div></div>';
+    document.body.appendChild(ov);
+    var ta = ov.querySelector("#grBody");
+    setTimeout(function(){ try{ ta.focus(); var p = ta.value.indexOf("\n\n")+2; ta.setSelectionRange(p, p); }catch(e){} }, 50);
+    var busy = false;
+    ov.addEventListener("click", async function(e){
+      if(e.target===ov || e.target.closest("[data-gr-close]")){ ov.remove(); return; }
+      if(!e.target.closest("[data-gr-go]") || busy) return;
+      var body = ta.value;
+      var core = body.replace("お世話になっております。住まいるハウジングです。","").replace("よろしくお願いいたします。","");
+      GMAIL_REPLY_SIGN.forEach(function(s){ core = core.replace(s, ""); });
+      if(!core.trim() && !confirm("本文がまだ書かれていません。このまま下書きを作りますか？（Gmailで書き足せます）")) return;
+      busy = true;
+      var btn = e.target.closest("[data-gr-go]"); btn.disabled = true; btn.textContent = "作っています…";
+      try{
+        var dres = await gmailCreateDraft({ to:[], subject:"", body: body, replyThreadId: t.fromGmail.threadId,
+          attachments: atts.map(function(a){ return { filename:a.name||"添付", mimeType:a.contentType||"application/octet-stream", url:a.url }; }) });
+        var dp = (dres && dres.payload) || {};
+        var t2 = state.tasks.find(function(x){ return x.id===id; });
+        if(t2){
+          t2.mailReplies = (Array.isArray(t2.mailReplies) ? t2.mailReplies : []).concat([{ by: state.currentUser||"", at: nowIso(), text: core.trim().slice(0,1000), to: dp.replyTo||"" }]);
+          t2.updatedAt = nowIso();
+          saveDoc("tasks", t2.id, t2);
+        }
+        ov.remove();
+        render();
+        var msg = (dp.replyTo ? "宛先："+dp.replyTo+"\n" : "")+(dp.subject ? "件名："+dp.subject+"\n" : "");
+        if(dp.linked && dp.linked.length) msg += "付けられなかった資料"+dp.linked.length+"件は本文にリンクを入れました\n";
+        offerOpenDrafts("✅ 返信の下書きを作りました", msg+"まだ送信していません。Gmailで開いて確かめてから送ってください。", [dp.messageId]);
+        logActivity("Gmailのタスクに返信の下書きを作成しました");
+      }catch(err){
+        busy = false; btn.disabled = false; btn.textContent = "下書きを作る（送信はしません）";
+        toast("下書きを作れませんでした"+(err && err.message ? "："+err.message : ""));
+      }
     });
-    try{
-      toast("返信の下書きを作っています…");
-      var dres = await gmailCreateDraft({ to:[], subject:"", body:lines.join("\n"), attachments:atts, replyThreadId:t.fromGmail.threadId });
-      var dp = (dres && dres.payload) || {};
-      var msg = (dp.replyTo ? "宛先："+dp.replyTo+"\n" : "")+(dp.subject ? "件名："+dp.subject+"\n" : "");
-      if(atts.length) msg += "添付："+(dp.attachmentCount!=null ? dp.attachmentCount : atts.length)+"件（このタスクにあとで付けた資料）\n";
-      else msg += "添付なし（届いたメールの添付は送り返しません）\n";
-      if(dp.linked && dp.linked.length) msg += "付けられなかった資料"+dp.linked.length+"件は本文にリンクを入れました\n";
-      offerOpenDrafts("✅ 返信の下書きを作成しました", msg+"送信はしていません。Gmailで本文を書いて送ってください。", [dp.messageId]);
-      logActivity("Gmailのタスクに返信の下書きを作成しました");
-    }catch(e){ toast("返信の下書きの作成に失敗しました"+(e && e.message ? "："+e.message : "")); }
+  }
+  function mailRepliesHtml(t){
+    var list = (t && t.mailReplies) || [];
+    if(!list.length) return "";
+    return '<div class="kc-custreply">'+list.map(function(r){
+      return '<div class="kcr-item"><div class="kcr-h">✉️ Gmailで返信（下書き・'+escapeHtml(r.by||"")+'・'+escapeHtml(fmtTs(r.at))+(r.to?'・'+escapeHtml(r.to):'')+'）</div>'+(r.text?'<div class="kcr-b">'+escapeHtml(r.text)+'</div>':'')+'</div>';
+    }).join("")+'</div>';
   }
 
   // ---- プランボードの書類をお客様に出す（部位を指定して反映）----
