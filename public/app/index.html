@@ -743,6 +743,9 @@
   .vclatest{ display:flex; gap:8px; align-items:center; margin-block:6px 2px; border:1px solid var(--border); border-radius:8px; padding:4px 6px; background:var(--surface-2); font-size:.85rem; line-height:1.35; min-width:0; }
   .kancard.ordered .vclatest{ margin-inline-end:58px; }
   .kancard.ordered:not(.exp) .kc-content{ padding-inline-end:56px; }
+  .kancard.ordered:not(.exp) .vcnxline{ padding-inline-end:56px; }
+  .kancard.ordered.st2:not(.exp) .vcnxline{ padding-inline-end:118px; }
+  .kancard.ordered.st3:not(.exp) .vcnxline{ padding-inline-end:178px; }
   .kancard.ordered.st2:not(.exp) .kc-content{ padding-inline-end:118px; }
   .kancard.ordered.st3:not(.exp) .kc-content{ padding-inline-end:178px; }
   .kancard.ordered.st2 .vclatest{ margin-inline-end:120px; }
@@ -1046,6 +1049,13 @@
   .spectl-card .spectl-meta{ padding-inline-end:84px; }
   .spectl-card.reflected{ background:var(--accent-soft); border-width:2px; border-inline-start-width:5px; border-block-color:var(--accent); border-inline-end-color:var(--accent); }
   .spectl-ops{ position:absolute; top:6px; inset-inline-end:8px; }
+  .vcnext .vcnx{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0; border-block-end:1px dashed var(--border); }
+  .vcnext .vcnx:last-of-type{ border-block-end:none; }
+  .vcnext .vcnxi{ flex-shrink:0; }
+  .vcnext .vcnxt{ flex:1; min-width:160px; font-weight:700; }
+  .vcnext .vcnx.late .vcnxt{ color:var(--danger); }
+  .vcnxline{ font-size:.85rem; font-weight:700; color:var(--accent-ink); margin-block-start:4px; }
+  .vcnxline.late{ color:var(--danger); }
   .qtg{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-start; margin-block-start:6px; }
   .spectl-card .qtg{ flex-basis:100%; margin-block-start:0; }
   @media (max-width:760px){ .qtg{ gap:4px; } .qtgbtn{ padding:3px 8px !important; } }
@@ -4664,7 +4674,7 @@
     }
     if(nAtt) meta.push('<span>📎'+nAtt+'</span>');
     if(t.fromGmail){ if(t.quoteReg) meta.push('<span class="refl">📄見積登録済</span>'); else if(taskLinkedRequests(t).length) meta.push('<span class="chk">📋見積依頼あり</span>'); }
-    if(t.estReq){ var erc = estReqCount(t); meta.push('<span class="'+(erc.done>=erc.all?'refl':'chk')+'">📋 '+(t.vendorCard ? '受領 '+erc.got+'/'+erc.all+'件' : erc.got+'/'+erc.all+'社 受領')+'</span>'); }
+    if(t.estReq){ var erc = estReqCount(t); meta.push('<span class="'+(erc.done>=erc.all?'refl':'chk')+'">📋 '+(t.vendorCard ? '届いた '+erc.got+(erc.all-erc.done ? '・待ち '+(erc.all-erc.done) : '') : erc.got+'/'+erc.all+'社 受領')+'</span>'); }
     if((t.downloads||[]).some(function(d){ return !d.done; })) meta.push('<span class="due">🔗要ダウンロード</span>');
     var lastRv = taskReviewList(t).slice(-1)[0];
     if(lastRv && (lastRv.result==="返信" || lastRv.result==="コメント")) meta.push('<span class="chk" style="color:#3a6ea5;">💬 '+escapeHtml(lastRv.by||"")+'から'+(lastRv.result==="返信"?"返信":"コメント")+'</span>');
@@ -4697,7 +4707,7 @@
       (stamps.length ? '<div class="kc-stamps">'+stamps.join("")+'</div>' : '')+
       '<div class="kc-row"><div class="kc-main">'+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
-        (t.vendorCard && !exp && !kanVcInline ? vcLatestHtml(t) : '')+
+        (t.vendorCard && !exp ? vcNextLineHtml(t) : '')+
         (meta.length ? '<div class="kc-meta2">'+meta.join("")+'</div>' : '')+
       '</div>'+
       (who ? '<div class="kc-av" style="background:'+avatarColor(who)+'" title="担当 '+escapeHtml(who)+'">'+escapeHtml(who.slice(0,1))+'</div>' : '<div class="kc-av none" title="担当未設定">？</div>')+
@@ -4717,7 +4727,7 @@
       (t.attachments && t.attachments.length ? '<div class="row" style="flex-wrap:wrap; gap:4px; margin-block-end:6px;">'+taskAttachmentsHtml(t.id, t.attachments)+'</div>' : "")+
       taskReviewsHtml(t)+
       (taskVendors(t).length ? taskVendorsHtml(t) : '')+
-      (t.vendorCard ? (kanVcInline ? '' : vcHtml(t)) : estReqHtml(t))+
+      (t.vendorCard ? vcNextHtml(t) : estReqHtml(t))+
       (t.custEstimate && t.custEstimate.undone ? '<div class="erbox"><div class="kc-undone">⚠️ お客様が回答をやり直しました（いまは未回答）</div></div>' : '')+
       (!t.estReq && (t.custDecided || t.fromCustomerChange || t.noteCheck) ? (function(){
         var cd = custDecisionOf(t);
@@ -5187,6 +5197,64 @@
     return '<div class="erbox vcbox"><div class="ertitle">📋 経緯（見積の受領 '+c.got+'/'+c.all+'件）</div>'+rows+
       ((pendN || orphan) ? '<button type="button" class="btn small kc-qbtn" data-taskact="toquote" data-id="'+t.id+'">📄 届いた書類を登録（'+(pendN+orphan)+'件）</button>' : '')+
       '<div class="muted" style="font-size:.85rem; margin-block-start:4px;">別の業者から届いたNETは、登録するとき「〇〇の分」でこのメーカーを選ぶと、ここに並びます。</div></div>';
+  }
+  // 業者のカードの「👉 次にやること」：依頼・届いた書類・おうちノート・お客様の決定から自動で出す
+  function vcNextSteps(t){
+    var pid = t.projectId, vid = t.vendorCard && t.vendorCard.vendorId, me = vendorById(vid), vnm = (me && me.name) || "業者";
+    var steps = [];
+    var b = function(label, act, extra){ return '<button type="button" class="btn small kc-qbtn" data-taskact="'+act+'" data-id="'+escapeHtml(t.id)+'"'+(extra||"")+'>'+label+'</button>'; };
+    var pn = function(part){ return part && part.scope ? partItemName(part, pid) : ""; };
+    var reqs = estReqReqs(t);
+    // 届いたのにまだ登録していないファイル
+    var lanes = vcLanes(t), pendN = 0; lanes.forEach(function(L){ L.ev.forEach(function(e){ if(e.kind==="pend") pendN++; }); });
+    pendN += (t.attachments||[]).filter(function(f){ return f && f.url && !f.fromVendorId; }).length;
+    if(pendN) steps.push({ i:"📥", tx:"届いた書類を登録する（"+pendN+"件）", btn: b("登録する", "toquote") });
+    (t.downloads||[]).filter(function(d){ return d && !d.done; }).forEach(function(){ steps.push({ i:"🔗", tx:"ダウンロードのリンクから書類を取ってきて付ける（下の「🔗 リンクを開く」）" }); });
+    // 返信が来ている・まだ届いていない依頼
+    reqs.filter(function(r){ return !estReqDone(r) && r.status==="依頼済み"; }).forEach(function(r){
+      var what = (r.sourceNoteId || r.sourceCard) ? "変更後の図面・見積" : "見積";
+      var p = pn(r.part);
+      if(r.replyDetected){ steps.push({ i:"✉️", tx: vnm+"から返信が来ています"+(p?"（"+p+"）":"")+"。中身を見て、書類があれば登録する" }); return; }
+      var dd = daysSince(r.requestedAt);
+      steps.push({ i:"⏳", late: dd!==null && dd>=5, tx: vnm+"から"+(p?"「"+p+"」の":"")+what+"が届くのを待つ"+(dd!==null?"（"+dd+"日目）":""),
+        btn: b("もう待たない", "erclose", ' data-req="'+escapeHtml(r.id)+'"') });
+    });
+    reqs.filter(function(r){ return !estReqDone(r) && r.status!=="依頼済み"; }).forEach(function(r){
+      var p = pn(r.part);
+      steps.push({ i:"📝", tx: vnm+"にまだ依頼していません"+(p?"（"+p+"）":""), btn: '<button type="button" class="btn small kc-qbtn" data-taskact="openreq" data-id="'+escapeHtml(pid||"")+'">見積タブで依頼する</button>' });
+    });
+    // 届いたプランボード・定価で、おうちノートにまだ出ていないもの
+    liveAttachments().filter(function(a){ return a.projectId===pid && a.vendorId===vid && a.kind==="quote" && quoteSharable(a) && !a.reflected && !a.hideInRecord && !vfAttShown(a); }).forEach(function(a){
+      var p = pn(a.specPart);
+      steps.push({ i:"🏠", tx: "届いた"+quoteTypeNorm(a.quoteType)+(p?"（"+p+"）":"")+"をお客様に見せるなら、おうちノートに出す", btn: b("おうちノートに出す", "quotereflect", ' data-att="'+escapeHtml(a.id)+'"') });
+    });
+    // お客様が決定したのに、まだ発注していない
+    if(!t.ordered){
+      var keys = {}; lanes.forEach(function(L){ if(L.part) keys[L.key] = L.part; });
+      var decN = (state.noteDecisions||[]).filter(function(d){
+        if(!d || d.deletedAt || d.projectId!==pid || d.status!=="決定" || !d.cardKey || d.ordered) return false;
+        var di = decisionInfo(d), doc = di.src ? estSrcDoc(di.src) : null, key = String(d.cardKey);
+        var lh = key.indexOf("l:")===0 ? key.slice(key.lastIndexOf("_")+1) : "";
+        var part = di.src ? vcPartOfDoc(di.src.coll, doc, lh) : null;
+        return !!(part && keys[vcPartKey(part)]);
+      }).length;
+      if(decN) steps.push({ i:"🔴", tx:"お客様が決定しました（"+decN+"件）→ "+vnm+"に発注して「発注済み」にする", btn: b("発注済みにする", "ordered") });
+    }
+    if(!steps.length && reqs.length && (t.status||"")!=="完了") steps.push({ i:"✅", tx:"依頼した分はすべて届きました。ほかにやることがなければ完了にする", btn: b("完了にする", "setstatus", ' data-status="完了"') });
+    return steps;
+  }
+  function vcNextHtml(t){
+    var steps = vcNextSteps(t);
+    var c = estReqCount(t);
+    var rows = steps.length ? steps.map(function(s){
+      return '<div class="vcnx'+(s.late?' late':'')+'"><span class="vcnxi">'+s.i+'</span><span class="vcnxt">'+escapeHtml(s.tx)+'</span>'+(s.btn||"")+'</div>';
+    }).join("") : '<div class="muted" style="font-size:.85rem;">いま、やることはありません。</div>';
+    return '<div class="erbox vcnext"><div class="ertitle">👉 次にやること</div>'+rows+
+      (c.all ? '<div class="muted" style="font-size:.85rem; margin-block-start:4px;">依頼 '+c.all+'件：届いた '+c.got+'件'+(c.all-c.done ? '・待ち '+(c.all-c.done)+'件' : '')+'。これまでの経緯は案件の「タスク」タブの「🏭 業者ごとの変更履歴」で見られます。</div>' : '')+'</div>';
+  }
+  function vcNextLineHtml(t){
+    var s = vcNextSteps(t)[0]; if(!s) return "";
+    return '<div class="vcnxline'+(s.late?' late':'')+'">👉 '+s.i+' '+escapeHtml(s.tx)+'</div>';
   }
   // 変更依頼のはんこ：変更（記録から出した依頼）がまだ届いていない間は「変更依頼」、届いたら「変更済」
   function vcChangeState(t){
@@ -20025,6 +20093,7 @@
       else if(act==="openest"){ var tce = state.tasks.find(function(x){ return x.id===id; }); if(tce && tce.projectId) goToOkaiEstimates(tce.projectId, tce.custEstimate && tce.custEstimate.estId); }
       else if(act==="ordered") toggleTaskOrdered(id);
       else if(act==="erclose") estReqToggleClose(id, btn.dataset.req);
+      else if(act==="quotereflect") toggleQuoteReflect(btn.dataset.att);
       else if(act==="scnote") sendCheckAct(id, "note");
       else if(act==="scmsg") sendCheckAct(id, "msg");
       else if(act==="scnone") sendCheckAct(id, "none");
