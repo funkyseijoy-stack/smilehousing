@@ -1425,13 +1425,14 @@
         <div class="card" id="hearMsgCard">
           <h3 style="margin:0 0 6px;">💬 お客様とのメッセージ</h3>
           <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">おうちノートの「メッセージ」と同じやりとりです（案件の「メッセージ」タブにも同じものが出ます）。お客様はおうちノートか、お打合せの記録ページから送れます。下のチェックを入れて送信すると、プロラインIDを登録したお客様のLINEに「おうちノートが更新されました」のお知らせも送れます。</p>
-          <div class="notelist" id="hearMsgList" style="max-height:360px; overflow-y:auto;"></div>
-          <div class="empty" id="hearMsgEmpty" hidden>まだメッセージがありません。</div>
-          <div class="row" style="margin-block-start:10px;">
+          <div class="row">
             <input type="text" id="hearMsgInput" placeholder="メッセージを入力" style="flex:1;">
             <button class="btn small" id="btnHearMsgSend">送信</button>
           </div>
           <label class="field" id="hearMsgLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="hearMsgLine"><span id="hearMsgLineLabel" style="font-size:.85rem;"></span></label>
+          <div class="muted" style="font-size:.85rem; margin-block:10px 4px;">新しいものが上です</div>
+          <div class="notelist" id="hearMsgList" style="max-height:360px; overflow-y:auto;"></div>
+          <div class="empty" id="hearMsgEmpty" hidden>まだメッセージがありません。</div>
         </div>
         <!-- 初期の打合せ記録（手書きメモをPDFで。お客様には専用の簡単なページで見せる） -->
         <div class="card" id="earlyCard">
@@ -1688,14 +1689,15 @@
         <div class="card">
           <h3>メッセージ</h3>
           <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">ここに入れたメッセージは、お客様のおうちノートの「メッセージ」にも表示されます。お客様のプロラインIDを「おうちノート連携」タブの「LINEでお知らせ」に登録していれば、下のチェックを入れて送信したときだけ、お客様のLINEに「おうちノートが更新されました」のお知らせも送ります（送ったらチェックは外れます）。お知らせメールを登録しているお客様には、メールでも知らせられます。</p>
-          <div class="notelist" id="messageList"></div>
-          <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
-          <div class="row" style="margin-block-start:10px;">
+          <div class="row">
             <input type="text" id="messageInput" placeholder="メッセージを入力" style="flex:1;">
             <button class="btn small" id="btnSendMessage">送信</button>
           </div>
           <label class="field" id="messageNotifyWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageNotify" checked><span id="messageNotifyLabel" style="font-size:.85rem;"></span></label>
           <label class="field" id="messageLineWrap" style="flex-direction:row; align-items:center; gap:8px; margin-block-start:6px;"><input type="checkbox" id="messageLine"><span id="messageLineLabel" style="font-size:.85rem;"></span></label>
+          <div class="muted" style="font-size:.85rem; margin-block:10px 4px;">新しいものが上です</div>
+          <div class="notelist" id="messageList"></div>
+          <div class="empty" id="messageEmpty" hidden>まだメッセージがありません。</div>
         </div>
       </div>
 
@@ -9191,17 +9193,18 @@
 
   function renderMessages(){
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
-    var html = rows.map(function(m){
+    // 表示は新しいものを上に（タブの印の数え方は古い順の rows のまま）
+    var html = rows.slice().reverse().map(function(m){
       return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+'</div>';
     }).join("");
     // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
       var wrap = document.getElementById(ids[0]), empty = document.getElementById(ids[1]);
       if(!wrap) return;
-      var stick = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
+      var atTop = wrap.scrollTop < 40;
       if(empty) empty.hidden = rows.length !== 0;
       wrap.innerHTML = html;
-      if(stick) wrap.scrollTop = wrap.scrollHeight;
+      if(atTop) wrap.scrollTop = 0;
     });
     // タブの印：最後にスタッフが送ったあとに届いた、お客様からのメッセージの数
     var badge = document.getElementById("subMsgBadge");
