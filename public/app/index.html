@@ -830,6 +830,8 @@
   .kancard .kc-part{ font-size:.85rem; padding:1px 8px; margin-block-end:4px; }
   .kancard .kc-full{ display:none; }
   .kancard .kc-qclosed{ margin-block-start:6px; }
+  .kancard .kc-from{ display:inline-block; font-weight:800; color:#8a4b14; background:#fdf0de; border:1px solid #e8c48f; border-radius:999px; padding:1px 10px; margin-block-end:4px; font-size:.9rem; }
+  .kancard .kc-from .kc-fromp{ font-weight:600; color:#8a6a4a; }
   .kancard .kc-state{ display:flex; align-items:center; gap:6px; font-weight:700; margin-block-end:6px; }
   .kancard .kc-state .kandot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
   .kancard.exp{ grid-column:1 / -1; cursor:default; box-shadow:0 0 0 2px var(--accent); }
@@ -4719,6 +4721,7 @@
     return '<div class="kancard'+(t.reflected?" reflected":"")+(stamps.length?" ordered st"+Math.min(stamps.length,3):"")+(exp?" exp":"")+(state.taskFlash && state.taskFlash.id===t.id ? " kc-flash":"")+'" data-taskid="'+t.id+'">'+
       (stamps.length ? '<div class="kc-stamps">'+stamps.join("")+'</div>' : '')+
       '<div class="kc-row"><div class="kc-main">'+
+        custFromHtml(t)+
         '<div class="kc-content">'+escapeHtml(t.content||"")+'</div>'+
         (t.vendorCard && !exp ? vcNextLineHtml(t) : '')+
         (!exp && t.fromGmail && !t.quoteReg && !t.estReq && (t.status||"未着手")!=="完了" && (t.attachments||[]).length ? '<button type="button" class="btn small kc-qbtn kc-qclosed" data-taskact="toquote" data-id="'+t.id+'">📄 案件の書類に登録（添付'+t.attachments.length+'件）</button>' : '')+
@@ -15542,6 +15545,17 @@
   }
 
   // お客様のメッセージ・変更のご依頼から来たタスク：カードから、案件のメッセージ（おうちノート・お打合せの記録ページと同じやりとり）へ返信できる
+  // お客様から来たタスク（メッセージ・変更のご依頼・サンプル請求・決定・追加見積りの返事）の「誰から」：送った人の名前と案件名
+  function custFromHtml(t){
+    if(!t || !t.projectId || !(isCustomerTask(t) || t.custDecided || t.custEstimate)) return "";
+    var p = projectById(t.projectId); if(!p) return "";
+    var mid = (t.fromCustomerMessage && t.fromCustomerMessage.messageId) || (t.fromCustomerChange && t.fromCustomerChange.messageId) || "";
+    var m = mid ? state.messages.find(function(x){ return x.id===mid; }) : null;
+    var who = String((m && m.sender) || "").replace(/（.*?）$/, "").trim() || (p.customer ? p.customer+"様" : "");
+    var proj = p.name || "";
+    var sameName = p.customer && proj.indexOf(String(p.customer))>=0;
+    return '<div class="kc-from" title="お客様から">👤 '+escapeHtml(who || "お客様")+(proj && !sameName ? '<span class="kc-fromp">（'+escapeHtml(proj)+'）</span>' : '')+' から</div>';
+  }
   function isCustomerTask(t){ return !!(t && t.projectId && (t.fromCustomerMessage || t.fromCustomerChange || t.fromSampleRequest)); }
   function custRepliesHtml(t){
     var list = (t && t.custReplies) || [];
