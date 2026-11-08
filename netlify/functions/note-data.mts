@@ -295,9 +295,13 @@ const BOAXEL_DEFAULTS: any[] = [
   { id: "so60", type: "shoe", name: "靴用の棚", code: "", size: 60, price: "" },
   { id: "so80", type: "shoe", name: "靴用の棚", code: "", size: 80, price: "" },
 ];
-function boaxelCatalog(settings: any) {
+// デモの案件（「デモ様邸（練習用）」など）か
+function isDemoProject(project: any) { return !!(project && (project.demo === true || /デモ/.test(String(project.name || "")))); }
+function boaxelCatalog(settings: any, project?: any) {
   const bx = settings && settings.boaxel;
   if (bx && bx.on === false) return null;
+  // 「デモの案件だけに出す」（設定が無いときも、試しの間はデモの案件だけ）
+  if ((!bx || bx.demoOnly !== false) && !isDemoProject(project)) return null;
   const src = bx && Array.isArray(bx.parts) && bx.parts.length ? bx.parts : BOAXEL_DEFAULTS;
   const parts = src.slice(0, 120).map((x: any) => ({
     id: String((x && x.id) || "").slice(0, 40),
@@ -516,7 +520,7 @@ export default async (req: Request, context: Context) => {
     // 収納プラン（IKEA ボーアクセル）のご依頼：お客様のプランを部品の一覧で数え直し、絵を保存して社内タスクにする（担当者なし＝「割り振り待ち」）
     if (body.action === "boaxelRequest") {
       const settings: any = await store.get("settings/main", { type: "json" }).catch(() => null);
-      const cat = boaxelCatalog(settings);
+      const cat = boaxelCatalog(settings, project);
       if (!cat) return json({ error: "unavailable" }, 400);
       const plan = body.plan || {};
       const pp = boaxelParts(cat, plan);
@@ -1260,7 +1264,7 @@ export default async (req: Request, context: Context) => {
       return items.length ? { items } : null;
     })(),
     // 収納プラン（IKEA ボーアクセル）：部品の一覧（スタッフが止めたときは null）と、これまでのご依頼
-    boaxel: boaxelCatalog(bxSettings),
+    boaxel: boaxelCatalog(bxSettings, project),
     boaxelRequests: tasks.filter((t: any) => t.fromBoaxel && !t.deletedAt)
       .map((t: any) => ({
         id: t.id, name: t.fromBoaxel.name || "", room: t.fromBoaxel.room || "", at: t.fromBoaxel.at || t.createdAt || "",

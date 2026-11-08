@@ -2061,7 +2061,8 @@
     <div class="card" id="bxSettingCard">
       <h3>🧺 収納プラン（IKEA ボーアクセル）の部品</h3>
       <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様がおうちノートの「≡ メニュー」→「収納プラン」で組み合わせを考え、そのまま依頼できます（依頼は「👤 割り振り待ち」のタスクに届きます）。お客様が選べるのは、ここにある部品だけです。品番・寸法・目安の金額は、IKEAのサイトで確かめて直してください。金額を空にした部品は、お客様の画面に金額を出しません。</p>
-      <label class="row" style="gap:6px; margin-block-end:8px;"><input type="checkbox" id="bxOn"> お客様のおうちノートに「収納プラン」を出す</label>
+      <label class="row" style="gap:6px; margin-block-end:4px;"><input type="checkbox" id="bxOn"> お客様のおうちノートに「収納プラン」を出す</label>
+      <label class="row" style="gap:6px; margin-block-end:8px;"><input type="checkbox" id="bxDemoOnly"> 試しの間は、デモの案件（名前に「デモ」が入った案件）のおうちノートだけに出す</label>
       <div class="tablewrap"><table><thead><tr><th>種類</th><th>名前</th><th>品番</th><th>寸法(cm)</th><th>目安の金額(円・税込)</th><th></th></tr></thead><tbody id="bxPartsBody"></tbody></table></div>
       <button type="button" class="btn small secondary" id="btnBxAddPart" style="margin-block-start:6px;">＋ 部品を足す</button>
       <label class="field" style="margin-block-start:10px;">お客様への注意書き（なくても可）<textarea id="bxNoteInput" rows="2" style="width:100%;" placeholder="例：取り付けには下地の確認が必要です。"></textarea></label>
@@ -6645,6 +6646,7 @@
     var b = (state.settings && state.settings.boaxel) || null;
     bxEdit = JSON.parse(JSON.stringify(bxSettingParts()));
     document.getElementById("bxOn").checked = !b || b.on !== false;
+    document.getElementById("bxDemoOnly").checked = !b || b.demoOnly !== false;
     document.getElementById("bxNoteInput").value = (b && b.note) || "";
     bxDrawRows();
     var st = document.getElementById("bxStatus");
@@ -6670,7 +6672,7 @@
     if(!parts.some(function(x){ return x.type==="upright"; })){ toast("縦レールを1つ以上入れてください"); return; }
     state.settings = state.settings || {};
     var prev = state.settings.boaxel;
-    state.settings.boaxel = { on: document.getElementById("bxOn").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
+    state.settings.boaxel = { on: document.getElementById("bxOn").checked, demoOnly: document.getElementById("bxDemoOnly").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
     var ok = await saveDoc("settings","main", state.settings);
     if(ok===false){ state.settings.boaxel = prev; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
     logActivity("収納プラン（ボーアクセル）の部品を保存しました");
