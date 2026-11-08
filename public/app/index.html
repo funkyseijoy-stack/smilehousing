@@ -2065,10 +2065,14 @@
       <label class="row" style="gap:6px; margin-block-end:8px;"><input type="checkbox" id="bxDemoOnly"> 試しの間は、デモの案件（名前に「デモ」が入った案件）のおうちノートだけに出す</label>
       <div class="tablewrap"><table><thead><tr><th>種類</th><th>名前</th><th>品番</th><th>寸法(cm)</th><th>目安の金額(円・税込)</th><th></th></tr></thead><tbody id="bxPartsBody"></tbody></table></div>
       <button type="button" class="btn small secondary" id="btnBxAddPart" style="margin-block-start:6px;">＋ 部品を足す</button>
+      <h4 style="margin:16px 0 4px;">見本（列1つ分の組み合わせ）</h4>
+      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">お客様は、この見本を列ごとに選んで左から並べるだけです（中の棚・カゴの数は変えられません）。中の部品は上から順です。見本の幅と同じ寸法の部品だけ入れられます。</p>
+      <div id="bxSetsBody"></div>
+      <button type="button" class="btn small secondary" id="btnBxAddSet" style="margin-block-start:6px;">＋ 見本を足す</button>
       <label class="field" style="margin-block-start:10px;">お客様への注意書き（なくても可）<textarea id="bxNoteInput" rows="2" style="width:100%;" placeholder="例：取り付けには下地の確認が必要です。"></textarea></label>
       <div class="row" style="gap:10px; align-items:center; margin-block-start:8px; flex-wrap:wrap;">
         <button class="btn" id="btnBxSave">保存</button>
-        <button type="button" class="btn small ghost" id="btnBxReset">最初の部品に戻す</button>
+        <button type="button" class="btn small ghost" id="btnBxReset">最初の部品・見本に戻す</button>
         <span class="muted" id="bxStatus" style="font-size:.85rem;"></span>
       </div>
     </div>
@@ -6637,6 +6641,38 @@
     { id:"so60", type:"shoe", name:"靴用の棚", code:"", size:60, price:"" },
     { id:"so80", type:"shoe", name:"靴用の棚", code:"", size:80, price:"" }
   ];
+  // note-data.mts の BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**（見本＝列1つ分の組み合わせ。items は上から順の部品ID）
+  var BOAXEL_SETS_DEFAULTS = [
+    { id:"st_hang80", name:"洋服かけ", w:80, items:["sh80","ra80"] },
+    { id:"st_hang2_80", name:"洋服かけ（上下2段）", w:80, items:["sh80","ra80","ra80"] },
+    { id:"st_hang60", name:"洋服かけ", w:60, items:["sh60","ra60"] },
+    { id:"st_fold80", name:"たたみ物", w:80, items:["sh80","sh80","ba80","ba80","dr80"] },
+    { id:"st_fold60", name:"たたみ物", w:60, items:["sh60","sh60","ba60","ba60","dr60"] },
+    { id:"st_shoe80", name:"靴", w:80, items:["sh80","so80","so80","so80","so80"] },
+    { id:"st_shoe60", name:"靴", w:60, items:["sh60","so60","so60","so60","so60"] },
+    { id:"st_small40", name:"小物・バッグ", w:40, items:["sh40","sh40","ba40","ba40"] }
+  ];
+  var bxSetEdit = null; // 編集中の見本
+  function bxNewId(pre){ return pre + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function bxSettingSets(){ var b = state.settings && state.settings.boaxel; return (b && Array.isArray(b.sets)) ? b.sets : BOAXEL_SETS_DEFAULTS; }
+  function bxEditWidths(){ var w = {}; (bxEdit||[]).forEach(function(x){ if(x.type!=="upright" && Number(x.size)>0) w[Number(x.size)] = 1; }); return Object.keys(w).map(Number).sort(function(a,b){ return a-b; }); }
+  function bxDrawSets(){
+    var el = document.getElementById("bxSetsBody"); if(!el || !bxSetEdit) return;
+    var ws = bxEditWidths();
+    el.innerHTML = bxSetEdit.length ? bxSetEdit.map(function(st, si){
+      var w = Number(st.w)||0;
+      var opts = (bxEdit||[]).filter(function(x){ return x.type!=="upright" && Number(x.size)===w && x.name; });
+      return '<div class="bxsetrow" style="border:1px solid var(--border); border-radius:12px; padding:8px; margin-block-end:6px;">'+
+        '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">'+
+        '<input type="text" data-bxs="'+si+'|name" value="'+escapeHtml(st.name||"")+'" placeholder="例：洋服かけ" style="min-width:9em;">'+
+        '<select data-bxs="'+si+'|w">'+(ws.indexOf(w)<0?'<option value="'+w+'" selected>幅 '+w+'cm（部品なし）</option>':'')+ws.map(function(x){ return '<option value="'+x+'"'+(x===w?' selected':'')+'>幅 '+x+'cm</option>'; }).join("")+'</select>'+
+        '<button type="button" class="btn small ghost" data-bxsetdel="'+si+'">この見本を消す</button></div>'+
+        '<div class="row" style="gap:4px; flex-wrap:wrap; margin-block-start:6px; align-items:center;">'+
+        (st.items||[]).map(function(id, ii){ var x = (bxEdit||[]).find(function(y){ return y.id===id; }); return '<span class="chip" style="display:inline-flex; gap:4px; align-items:center;">'+(ii+1)+'. '+escapeHtml(x ? x.name : "（消えた部品）")+
+          '<button type="button" class="btn small ghost" data-bxsitem="'+si+'|'+ii+'|up"'+(ii===0?' disabled':'')+'>▲</button><button type="button" class="btn small ghost" data-bxsitem="'+si+'|'+ii+'|del">✕</button></span>'; }).join("")+
+        '<select data-bxsadd="'+si+'"><option value="">＋ 部品を入れる</option>'+opts.map(function(x){ return '<option value="'+escapeHtml(x.id)+'">'+escapeHtml(x.name)+'</option>'; }).join("")+'</select></div></div>';
+    }).join("") : '<div class="muted">見本がありません（お客様の画面に収納プランが出ません）。</div>';
+  }
   var BX_TYPE_NAMES = [["upright","縦レール"],["shelf","棚板"],["rail","ハンガー"],["basket","バスケット"],["drawer","引き出し"],["shoe","靴用の棚"],["other","そのほか"]];
   var bxEdit = null; // 編集中の部品の一覧（保存するまで設定は変えない）
   function bxSettingParts(){ var b = state.settings && state.settings.boaxel; return (b && Array.isArray(b.parts) && b.parts.length) ? b.parts : BOAXEL_DEFAULTS; }
@@ -6645,10 +6681,11 @@
     if(bxEdit && bxEdit.dirty && !force) return; // 入力中は自動更新で上書きしない
     var b = (state.settings && state.settings.boaxel) || null;
     bxEdit = JSON.parse(JSON.stringify(bxSettingParts()));
+    bxSetEdit = JSON.parse(JSON.stringify(bxSettingSets()));
     document.getElementById("bxOn").checked = !b || b.on !== false;
     document.getElementById("bxDemoOnly").checked = !b || b.demoOnly !== false;
     document.getElementById("bxNoteInput").value = (b && b.note) || "";
-    bxDrawRows();
+    bxDrawRows(); bxDrawSets();
     var st = document.getElementById("bxStatus");
     st.textContent = b ? ("最終保存：" + String(b.updatedAt||"").slice(0,10) + (b.updatedBy?"（"+b.updatedBy+"）":"")) : "最初の部品のままです（品番・金額は未設定）";
     bxEdit.dirty = false;
@@ -6670,9 +6707,14 @@
       size:Number(x.size)||0, price:(x.price===""||x.price==null||!isFinite(Number(x.price))) ? "" : Math.round(Number(x.price)) }; })
       .filter(function(x){ return x.name && x.size>0; });
     if(!parts.some(function(x){ return x.type==="upright"; })){ toast("縦レールを1つ以上入れてください"); return; }
+    var pById = {}; parts.forEach(function(x){ pById[x.id] = x; });
+    var sets = (bxSetEdit||[]).map(function(st){ var w = Number(st.w)||0; return { id: st.id || bxNewId("st"), name:String(st.name||"").trim(), w:w,
+      items:(st.items||[]).filter(function(id){ return pById[id] && pById[id].type!=="upright" && pById[id].size===w; }) }; })
+      .filter(function(st){ return st.name && st.w>0 && st.items.length; });
+    if(!sets.length){ toast("見本を1つ以上（名前と中の部品を）入れてください"); return; }
     state.settings = state.settings || {};
     var prev = state.settings.boaxel;
-    state.settings.boaxel = { on: document.getElementById("bxOn").checked, demoOnly: document.getElementById("bxDemoOnly").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
+    state.settings.boaxel = { on: document.getElementById("bxOn").checked, demoOnly: document.getElementById("bxDemoOnly").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, sets: sets, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
     var ok = await saveDoc("settings","main", state.settings);
     if(ok===false){ state.settings.boaxel = prev; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
     logActivity("収納プラン（ボーアクセル）の部品を保存しました");
@@ -6838,24 +6880,47 @@
     document.getElementById("btnCiSave").addEventListener("click", saveCompanyIntro);
     document.getElementById("btnBxSave").addEventListener("click", saveBoaxelSetting);
     document.getElementById("btnBxReset").addEventListener("click", function(){
-      if(!confirm("部品の一覧を最初の状態（品番・金額なし）に戻しますか？\n（「保存」を押すまでは変わりません）")) return;
-      bxEdit = JSON.parse(JSON.stringify(BOAXEL_DEFAULTS)); bxEdit.dirty = true; bxDrawRows();
+      if(!confirm("部品の一覧と見本を最初の状態（品番・金額なし）に戻しますか？\n（「保存」を押すまでは変わりません）")) return;
+      bxEdit = JSON.parse(JSON.stringify(BOAXEL_DEFAULTS)); bxSetEdit = JSON.parse(JSON.stringify(BOAXEL_SETS_DEFAULTS)); bxEdit.dirty = true; bxDrawRows(); bxDrawSets();
     });
     document.getElementById("btnBxAddPart").addEventListener("click", function(){
       if(!bxEdit) renderBoaxelSetting(true);
-      bxEdit.push({ id:"", type:"shelf", name:"", code:"", size:60, price:"" }); bxEdit.dirty = true; bxDrawRows();
+      bxEdit.push({ id:bxNewId("bx"), type:"shelf", name:"", code:"", size:60, price:"" }); bxEdit.dirty = true; bxDrawRows(); bxDrawSets();
+    });
+    document.getElementById("btnBxAddSet").addEventListener("click", function(){
+      if(!bxEdit) renderBoaxelSetting(true);
+      var ws = bxEditWidths();
+      bxSetEdit.push({ id:bxNewId("st"), name:"", w: ws.indexOf(60)>=0 ? 60 : (ws[0]||60), items:[] }); bxEdit.dirty = true; bxDrawSets();
     });
     document.getElementById("bxSettingCard").addEventListener("input", function(e){
+      var g = e.target.closest('[data-bxs$="|name"]'); if(g && bxEdit){ bxSetEdit[+g.dataset.bxs.split("|")[0]].name = g.value; bxEdit.dirty = true; return; }
       var f = e.target.closest("[data-bxe]"); if(!f || !bxEdit) return;
       var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true;
     });
     document.getElementById("bxSettingCard").addEventListener("change", function(e){
-      var f = e.target.closest("[data-bxe]"); if(!f || !bxEdit) return;
-      var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true;
+      if(!bxEdit) return;
+      var f = e.target.closest("[data-bxe]");
+      if(f){ var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true; if(a[1]!=="code" && a[1]!=="price") bxDrawSets(); return; }
+      var g = e.target.closest("[data-bxs]");
+      if(g){ var b = g.dataset.bxs.split("|"), st = bxSetEdit[+b[0]];
+        if(b[1]==="w"){ var nw = Number(g.value); // 幅を変えたら、中の部品も同じ名前の新しい幅の部品に入れ替える
+          st.items = (st.items||[]).map(function(id){ var x = bxEdit.find(function(y){ return y.id===id; }); var q = x && bxEdit.find(function(y){ return y.type===x.type && y.name===x.name && Number(y.size)===nw; }); return q ? q.id : null; }).filter(Boolean);
+          st.w = nw; bxDrawSets(); }
+        else st[b[1]] = g.value;
+        bxEdit.dirty = true; return; }
+      var ad = e.target.closest("[data-bxsadd]");
+      if(ad && ad.value){ var s2 = bxSetEdit[+ad.dataset.bxsadd]; s2.items = (s2.items||[]).concat([ad.value]).slice(0, 15); bxEdit.dirty = true; bxDrawSets(); }
     });
     document.getElementById("bxSettingCard").addEventListener("click", function(e){
-      var d = e.target.closest("[data-bxdelpart]"); if(!d || !bxEdit) return;
-      bxEdit.splice(+d.dataset.bxdelpart, 1); bxEdit.dirty = true; bxDrawRows();
+      if(!bxEdit) return;
+      var d = e.target.closest("[data-bxdelpart]");
+      if(d){ bxEdit.splice(+d.dataset.bxdelpart, 1); bxEdit.dirty = true; bxDrawRows(); bxDrawSets(); return; }
+      var sd = e.target.closest("[data-bxsetdel]");
+      if(sd){ if(!confirm("この見本を消しますか？（「保存」を押すまでは変わりません）")) return; bxSetEdit.splice(+sd.dataset.bxsetdel, 1); bxEdit.dirty = true; bxDrawSets(); return; }
+      var si = e.target.closest("[data-bxsitem]");
+      if(si){ var c = si.dataset.bxsitem.split("|"), it = bxSetEdit[+c[0]].items, i = +c[1];
+        if(c[2]==="del") it.splice(i, 1); else if(i>0){ var tmp = it[i-1]; it[i-1] = it[i]; it[i] = tmp; }
+        bxEdit.dirty = true; bxDrawSets(); }
     });
     document.getElementById("btnEarlyOpen").addEventListener("click", function(){ openEarlyForm(null); });
     document.getElementById("btnEarlyCancel").addEventListener("click", closeEarlyForm);

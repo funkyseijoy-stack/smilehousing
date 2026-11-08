@@ -295,6 +295,18 @@ const BOAXEL_DEFAULTS: any[] = [
   { id: "so60", type: "shoe", name: "靴用の棚", code: "", size: 60, price: "" },
   { id: "so80", type: "shoe", name: "靴用の棚", code: "", size: 80, price: "" },
 ];
+// 見本（列1つ分の組み合わせ。items は上から順の部品ID）。お客様は見本を列ごとに選んで並べるだけ（中身は変えられない）。
+// 住まいるアプリの BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**。
+const BOAXEL_SETS_DEFAULTS: any[] = [
+  { id: "st_hang80", name: "洋服かけ", w: 80, items: ["sh80", "ra80"] },
+  { id: "st_hang2_80", name: "洋服かけ（上下2段）", w: 80, items: ["sh80", "ra80", "ra80"] },
+  { id: "st_hang60", name: "洋服かけ", w: 60, items: ["sh60", "ra60"] },
+  { id: "st_fold80", name: "たたみ物", w: 80, items: ["sh80", "sh80", "ba80", "ba80", "dr80"] },
+  { id: "st_fold60", name: "たたみ物", w: 60, items: ["sh60", "sh60", "ba60", "ba60", "dr60"] },
+  { id: "st_shoe80", name: "靴", w: 80, items: ["sh80", "so80", "so80", "so80", "so80"] },
+  { id: "st_shoe60", name: "靴", w: 60, items: ["sh60", "so60", "so60", "so60", "so60"] },
+  { id: "st_small40", name: "小物・バッグ", w: 40, items: ["sh40", "sh40", "ba40", "ba40"] },
+];
 // デモの案件（「デモ様邸（練習用）」など）か
 function isDemoProject(project: any) { return !!(project && (project.demo === true || /デモ/.test(String(project.name || "")))); }
 function boaxelCatalog(settings: any, project?: any) {
@@ -312,16 +324,29 @@ function boaxelCatalog(settings: any, project?: any) {
     price: x && x.price !== "" && x.price != null && isFinite(Number(x.price)) ? Math.round(Number(x.price)) : null,
   })).filter((x: any) => x.id && x.name && x.size);
   if (!parts.some((x: any) => x.type === "upright")) return null;
-  return { parts, note: String((bx && bx.note) || "").slice(0, 500) };
+  const byId: any = {}; parts.forEach((x: any) => { byId[x.id] = x; });
+  const srcSets = bx && Array.isArray(bx.sets) ? bx.sets : BOAXEL_SETS_DEFAULTS;
+  const sets = srcSets.slice(0, 60).map((x: any) => {
+    const w = Math.max(0, Math.min(200, Number(x && x.w) || 0));
+    return {
+      id: String((x && x.id) || "").slice(0, 40),
+      name: String((x && x.name) || "").trim().slice(0, 40),
+      w,
+      // その幅の部品だけ（縦レールは除く）
+      items: (Array.isArray(x && x.items) ? x.items : []).slice(0, 15).map((id: any) => String(id)).filter((id: string) => byId[id] && byId[id].type !== "upright" && byId[id].size === w),
+    };
+  }).filter((x: any) => x.id && x.name && x.w && x.items.length);
+  if (!sets.length) return null;
+  return { parts, sets, note: String((bx && bx.note) || "").slice(0, 500) };
 }
 // お客様のプランから部品の数を数える（縦レールは列の数＋1本。部品の一覧にあるものだけ）
 function boaxelParts(cat: any, plan: any) {
   const byId: any = {}; cat.parts.forEach((x: any) => { byId[x.id] = x; });
   const up = byId[String(plan && plan.upright || "")];
-  const cols = (Array.isArray(plan && plan.cols) ? plan.cols : []).slice(0, 12).map((c: any) => ({
-    w: Math.max(0, Math.min(200, Number(c && c.w) || 0)),
-    items: (Array.isArray(c && c.items) ? c.items : []).slice(0, 15).map((id: any) => String(id)).filter((id: string) => byId[id] && byId[id].type !== "upright"),
-  })).filter((c: any) => c.w);
+  // 列は見本のIDだけを受け取り、中身は見本から決める（お客様が自由に部品を増やせないように）
+  const setById: any = {}; (cat.sets || []).forEach((x: any) => { setById[x.id] = x; });
+  const cols = (Array.isArray(plan && plan.cols) ? plan.cols : []).slice(0, 12).map((c: any) => setById[String(c && c.set || "")]).filter(Boolean)
+    .map((st: any) => ({ set: st.id, name: st.name, w: st.w, items: st.items.slice() }));
   if (!up || up.type !== "upright" || !cols.length) return null;
   const count: any = {};
   count[up.id] = cols.length + 1;
@@ -528,6 +553,7 @@ export default async (req: Request, context: Context) => {
       const name = String(plan.name || "").trim().slice(0, 40) || "収納プラン";
       const room = String(plan.room || "").trim().slice(0, 40);
       const wall = Math.max(0, Math.min(2000, Number(plan.wall) || 0));
+      if (wall && pp.cols.reduce((a: number, c: any) => a + c.w, 0) > wall) return json({ error: "too_wide" }, 400);
       const note = String(plan.note || "").trim().slice(0, 500);
       const mine = (await listCollection(store, "tasks", projectId)).filter((t: any) => t.fromBoaxel && !t.deletedAt);
       if (mine.length >= 50) return json({ error: "too_many" }, 429);
@@ -550,6 +576,7 @@ export default async (req: Request, context: Context) => {
       const lineTxt = pp.lines.map((l: any) => `・${l.name} ${l.size}cm${l.code ? "（" + l.code + "）" : ""} × ${l.qty}${l.sub != null ? "　" + yen(l.sub) : ""}`).join("\n");
       const content = "【収納プランのご依頼】" + name + (room ? "（" + room + "）" : "") +
         "\n幅 約" + totalW + "cm（" + pp.cols.length + "列）・高さ " + pp.height + "cm" + (wall ? "／壁の幅 " + wall + "cm" : "") +
+        "\n列：" + pp.cols.map((c: any, i: number) => (i + 1) + "列目 " + c.name + "（" + c.w + "cm）").join("／") +
         "\n" + lineTxt +
         (pp.total != null ? "\n目安の合計：" + yen(pp.total) + "（税込・部品代のみ）" : "") +
         (note ? "\nひとこと：" + note : "");
