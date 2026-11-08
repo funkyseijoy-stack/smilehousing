@@ -830,6 +830,7 @@
   .kancard .kc-part{ font-size:.85rem; padding:1px 8px; margin-block-end:4px; }
   .kancard .kc-full{ display:none; }
   .kancard .kc-qclosed{ margin-block-start:6px; }
+  #bxPartsBody input[type=number]{ padding:6px 8px; border:1px solid var(--border); border-radius:10px; font:inherit; background:var(--surface,#fff); color:inherit; }
   .kancard .kc-from{ display:inline-block; font-weight:800; color:#8a4b14; background:#fdf0de; border:1px solid #e8c48f; border-radius:999px; padding:1px 10px; margin-block-end:4px; font-size:.9rem; }
   .kancard .kc-from .kc-fromp{ font-weight:600; color:#8a6a4a; }
   .kancard .kc-state{ display:flex; align-items:center; gap:6px; font-weight:700; margin-block-end:6px; }
@@ -2055,6 +2056,20 @@
       <div class="row" style="justify-content:space-between; align-items:center; margin-block-end:10px;"><h2 style="margin:0;">業者一覧</h2><button type="button" class="btn small" data-reveal="vendorAddCard">＋ 業者を追加</button></div>
       <div class="tablewrap"><table><thead><tr><th>業者名</th><th>カテゴリ</th><th>方法</th><th>メール</th><th></th></tr></thead><tbody id="vendorTableBody"></tbody></table></div>
       <div class="empty" id="vendorEmpty" hidden>業者が登録されていません。</div>
+    </div>
+
+    <div class="card" id="bxSettingCard">
+      <h3>🧺 収納プラン（IKEA ボーアクセル）の部品</h3>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様がおうちノートの「≡ メニュー」→「収納プラン」で組み合わせを考え、そのまま依頼できます（依頼は「👤 割り振り待ち」のタスクに届きます）。お客様が選べるのは、ここにある部品だけです。品番・寸法・目安の金額は、IKEAのサイトで確かめて直してください。金額を空にした部品は、お客様の画面に金額を出しません。</p>
+      <label class="row" style="gap:6px; margin-block-end:8px;"><input type="checkbox" id="bxOn"> お客様のおうちノートに「収納プラン」を出す</label>
+      <div class="tablewrap"><table><thead><tr><th>種類</th><th>名前</th><th>品番</th><th>寸法(cm)</th><th>目安の金額(円・税込)</th><th></th></tr></thead><tbody id="bxPartsBody"></tbody></table></div>
+      <button type="button" class="btn small secondary" id="btnBxAddPart" style="margin-block-start:6px;">＋ 部品を足す</button>
+      <label class="field" style="margin-block-start:10px;">お客様への注意書き（なくても可）<textarea id="bxNoteInput" rows="2" style="width:100%;" placeholder="例：取り付けには下地の確認が必要です。"></textarea></label>
+      <div class="row" style="gap:10px; align-items:center; margin-block-start:8px; flex-wrap:wrap;">
+        <button class="btn" id="btnBxSave">保存</button>
+        <button type="button" class="btn small ghost" id="btnBxReset">最初の部品に戻す</button>
+        <span class="muted" id="bxStatus" style="font-size:.85rem;"></span>
+      </div>
     </div>
 
     <div class="card" id="companyIntroCard">
@@ -3382,6 +3397,8 @@
         if(s.prolineBeaconUrl) state.settings.prolineBeaconUrl = s.prolineBeaconUrl;
         if(Array.isArray(s.projectFolders)) state.settings.projectFolders = s.projectFolders;
         if(s.pin) state.settings.pin = s.pin;
+        // 上で個別に取り込んでいない項目（会社紹介・収納プランの部品など）も全部取り込む（取り込まないと、設定の保存のたびに消えてしまう）
+        Object.keys(s).forEach(function(k){ if(k!=="id" && k!=="updatedAt") state.settings[k] = s[k]; });
       } else {
         await saveDoc("settings","main", state.settings);
       }
@@ -3829,6 +3846,7 @@
         if(s.prolineBeaconUrl) state.settings.prolineBeaconUrl = s.prolineBeaconUrl;
         if(Array.isArray(s.projectFolders)) state.settings.projectFolders = s.projectFolders;
         if(s.pin) state.settings.pin = s.pin;
+        Object.keys(s).forEach(function(k){ if(k!=="id" && k!=="updatedAt") state.settings[k] = s[k]; });
       }
       render();
       populateUserSelect();
@@ -4079,6 +4097,7 @@
     renderEarlyMeetings();
     renderFinanceDocs();
     renderCompanyIntro();
+    renderBoaxelSetting();
     renderVendorCheckboxList();
     renderProjectTable();
     renderPendingTable();
@@ -4809,7 +4828,7 @@
   }
   function kanStackCard(t){
     var st = t.status||"未着手";
-    var src = t.fromGmail ? "✉️ メール" : (t.fromSampleRequest ? "📦 サンプル請求" : (t.fromCustomerMessage||t.fromCustomerChange ? "🏠 お客様から" : (t.quoteReg ? "📄 見積" : "")));
+    var src = t.fromGmail ? "✉️ メール" : (t.fromBoaxel ? "🧺 収納プラン" : t.fromSampleRequest ? "📦 サンプル請求" : (t.fromCustomerMessage||t.fromCustomerChange ? "🏠 お客様から" : (t.quoteReg ? "📄 見積" : "")));
     var waiting = isAssignWaiting(t);
     return '<div class="kwaititem">'+
       ((st!=="未着手" && st!=="完了") || src ? '<div class="kmst">'+(st!=="未着手" && st!=="完了" ? '<span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span>' : '')+(src?'<span class="kwaitsrc">'+src+'</span>':'')+'</div>' : '')+
@@ -5621,7 +5640,7 @@
         waitCol = '<div class="kcol kwait" style="--sc:#c0392b">'+
           '<div class="khead"><span class="kandot" style="background:#c0392b"></span><span>👤 割り振り待ち</span><span class="kn tabular">'+waiting.length+'</span></div>'+
           '<div class="kbody"><div class="klist">'+waiting.map(function(t){
-            var src = t.creator==="Gmail" ? "✉️ Gmailから" : (t.creator==="おうちノート" ? "🏠 おうちノートから" : (t.creator==="お打合せの記録ページ" ? "📝 お打合せの記録ページから" : (t.creator ? "作成："+t.creator : "")));
+            var src = t.creator==="Gmail" ? "✉️ Gmailから" : (t.fromBoaxel ? "🧺 おうちノートから（収納プランのご依頼）" : t.creator==="おうちノート" ? "🏠 おうちノートから" : (t.creator==="お打合せの記録ページ" ? "📝 お打合せの記録ページから" : (t.creator ? "作成："+t.creator : "")));
             return '<div class="kwaititem">'+(src?'<div class="kwaitsrc">'+escapeHtml(src)+'</div>':'')+kanCardHtml(t, t.status||"未着手")+
               '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
               (isCustomerTask(t) ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="custreply" data-id="'+escapeHtml(t.id)+'">💬 お客様に返信</button>' : '')+
@@ -6597,6 +6616,67 @@
     toast("✓ 会社紹介を保存しました");
     renderCompanyIntro();
   }
+  // ---- 収納プラン（IKEA ボーアクセル）の部品（settings/main.boaxel={on,note,parts:[{id,type,name,code,size,price}],updatedAt,updatedBy}） ----
+  // note-data.mts の BOAXEL_DEFAULTS と**2か所に同じ内容**（設定が無いときに使う最初の部品）
+  var BOAXEL_DEFAULTS = [
+    { id:"up200", type:"upright", name:"縦レール（壁取り付け）", code:"", size:200, price:"" },
+    { id:"up120", type:"upright", name:"縦レール（壁取り付け）", code:"", size:120, price:"" },
+    { id:"up80", type:"upright", name:"縦レール（壁取り付け）", code:"", size:80, price:"" },
+    { id:"sh40", type:"shelf", name:"棚板", code:"", size:40, price:"" },
+    { id:"sh60", type:"shelf", name:"棚板", code:"", size:60, price:"" },
+    { id:"sh80", type:"shelf", name:"棚板", code:"", size:80, price:"" },
+    { id:"ra40", type:"rail", name:"ハンガーレール", code:"", size:40, price:"" },
+    { id:"ra60", type:"rail", name:"ハンガーレール", code:"", size:60, price:"" },
+    { id:"ra80", type:"rail", name:"ハンガーレール", code:"", size:80, price:"" },
+    { id:"ba40", type:"basket", name:"メッシュバスケット", code:"", size:40, price:"" },
+    { id:"ba60", type:"basket", name:"メッシュバスケット", code:"", size:60, price:"" },
+    { id:"ba80", type:"basket", name:"メッシュバスケット", code:"", size:80, price:"" },
+    { id:"dr60", type:"drawer", name:"引き出し", code:"", size:60, price:"" },
+    { id:"dr80", type:"drawer", name:"引き出し", code:"", size:80, price:"" },
+    { id:"so60", type:"shoe", name:"靴用の棚", code:"", size:60, price:"" },
+    { id:"so80", type:"shoe", name:"靴用の棚", code:"", size:80, price:"" }
+  ];
+  var BX_TYPE_NAMES = [["upright","縦レール"],["shelf","棚板"],["rail","ハンガー"],["basket","バスケット"],["drawer","引き出し"],["shoe","靴用の棚"],["other","そのほか"]];
+  var bxEdit = null; // 編集中の部品の一覧（保存するまで設定は変えない）
+  function bxSettingParts(){ var b = state.settings && state.settings.boaxel; return (b && Array.isArray(b.parts) && b.parts.length) ? b.parts : BOAXEL_DEFAULTS; }
+  function renderBoaxelSetting(force){
+    var body = document.getElementById("bxPartsBody"); if(!body) return;
+    if(bxEdit && bxEdit.dirty && !force) return; // 入力中は自動更新で上書きしない
+    var b = (state.settings && state.settings.boaxel) || null;
+    bxEdit = JSON.parse(JSON.stringify(bxSettingParts()));
+    document.getElementById("bxOn").checked = !b || b.on !== false;
+    document.getElementById("bxNoteInput").value = (b && b.note) || "";
+    bxDrawRows();
+    var st = document.getElementById("bxStatus");
+    st.textContent = b ? ("最終保存：" + String(b.updatedAt||"").slice(0,10) + (b.updatedBy?"（"+b.updatedBy+"）":"")) : "最初の部品のままです（品番・金額は未設定）";
+    bxEdit.dirty = false;
+  }
+  function bxDrawRows(){
+    var body = document.getElementById("bxPartsBody"); if(!body || !bxEdit) return;
+    body.innerHTML = bxEdit.map(function(x, i){
+      return '<tr><td><select data-bxe="'+i+'|type">'+BX_TYPE_NAMES.map(function(t){ return '<option value="'+t[0]+'"'+(t[0]===x.type?' selected':'')+'>'+t[1]+'</option>'; }).join("")+'</select></td>'+
+        '<td><input type="text" data-bxe="'+i+'|name" value="'+escapeHtml(x.name||"")+'" style="min-width:9em;"></td>'+
+        '<td><input type="text" data-bxe="'+i+'|code" value="'+escapeHtml(x.code||"")+'" placeholder="例：000.000.00" style="min-width:7em;"></td>'+
+        '<td><input type="number" data-bxe="'+i+'|size" value="'+escapeHtml(String(x.size||""))+'" style="width:5em;"></td>'+
+        '<td><input type="number" data-bxe="'+i+'|price" value="'+escapeHtml(x.price==null?"":String(x.price))+'" placeholder="空欄＝出さない" style="width:8em;"></td>'+
+        '<td><button type="button" class="btn small ghost" data-bxdelpart="'+i+'">✕</button></td></tr>';
+    }).join("");
+  }
+  async function saveBoaxelSetting(){
+    if(!bxEdit) return;
+    var parts = bxEdit.map(function(x){ return { id: x.id || ("bx" + Date.now().toString(36) + Math.random().toString(36).slice(2,6)), type:x.type||"other", name:String(x.name||"").trim(), code:String(x.code||"").trim(),
+      size:Number(x.size)||0, price:(x.price===""||x.price==null||!isFinite(Number(x.price))) ? "" : Math.round(Number(x.price)) }; })
+      .filter(function(x){ return x.name && x.size>0; });
+    if(!parts.some(function(x){ return x.type==="upright"; })){ toast("縦レールを1つ以上入れてください"); return; }
+    state.settings = state.settings || {};
+    var prev = state.settings.boaxel;
+    state.settings.boaxel = { on: document.getElementById("bxOn").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
+    var ok = await saveDoc("settings","main", state.settings);
+    if(ok===false){ state.settings.boaxel = prev; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
+    logActivity("収納プラン（ボーアクセル）の部品を保存しました");
+    toast("✓ 収納プランの部品を保存しました");
+    renderBoaxelSetting(true);
+  }
   // ---- 資金計画・お見積り（project.financeDocs=[{id,kind,date,memo,shared,file,createdAt,createdBy,deletedAt}]） ----
   var FIN_KINDS = ["資金計画書","概算見積書","その他"];
   var finDraft = { pid:null, files:[] };
@@ -6754,6 +6834,27 @@
     });
     document.getElementById("ciOn").addEventListener("change", function(){ document.getElementById("ciText").dataset.dirty = "1"; });
     document.getElementById("btnCiSave").addEventListener("click", saveCompanyIntro);
+    document.getElementById("btnBxSave").addEventListener("click", saveBoaxelSetting);
+    document.getElementById("btnBxReset").addEventListener("click", function(){
+      if(!confirm("部品の一覧を最初の状態（品番・金額なし）に戻しますか？\n（「保存」を押すまでは変わりません）")) return;
+      bxEdit = JSON.parse(JSON.stringify(BOAXEL_DEFAULTS)); bxEdit.dirty = true; bxDrawRows();
+    });
+    document.getElementById("btnBxAddPart").addEventListener("click", function(){
+      if(!bxEdit) renderBoaxelSetting(true);
+      bxEdit.push({ id:"", type:"shelf", name:"", code:"", size:60, price:"" }); bxEdit.dirty = true; bxDrawRows();
+    });
+    document.getElementById("bxSettingCard").addEventListener("input", function(e){
+      var f = e.target.closest("[data-bxe]"); if(!f || !bxEdit) return;
+      var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true;
+    });
+    document.getElementById("bxSettingCard").addEventListener("change", function(e){
+      var f = e.target.closest("[data-bxe]"); if(!f || !bxEdit) return;
+      var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true;
+    });
+    document.getElementById("bxSettingCard").addEventListener("click", function(e){
+      var d = e.target.closest("[data-bxdelpart]"); if(!d || !bxEdit) return;
+      bxEdit.splice(+d.dataset.bxdelpart, 1); bxEdit.dirty = true; bxDrawRows();
+    });
     document.getElementById("btnEarlyOpen").addEventListener("click", function(){ openEarlyForm(null); });
     document.getElementById("btnEarlyCancel").addEventListener("click", closeEarlyForm);
     document.getElementById("btnEarlySave").addEventListener("click", saveEarlyMeeting);
@@ -15556,7 +15657,7 @@
     var sameName = p.customer && proj.indexOf(String(p.customer))>=0;
     return '<div class="kc-from" title="お客様から">👤 '+escapeHtml(who || "お客様")+(proj && !sameName ? '<span class="kc-fromp">（'+escapeHtml(proj)+'）</span>' : '')+' から</div>';
   }
-  function isCustomerTask(t){ return !!(t && t.projectId && (t.fromCustomerMessage || t.fromCustomerChange || t.fromSampleRequest)); }
+  function isCustomerTask(t){ return !!(t && t.projectId && (t.fromCustomerMessage || t.fromCustomerChange || t.fromSampleRequest || t.fromBoaxel)); }
   function custRepliesHtml(t){
     var list = (t && t.custReplies) || [];
     if(!list.length) return "";

@@ -273,6 +273,64 @@ function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
 
+// ---- 収納プラン（IKEA ボーアクセル）：部品の一覧 ----
+// スタッフが住まいるアプリの「業者・設定」で直す（settings/main.boaxel={on,parts:[{id,type,name,code,size,price}]}）。
+// 無いときは BOAXEL_DEFAULTS を使う。住まいるアプリの BOAXEL_DEFAULTS と**2か所に同じ内容**があるので、直すときは両方。
+const BOAXEL_TYPES = ["upright", "shelf", "rail", "basket", "drawer", "shoe", "other"];
+const BOAXEL_DEFAULTS: any[] = [
+  { id: "up200", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 200, price: "" },
+  { id: "up120", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 120, price: "" },
+  { id: "up80", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 80, price: "" },
+  { id: "sh40", type: "shelf", name: "棚板", code: "", size: 40, price: "" },
+  { id: "sh60", type: "shelf", name: "棚板", code: "", size: 60, price: "" },
+  { id: "sh80", type: "shelf", name: "棚板", code: "", size: 80, price: "" },
+  { id: "ra40", type: "rail", name: "ハンガーレール", code: "", size: 40, price: "" },
+  { id: "ra60", type: "rail", name: "ハンガーレール", code: "", size: 60, price: "" },
+  { id: "ra80", type: "rail", name: "ハンガーレール", code: "", size: 80, price: "" },
+  { id: "ba40", type: "basket", name: "メッシュバスケット", code: "", size: 40, price: "" },
+  { id: "ba60", type: "basket", name: "メッシュバスケット", code: "", size: 60, price: "" },
+  { id: "ba80", type: "basket", name: "メッシュバスケット", code: "", size: 80, price: "" },
+  { id: "dr60", type: "drawer", name: "引き出し", code: "", size: 60, price: "" },
+  { id: "dr80", type: "drawer", name: "引き出し", code: "", size: 80, price: "" },
+  { id: "so60", type: "shoe", name: "靴用の棚", code: "", size: 60, price: "" },
+  { id: "so80", type: "shoe", name: "靴用の棚", code: "", size: 80, price: "" },
+];
+function boaxelCatalog(settings: any) {
+  const bx = settings && settings.boaxel;
+  if (bx && bx.on === false) return null;
+  const src = bx && Array.isArray(bx.parts) && bx.parts.length ? bx.parts : BOAXEL_DEFAULTS;
+  const parts = src.slice(0, 120).map((x: any) => ({
+    id: String((x && x.id) || "").slice(0, 40),
+    type: BOAXEL_TYPES.includes(x && x.type) ? x.type : "other",
+    name: String((x && x.name) || "").trim().slice(0, 40),
+    code: String((x && x.code) || "").trim().slice(0, 40),
+    size: Math.max(0, Math.min(400, Number(x && x.size) || 0)),
+    price: x && x.price !== "" && x.price != null && isFinite(Number(x.price)) ? Math.round(Number(x.price)) : null,
+  })).filter((x: any) => x.id && x.name && x.size);
+  if (!parts.some((x: any) => x.type === "upright")) return null;
+  return { parts, note: String((bx && bx.note) || "").slice(0, 500) };
+}
+// お客様のプランから部品の数を数える（縦レールは列の数＋1本。部品の一覧にあるものだけ）
+function boaxelParts(cat: any, plan: any) {
+  const byId: any = {}; cat.parts.forEach((x: any) => { byId[x.id] = x; });
+  const up = byId[String(plan && plan.upright || "")];
+  const cols = (Array.isArray(plan && plan.cols) ? plan.cols : []).slice(0, 12).map((c: any) => ({
+    w: Math.max(0, Math.min(200, Number(c && c.w) || 0)),
+    items: (Array.isArray(c && c.items) ? c.items : []).slice(0, 15).map((id: any) => String(id)).filter((id: string) => byId[id] && byId[id].type !== "upright"),
+  })).filter((c: any) => c.w);
+  if (!up || up.type !== "upright" || !cols.length) return null;
+  const count: any = {};
+  count[up.id] = cols.length + 1;
+  cols.forEach((c: any) => c.items.forEach((id: string) => { count[id] = (count[id] || 0) + 1; }));
+  const lines = Object.keys(count).map((id) => {
+    const x = byId[id];
+    return { id, type: x.type, name: x.name, code: x.code, size: x.size, qty: count[id], price: x.price, sub: x.price != null ? x.price * count[id] : null };
+  });
+  const allPriced = lines.every((l: any) => l.sub != null);
+  const total = lines.reduce((a: number, l: any) => a + (l.sub || 0), 0);
+  return { cols, upright: up.id, height: up.size, lines, total: allPriced ? total : null, partial: !allPriced && lines.some((l: any) => l.sub != null) };
+}
+
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
 
@@ -455,6 +513,59 @@ export default async (req: Request, context: Context) => {
     }
     // お知らせメール（スタッフからメッセージが届いたときに知らせる宛先。お客様が自分で登録・変更・解除する）
     // サンプル請求（お客様 → 社内タスク。担当者なし＝「割り振り待ち」。状態はタスクの進捗から出す）
+    // 収納プラン（IKEA ボーアクセル）のご依頼：お客様のプランを部品の一覧で数え直し、絵を保存して社内タスクにする（担当者なし＝「割り振り待ち」）
+    if (body.action === "boaxelRequest") {
+      const settings: any = await store.get("settings/main", { type: "json" }).catch(() => null);
+      const cat = boaxelCatalog(settings);
+      if (!cat) return json({ error: "unavailable" }, 400);
+      const plan = body.plan || {};
+      const pp = boaxelParts(cat, plan);
+      if (!pp) return json({ error: "empty" }, 400);
+      const name = String(plan.name || "").trim().slice(0, 40) || "収納プラン";
+      const room = String(plan.room || "").trim().slice(0, 40);
+      const wall = Math.max(0, Math.min(2000, Number(plan.wall) || 0));
+      const note = String(plan.note || "").trim().slice(0, 500);
+      const mine = (await listCollection(store, "tasks", projectId)).filter((t: any) => t.fromBoaxel && !t.deletedAt);
+      if (mine.length >= 50) return json({ error: "too_many" }, 429);
+      const now = new Date().toISOString();
+      const attachments: any[] = [];
+      const dm = /^data:(image\/(?:jpeg|png));base64,(.+)$/.exec(String(body.image || ""));
+      if (dm) {
+        try {
+          const bytes = Uint8Array.from(Buffer.from(dm[2], "base64"));
+          if (bytes.length && bytes.length <= IMAGE_MAX_BYTES) {
+            const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+            await getStore("customerPhotos").set(`${projectId}/${key}`, bytes, { metadata: { contentType: dm[1] } });
+            attachments.push({ id: genId("att"), url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
+              contentType: dm[1], name: `収納プラン_${name}_${now.slice(5, 10).replace("-", "")}.${dm[1] === "image/png" ? "png" : "jpg"}`, fromCustomer: true });
+          }
+        } catch (e) { console.error("boaxel image failed", e); }
+      }
+      const yen = (n: number) => n.toLocaleString("ja-JP") + "円";
+      const totalW = pp.cols.reduce((a: number, c: any) => a + c.w, 0);
+      const lineTxt = pp.lines.map((l: any) => `・${l.name} ${l.size}cm${l.code ? "（" + l.code + "）" : ""} × ${l.qty}${l.sub != null ? "　" + yen(l.sub) : ""}`).join("\n");
+      const content = "【収納プランのご依頼】" + name + (room ? "（" + room + "）" : "") +
+        "\n幅 約" + totalW + "cm（" + pp.cols.length + "列）・高さ " + pp.height + "cm" + (wall ? "／壁の幅 " + wall + "cm" : "") +
+        "\n" + lineTxt +
+        (pp.total != null ? "\n目安の合計：" + yen(pp.total) + "（税込・部品代のみ）" : "") +
+        (note ? "\nひとこと：" + note : "");
+      const taskId = genId("task_bx_");
+      const task = {
+        id: taskId, projectId, content,
+        assignee: "", instructor: "お客様", creator: "おうちノート",
+        hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+        attachmentAssetIds: [], attachments, private: false, reflected: false, reflectedAt: null,
+        status: "未着手",
+        fromBoaxel: { name, room, wall, note, upright: pp.upright, height: pp.height, cols: pp.cols, lines: pp.lines, total: pp.total, at: now },
+        createdAt: now, updatedAt: now,
+      };
+      await store.setJSON(`tasks/${taskId}`, task);
+      await sendNotifyMail(
+        `【おうちノート】${project.customer || "お客様"}様から収納プラン（ボーアクセル）のご依頼が届きました`,
+        `${project.customer || "お客様"}様（${project.name || ""}）から、おうちノートで収納プランのご依頼が届きました。\n\n${content}\n\n住まいるアプリのホームのタスク（割り振り待ち）に入っています。プランの絵も付いています。`
+      );
+      return json({ ok: true, req: { id: taskId, name, room, at: now, total: pp.total, state: "受付済み" } });
+    }
     if (body.action === "sampleRequest") {
       const catName = String(body.catName || "").trim().slice(0, 40);
       const what = String(body.what || "").trim().slice(0, 300);
@@ -1028,6 +1139,7 @@ export default async (req: Request, context: Context) => {
     })
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
+  const bxSettings: any = await store.get("settings/main", { type: "json" }).catch(() => null);
   return json({
     project: {
       name: project.name || "",
@@ -1147,6 +1259,15 @@ export default async (req: Request, context: Context) => {
       })).filter((x: any) => x.name && x.group);
       return items.length ? { items } : null;
     })(),
+    // 収納プラン（IKEA ボーアクセル）：部品の一覧（スタッフが止めたときは null）と、これまでのご依頼
+    boaxel: boaxelCatalog(bxSettings),
+    boaxelRequests: tasks.filter((t: any) => t.fromBoaxel && !t.deletedAt)
+      .map((t: any) => ({
+        id: t.id, name: t.fromBoaxel.name || "", room: t.fromBoaxel.room || "", at: t.fromBoaxel.at || t.createdAt || "",
+        total: t.fromBoaxel.total != null ? t.fromBoaxel.total : null,
+        state: t.status === "完了" ? "ご注文済み" : (t.status === "未着手" ? "受付済み" : "確認中"),
+      }))
+      .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at))).slice(0, 30),
     // サンプル請求（お客様が送ったもの。状態はタスクの進捗：未着手＝受付済み／完了＝お渡し済み／それ以外＝準備中）
     sampleRequests: tasks.filter((t: any) => t.fromSampleRequest && !t.deletedAt)
       .map((t: any) => ({
