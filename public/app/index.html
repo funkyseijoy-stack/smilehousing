@@ -2063,10 +2063,10 @@
       <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様がおうちノートの「≡ メニュー」→「収納プラン」で組み合わせを考え、そのまま依頼できます（依頼は「👤 割り振り待ち」のタスクに届きます）。お客様が選べるのは、ここにある部品だけです。品番・寸法・目安の金額は、IKEAのサイトで確かめて直してください。金額を空にした部品は、お客様の画面に金額を出しません。</p>
       <label class="row" style="gap:6px; margin-block-end:4px;"><input type="checkbox" id="bxOn"> お客様のおうちノートに「収納プラン」を出す</label>
       <label class="row" style="gap:6px; margin-block-end:8px;"><input type="checkbox" id="bxDemoOnly"> 試しの間は、デモの案件（名前に「デモ」が入った案件）のおうちノートだけに出す</label>
-      <div class="tablewrap"><table><thead><tr><th>種類</th><th>名前</th><th>品番</th><th>寸法(cm)</th><th>目安の金額(円・税込)</th><th></th></tr></thead><tbody id="bxPartsBody"></tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>種類</th><th>名前</th><th>品番</th><th>寸法(cm)</th><th>目安の金額(円・税込)</th><th>1列に入る数<br>（縦レールだけ）</th><th></th></tr></thead><tbody id="bxPartsBody"></tbody></table></div>
       <button type="button" class="btn small secondary" id="btnBxAddPart" style="margin-block-start:6px;">＋ 部品を足す</button>
       <h4 style="margin:16px 0 4px;">見本（列1つ分の組み合わせ）</h4>
-      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">お客様は、この見本を列ごとに選んで左から並べるだけです（中の棚・カゴの数は変えられません）。中の部品は上から順です。見本の幅と同じ寸法の部品だけ入れられます。</p>
+      <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">お客様は見本を選んで左から並べ、そのあと列ごとに棚・カゴを足したり外したりできます（1列に入る数は縦レールの「1列に入る数」まで）。中の部品は上から順です。見本の幅と同じ寸法の部品だけ入れられます。</p>
       <div id="bxSetsBody"></div>
       <button type="button" class="btn small secondary" id="btnBxAddSet" style="margin-block-start:6px;">＋ 見本を足す</button>
       <label class="field" style="margin-block-start:10px;">お客様への注意書き（なくても可）<textarea id="bxNoteInput" rows="2" style="width:100%;" placeholder="例：取り付けには下地の確認が必要です。"></textarea></label>
@@ -6624,33 +6624,18 @@
   // ---- 収納プラン（IKEA ボーアクセル）の部品（settings/main.boaxel={on,note,parts:[{id,type,name,code,size,price}],updatedAt,updatedBy}） ----
   // note-data.mts の BOAXEL_DEFAULTS と**2か所に同じ内容**（設定が無いときに使う最初の部品）
   var BOAXEL_DEFAULTS = [
-    { id:"up200", type:"upright", name:"縦レール（壁取り付け）", code:"", size:200, price:"" },
-    { id:"up120", type:"upright", name:"縦レール（壁取り付け）", code:"", size:120, price:"" },
-    { id:"up80", type:"upright", name:"縦レール（壁取り付け）", code:"", size:80, price:"" },
-    { id:"sh40", type:"shelf", name:"棚板", code:"", size:40, price:"" },
+    { id:"up200", type:"upright", name:"縦レール（壁取り付け）", code:"", size:200, price:"", max:8 },
+    { id:"up120", type:"upright", name:"縦レール（壁取り付け）", code:"", size:120, price:"", max:5 },
+    { id:"up80", type:"upright", name:"縦レール（壁取り付け）", code:"", size:80, price:"", max:3 },
     { id:"sh60", type:"shelf", name:"棚板", code:"", size:60, price:"" },
     { id:"sh80", type:"shelf", name:"棚板", code:"", size:80, price:"" },
-    { id:"ra40", type:"rail", name:"ハンガーレール", code:"", size:40, price:"" },
-    { id:"ra60", type:"rail", name:"ハンガーレール", code:"", size:60, price:"" },
-    { id:"ra80", type:"rail", name:"ハンガーレール", code:"", size:80, price:"" },
-    { id:"ba40", type:"basket", name:"メッシュバスケット", code:"", size:40, price:"" },
-    { id:"ba60", type:"basket", name:"メッシュバスケット", code:"", size:60, price:"" },
-    { id:"ba80", type:"basket", name:"メッシュバスケット", code:"", size:80, price:"" },
-    { id:"dr60", type:"drawer", name:"引き出し", code:"", size:60, price:"" },
-    { id:"dr80", type:"drawer", name:"引き出し", code:"", size:80, price:"" },
-    { id:"so60", type:"shoe", name:"靴用の棚", code:"", size:60, price:"" },
-    { id:"so80", type:"shoe", name:"靴用の棚", code:"", size:80, price:"" }
+    { id:"ba60", type:"basket", name:"カゴ", code:"", size:60, price:"" },
+    { id:"ba80", type:"basket", name:"カゴ", code:"", size:80, price:"" }
   ];
   // note-data.mts の BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**（見本＝列1つ分の組み合わせ。items は上から順の部品ID）
   var BOAXEL_SETS_DEFAULTS = [
-    { id:"st_hang80", name:"洋服かけ", w:80, items:["sh80","ra80"] },
-    { id:"st_hang2_80", name:"洋服かけ（上下2段）", w:80, items:["sh80","ra80","ra80"] },
-    { id:"st_hang60", name:"洋服かけ", w:60, items:["sh60","ra60"] },
-    { id:"st_fold80", name:"たたみ物", w:80, items:["sh80","sh80","ba80","ba80","dr80"] },
-    { id:"st_fold60", name:"たたみ物", w:60, items:["sh60","sh60","ba60","ba60","dr60"] },
-    { id:"st_shoe80", name:"靴", w:80, items:["sh80","so80","so80","so80","so80"] },
-    { id:"st_shoe60", name:"靴", w:60, items:["sh60","so60","so60","so60","so60"] },
-    { id:"st_small40", name:"小物・バッグ", w:40, items:["sh40","sh40","ba40","ba40"] }
+    { id:"st_sh60", name:"棚板1枚", w:60, items:["sh60"] },
+    { id:"st_sh80", name:"棚板1枚", w:80, items:["sh80"] }
   ];
   var bxSetEdit = null; // 編集中の見本
   function bxNewId(pre){ return pre + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -6698,13 +6683,15 @@
         '<td><input type="text" data-bxe="'+i+'|code" value="'+escapeHtml(x.code||"")+'" placeholder="例：000.000.00" style="min-width:7em;"></td>'+
         '<td><input type="number" data-bxe="'+i+'|size" value="'+escapeHtml(String(x.size||""))+'" style="width:5em;"></td>'+
         '<td><input type="number" data-bxe="'+i+'|price" value="'+escapeHtml(x.price==null?"":String(x.price))+'" placeholder="空欄＝出さない" style="width:8em;"></td>'+
+        '<td>'+(x.type==="upright" ? '<input type="number" data-bxe="'+i+'|max" value="'+escapeHtml(String(x.max||""))+'" placeholder="例：8" style="width:5em;">' : '')+'</td>'+
         '<td><button type="button" class="btn small ghost" data-bxdelpart="'+i+'">✕</button></td></tr>';
     }).join("");
   }
   async function saveBoaxelSetting(){
     if(!bxEdit) return;
     var parts = bxEdit.map(function(x){ return { id: x.id || ("bx" + Date.now().toString(36) + Math.random().toString(36).slice(2,6)), type:x.type||"other", name:String(x.name||"").trim(), code:String(x.code||"").trim(),
-      size:Number(x.size)||0, price:(x.price===""||x.price==null||!isFinite(Number(x.price))) ? "" : Math.round(Number(x.price)) }; })
+      size:Number(x.size)||0, price:(x.price===""||x.price==null||!isFinite(Number(x.price))) ? "" : Math.round(Number(x.price)),
+      max: x.type==="upright" ? (Math.round(Number(x.max)||0) > 0 ? Math.min(30, Math.round(Number(x.max))) : (Number(x.size)>=200?8:Number(x.size)>=120?5:3)) : undefined }; })
       .filter(function(x){ return x.name && x.size>0; });
     if(!parts.some(function(x){ return x.type==="upright"; })){ toast("縦レールを1つ以上入れてください"); return; }
     var pById = {}; parts.forEach(function(x){ pById[x.id] = x; });
@@ -6885,7 +6872,7 @@
     });
     document.getElementById("btnBxAddPart").addEventListener("click", function(){
       if(!bxEdit) renderBoaxelSetting(true);
-      bxEdit.push({ id:bxNewId("bx"), type:"shelf", name:"", code:"", size:60, price:"" }); bxEdit.dirty = true; bxDrawRows(); bxDrawSets();
+      bxEdit.push({ id:bxNewId("bx"), type:"shelf", name:"", code:"", size:60, price:"", max:"" }); bxEdit.dirty = true; bxDrawRows(); bxDrawSets();
     });
     document.getElementById("btnBxAddSet").addEventListener("click", function(){
       if(!bxEdit) renderBoaxelSetting(true);
@@ -6900,7 +6887,7 @@
     document.getElementById("bxSettingCard").addEventListener("change", function(e){
       if(!bxEdit) return;
       var f = e.target.closest("[data-bxe]");
-      if(f){ var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true; if(a[1]!=="code" && a[1]!=="price") bxDrawSets(); return; }
+      if(f){ var a = f.dataset.bxe.split("|"); bxEdit[+a[0]][a[1]] = f.value; bxEdit.dirty = true; if(a[1]==="type") bxDrawRows(); if(a[1]!=="code" && a[1]!=="price" && a[1]!=="max") bxDrawSets(); return; }
       var g = e.target.closest("[data-bxs]");
       if(g){ var b = g.dataset.bxs.split("|"), st = bxSetEdit[+b[0]];
         if(b[1]==="w"){ var nw = Number(g.value); // 幅を変えたら、中の部品も同じ名前の新しい幅の部品に入れ替える

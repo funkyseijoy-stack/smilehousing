@@ -278,35 +278,22 @@ function fileOf(f: any) {
 // 無いときは BOAXEL_DEFAULTS を使う。住まいるアプリの BOAXEL_DEFAULTS と**2か所に同じ内容**があるので、直すときは両方。
 const BOAXEL_TYPES = ["upright", "shelf", "rail", "basket", "drawer", "shoe", "other"];
 const BOAXEL_DEFAULTS: any[] = [
-  { id: "up200", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 200, price: "" },
-  { id: "up120", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 120, price: "" },
-  { id: "up80", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 80, price: "" },
-  { id: "sh40", type: "shelf", name: "棚板", code: "", size: 40, price: "" },
+  { id: "up200", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 200, price: "", max: 8 },
+  { id: "up120", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 120, price: "", max: 5 },
+  { id: "up80", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 80, price: "", max: 3 },
   { id: "sh60", type: "shelf", name: "棚板", code: "", size: 60, price: "" },
   { id: "sh80", type: "shelf", name: "棚板", code: "", size: 80, price: "" },
-  { id: "ra40", type: "rail", name: "ハンガーレール", code: "", size: 40, price: "" },
-  { id: "ra60", type: "rail", name: "ハンガーレール", code: "", size: 60, price: "" },
-  { id: "ra80", type: "rail", name: "ハンガーレール", code: "", size: 80, price: "" },
-  { id: "ba40", type: "basket", name: "メッシュバスケット", code: "", size: 40, price: "" },
-  { id: "ba60", type: "basket", name: "メッシュバスケット", code: "", size: 60, price: "" },
-  { id: "ba80", type: "basket", name: "メッシュバスケット", code: "", size: 80, price: "" },
-  { id: "dr60", type: "drawer", name: "引き出し", code: "", size: 60, price: "" },
-  { id: "dr80", type: "drawer", name: "引き出し", code: "", size: 80, price: "" },
-  { id: "so60", type: "shoe", name: "靴用の棚", code: "", size: 60, price: "" },
-  { id: "so80", type: "shoe", name: "靴用の棚", code: "", size: 80, price: "" },
+  { id: "ba60", type: "basket", name: "カゴ", code: "", size: 60, price: "" },
+  { id: "ba80", type: "basket", name: "カゴ", code: "", size: 80, price: "" },
 ];
-// 見本（列1つ分の組み合わせ。items は上から順の部品ID）。お客様は見本を列ごとに選んで並べるだけ（中身は変えられない）。
-// 住まいるアプリの BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**。
+// 見本（列1つ分の組み合わせ。items は上から順の部品ID）。お客様は見本を選んで並べたあと、列ごとに部品を足したり外したりできる
+// （1列に入る数は縦レールの max まで）。住まいるアプリの BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**。
 const BOAXEL_SETS_DEFAULTS: any[] = [
-  { id: "st_hang80", name: "洋服かけ", w: 80, items: ["sh80", "ra80"] },
-  { id: "st_hang2_80", name: "洋服かけ（上下2段）", w: 80, items: ["sh80", "ra80", "ra80"] },
-  { id: "st_hang60", name: "洋服かけ", w: 60, items: ["sh60", "ra60"] },
-  { id: "st_fold80", name: "たたみ物", w: 80, items: ["sh80", "sh80", "ba80", "ba80", "dr80"] },
-  { id: "st_fold60", name: "たたみ物", w: 60, items: ["sh60", "sh60", "ba60", "ba60", "dr60"] },
-  { id: "st_shoe80", name: "靴", w: 80, items: ["sh80", "so80", "so80", "so80", "so80"] },
-  { id: "st_shoe60", name: "靴", w: 60, items: ["sh60", "so60", "so60", "so60", "so60"] },
-  { id: "st_small40", name: "小物・バッグ", w: 40, items: ["sh40", "sh40", "ba40", "ba40"] },
+  { id: "st_sh60", name: "棚板1枚", w: 60, items: ["sh60"] },
+  { id: "st_sh80", name: "棚板1枚", w: 80, items: ["sh80"] },
 ];
+// 縦レールの「1列に入る数」（設定に無いときは長さから決める）
+function boaxelMax(up: any) { const m = Number(up && up.max); if (m > 0) return Math.min(30, Math.round(m)); const h = Number(up && up.size) || 0; return h >= 200 ? 8 : h >= 120 ? 5 : 3; }
 // デモの案件（「デモ様邸（練習用）」など）か
 function isDemoProject(project: any) { return !!(project && (project.demo === true || /デモ/.test(String(project.name || "")))); }
 function boaxelCatalog(settings: any, project?: any) {
@@ -322,6 +309,7 @@ function boaxelCatalog(settings: any, project?: any) {
     code: String((x && x.code) || "").trim().slice(0, 40),
     size: Math.max(0, Math.min(400, Number(x && x.size) || 0)),
     price: x && x.price !== "" && x.price != null && isFinite(Number(x.price)) ? Math.round(Number(x.price)) : null,
+    max: x && x.type === "upright" ? boaxelMax(x) : undefined,
   })).filter((x: any) => x.id && x.name && x.size);
   if (!parts.some((x: any) => x.type === "upright")) return null;
   const byId: any = {}; parts.forEach((x: any) => { byId[x.id] = x; });
@@ -343,10 +331,21 @@ function boaxelCatalog(settings: any, project?: any) {
 function boaxelParts(cat: any, plan: any) {
   const byId: any = {}; cat.parts.forEach((x: any) => { byId[x.id] = x; });
   const up = byId[String(plan && plan.upright || "")];
-  // 列は見本のIDだけを受け取り、中身は見本から決める（お客様が自由に部品を増やせないように）
+  // 列は幅と部品（上から順）を受け取る。その幅の部品だけ・1列に入る数（縦レールの max）までに限る。見本の名前は参考に残す
   const setById: any = {}; (cat.sets || []).forEach((x: any) => { setById[x.id] = x; });
-  const cols = (Array.isArray(plan && plan.cols) ? plan.cols : []).slice(0, 12).map((c: any) => setById[String(c && c.set || "")]).filter(Boolean)
-    .map((st: any) => ({ set: st.id, name: st.name, w: st.w, items: st.items.slice() }));
+  const max = boaxelMax(up);
+  const widths = new Set(cat.parts.filter((x: any) => x.type !== "upright").map((x: any) => x.size));
+  const cols = (Array.isArray(plan && plan.cols) ? plan.cols : []).slice(0, 12).map((c: any) => {
+    const st = setById[String(c && c.set || "")];
+    const w = Number(c && c.w) || (st ? st.w : 0);
+    if (!widths.has(w)) return null;
+    const raw = Array.isArray(c && c.items) ? c.items : (st ? st.items : []);
+    const items = raw.slice(0, 30).map((id: any) => String(id)).filter((id: string) => byId[id] && byId[id].type !== "upright" && byId[id].size === w);
+    if (items.length > max) return { over: true };
+    const name = st ? st.name + (st.w === w && st.items.join(",") === items.join(",") ? "" : "（変更あり）") : "自由に組んだ列";
+    return { set: st ? st.id : "", name, w, items };
+  }).filter(Boolean);
+  if (cols.some((c: any) => c.over)) return { error: "too_many_items" };
   if (!up || up.type !== "upright" || !cols.length) return null;
   const count: any = {};
   count[up.id] = cols.length + 1;
@@ -548,8 +547,9 @@ export default async (req: Request, context: Context) => {
       const cat = boaxelCatalog(settings, project);
       if (!cat) return json({ error: "unavailable" }, 400);
       const plan = body.plan || {};
-      const pp = boaxelParts(cat, plan);
+      const pp: any = boaxelParts(cat, plan);
       if (!pp) return json({ error: "empty" }, 400);
+      if (pp.error) return json({ error: pp.error }, 400);
       const name = String(plan.name || "").trim().slice(0, 40) || "収納プラン";
       const room = String(plan.room || "").trim().slice(0, 40);
       const wall = Math.max(0, Math.min(2000, Number(plan.wall) || 0));
