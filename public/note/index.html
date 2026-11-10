@@ -2786,10 +2786,23 @@ function homeHtml(){ return homeParts().main; }
     var cols = bxColsResolved(), up = bxPart(bx.upright), count = {};
     if(up && cols.length) count[up.id] = cols.length + 1;
     cols.forEach(function(c){ c.items.forEach(function(id){ count[id] = (count[id]||0) + 1; }); });
+    // ブラケット：棚板・カゴ1つに左右1つずつ。上から同じ段でとなり合う列は、間の縦レールのブラケットを共用（＝横につながった数＋1）
+    var br = bxParts().find(function(x){ return x.type==="bracket"; });
+    if(br){ var nb = bxBrackets(cols); if(nb) count[br.id] = nb; }
     var lines = Object.keys(count).map(function(id){ var x = bxPart(id); return { x:x, qty:count[id], sub: x && x.price!=null ? x.price*count[id] : null }; }).filter(function(l){ return l.x; });
     var all = lines.length && lines.every(function(l){ return l.sub!=null; });
     var total = lines.reduce(function(a,l){ return a + (l.sub||0); }, 0);
     return { cols:cols, lines:lines, total: all ? total : null, partial: !all && lines.some(function(l){ return l.sub!=null; }), width: bxWidthOf(cols) };
+  }
+  var BX_BRACKETED = ["shelf","basket"];
+  function bxBrackets(cols){
+    var n = 0, rows = cols.reduce(function(a,c){ return Math.max(a, c.items.length); }, 0);
+    for(var r=0; r<rows; r++){
+      var run = 0;
+      cols.forEach(function(c){ var x = bxPart(c.items[r]); if(x && BX_BRACKETED.indexOf(x.type)>=0) run++; else { if(run) n += run + 1; run = 0; } });
+      if(run) n += run + 1;
+    }
+    return n;
   }
   // この見本を（ci列目と入れ替えて／足して）も、壁の幅に収まるか
   function bxFits(setW, ci){
@@ -2797,7 +2810,7 @@ function homeHtml(){ return homeParts().main; }
     var cols = bxColsResolved(), w = bxWidthOf(cols) - (ci!=null && cols[ci] ? cols[ci].w : 0) + setW;
     return w <= wall;
   }
-  // 正面から見た絵（だいたいのイメージ。部品の位置は上から等間隔に並べる）
+  // 正面から見た絵（だいたいのイメージ）。どの列も「上から何段目」を同じ高さにそろえて描く（横並びがわかるように）
   function bxSvg(colsIn, H0, mini){
     var cols = colsIn || bxColsResolved();
     var up = bxPart(bx && bx.upright), H = H0 || (up ? up.size : 200);
@@ -2806,11 +2819,13 @@ function homeHtml(){ return homeParts().main; }
     out.push('<rect x="0" y="0" width="'+(W+pad*2)+'" height="'+(H+pad*2+(mini?0:14))+'" fill="#fff"/>');
     out.push('<rect x="'+pad+'" y="'+pad+'" width="'+W+'" height="'+H+'" fill="#f6f2ec" stroke="#e2d8cc" stroke-width=".6"/>');
     var x = pad;
+    var longest = cols.reduce(function(a,c){ return Math.max(a, c.items.length); }, 0);
+    var slots = mini ? Math.max(1, longest) : Math.max(longest, bx ? bxMax() : 1, 1);
     cols.forEach(function(c){
-      var n = c.items.length;
       c.items.forEach(function(id, i){
         var it = bxPart(id); if(!it) return;
-        var y = pad + H*(i+1)/(n+1);
+        var y = pad + H*(i+1)/(slots+1);
+        if(BX_BRACKETED.indexOf(it.type)>=0){ out.push('<path d="M'+(x+1)+' '+(y+1)+' l3 0 l-3 4 z M'+(x+c.w-1)+' '+(y+1)+' l-3 0 l3 4 z" fill="#4a4a4a"/>'); }
         var x0 = x + 1.5, w = c.w - 3;
         if(it.type==="shelf") out.push('<rect x="'+x0+'" y="'+(y-1.2)+'" width="'+w+'" height="2.4" fill="#c4ad8e" stroke="#8d7556" stroke-width=".4"/>');
         else if(it.type==="rail"){
@@ -2868,14 +2883,14 @@ function homeHtml(){ return homeParts().main; }
           '<button type="button" class="bxmini" data-bxmvc="'+ci+'|-1"'+(ci===0?' disabled':'')+' title="左へ">◀</button>'+
           '<button type="button" class="bxmini" data-bxmvc="'+ci+'|1"'+(ci===bx.cols.length-1?' disabled':'')+' title="右へ">▶</button>'+
           '<button type="button" class="bxmini" data-bxdelcol="'+ci+'" title="この列を外す">✕</button></div>'+
-          (c.items.length ? c.items.map(function(id, i){ var p = bxPart(id); return '<div class="bxit"><span>'+(i+1)+'. '+esc(p?p.name:"")+'</span>'+
+          (c.items.length ? c.items.map(function(id, i){ var p = bxPart(id); return '<div class="bxit"><span>'+(i+1)+'段目 '+esc(p?p.name:"")+'</span>'+
             '<button type="button" class="bxmini" data-bxmv="'+ci+'|'+i+'|-1"'+(i===0?' disabled':'')+'>▲</button><button type="button" class="bxmini" data-bxmv="'+ci+'|'+i+'|1"'+(i===c.items.length-1?' disabled':'')+'>▼</button>'+
             '<button type="button" class="bxmini" data-bxdel="'+ci+'|'+i+'">✕</button></div>'; }).join("") : '<div class="bxnote">下のボタンで足してください</div>')+
           (left<0 ? '<div class="bxwarn">高さ'+(bxPart(bx.upright)||{size:""}).size+'cmでは'+max+'個までです。'+(-left)+'個外してください。</div>' : '<div class="bxleft">あと'+left+'個</div>')+
           '<div class="bxadd">'+adds+'</div></div>';
       }).join("")+'</div>' : '')+
       '<div class="smpl" style="margin-top:12px;">必要な部品</div>'+
-      (calc.lines.length ? '<table class="bxparts">'+calc.lines.map(function(l){ return '<tr><td>'+esc(l.x.name)+' '+l.x.size+'cm'+(l.x.code?'<div class="bxnote">'+esc(l.x.code)+'</div>':'')+'</td><td class="n">× '+l.qty+'</td><td class="n">'+(l.sub!=null?bxYen(l.sub):'')+'</td></tr>'; }).join("")+'</table>' : '<div class="bxnote">まだ部品がありません。</div>')+
+      (calc.lines.length ? '<table class="bxparts">'+calc.lines.map(function(l){ return '<tr><td>'+esc(l.x.name)+(l.x.size?' '+l.x.size+'cm':'')+(l.x.code?'<div class="bxnote">'+esc(l.x.code)+'</div>':'')+'</td><td class="n">× '+l.qty+'</td><td class="n">'+(l.sub!=null?bxYen(l.sub):'')+'</td></tr>'; }).join("")+'</table>' : '<div class="bxnote">まだ部品がありません。</div>')+
       (calc.total!=null ? '<div class="bxtot">目安の合計：'+bxYen(calc.total)+'</div>' : (calc.partial ? '<div class="bxnote" style="text-align:right;">一部の部品は金額が未設定です（弊社からお知らせします）</div>' : ''))+
       ((calc.total!=null || calc.partial) ? '<div class="bxnote">金額は部品代の目安（税込）です。取り付け・送料などを含めた金額は、弊社からお見積りします。</div>' : '<div class="bxnote">金額は、弊社からお見積りします。</div>')+
       (data.boaxel && data.boaxel.note ? '<div class="bxnote" style="margin-top:6px;">'+esc(data.boaxel.note).replace(/\n/g,"<br>")+'</div>' : '')+

@@ -6628,6 +6628,7 @@
     { id:"up200", type:"upright", name:"縦レール（壁取り付け）", code:"", size:200, price:"", max:8 },
     { id:"up120", type:"upright", name:"縦レール（壁取り付け）", code:"", size:120, price:"", max:5 },
     { id:"up80", type:"upright", name:"縦レール（壁取り付け）", code:"", size:80, price:"", max:3 },
+    { id:"br", type:"bracket", name:"ブラケット", code:"", size:"", price:"" },
     { id:"sh60", type:"shelf", name:"棚板", code:"", size:60, price:"" },
     { id:"sh80", type:"shelf", name:"棚板", code:"", size:80, price:"" },
     { id:"ba60", type:"basket", name:"カゴ", code:"", size:60, price:"" },
@@ -6659,7 +6660,7 @@
         '<select data-bxsadd="'+si+'"><option value="">＋ 部品を入れる</option>'+opts.map(function(x){ return '<option value="'+escapeHtml(x.id)+'">'+escapeHtml(x.name)+'</option>'; }).join("")+'</select></div></div>';
     }).join("") : '<div class="muted">見本がありません（お客様の画面に収納プランが出ません）。</div>';
   }
-  var BX_TYPE_NAMES = [["upright","縦レール"],["shelf","棚板"],["rail","ハンガー"],["basket","バスケット"],["drawer","引き出し"],["shoe","靴用の棚"],["other","そのほか"]];
+  var BX_TYPE_NAMES = [["upright","縦レール"],["bracket","ブラケット"],["shelf","棚板"],["rail","ハンガー"],["basket","バスケット"],["drawer","引き出し"],["shoe","靴用の棚"],["other","そのほか"]];
   var bxEdit = null; // 編集中の部品の一覧（保存するまで設定は変えない）
   function bxSettingParts(){ var b = state.settings && state.settings.boaxel; return (b && Array.isArray(b.parts) && b.parts.length) ? b.parts : BOAXEL_DEFAULTS; }
   function renderBoaxelSetting(force){
@@ -6693,7 +6694,7 @@
     var parts = bxEdit.map(function(x){ return { id: x.id || ("bx" + Date.now().toString(36) + Math.random().toString(36).slice(2,6)), type:x.type||"other", name:String(x.name||"").trim(), code:String(x.code||"").trim(),
       size:Number(x.size)||0, price:(x.price===""||x.price==null||!isFinite(Number(x.price))) ? "" : Math.round(Number(x.price)),
       max: x.type==="upright" ? (Math.round(Number(x.max)||0) > 0 ? Math.min(30, Math.round(Number(x.max))) : (Number(x.size)>=200?8:Number(x.size)>=120?5:3)) : undefined }; })
-      .filter(function(x){ return x.name && x.size>0; });
+      .filter(function(x){ return x.name && (x.size>0 || x.type==="bracket"); });
     if(!parts.some(function(x){ return x.type==="upright"; })){ toast("縦レールを1つ以上入れてください"); return; }
     var pById = {}; parts.forEach(function(x){ pById[x.id] = x; });
     var sets = (bxSetEdit||[]).map(function(st){ var w = Number(st.w)||0; return { id: st.id || bxNewId("st"), name:String(st.name||"").trim(), w:w,

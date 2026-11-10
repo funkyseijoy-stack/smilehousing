@@ -276,11 +276,28 @@ function fileOf(f: any) {
 // ---- 収納プラン（IKEA ボーアクセル）：部品の一覧 ----
 // スタッフが住まいるアプリの「業者・設定」で直す（settings/main.boaxel={on,parts:[{id,type,name,code,size,price}]}）。
 // 無いときは BOAXEL_DEFAULTS を使う。住まいるアプリの BOAXEL_DEFAULTS と**2か所に同じ内容**があるので、直すときは両方。
-const BOAXEL_TYPES = ["upright", "shelf", "rail", "basket", "drawer", "shoe", "other"];
+const BOAXEL_TYPES = ["upright", "bracket", "shelf", "rail", "basket", "drawer", "shoe", "other"];
+// ブラケットを付ける部品（棚板・カゴ）。上から同じ段で横につながった枚数＋1つ（間の縦レールのブラケットは共用）
+const BOAXEL_BRACKETED = ["shelf", "basket"];
+function boaxelBracketCount(cols: any[], byId: any) {
+  let n = 0;
+  const rows = Math.max(0, ...cols.map((c: any) => c.items.length));
+  for (let r = 0; r < rows; r++) {
+    let run = 0;
+    cols.forEach((c: any) => {
+      const x = byId[c.items[r]];
+      if (x && BOAXEL_BRACKETED.includes(x.type)) run++;
+      else { if (run) n += run + 1; run = 0; }
+    });
+    if (run) n += run + 1;
+  }
+  return n;
+}
 const BOAXEL_DEFAULTS: any[] = [
   { id: "up200", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 200, price: "", max: 8 },
   { id: "up120", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 120, price: "", max: 5 },
   { id: "up80", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 80, price: "", max: 3 },
+  { id: "br", type: "bracket", name: "ブラケット", code: "", size: "", price: "" },
   { id: "sh60", type: "shelf", name: "棚板", code: "", size: 60, price: "" },
   { id: "sh80", type: "shelf", name: "棚板", code: "", size: 80, price: "" },
   { id: "ba60", type: "basket", name: "カゴ", code: "", size: 60, price: "" },
@@ -310,7 +327,7 @@ function boaxelCatalog(settings: any, project?: any) {
     size: Math.max(0, Math.min(400, Number(x && x.size) || 0)),
     price: x && x.price !== "" && x.price != null && isFinite(Number(x.price)) ? Math.round(Number(x.price)) : null,
     max: x && x.type === "upright" ? boaxelMax(x) : undefined,
-  })).filter((x: any) => x.id && x.name && x.size);
+  })).filter((x: any) => x.id && x.name && (x.size || x.type === "bracket"));
   if (!parts.some((x: any) => x.type === "upright")) return null;
   const byId: any = {}; parts.forEach((x: any) => { byId[x.id] = x; });
   const srcSets = bx && Array.isArray(bx.sets) ? bx.sets : BOAXEL_SETS_DEFAULTS;
@@ -349,6 +366,9 @@ function boaxelParts(cat: any, plan: any) {
   if (!up || up.type !== "upright" || !cols.length) return null;
   const count: any = {};
   count[up.id] = cols.length + 1;
+  // ブラケット（部品の一覧にあるときだけ数える）
+  const br = cat.parts.find((x: any) => x.type === "bracket");
+  if (br) { const nb = boaxelBracketCount(cols, byId); if (nb) count[br.id] = nb; }
   cols.forEach((c: any) => c.items.forEach((id: string) => { count[id] = (count[id] || 0) + 1; }));
   const lines = Object.keys(count).map((id) => {
     const x = byId[id];
@@ -573,7 +593,7 @@ export default async (req: Request, context: Context) => {
       }
       const yen = (n: number) => n.toLocaleString("ja-JP") + "円";
       const totalW = pp.cols.reduce((a: number, c: any) => a + c.w, 0);
-      const lineTxt = pp.lines.map((l: any) => `・${l.name} ${l.size}cm${l.code ? "（" + l.code + "）" : ""} × ${l.qty}${l.sub != null ? "　" + yen(l.sub) : ""}`).join("\n");
+      const lineTxt = pp.lines.map((l: any) => `・${l.name}${l.size ? " " + l.size + "cm" : ""}${l.code ? "（" + l.code + "）" : ""} × ${l.qty}${l.sub != null ? "　" + yen(l.sub) : ""}`).join("\n");
       const content = "【収納プランのご依頼】" + name + (room ? "（" + room + "）" : "") +
         "\n幅 約" + totalW + "cm（" + pp.cols.length + "列）・高さ " + pp.height + "cm" + (wall ? "／壁の幅 " + wall + "cm" : "") +
         "\n列：" + pp.cols.map((c: any, i: number) => (i + 1) + "列目 " + c.name + "（" + c.w + "cm）").join("／") +
