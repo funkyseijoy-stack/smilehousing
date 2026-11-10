@@ -4031,6 +4031,7 @@
       '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" data-ok>割り振る</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
     document.body.appendChild(ov);
     var sel = ov.querySelector("[data-as]"), dt = ov.querySelector("[data-ad]");
+    if(myStaffName()) sel.value = myStaffName();
     if(t.hasDeadline && t.deadline) dt.value = String(t.deadline).slice(0,10);
     setTimeout(function(){ sel.focus(); }, 50);
     ov.addEventListener("click", async function(e){
@@ -17184,6 +17185,8 @@
     var st = (checker||"")+"確認依頼中";
     return STATUS_ORDER.indexOf(st) >= 0 ? st : null;
   }
+  // ログインしている本人（担当者一覧にいるときだけ）。担当者を選ぶ画面で最初から選んでおく
+  function myStaffName(){ var me = state.currentUser || ""; return me && (state.settings.staffList || []).indexOf(me) >= 0 ? me : ""; }
   function openTaskForm(taskId){
     var editing = (typeof taskId === "string") ? state.tasks.find(function(x){ return x.id===taskId; }) : null;
     editingTaskId = editing ? editing.id : null;
@@ -17209,6 +17212,7 @@
     taskFormOnSaved = null;
     taskFormVendorSpec = null;
     document.getElementById("tfVendorSpecLabel").textContent = "未選択";
+    if(!editing && myStaffName()) document.getElementById("tfAssignee").value = myStaffName();
     document.getElementById("tfTitle").textContent = editing ? "タスクを編集" : "タスクを追加";
     document.getElementById("tfSubmit").textContent = editing ? "保存" : "追加";
     if(editing){
@@ -17949,7 +17953,10 @@
   // タスクを作るときの担当者を選ばせる。callback: スタッフ名／""（あとで決める）／キャンセル時null
   function askAssignee(callback){
     var staff = state.settings.staffList || [];
-    var choices = staff.map(function(n){ return {label:n, value:n}; }).concat([{label:"（担当者はあとで決める）", value:""}]);
+    // ログインしている本人をいちばん上に（「自分」と添える）
+    var me = myStaffName();
+    var order = me ? [me].concat(staff.filter(function(n){ return n!==me; })) : staff;
+    var choices = order.map(function(n){ return {label: n===me ? n+"（自分）" : n, value:n}; }).concat([{label:"（担当者はあとで決める）", value:""}]);
     askChoice("担当者を選択", "このタスクの担当者を選んでください", choices, callback);
   }
   // 業者タスクに紐付ける「部位」を、仕様タブの既存カテゴリーから選ばせる。
