@@ -2060,15 +2060,19 @@
 
     <div class="card" id="bxSettingCard">
       <h3>🧺 収納プラン（IKEA ボーアクセル）の部品</h3>
-      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様がおうちノートの「≡ メニュー」→「収納プラン」で組み合わせを考え、そのまま依頼できます（依頼は「👤 割り振り待ち」のタスクに届きます）。お客様が選べるのは、ここにある部品だけです。品番・寸法・目安の金額は、IKEAのサイトで確かめて直してください。金額を空にした部品は、お客様の画面に金額を出しません。</p>
+      <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様が収納の場所（幅はマスか測ったcm・ハンガー収納／棚収納）を足し、棚・カゴ・ハンガーを選んで依頼できるページ（/shuno/）の部品です。依頼は「👤 割り振り待ち」のタスクに届きます。1列ごとの標準（ハンガー収納＝棚1枚、棚収納＝棚4枚とそのブラケット）は金額に入りません。品番・寸法・目安の金額は、IKEAのサイトで確かめて直してください。金額を空にした部品は、お客様の画面に金額を出しません。</p>
       <label class="row" style="gap:6px; margin-block-end:4px;"><input type="checkbox" id="bxOn"> お客様のおうちノートに「収納プラン」を出す</label>
-      <label class="row" style="gap:6px; margin-block-end:8px;"><input type="checkbox" id="bxDemoOnly"> 試しの間は、デモの案件（名前に「デモ」が入った案件）のおうちノートだけに出す</label>
+      <label class="row" style="gap:6px; margin-block-end:4px;"><input type="checkbox" id="bxDemoOnly"> 試しの間は、デモの案件（名前に「デモ」が入った案件）のおうちノートだけに出す</label>
+      <label class="row" style="gap:6px; margin-block-end:4px;"><input type="checkbox" id="bxPublicOn"> 公開ページ（OBのお客様など・ログイン不要）を出す</label>
+      <div class="muted" style="font-size:.85rem; margin-block-end:8px;">公開ページ：<a href="/shuno/" target="_blank" rel="noopener">https://sprightly-pegasus-9b65a7.netlify.app/shuno/</a>（この端末からは、出す前でも確認用に開けます）<button type="button" class="btn small ghost" id="btnBxCopyUrl" style="margin-inline-start:6px;">URLをコピー</button></div>
       <div class="tablewrap"><table><thead><tr><th>種類</th><th>名前</th><th>品番</th><th>寸法(cm)</th><th>目安の金額(円・税込)</th><th>1列に入る数<br>（縦レールだけ）</th><th></th></tr></thead><tbody id="bxPartsBody"></tbody></table></div>
       <button type="button" class="btn small secondary" id="btnBxAddPart" style="margin-block-start:6px;">＋ 部品を足す</button>
+      <div hidden>
       <h4 style="margin:16px 0 4px;">見本（列1つ分の組み合わせ）</h4>
       <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">お客様は見本を選んで左から並べ、そのあと列ごとに棚・カゴを足したり外したりできます（1列に入る数は縦レールの「1列に入る数」まで）。中の部品は上から順です。見本の幅と同じ寸法の部品だけ入れられます。</p>
       <div id="bxSetsBody"></div>
       <button type="button" class="btn small secondary" id="btnBxAddSet" style="margin-block-start:6px;">＋ 見本を足す</button>
+      </div>
       <label class="field" style="margin-block-start:10px;">お客様への注意書き（なくても可）<textarea id="bxNoteInput" rows="2" style="width:100%;" placeholder="例：取り付けには下地の確認が必要です。"></textarea></label>
       <div class="row" style="gap:10px; align-items:center; margin-block-start:8px; flex-wrap:wrap;">
         <button class="btn" id="btnBxSave">保存</button>
@@ -6632,7 +6636,9 @@
     { id:"sh60", type:"shelf", name:"棚板", code:"", size:60, price:"" },
     { id:"sh80", type:"shelf", name:"棚板", code:"", size:80, price:"" },
     { id:"ba60", type:"basket", name:"カゴ", code:"", size:60, price:"" },
-    { id:"ba80", type:"basket", name:"カゴ", code:"", size:80, price:"" }
+    { id:"ba80", type:"basket", name:"カゴ", code:"", size:80, price:"" },
+    { id:"ra60", type:"rail", name:"ハンガーパイプ", code:"", size:60, price:"" },
+    { id:"ra80", type:"rail", name:"ハンガーパイプ", code:"", size:80, price:"" }
   ];
   // note-data.mts の BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**（見本＝列1つ分の組み合わせ。items は上から順の部品ID）
   var BOAXEL_SETS_DEFAULTS = [
@@ -6671,6 +6677,7 @@
     bxSetEdit = JSON.parse(JSON.stringify(bxSettingSets()));
     document.getElementById("bxOn").checked = !b || b.on !== false;
     document.getElementById("bxDemoOnly").checked = !b || b.demoOnly !== false;
+    document.getElementById("bxPublicOn").checked = !!(b && b.publicOn === true);
     document.getElementById("bxNoteInput").value = (b && b.note) || "";
     bxDrawRows(); bxDrawSets();
     var st = document.getElementById("bxStatus");
@@ -6700,10 +6707,9 @@
     var sets = (bxSetEdit||[]).map(function(st){ var w = Number(st.w)||0; return { id: st.id || bxNewId("st"), name:String(st.name||"").trim(), w:w,
       items:(st.items||[]).filter(function(id){ return pById[id] && pById[id].type!=="upright" && pById[id].size===w; }) }; })
       .filter(function(st){ return st.name && st.w>0 && st.items.length; });
-    if(!sets.length){ toast("見本を1つ以上（名前と中の部品を）入れてください"); return; }
     state.settings = state.settings || {};
     var prev = state.settings.boaxel;
-    state.settings.boaxel = { on: document.getElementById("bxOn").checked, demoOnly: document.getElementById("bxDemoOnly").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, sets: sets, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
+    state.settings.boaxel = { on: document.getElementById("bxOn").checked, demoOnly: document.getElementById("bxDemoOnly").checked, publicOn: document.getElementById("bxPublicOn").checked, note: document.getElementById("bxNoteInput").value.trim(), parts: parts, sets: sets, updatedAt: nowIso(), updatedBy: state.currentUser||"" };
     var ok = await saveDoc("settings","main", state.settings);
     if(ok===false){ state.settings.boaxel = prev; toast("⚠ 保存できませんでした。もう一度押してください"); return; }
     logActivity("収納プラン（ボーアクセル）の部品を保存しました");
@@ -6868,6 +6874,7 @@
     document.getElementById("ciOn").addEventListener("change", function(){ document.getElementById("ciText").dataset.dirty = "1"; });
     document.getElementById("btnCiSave").addEventListener("click", saveCompanyIntro);
     document.getElementById("btnBxSave").addEventListener("click", saveBoaxelSetting);
+    document.getElementById("btnBxCopyUrl").addEventListener("click", function(){ var u = location.origin + "/shuno/"; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function(){ toast("URLをコピーしました"); }, function(){ prompt("このURLをコピーしてください", u); }); });
     document.getElementById("btnBxReset").addEventListener("click", function(){
       if(!confirm("部品の一覧と見本を最初の状態（品番・金額なし）に戻しますか？\n（「保存」を押すまでは変わりません）")) return;
       bxEdit = JSON.parse(JSON.stringify(BOAXEL_DEFAULTS)); bxSetEdit = JSON.parse(JSON.stringify(BOAXEL_SETS_DEFAULTS)); bxEdit.dirty = true; bxDrawRows(); bxDrawSets();

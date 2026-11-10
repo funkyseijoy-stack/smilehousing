@@ -2,6 +2,7 @@ import type { Context, Config } from "@netlify/functions";
 import { sendNotifyMail } from "../lib/google.mts";
 import { getExtras, saveExtras } from "../lib/note-extras.mts";
 import { sendTaskReviewMail } from "../lib/task-mail.mts";
+import { boaxelForNote } from "../lib/boaxel.mts";
 import { getStore } from "@netlify/blobs";
 
 // 新おうちノート（/note/）用のお客様向けAPI。
@@ -273,111 +274,7 @@ function fileOf(f: any) {
   return { url: f.url, contentType: f.contentType || "", name: f.name || f.fileName || "" };
 }
 
-// ---- 収納プラン（IKEA ボーアクセル）：部品の一覧 ----
-// スタッフが住まいるアプリの「業者・設定」で直す（settings/main.boaxel={on,parts:[{id,type,name,code,size,price}]}）。
-// 無いときは BOAXEL_DEFAULTS を使う。住まいるアプリの BOAXEL_DEFAULTS と**2か所に同じ内容**があるので、直すときは両方。
-const BOAXEL_TYPES = ["upright", "bracket", "shelf", "rail", "basket", "drawer", "shoe", "other"];
-// ブラケットを付ける部品（棚板・カゴ）。上から同じ段で横につながった枚数＋1つ（間の縦レールのブラケットは共用）
-const BOAXEL_BRACKETED = ["shelf", "basket"];
-function boaxelBracketCount(cols: any[], byId: any) {
-  let n = 0;
-  const rows = Math.max(0, ...cols.map((c: any) => c.items.length));
-  for (let r = 0; r < rows; r++) {
-    let run = 0;
-    cols.forEach((c: any) => {
-      const x = byId[c.items[r]];
-      if (x && BOAXEL_BRACKETED.includes(x.type)) run++;
-      else { if (run) n += run + 1; run = 0; }
-    });
-    if (run) n += run + 1;
-  }
-  return n;
-}
-const BOAXEL_DEFAULTS: any[] = [
-  { id: "up200", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 200, price: "", max: 8 },
-  { id: "up120", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 120, price: "", max: 5 },
-  { id: "up80", type: "upright", name: "縦レール（壁取り付け）", code: "", size: 80, price: "", max: 3 },
-  { id: "br", type: "bracket", name: "ブラケット", code: "", size: "", price: "" },
-  { id: "sh60", type: "shelf", name: "棚板", code: "", size: 60, price: "" },
-  { id: "sh80", type: "shelf", name: "棚板", code: "", size: 80, price: "" },
-  { id: "ba60", type: "basket", name: "カゴ", code: "", size: 60, price: "" },
-  { id: "ba80", type: "basket", name: "カゴ", code: "", size: 80, price: "" },
-];
-// 見本（列1つ分の組み合わせ。items は上から順の部品ID）。お客様は見本を選んで並べたあと、列ごとに部品を足したり外したりできる
-// （1列に入る数は縦レールの max まで）。住まいるアプリの BOAXEL_SETS_DEFAULTS と**2か所に同じ内容**。
-const BOAXEL_SETS_DEFAULTS: any[] = [
-  { id: "st_sh60", name: "棚板1枚", w: 60, items: ["sh60"] },
-  { id: "st_sh80", name: "棚板1枚", w: 80, items: ["sh80"] },
-];
-// 縦レールの「1列に入る数」（設定に無いときは長さから決める）
-function boaxelMax(up: any) { const m = Number(up && up.max); if (m > 0) return Math.min(30, Math.round(m)); const h = Number(up && up.size) || 0; return h >= 200 ? 8 : h >= 120 ? 5 : 3; }
-// デモの案件（「デモ様邸（練習用）」など）か
-function isDemoProject(project: any) { return !!(project && (project.demo === true || /デモ/.test(String(project.name || "")))); }
-function boaxelCatalog(settings: any, project?: any) {
-  const bx = settings && settings.boaxel;
-  if (bx && bx.on === false) return null;
-  // 「デモの案件だけに出す」（設定が無いときも、試しの間はデモの案件だけ）
-  if ((!bx || bx.demoOnly !== false) && !isDemoProject(project)) return null;
-  const src = bx && Array.isArray(bx.parts) && bx.parts.length ? bx.parts : BOAXEL_DEFAULTS;
-  const parts = src.slice(0, 120).map((x: any) => ({
-    id: String((x && x.id) || "").slice(0, 40),
-    type: BOAXEL_TYPES.includes(x && x.type) ? x.type : "other",
-    name: String((x && x.name) || "").trim().slice(0, 40),
-    code: String((x && x.code) || "").trim().slice(0, 40),
-    size: Math.max(0, Math.min(400, Number(x && x.size) || 0)),
-    price: x && x.price !== "" && x.price != null && isFinite(Number(x.price)) ? Math.round(Number(x.price)) : null,
-    max: x && x.type === "upright" ? boaxelMax(x) : undefined,
-  })).filter((x: any) => x.id && x.name && (x.size || x.type === "bracket"));
-  if (!parts.some((x: any) => x.type === "upright")) return null;
-  const byId: any = {}; parts.forEach((x: any) => { byId[x.id] = x; });
-  const srcSets = bx && Array.isArray(bx.sets) ? bx.sets : BOAXEL_SETS_DEFAULTS;
-  const sets = srcSets.slice(0, 60).map((x: any) => {
-    const w = Math.max(0, Math.min(200, Number(x && x.w) || 0));
-    return {
-      id: String((x && x.id) || "").slice(0, 40),
-      name: String((x && x.name) || "").trim().slice(0, 40),
-      w,
-      // その幅の部品だけ（縦レールは除く）
-      items: (Array.isArray(x && x.items) ? x.items : []).slice(0, 15).map((id: any) => String(id)).filter((id: string) => byId[id] && byId[id].type !== "upright" && byId[id].size === w),
-    };
-  }).filter((x: any) => x.id && x.name && x.w && x.items.length);
-  if (!sets.length) return null;
-  return { parts, sets, note: String((bx && bx.note) || "").slice(0, 500) };
-}
-// お客様のプランから部品の数を数える（縦レールは列の数＋1本。部品の一覧にあるものだけ）
-function boaxelParts(cat: any, plan: any) {
-  const byId: any = {}; cat.parts.forEach((x: any) => { byId[x.id] = x; });
-  const up = byId[String(plan && plan.upright || "")];
-  // 列は幅と部品（上から順）を受け取る。その幅の部品だけ・1列に入る数（縦レールの max）までに限る。見本の名前は参考に残す
-  const setById: any = {}; (cat.sets || []).forEach((x: any) => { setById[x.id] = x; });
-  const max = boaxelMax(up);
-  const widths = new Set(cat.parts.filter((x: any) => x.type !== "upright").map((x: any) => x.size));
-  const cols = (Array.isArray(plan && plan.cols) ? plan.cols : []).slice(0, 12).map((c: any) => {
-    const st = setById[String(c && c.set || "")];
-    const w = Number(c && c.w) || (st ? st.w : 0);
-    if (!widths.has(w)) return null;
-    const raw = Array.isArray(c && c.items) ? c.items : (st ? st.items : []);
-    const items = raw.slice(0, 30).map((id: any) => String(id)).filter((id: string) => byId[id] && byId[id].type !== "upright" && byId[id].size === w);
-    if (items.length > max) return { over: true };
-    const name = st ? st.name + (st.w === w && st.items.join(",") === items.join(",") ? "" : "（変更あり）") : "自由に組んだ列";
-    return { set: st ? st.id : "", name, w, items };
-  }).filter(Boolean);
-  if (cols.some((c: any) => c.over)) return { error: "too_many_items" };
-  if (!up || up.type !== "upright" || !cols.length) return null;
-  const count: any = {};
-  count[up.id] = cols.length + 1;
-  // ブラケット（部品の一覧にあるときだけ数える）
-  const br = cat.parts.find((x: any) => x.type === "bracket");
-  if (br) { const nb = boaxelBracketCount(cols, byId); if (nb) count[br.id] = nb; }
-  cols.forEach((c: any) => c.items.forEach((id: string) => { count[id] = (count[id] || 0) + 1; }));
-  const lines = Object.keys(count).map((id) => {
-    const x = byId[id];
-    return { id, type: x.type, name: x.name, code: x.code, size: x.size, qty: count[id], price: x.price, sub: x.price != null ? x.price * count[id] : null };
-  });
-  const allPriced = lines.every((l: any) => l.sub != null);
-  const total = lines.reduce((a: number, l: any) => a + (l.sub || 0), 0);
-  return { cols, upright: up.id, height: up.size, lines, total: allPriced ? total : null, partial: !allPriced && lines.some((l: any) => l.sub != null) };
-}
+// 収納プラン（IKEA ボーアクセル）の部品・計算は netlify/lib/boaxel.mts、ページは /shuno/（API /api/shuno）。
 
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -561,62 +458,6 @@ export default async (req: Request, context: Context) => {
     }
     // お知らせメール（スタッフからメッセージが届いたときに知らせる宛先。お客様が自分で登録・変更・解除する）
     // サンプル請求（お客様 → 社内タスク。担当者なし＝「割り振り待ち」。状態はタスクの進捗から出す）
-    // 収納プラン（IKEA ボーアクセル）のご依頼：お客様のプランを部品の一覧で数え直し、絵を保存して社内タスクにする（担当者なし＝「割り振り待ち」）
-    if (body.action === "boaxelRequest") {
-      const settings: any = await store.get("settings/main", { type: "json" }).catch(() => null);
-      const cat = boaxelCatalog(settings, project);
-      if (!cat) return json({ error: "unavailable" }, 400);
-      const plan = body.plan || {};
-      const pp: any = boaxelParts(cat, plan);
-      if (!pp) return json({ error: "empty" }, 400);
-      if (pp.error) return json({ error: pp.error }, 400);
-      const name = String(plan.name || "").trim().slice(0, 40) || "収納プラン";
-      const room = String(plan.room || "").trim().slice(0, 40);
-      const wall = Math.max(0, Math.min(2000, Number(plan.wall) || 0));
-      if (wall && pp.cols.reduce((a: number, c: any) => a + c.w, 0) > wall) return json({ error: "too_wide" }, 400);
-      const note = String(plan.note || "").trim().slice(0, 500);
-      const mine = (await listCollection(store, "tasks", projectId)).filter((t: any) => t.fromBoaxel && !t.deletedAt);
-      if (mine.length >= 50) return json({ error: "too_many" }, 429);
-      const now = new Date().toISOString();
-      const attachments: any[] = [];
-      const dm = /^data:(image\/(?:jpeg|png));base64,(.+)$/.exec(String(body.image || ""));
-      if (dm) {
-        try {
-          const bytes = Uint8Array.from(Buffer.from(dm[2], "base64"));
-          if (bytes.length && bytes.length <= IMAGE_MAX_BYTES) {
-            const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-            await getStore("customerPhotos").set(`${projectId}/${key}`, bytes, { metadata: { contentType: dm[1] } });
-            attachments.push({ id: genId("att"), url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
-              contentType: dm[1], name: `収納プラン_${name}_${now.slice(5, 10).replace("-", "")}.${dm[1] === "image/png" ? "png" : "jpg"}`, fromCustomer: true });
-          }
-        } catch (e) { console.error("boaxel image failed", e); }
-      }
-      const yen = (n: number) => n.toLocaleString("ja-JP") + "円";
-      const totalW = pp.cols.reduce((a: number, c: any) => a + c.w, 0);
-      const lineTxt = pp.lines.map((l: any) => `・${l.name}${l.size ? " " + l.size + "cm" : ""}${l.code ? "（" + l.code + "）" : ""} × ${l.qty}${l.sub != null ? "　" + yen(l.sub) : ""}`).join("\n");
-      const content = "【収納プランのご依頼】" + name + (room ? "（" + room + "）" : "") +
-        "\n幅 約" + totalW + "cm（" + pp.cols.length + "列）・高さ " + pp.height + "cm" + (wall ? "／壁の幅 " + wall + "cm" : "") +
-        "\n列：" + pp.cols.map((c: any, i: number) => (i + 1) + "列目 " + c.name + "（" + c.w + "cm）").join("／") +
-        "\n" + lineTxt +
-        (pp.total != null ? "\n目安の合計：" + yen(pp.total) + "（税込・部品代のみ）" : "") +
-        (note ? "\nひとこと：" + note : "");
-      const taskId = genId("task_bx_");
-      const task = {
-        id: taskId, projectId, content,
-        assignee: "", instructor: "お客様", creator: "おうちノート",
-        hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
-        attachmentAssetIds: [], attachments, private: false, reflected: false, reflectedAt: null,
-        status: "未着手",
-        fromBoaxel: { name, room, wall, note, upright: pp.upright, height: pp.height, cols: pp.cols, lines: pp.lines, total: pp.total, at: now },
-        createdAt: now, updatedAt: now,
-      };
-      await store.setJSON(`tasks/${taskId}`, task);
-      await sendNotifyMail(
-        `【おうちノート】${project.customer || "お客様"}様から収納プラン（ボーアクセル）のご依頼が届きました`,
-        `${project.customer || "お客様"}様（${project.name || ""}）から、おうちノートで収納プランのご依頼が届きました。\n\n${content}\n\n住まいるアプリのホームのタスク（割り振り待ち）に入っています。プランの絵も付いています。`
-      );
-      return json({ ok: true, req: { id: taskId, name, room, at: now, total: pp.total, state: "受付済み" } });
-    }
     if (body.action === "sampleRequest") {
       const catName = String(body.catName || "").trim().slice(0, 40);
       const what = String(body.what || "").trim().slice(0, 300);
@@ -1310,15 +1151,8 @@ export default async (req: Request, context: Context) => {
       })).filter((x: any) => x.name && x.group);
       return items.length ? { items } : null;
     })(),
-    // 収納プラン（IKEA ボーアクセル）：部品の一覧（スタッフが止めたときは null）と、これまでのご依頼
-    boaxel: boaxelCatalog(bxSettings, project),
-    boaxelRequests: tasks.filter((t: any) => t.fromBoaxel && !t.deletedAt)
-      .map((t: any) => ({
-        id: t.id, name: t.fromBoaxel.name || "", room: t.fromBoaxel.room || "", at: t.fromBoaxel.at || t.createdAt || "",
-        total: t.fromBoaxel.total != null ? t.fromBoaxel.total : null,
-        state: t.status === "完了" ? "ご注文済み" : (t.status === "未着手" ? "受付済み" : "確認中"),
-      }))
-      .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at))).slice(0, 30),
+    // 収納プラン（IKEA ボーアクセル）を出すか（ページは /shuno/。試しの間はデモの案件だけ）
+    boaxel: !!boaxelForNote(bxSettings, project),
     // サンプル請求（お客様が送ったもの。状態はタスクの進捗：未着手＝受付済み／完了＝お渡し済み／それ以外＝準備中）
     sampleRequests: tasks.filter((t: any) => t.fromSampleRequest && !t.deletedAt)
       .map((t: any) => ({

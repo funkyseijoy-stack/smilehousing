@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a302b">
+<meta name="robots" content="noindex">
+<title>収納プラン（IKEA ボーアクセル）｜住まいるハウジング</title>
+<link rel="icon" href="/note/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/note/icons/apple-touch-icon.png">
+<style>
+  :root{
+    --page:#efe9e2; --bg:#f7f3ee; --card:#fffdfa; --line:#e9e2da; --line2:#ded5cb;
+    --ink:#2f2925; --ink2:#5c534d; --muted:#8a8078; --brown:#5d5049; --brown2:#7a6a60;
+    --chip:#efe9e3; --green:#e3efe7; --green-ink:#3f6a4f; --rose:#b45b6a; --red:#b3261e;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--page); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.6; }
+  button,input,textarea,select{ font-family:inherit; font-size:1rem; }
+  .app{ max-width:640px; margin:0 auto; min-height:100vh; background:var(--bg); }
+  .hd{ background:#3a302b; padding:18px 18px 16px; }
+  .hd .co{ color:#f1e6d6; font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",Georgia,serif; letter-spacing:.28em; font-size:1rem; }
+  .hd .rule{ height:1px; width:120px; background:rgba(216,191,157,.55); margin:8px 0; }
+  .hd .sb{ color:#cdb9a0; font-size:.68rem; letter-spacing:.34em; }
+  .hd a[hidden]{ display:none; }
+  .hd a{ color:#e8d9c4; font-size:.85rem; text-decoration:none; display:inline-block; margin-top:8px; }
+  .wrap{ padding:20px 16px calc(64px + env(safe-area-inset-bottom)); }
+  h1{ font-size:1.32rem; line-height:1.4; margin:0 0 8px; }
+  .lead{ margin:0 0 8px; color:var(--ink2); font-size:.9rem; }
+  .note{ font-size:.82rem; color:var(--muted); line-height:1.6; }
+  .warn{ color:var(--red); font-size:.85rem; font-weight:700; margin:6px 0; }
+  .box{ background:var(--card); border:1.5px solid var(--line2); border-radius:16px; padding:14px; margin:14px 0; }
+  .masuhelp{ background:#fbf6ee; border:1.5px dashed #d8c3a5; border-radius:14px; padding:12px 14px; font-size:.88rem; color:var(--ink2); }
+  .masuhelp b{ color:var(--ink); }
+  .btn{ border:none; border-radius:12px; padding:10px 16px; font-weight:700; cursor:pointer; background:var(--chip); color:var(--ink); }
+  .btn.dk{ background:var(--brown); color:#fff; }
+  .btn.full{ width:100%; padding:14px; font-size:1.05rem; }
+  .btn[disabled]{ opacity:.45; cursor:default; }
+  .btn.ghost{ background:transparent; border:1.5px solid var(--line2); }
+  .lbl{ display:block; font-weight:700; font-size:.9rem; margin:12px 0 6px; }
+  .in{ width:100%; border:1.5px solid var(--line2); border-radius:12px; padding:10px 12px; background:#fff; color:var(--ink); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ border:1.5px solid var(--line2); background:#fff; border-radius:999px; padding:6px 12px; font-size:.86rem; cursor:pointer; color:var(--ink); }
+  .chip.on{ background:var(--brown); color:#fff; border-color:var(--brown); }
+  .seg{ display:flex; gap:6px; }
+  .seg button{ flex:1; }
+  .tcard{ flex:1; border:1.5px solid var(--line2); background:#fff; border-radius:14px; padding:10px; text-align:left; cursor:pointer; color:var(--ink); }
+  .tcard.on{ border-color:var(--brown); box-shadow:0 0 0 2px var(--brown) inset; }
+  .tcard b{ display:block; font-size:.95rem; }
+  .tcard span{ font-size:.78rem; color:var(--ink2); }
+  .fit{ font-size:.86rem; color:var(--green-ink); font-weight:700; margin-top:6px; }
+  .place{ background:var(--card); border:1.5px solid var(--line2); border-radius:18px; padding:14px; margin:16px 0; }
+  .place h3{ margin:0; font-size:1.08rem; }
+  .pmeta{ font-size:.82rem; color:var(--ink2); margin:2px 0 8px; }
+  .phd{ display:flex; gap:8px; align-items:flex-start; }
+  .phd .t{ flex:1; min-width:0; }
+  .mini{ border:1px solid var(--line2); background:#fff; border-radius:8px; font-size:.8rem; padding:3px 8px; cursor:pointer; color:var(--ink); }
+  .mini[disabled]{ opacity:.35; cursor:default; }
+  .svg{ background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:6px; text-align:center; margin:6px 0; }
+  .svg svg{ width:100%; height:auto; max-height:44vh; }
+  .cols{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; }
+  .col{ flex:0 0 220px; border:1.5px solid var(--line2); border-radius:14px; padding:8px; background:#fff; }
+  .col.over{ border-color:var(--red); }
+  .ch{ font-weight:700; font-size:.88rem; margin-bottom:4px; }
+  .it{ display:flex; align-items:center; gap:4px; font-size:.84rem; border-bottom:1px dashed var(--line); padding:4px 0; }
+  .it span{ flex:1; min-width:0; }
+  .std{ display:inline-block; font-size:.7rem; background:var(--green); color:var(--green-ink); border-radius:6px; padding:0 6px; margin-left:4px; font-weight:700; }
+  .left{ font-size:.78rem; color:var(--ink2); margin-top:4px; }
+  .adds{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .adds button{ border:1.5px dashed var(--line2); background:var(--bg); border-radius:10px; font-size:.8rem; padding:4px 8px; cursor:pointer; color:var(--ink); }
+  .adds button[disabled]{ opacity:.4; cursor:default; }
+  .sub{ text-align:right; font-weight:700; font-size:.92rem; margin-top:8px; }
+  table.parts{ width:100%; border-collapse:collapse; font-size:.86rem; }
+  table.parts td{ border-bottom:1px solid var(--line); padding:5px 4px; }
+  table.parts td.n{ text-align:right; white-space:nowrap; }
+  .tot{ font-size:1.12rem; font-weight:700; text-align:right; margin:10px 0 2px; }
+  .hist{ font-size:.86rem; border-bottom:1px solid var(--line); padding:6px 0; }
+  .st{ display:inline-block; font-size:.74rem; border-radius:999px; padding:1px 8px; background:var(--chip); margin-right:6px; font-weight:700; }
+  .st.d{ background:var(--green); color:var(--green-ink); }
+  .hp{ position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#2f2925; color:#fff; padding:10px 16px; border-radius:12px; font-size:.9rem; z-index:99; max-width:90vw; }
+  .done{ text-align:center; padding:30px 10px; }
+  .done .big{ font-size:3rem; }
+  .prevbar{ background:#fff3d6; color:#7a5a12; font-size:.85rem; padding:8px 14px; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hd">
+    <div class="co">SMILE HOUSING</div><div class="rule"></div><div class="sb">住まいるハウジング</div>
+    <a id="backNote" href="#" hidden>← おうちノートへ戻る</a>
+  </div>
+  <div id="prev" class="prevbar" hidden>スタッフの確認用に表示しています（お客様にはまだ出ていません）</div>
+  <div class="wrap" id="main"><p class="note">読み込み中…</p></div>
+</div>
+<script>
+(function(){
+  "use strict";
+  var qs = new URLSearchParams(location.search);
+  var P = qs.get("p") || "", T = qs.get("t") || "";
+  var DRAFT_KEY = "shunoPlan:" + (P || "public");
+  var staffCode = ""; try{ staffCode = localStorage.getItem("sumairu_staff_token") || ""; }catch(e){}
+  var C = null;      // サーバーから：部品の一覧など
+  var S = null;      // お客様のプラン（下書き）
+  var form = null;   // 場所の追加・直す画面（null＝閉じている）
+  var sent = null;   // 送ったあと
+  var main = document.getElementById("main");
+  var NAME_PRESETS = ["ファミリークローゼット","パントリー","子供部屋 クローゼット","ウォークイン 奥の壁","ウォークイン 右の壁","ウォークイン 左の壁","玄関収納","寝室 クローゼット"];
+  var MASU_CHOICES = [1,1.5,2,2.5,3,3.5,4];
+  var BRACKETED = ["shelf","basket"];
+  var UPRIGHT_CM = 2, WALL_CM = 10.5;
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function toast(m){ var d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 3200); }
+  function yen(n){ return Number(n).toLocaleString("ja-JP") + "円"; }
+  function uid(){ return "pl" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function part(id){ return C.parts.find(function(x){ return x.id===id; }) || null; }
+  function uprights(){ return C.parts.filter(function(x){ return x.type==="upright"; }).sort(function(a,b){ return b.size-a.size; }); }
+  function widths(){ return C.parts.filter(function(x){ return x.type==="shelf"; }).map(function(x){ return x.size; }); }
+  function maxOf(up){ var m = up && Number(up.max); if(m>0) return m; var h = up ? up.size : 200; return h>=200 ? 8 : (h>=120 ? 5 : 3); }
+  function typeInfo(t){ return (C.placeTypes && C.placeTypes[t]) || {name:t, stdShelves:1}; }
+  function masuText(m){ return String(m).replace(/\.5$/, ".5") + "マス"; }
+
+  // ---- 計算（netlify/lib/boaxel.mts と同じ内容） ----
+  function placeInner(p){ if(p.wmode==="cm" && Number(p.cm)>0) return Math.min(800, Number(p.cm)); var m = Number(p.masu)||0; return m>0 ? Math.max(0, m*(C.masuCm||91) - WALL_CM) : 0; }
+  function colsForInner(inner){
+    var ws = Array.from(new Set(widths())).sort(function(a,b){ return b-a; }), best = [], bestSum = 0;
+    for(var n=1; n<=10; n++){
+      (function rec(left, from, acc){
+        if(left===0){ var sum = acc.reduce(function(a,b){ return a+b; }, 0); if(sum + (acc.length+1)*UPRIGHT_CM <= inner && sum > bestSum){ best = acc.slice(); bestSum = sum; } return; }
+        for(var i=from; i<ws.length; i++){ acc.push(ws[i]); rec(left-1, i, acc); acc.pop(); }
+      })(n, 0, []);
+    }
+    return best;
+  }
+  function bracketCount(cols){
+    var n = 0, rows = cols.reduce(function(a,c){ return Math.max(a, c.length); }, 0);
+    for(var r=0; r<rows; r++){
+      var run = 0;
+      cols.forEach(function(c){ var x = part(c[r]); if(x && BRACKETED.indexOf(x.type)>=0) run++; else { if(run) n += run+1; run = 0; } });
+      if(run) n += run+1;
+    }
+    return n;
+  }
+  // 場所1つ分の列（幅・標準・足した分）
+  function placeCols(p){
+    var up = part(p.height) || uprights()[0], max = maxOf(up);
+    var ws = colsForInner(placeInner(p));
+    var stdN = Math.min(max, typeInfo(p.type).stdShelves);
+    var cols = ws.map(function(w, i){
+      var sh = C.parts.find(function(x){ return x.type==="shelf" && x.size===w; });
+      var std = sh ? Array.from({length:stdN}, function(){ return sh.id; }) : [];
+      var ex = ((p.cols[i] && p.cols[i].extras) || []).filter(function(id){ var x = part(id); return x && x.size===w; });
+      return { w:w, std:std, extras:ex, items:std.concat(ex) };
+    });
+    return { up:up, max:max, cols:cols };
+  }
+  // 幅が変わったら、足した分を新しい幅の同じ部品に入れ替える
+  function syncCols(p){
+    var ws = colsForInner(placeInner(p));
+    var old = p.cols || [], oldW = p._ws || [];
+    p.cols = ws.map(function(w, i){
+      var ex = (old[i] && old[i].extras) || [];
+      if(oldW[i] && oldW[i]!==w) ex = ex.map(function(id){ var x = part(id); var q = x && C.parts.find(function(y){ return y.type===x.type && y.name===x.name && y.size===w; }); return q ? q.id : null; }).filter(Boolean);
+      return { extras: ex };
+    });
+    p._ws = ws;
+  }
+  function calc(places){
+    var count = {}, std = {}, br = C.parts.find(function(x){ return x.type==="bracket"; });
+    var add = function(o, id, n){ if(id && n) o[id] = (o[id]||0) + n; };
+    var per = places.map(function(p){
+      var pc = placeCols(p), pcount = {}, pstd = {};
+      if(!pc.cols.length) return { pc:pc, sub:0, partial:false };
+      add(pcount, pc.up.id, pc.cols.length + 1); add(pstd, pc.up.id, pc.cols.length + 1); // 縦レールは標準（棚を付けるのに必ず要るため）
+      pc.cols.forEach(function(c){ c.items.forEach(function(id){ add(pcount, id, 1); }); c.std.forEach(function(id){ add(pstd, id, 1); }); });
+      if(br){ add(pcount, br.id, bracketCount(pc.cols.map(function(c){ return c.items; }))); add(pstd, br.id, bracketCount(pc.cols.map(function(c){ return c.std; }))); }
+      var sub = 0, partial = false;
+      Object.keys(pcount).forEach(function(id){ var x = part(id), pay = pcount[id] - Math.min(pcount[id], pstd[id]||0); add(count, id, pcount[id]); add(std, id, pstd[id]||0); if(pay){ if(x.price!=null) sub += x.price*pay; else partial = true; } });
+      return { pc:pc, sub:sub, partial:partial };
+    });
+    var lines = Object.keys(count).map(function(id){ var x = part(id), s = Math.min(count[id], std[id]||0), pay = count[id]-s; return { x:x, qty:count[id], std:s, sub: x.price!=null ? x.price*pay : (pay ? null : 0) }; });
+    var all = lines.every(function(l){ return l.sub!=null; });
+    return { per:per, lines:lines, total: all ? lines.reduce(function(a,l){ return a + (l.sub||0); }, 0) : null, partial: !all };
+  }
+
+  // ---- 絵 ----
+  function svgOf(pc, mini){
+    var cols = pc.cols, H = pc.up ? pc.up.size : 200;
+    var W = Math.max(40, cols.reduce(function(a,c){ return a + c.w; }, 0) + (cols.length+1)*UPRIGHT_CM);
+    var pad = 8, out = [], slots = Math.max(pc.max, cols.reduce(function(a,c){ return Math.max(a, c.items.length); }, 0), 1);
+    out.push('<rect x="0" y="0" width="'+(W+pad*2)+'" height="'+(H+pad*2+14)+'" fill="#fff"/>');
+    out.push('<rect x="'+pad+'" y="'+pad+'" width="'+W+'" height="'+H+'" fill="#f6f2ec" stroke="#e2d8cc" stroke-width=".6"/>');
+    var x = pad + UPRIGHT_CM;
+    cols.forEach(function(c){
+      var yOf = function(i){ return pad + H*(i+1)/(slots+1); };
+      c.items.forEach(function(id, i){
+        var it = part(id); if(!it) return;
+        var y = yOf(i), x0 = x + 1, w = c.w - 2;
+        if(BRACKETED.indexOf(it.type)>=0) out.push('<path d="M'+(x)+' '+(y+1)+' l3 0 l-3 4 z M'+(x+c.w)+' '+(y+1)+' l-3 0 l3 4 z" fill="#4a4a4a"/>');
+        if(it.type==="shelf") out.push('<rect x="'+x0+'" y="'+(y-1.2)+'" width="'+w+'" height="2.4" fill="#c4ad8e" stroke="#8d7556" stroke-width=".4"/>');
+        else if(it.type==="basket"){ out.push('<rect x="'+x0+'" y="'+(y-8)+'" width="'+w+'" height="16" fill="none" stroke="#7d7d7d" stroke-width=".8"/>'); for(var g=1;g<6;g++) out.push('<line x1="'+(x0+w*g/6)+'" y1="'+(y-8)+'" x2="'+(x0+w*g/6)+'" y2="'+(y+8)+'" stroke="#b5b5b5" stroke-width=".4"/>'); }
+        else if(it.type==="rail"){
+          // ハンガーは棚の下に付く：すぐ上が棚ならその直下、無ければこの段に描く
+          var prev = i>0 ? part(c.items[i-1]) : null;
+          var ry = prev && prev.type==="shelf" ? yOf(i-1) + 6 : y;
+          out.push('<line x1="'+x0+'" y1="'+ry+'" x2="'+(x0+w)+'" y2="'+ry+'" stroke="#6b6b6b" stroke-width="1.4"/>');
+          var nh = Math.max(2, Math.round(w/12));
+          for(var k=1;k<nh;k++){ var hx = x0 + w*k/nh; out.push('<path d="M'+hx+' '+ry+' l-5 7 h10 z" fill="none" stroke="#9a8f86" stroke-width=".6"/><rect x="'+(hx-4)+'" y="'+(ry+7)+'" width="8" height="'+Math.min(40, H/(slots+1)*1.6)+'" fill="#e9dfd3" stroke="#cbbba8" stroke-width=".4" rx="1.5"/>'); }
+        }
+        else out.push('<rect x="'+x0+'" y="'+(y-5)+'" width="'+w+'" height="10" fill="none" stroke="#9a8f86" stroke-dasharray="2 1.5" stroke-width=".6"/>');
+      });
+      if(!mini) out.push('<text x="'+(x + c.w/2)+'" y="'+(pad+H+10)+'" font-size="5" text-anchor="middle" fill="#5c534d">'+c.w+'cm</text>');
+      x += c.w + UPRIGHT_CM;
+    });
+    var xx = pad;
+    for(var u=0; u<=cols.length; u++){ out.push('<rect x="'+xx+'" y="'+pad+'" width="'+UPRIGHT_CM+'" height="'+H+'" fill="#4a4a4a"/>'); if(u<cols.length) xx += cols[u].w + UPRIGHT_CM; }
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+(W+pad*2)+' '+(H+pad*2+14)+'">'+out.join("")+'</svg>';
+  }
+
+  // ---- 下書き ----
+  function load(){
+    var d = null; try{ d = JSON.parse(localStorage.getItem(DRAFT_KEY)||"null"); }catch(e){}
+    S = d && Array.isArray(d.places) ? d : { places:[], note:"", contact:{name:"",phone:"",email:"",addr:""} };
+    S.contact = S.contact || {name:"",phone:"",email:"",addr:""};
+    var ups = uprights();
+    S.places = S.places.filter(function(p){ return p && p.id; }).slice(0, 12);
+    S.places.forEach(function(p){ if(!part(p.height)) p.height = ups[0].id; if(!typeInfo(p.type)) p.type = "hang"; p.cols = p.cols || []; p._ws = colsForInner(placeInner(p)); });
+  }
+  function save(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(S)); }catch(e){} }
+
+  // ---- 画面 ----
+  function fitText(p){
+    var ws = colsForInner(placeInner(p));
+    if(!ws.length) return '<div class="warn">この幅では、ボーアクセルが入りません（幅をご確認ください）</div>';
+    return '<div class="fit">→ ' + ws.map(function(w){ return w+"cm"; }).join("＋") + "の" + ws.length + "列が入ります</div>";
+  }
+  function formHtml(){
+    var f = form, ups = uprights();
+    return '<div class="box" id="pform">'+
+      '<b style="font-size:1.05rem;">'+(f.editId ? "✏️ 場所を直す" : "＋ 場所を足す")+'</b>'+
+      '<label class="lbl">どこの収納ですか？</label>'+
+      '<div class="chips">'+NAME_PRESETS.map(function(n){ return '<button type="button" class="chip'+(f.name===n?' on':'')+'" data-fname="'+esc(n)+'">'+esc(n)+'</button>'; }).join("")+'</div>'+
+      '<input class="in" data-ff="name" maxlength="40" placeholder="例：2階 ウォークイン 奥の壁" value="'+esc(f.name)+'" style="margin-top:8px;">'+
+      '<div class="note" style="margin-top:4px;">ウォークインは、壁ごとに1つずつ足してください。</div>'+
+      '<label class="lbl">幅</label>'+
+      '<div class="seg"><button type="button" class="btn'+(f.wmode==="masu"?' dk':'')+'" data-fwm="masu">マスで選ぶ</button><button type="button" class="btn'+(f.wmode==="cm"?' dk':'')+'" data-fwm="cm">測った幅（cm）</button></div>'+
+      (f.wmode==="masu" ?
+        '<div class="chips" style="margin-top:8px;">'+MASU_CHOICES.map(function(m){ return '<button type="button" class="chip'+(Number(f.masu)===m?' on':'')+'" data-fmasu="'+m+'">'+masuText(m)+'</button>'; }).join("")+'</div>' :
+        '<input class="in" data-ff="cm" inputmode="decimal" placeholder="例：125" value="'+esc(f.cm||"")+'" style="margin-top:8px;"><div class="note">収納の内側の壁から壁までを、メジャーで測った幅（cm）。</div>')+
+      '<div id="fitBox">'+(placeInner(f) ? fitText(f) : '')+'</div>'+
+      '<label class="lbl">種類</label>'+
+      '<div class="seg">'+Object.keys(C.placeTypes).map(function(k){ var t = C.placeTypes[k]; return '<button type="button" class="tcard'+(f.type===k?' on':'')+'" data-ftype="'+k+'"><b>'+(k==="hang"?"👕 ":"📚 ")+esc(t.name)+'</b><span>'+(k==="hang"?"上に棚1枚＋その下にハンガー。服をかける収納":"棚"+t.stdShelves+"段。食品・小物を置く収納")+'</span></button>'; }).join("")+'</div>'+
+      '<label class="lbl">高さ（縦レールの長さ）</label>'+
+      '<select class="in" data-ff="height">'+ups.map(function(u){ return '<option value="'+esc(u.id)+'"'+(u.id===f.height?' selected':'')+'>'+u.size+'cm'+(u.size>=200?'（ふつうはこちら）':'')+'</option>'; }).join("")+'</select>'+
+      '<div class="seg" style="margin-top:14px;"><button type="button" class="btn ghost" data-fcancel="1">やめる</button><button type="button" class="btn dk" data-fok="1">'+(f.editId?"この内容にする":"この場所を足す")+'</button></div>'+
+    '</div>';
+  }
+  function placeHtml(p, r, idx){
+    var pc = r.pc, ti = typeInfo(p.type);
+    var addTypes = ["shelf","basket","rail"];
+    var head = '<div class="phd"><div class="t"><h3>'+esc(p.name)+'</h3><div class="pmeta">'+(p.wmode==="cm" ? "内側の幅 "+esc(p.cm)+"cm" : masuText(p.masu)+"（約"+Math.round(Number(p.masu)*(C.masuCm||91))+"cm）")+'・'+esc(ti.name)+'・高さ'+(pc.up?pc.up.size:"")+'cm</div></div>'+
+      '<button type="button" class="mini" data-pedit="'+idx+'">✏️ 直す</button><button type="button" class="mini" data-pdel="'+idx+'">✕</button></div>';
+    if(!pc.cols.length) return '<div class="place">'+head+'<div class="warn">この幅では、ボーアクセルが入りません。「直す」で幅をご確認ください。</div></div>';
+    return '<div class="place">'+head+
+      '<div class="svg">'+svgOf(pc)+'</div>'+
+      '<div class="note">絵は、だいたいのイメージです。標準の棚（'+ti.name+'は1列に'+ti.stdShelves+'枚）は最初から入っています。</div>'+
+      '<div class="cols" style="margin-top:8px;">'+pc.cols.map(function(c, ci){
+        var left = pc.max - c.items.length;
+        return '<div class="col'+(left<0?' over':'')+'"><div class="ch">'+(ci+1)+'列目（幅'+c.w+'cm）</div>'+
+          c.items.map(function(id, i){ var x = part(id), isStd = i < c.std.length, ei = i - c.std.length;
+            return '<div class="it"><span>'+(i+1)+'段目 '+esc(x?x.name:"")+(isStd?'<em class="std">標準</em>':'')+'</span>'+
+              (isStd ? '' : '<button type="button" class="mini" data-imv="'+idx+'|'+ci+'|'+ei+'|-1"'+(ei===0?' disabled':'')+'>▲</button><button type="button" class="mini" data-imv="'+idx+'|'+ci+'|'+ei+'|1"'+(ei===c.extras.length-1?' disabled':'')+'>▼</button><button type="button" class="mini" data-idel="'+idx+'|'+ci+'|'+ei+'">✕</button>')+'</div>';
+          }).join("")+
+          (left<0 ? '<div class="warn">高さ'+(pc.up?pc.up.size:"")+'cmでは'+pc.max+'段までです。'+(-left)+'つ外してください。</div>' : '<div class="left">あと'+left+'段</div>')+
+          '<div class="adds">'+C.parts.filter(function(x){ return addTypes.indexOf(x.type)>=0 && x.size===c.w; }).map(function(x){ return '<button type="button" data-iadd="'+idx+'|'+ci+'|'+esc(x.id)+'"'+(left>0?'':' disabled')+'>＋'+esc(x.name)+'</button>'; }).join("")+'</div></div>';
+      }).join("")+'</div>'+
+      '<div class="sub">'+(r.sub||r.partial ? "この場所の追加分："+(r.partial ? "金額は弊社からお知らせします" : yen(r.sub)) : "この場所の追加分：なし（標準のまま）")+'</div>'+
+    '</div>';
+  }
+  function render(){
+    if(sent){ main.innerHTML = '<div class="done"><div class="big">🧺</div><h1>ご依頼ありがとうございました</h1><p class="lead">内容を確認して、住まいるハウジングからご連絡します。</p>'+(P?'<p><a class="btn dk" href="/note/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'">おうちノートへ戻る</a></p>':'')+'<p><button type="button" class="btn ghost" data-again="1">続けて別のプランを作る</button></p></div>'; return; }
+    var r = calc(S.places), over = r.per.some(function(x){ return x.pc.cols.some(function(c){ return c.items.length > x.pc.max; }) || !x.pc.cols.length; });
+    var h = '<h1>🧺 収納プラン（IKEA ボーアクセル）</h1>'+
+      '<p class="lead">収納の場所ごとに、棚・カゴ・ハンガーを選んでください。選んだ内容で、弊社が部品を注文して取り付けます。</p>'+
+      '<div class="masuhelp"><b>📏「マス」について</b><br>1マス＝約91cm。図面の「910」が1マス、「1,365」が1.5マス、「1,820」が2マスです。<br>クローゼットの扉（片方）1枚分くらいが1マスの目安です。わからないときは、メジャーで測った幅（cm）でも大丈夫です。</div>';
+    if(!form) h += S.places.map(function(p, i){ return placeHtml(p, r.per[i], i); }).join("");
+    h += form ? formHtml() : '<button type="button" class="btn full" data-padd="1" style="margin:12px 0;">＋ 場所を足す</button>';
+    if(!form && S.places.length){
+      h += '<div class="box"><b>必要な部品（全部の場所）</b>'+
+        '<table class="parts">'+r.lines.map(function(l){ return '<tr><td>'+esc(l.x.name)+(l.x.size?' '+l.x.size+'cm':'')+(l.std?'<div class="note">うち標準 '+l.std+'</div>':'')+'</td><td class="n">× '+l.qty+'</td><td class="n">'+(l.sub ? yen(l.sub) : (l.sub===0 ? (l.std?'標準':'') : ''))+'</td></tr>'; }).join("")+'</table>'+
+        (r.total!=null ? '<div class="tot">追加分の目安：'+yen(r.total)+'</div>' : '<div class="note" style="text-align:right;margin-top:6px;">一部の部品は金額が未設定です（弊社からお知らせします）</div>')+
+        '<div class="note">標準の分（縦レール・各列の標準の棚とそのブラケット）は金額に入りません。金額は部品代の目安（税込）です。取り付けなどを含めた金額は、弊社からお見積りします。'+(C.note?'<br>'+esc(C.note).replace(/\n/g,"<br>"):'')+'</div></div>';
+      if(C.mode==="public"){
+        var ct = S.contact;
+        h += '<div class="box"><b>お客様のこと</b>'+
+          '<label class="lbl">お名前（必須）</label><input class="in" data-ct="name" maxlength="50" autocomplete="name" value="'+esc(ct.name)+'">'+
+          '<label class="lbl">電話番号</label><input class="in" data-ct="phone" inputmode="tel" autocomplete="tel" value="'+esc(ct.phone)+'">'+
+          '<label class="lbl">メールアドレス</label><input class="in" data-ct="email" inputmode="email" autocomplete="email" value="'+esc(ct.email)+'">'+
+          '<div class="note">電話番号かメールアドレスのどちらかは必ずご入力ください。</div>'+
+          '<label class="lbl">ご住所・建てた年など（わかれば）</label><input class="in" data-ct="addr" maxlength="100" value="'+esc(ct.addr)+'">'+
+          '<div class="hp"><input data-hp="1" tabindex="-1" autocomplete="off"></div></div>';
+      }
+      h += '<label class="lbl">ひとこと（なくても大丈夫です）</label><textarea class="in" data-fnote="1" rows="3" placeholder="例：カゴの数は相談したいです">'+esc(S.note||"")+'</textarea>'+
+        '<button type="button" class="btn dk full" id="send" style="margin-top:12px;"'+(over?' disabled':'')+'>この内容で依頼する</button>'+
+        (over ? '<div class="warn">入らない場所・段数をこえた列があります。直してから依頼してください。</div>' : '');
+    }
+    if(C.requests && C.requests.length){
+      h += '<div class="box"><b>これまでのご依頼</b>'+C.requests.map(function(q){ return '<div class="hist"><span class="st'+(q.state==="ご注文済み"?' d':'')+'">'+esc(q.state)+'</span>'+esc(String(q.at||"").slice(0,10).replace(/-/g,"/"))+'・'+esc(q.names)+(q.total!=null?'（追加分の目安 '+yen(q.total)+'）':'')+'</div>'; }).join("")+'</div>';
+    }
+    var y = window.scrollY;
+    main.innerHTML = h;
+    if(form) setTimeout(function(){ var el = document.getElementById("pform"); if(el && !form._scrolled){ el.scrollIntoView({block:"start"}); form._scrolled = true; } }, 0); else window.scrollTo(0, y);
+  }
+  function openForm(idx){
+    var ups = uprights();
+    if(idx==null) form = { name:"", wmode:"masu", masu:1, cm:"", type:"hang", height:ups[0].id };
+    else { var p = S.places[idx]; form = { editId:p.id, name:p.name, wmode:p.wmode||"masu", masu:p.masu||1, cm:p.cm||"", type:p.type, height:p.height }; }
+    render();
+  }
+  function commitForm(){
+    var f = form, name = String(f.name||"").trim();
+    if(!name){ toast("どこの収納か選ぶか、書いてください"); return; }
+    if(!placeInner(f) || !colsForInner(placeInner(f)).length){ toast("幅をご確認ください（この幅では入りません）"); return; }
+    var p = f.editId ? S.places.find(function(x){ return x.id===f.editId; }) : null;
+    if(!p){ p = { id:uid(), cols:[] }; S.places.push(p); }
+    p.name = name.slice(0,40); p.wmode = f.wmode; p.masu = Number(f.masu)||0; p.cm = f.wmode==="cm" ? Number(f.cm)||0 : 0; p.type = f.type; p.height = f.height;
+    syncCols(p);
+    form = null; save(); render();
+  }
+
+  main.addEventListener("click", async function(e){
+    var t;
+    if(e.target.closest("[data-again]")){ sent = null; render(); return; }
+    if(e.target.closest("[data-padd]")){ if(S.places.length>=12){ toast("場所は12か所までです"); return; } openForm(null); return; }
+    if((t = e.target.closest("[data-pedit]"))){ openForm(+t.dataset.pedit); return; }
+    if((t = e.target.closest("[data-pdel]"))){ var p0 = S.places[+t.dataset.pdel]; if(!confirm("「"+p0.name+"」を外しますか？")) return; S.places.splice(+t.dataset.pdel, 1); save(); render(); return; }
+    if(form){
+      if((t = e.target.closest("[data-fname]"))){ form.name = t.dataset.fname; render(); return; }
+      if((t = e.target.closest("[data-fwm]"))){ form.wmode = t.dataset.fwm; render(); return; }
+      if((t = e.target.closest("[data-fmasu]"))){ form.masu = Number(t.dataset.fmasu); render(); return; }
+      if((t = e.target.closest("[data-ftype]"))){ form.type = t.dataset.ftype; render(); return; }
+      if(e.target.closest("[data-fcancel]")){ form = null; render(); return; }
+      if(e.target.closest("[data-fok]")){ commitForm(); return; }
+    }
+    if((t = e.target.closest("[data-iadd]"))){ var a = t.dataset.iadd.split("|"), p = S.places[+a[0]], pc = placeCols(p), c = pc.cols[+a[1]];
+      if(c && c.items.length < pc.max){ p.cols[+a[1]] = p.cols[+a[1]] || {extras:[]}; p.cols[+a[1]].extras.push(a[2]); save(); render(); } return; }
+    if((t = e.target.closest("[data-idel]"))){ var d = t.dataset.idel.split("|"); S.places[+d[0]].cols[+d[1]].extras.splice(+d[2], 1); save(); render(); return; }
+    if((t = e.target.closest("[data-imv]"))){ var m = t.dataset.imv.split("|"), ex = S.places[+m[0]].cols[+m[1]].extras, i = +m[2], j = i + (+m[3]);
+      if(j>=0 && j<ex.length){ var tmp = ex[i]; ex[i] = ex[j]; ex[j] = tmp; save(); render(); } return; }
+    if(e.target.closest("#send")) await send(e.target.closest("#send"));
+  });
+  main.addEventListener("input", function(e){
+    var f = e.target.closest("[data-ff]");
+    if(f && form){ form[f.dataset.ff] = f.value; if(f.dataset.ff==="cm"){ var fb = document.getElementById("fitBox"); if(fb) fb.innerHTML = placeInner(form) ? fitText(form) : ""; } return; }
+    var c = e.target.closest("[data-ct]"); if(c){ S.contact[c.dataset.ct] = c.value; save(); return; }
+    if(e.target.closest("[data-fnote]")){ S.note = e.target.value; save(); }
+  });
+  main.addEventListener("change", function(e){ var f = e.target.closest("[data-ff]"); if(f && form){ form[f.dataset.ff] = f.value; } });
+
+  // 絵をまとめて1枚の画像に
+  function planImage(){
+    return new Promise(function(resolve){
+      try{
+        var rs = calc(S.places).per, W = 1400, blocks = [], loaded = 0;
+        if(!rs.length) return resolve("");
+        rs.forEach(function(r, i){
+          var img = new Image(), url = URL.createObjectURL(new Blob([svgOf(r.pc)], {type:"image/svg+xml"}));
+          img.onload = function(){ blocks[i] = img; URL.revokeObjectURL(url); if(++loaded===rs.length) draw(); };
+          img.onerror = function(){ blocks[i] = null; URL.revokeObjectURL(url); if(++loaded===rs.length) draw(); };
+          img.src = url;
+        });
+        function draw(){
+          var hs = blocks.map(function(img){ return img ? Math.min(900, Math.round(img.height * (W-80) / img.width)) : 0; });
+          var H = 40 + hs.reduce(function(a,h){ return a + h + 90; }, 0);
+          var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+          var g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,W,H);
+          var y = 30;
+          blocks.forEach(function(img, i){
+            var p = S.places[i]; g.fillStyle = "#2f2925"; g.font = "bold 34px sans-serif";
+            g.fillText(p.name + "（" + (p.wmode==="cm" ? p.cm+"cm" : masuText(p.masu)) + "・" + typeInfo(p.type).name + "）", 40, y + 40);
+            if(img){ var w = Math.round(img.width * hs[i] / img.height); g.drawImage(img, (W-w)/2, y + 60, w, hs[i]); }
+            y += hs[i] + 90;
+          });
+          resolve(cv.toDataURL("image/jpeg", 0.85));
+        }
+      }catch(e){ resolve(""); }
+    });
+  }
+  async function send(btn){
+    if(C.mode==="public"){
+      var ct = S.contact;
+      if(!String(ct.name||"").trim()){ toast("お名前を入れてください"); return; }
+      if(!String(ct.phone||"").trim() && !String(ct.email||"").trim()){ toast("電話番号かメールアドレスを入れてください"); return; }
+    }
+    if(!confirm("この内容で住まいるハウジングに依頼しますか？\n（このあと、弊社からご連絡します）")) return;
+    btn.disabled = true;
+    try{
+      var image = await planImage();
+      var hp = main.querySelector("[data-hp]");
+      var res = await fetch("/api/shuno", { method:"POST", headers: Object.assign({"Content-Type":"application/json"}, staffCode ? {"x-staff-code":staffCode} : {}),
+        body: JSON.stringify({ p:P, t:T, action:"request", plan:{ places: S.places.map(function(p){ return { name:p.name, type:p.type, masu:p.wmode==="cm"?0:p.masu, cm:p.wmode==="cm"?p.cm:0, height:p.height, cols:p.cols }; }) },
+          note:S.note||"", image:image, name:S.contact.name, phone:S.contact.phone, email:S.contact.email, addr:S.contact.addr, website: hp ? hp.value : "" }) });
+      var j = await res.json().catch(function(){ return {}; });
+      if(!res.ok) throw new Error(j.error||"error");
+      if(j.req) C.requests = [j.req].concat(C.requests||[]);
+      S.note = ""; save();
+      sent = true; render(); window.scrollTo(0,0);
+    }catch(er){
+      var m = er && er.message;
+      toast(m==="too_many" ? "ご依頼が多いため受け付けられませんでした。お電話でご連絡ください" : m==="too_narrow" ? "入らない幅の場所があります" : m==="too_many_items" ? "段数をこえた列があります" : m==="invalid_phone" ? "電話番号をご確認ください" : m==="invalid_email" ? "メールアドレスをご確認ください" : "送れませんでした。もう一度お試しください");
+      btn.disabled = false;
+    }
+  }
+
+  // ---- はじめ ----
+  (async function(){
+    if(P && T){ var bn = document.getElementById("backNote"); bn.href = "/note/?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T); bn.hidden = false; }
+    try{
+      var res = await fetch("/api/shuno" + (P ? "?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T) : ""), { headers: staffCode ? {"x-staff-code":staffCode} : {} });
+      var j = await res.json().catch(function(){ return {}; });
+      if(!res.ok) throw new Error(j.error||"error");
+      C = j;
+      if(j.preview) document.getElementById("prev").hidden = false;
+      load(); render();
+    }catch(e){
+      main.innerHTML = '<h1>🧺 収納プラン</h1><p class="lead">'+(e && e.message==="invalid_link" ? "リンクが正しくありません。おうちノートから開き直してください。" : "いまはご利用いただけません。お手数ですが、住まいるハウジングへお問い合わせください。")+'</p>';
+    }
+  })();
+})();
+</script>
+</body>
+</html>

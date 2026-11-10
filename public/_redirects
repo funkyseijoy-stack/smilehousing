@@ -10,4 +10,6 @@
 /yoyaku/*  /yoyaku/index.html  200!
 /app/*  /app/index.html  200!
 /gallery  /gallery/index.html  200!
+/shuno  /shuno/index.html  200!
+/shuno/*  /shuno/index.html  200!
 /*  /index.html  200
