@@ -2572,6 +2572,26 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+/* 日本語の文字（埋め込まれていないフォント）を描くための文字表・標準フォントを、このサイトの /pdfjs/ から読む。
+   これが無いと、業者さんのPDFで線だけが出て文字が出ないことがある。 */
+(function(){
+  if(typeof pdfjsLib==="undefined"||!pdfjsLib.getDocument||pdfjsLib.__cmapWrapped) return;
+  var base = location.origin + "/pdfjs/";
+  var lib = window.pdfjsLib, orig = lib.getDocument.bind(lib);
+  /* pdf.js の関数は上書きできない作りなので、本体を元にした新しい入れ物を作って差し替える */
+  var w = Object.create(lib);
+  Object.defineProperty(w, "getDocument", {value: function(src){
+    var o = (typeof src==="string" || (typeof URL!=="undefined" && src instanceof URL)) ? {url:String(src)}
+      : (src && (src instanceof Uint8Array || src instanceof ArrayBuffer)) ? {data:src} : Object.assign({}, src||{});
+    if(!o.cMapUrl){ o.cMapUrl = base + "cmaps/"; o.cMapPacked = true; }
+    if(!o.standardFontDataUrl) o.standardFontDataUrl = base + "standard_fonts/";
+    return orig(o);
+  }});
+  Object.defineProperty(w, "__cmapWrapped", {value: true});
+  window.pdfjsLib = w;
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
