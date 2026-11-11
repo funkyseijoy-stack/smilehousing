@@ -546,6 +546,13 @@
   #drawModal .dbot textarea{ width:100%; min-height:56px; border:1px solid var(--line2); border-radius:10px; padding:8px; font:inherit; font-size:.92rem; box-sizing:border-box; }
   #drawModal .dbot .dsend{ background:#c8553d; color:#fff; border:0; border-radius:999px; padding:12px; font:inherit; font-weight:700; font-size:.98rem; cursor:pointer; }
   #drawModal .dmsg{ color:#fff; text-align:center; padding:40px 10px; }
+  #drawModal .dtxt{ position:absolute; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-start; justify-content:center; padding:calc(70px + env(safe-area-inset-top)) 14px 14px; z-index:3; }
+  #drawModal .dtxt[hidden]{ display:none; }
+  #drawModal .dtxtin{ background:#fff; border-radius:14px; padding:14px; width:100%; max-width:420px; display:flex; flex-direction:column; gap:10px; box-sizing:border-box; }
+  #drawModal .dtxtin input{ font:inherit; font-size:1rem; padding:10px; border:1px solid var(--line2); border-radius:10px; width:100%; box-sizing:border-box; }
+  #drawModal .dtxtbtn{ display:flex; gap:8px; justify-content:flex-end; }
+  #drawModal .dtxtbtn button{ font:inherit; font-weight:700; border-radius:999px; padding:9px 16px; border:1px solid var(--line2); background:#fff; cursor:pointer; }
+  #drawModal .dtxtbtn button.ok{ background:#c8553d; color:#fff; border-color:#c8553d; }
   .msgs{ display:flex; flex-direction:column; gap:10px; }
   .msg{ max-width:82%; padding:10px 12px; border-radius:16px; font-size:.88rem; white-space:pre-wrap; line-height:1.55; }
   .msg .mm{ font-size:.66rem; opacity:.65; margin-bottom:3px; }
@@ -803,6 +810,11 @@
   <div class="dbot">
     <textarea id="drawText" placeholder="ひとこと（例：ここにコンセントを増やしたい）"></textarea>
     <button class="dsend" id="drawSend">スタッフに送る</button>
+  </div>
+  <div class="dtxt" id="drawTxtBox" hidden>
+    <div class="dtxtin"><b>書き込む文字</b>
+      <input type="text" id="drawTxtIn" maxlength="60" placeholder="例：ここにコンセント" enterkeyhint="done">
+      <div class="dtxtbtn"><button type="button" id="drawTxtCancel">やめる</button><button type="button" id="drawTxtOk" class="ok">入れる</button></div></div>
   </div>
 </div>
 <div class="help" id="menuModal" hidden>
@@ -2919,8 +2931,10 @@ function homeHtml(){ return homeParts().main; }
       e.preventDefault();
       var p = pt(e);
       if(dr.tool==="text"){
-        var t = window.prompt("書き込む文字を入れてください", "");
-        if(t && t.trim()){ dr.strokes.push({ text:t.trim().slice(0,60), x:p[0], y:p[1], color:dr.color }); drawRedraw(); }
+        // LINEの中のブラウザでは window.prompt が出ないことがあるので、画面の中に入力欄を出す
+        dr.txtAt = { x:p[0], y:p[1], color:dr.color };
+        var tb = document.getElementById("drawTxtBox"), ti = document.getElementById("drawTxtIn");
+        ti.value = ""; tb.hidden = false; setTimeout(function(){ try{ ti.focus(); }catch(er){} }, 50);
         return;
       }
       try{ drInk.setPointerCapture(e.pointerId); }catch(er){}
@@ -2935,6 +2949,16 @@ function homeHtml(){ return homeParts().main; }
     drawClose();
   });
   document.getElementById("drawUndo").addEventListener("click", function(){ dr.strokes.pop(); drawRedraw(); });
+  var drawTxtClose = function(){ document.getElementById("drawTxtBox").hidden = true; dr.txtAt = null; };
+  var drawTxtPut = function(){
+    var t = (document.getElementById("drawTxtIn").value||"").trim();
+    if(t && dr.txtAt){ dr.strokes.push({ text:t.slice(0,60), x:dr.txtAt.x, y:dr.txtAt.y, color:dr.txtAt.color }); drawRedraw(); }
+    drawTxtClose();
+  };
+  document.getElementById("drawTxtOk").addEventListener("click", drawTxtPut);
+  document.getElementById("drawTxtCancel").addEventListener("click", drawTxtClose);
+  document.getElementById("drawTxtIn").addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); drawTxtPut(); } });
+  var drawnSomething = function(){ return dr.strokes.some(function(s){ return !s.erase; }); };
   document.getElementById("drawFileSel").addEventListener("change", function(){
     if(dr.strokes.length && !confirm("ほかの図面に切り替えると、いまの書き込みは消えます。よろしいですか？")){ this.value = String(dr.fi); return; }
     dr.fi = Number(this.value)||0; dr.page = 1; drawLoad();
@@ -2957,19 +2981,20 @@ function homeHtml(){ return homeParts().main; }
   }); });
   document.getElementById("drawSend").addEventListener("click", async function(){
     if(!drBg){ return; }
-    if(!dr.strokes.length && !confirm("まだ何も書き込んでいません。このまま送りますか？")) return;
+    var drawn = drawnSomething();
+    if(!drawn && !confirm("まだ図面に何も書き込んでいません。このまま（書き込みなしで）送りますか？")) return;
     var btn = this; btn.disabled = true; btn.textContent = "送っています…";
     try{
       var out = document.createElement("canvas"); out.width = dr.w; out.height = dr.h;
       var og = out.getContext("2d"); og.drawImage(drBg, 0, 0); og.drawImage(drInk, 0, 0);
       var q = 0.85, url = out.toDataURL("image/jpeg", q);
       while(url.length > 5200000 && q > 0.4){ q -= 0.15; url = out.toDataURL("image/jpeg", q); }
-      var note = (document.getElementById("drawText").value||"").trim() || "図面に書き込みました。ご確認ください。";
+      var note = (document.getElementById("drawText").value||"").trim() || (drawn ? "図面に書き込みました。ご確認ください。" : "図面についてご連絡します。");
       // すでにやりとりがあるカードは「お返事」として同じやりとり（同じタスク）に入れる
       var hasThread = (data.messages||[]).some(function(m){ return m.chgKey===dr.key; });
       var prefix = hasThread ? "【お返事】" : "【変更のご依頼】";
-      var full = prefix + dr.label + "\n✏️ 図面に書き込みました\n" + note;
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey:dr.key, drawing:url }) });
+      var full = prefix + dr.label + (drawn ? "\n✏️ 図面に書き込みました\n" : "\n（図面への書き込みはありません）\n") + note;
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey:dr.key, drawing:url, drawn:drawn }) });
       var j = await res.json().catch(function(){ return {}; });
       if(!res.ok) throw new Error(j.error||"error");
       data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:dr.key, chgReply:hasThread, files:(j.message && j.message.files)||[], createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });

@@ -383,7 +383,7 @@ export default async (req: Request, context: Context) => {
         await getStore("customerPhotos").set(`${projectId}/${key}`, bytes, { metadata: { contentType: dm[1] } });
         const md = now.slice(5, 10).replace("-", "");
         drawFile = { id: genId("att"), url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
-          contentType: dm[1], name: `お客様の書き込み_${md}.${dm[1] === "image/png" ? "png" : "jpg"}`, fromCustomer: true };
+          contentType: dm[1], name: `${body.drawn === false ? "お客様が送った図面（書き込みなし）" : "お客様の書き込み"}_${md}.${dm[1] === "image/png" ? "png" : "jpg"}`, fromCustomer: true };
         doc.files = [drawFile];
         doc.drawing = true;
       }
@@ -421,7 +421,7 @@ export default async (req: Request, context: Context) => {
           const taskId = genId("task");
           const body2 = text.replace(/^【(変更のご依頼|お返事)】/, "");
           await store.setJSON(`tasks/${taskId}`, {
-            id: taskId, projectId, content: "【お客様から変更のご依頼】" + (drawFile ? "（✏️ 図面に書き込みあり）" : "") + body2,
+            id: taskId, projectId, content: "【お客様から変更のご依頼】" + (drawFile ? (body.drawn === false ? "（図面を添付・書き込みなし）" : "（✏️ 図面に書き込みあり）") : "") + body2,
             assignee: "", instructor: "お客様", creator: "おうちノート",
             hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
             attachmentAssetIds: [], attachments: (drawFile ? [drawFile] : []).concat(card.files || []),
