@@ -754,7 +754,8 @@ export default async (req: Request, context: Context) => {
   // プランボード・定価の書類（スタッフが部位を指定して「反映」したものだけ）。NET（以前の「仕切り」）は、反映の有無にかかわらず絶対に出さない。
   // 「見積もり」は「定価」の旧名なので定価として扱う。社内だけの部位（internal）は noteCatFor が null を返すので出ない。
   for (const a of attachments) {
-    const qt = a.quoteType === "見積もり" ? "定価" : a.quoteType;
+    // 「見積もり」「見積」は「定価」と同じ（住まいるアプリでは「定価見積」1つにまとめた）
+    const qt = (a.quoteType === "見積もり" || a.quoteType === "見積") ? "定価" : a.quoteType;
     if (a.kind !== "quote" || (qt !== "プランボード" && qt !== "定価") || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;

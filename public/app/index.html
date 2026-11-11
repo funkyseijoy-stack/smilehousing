@@ -1846,9 +1846,8 @@
             <input type="file" id="attachmentInput" multiple>
             <select id="attachmentKind">
               <option value="plan">図面</option>
-              <option value="プランボード">プランボード</option>
-              <option value="見積">見積</option>
-              <option value="定価">定価</option>
+              <option value="プランボード">プラン・図面</option>
+              <option value="定価">定価見積</option>
               <option value="NET">NET</option>
               <option value="other">その他</option>
             </select>
@@ -5154,7 +5153,7 @@
       var via = a.viaVendorId && a.viaVendorId!==vid ? vendorById(a.viaVendorId) : null;
       var qt = a.kind==="quote" ? quoteTypeNorm(a.quoteType) : "図面";
       var locked = a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked;
-      lane(a.specPart).ev.push({ d: vcDateOf(a.receivedAt || a.uploadedAt || a.createdAt), kind: qt==="NET" ? "net" : "doc", h: (qt==="NET"?"🔒 ":"📄 ")+qt,
+      lane(a.specPart).ev.push({ d: vcDateOf(a.receivedAt || a.uploadedAt || a.createdAt), kind: qt==="NET" ? "net" : "doc", h: (qt==="NET"?"🔒 ":"📄 ")+(a.kind==="quote" ? qtLabel(qt) : qt),
         who: ((via && via.name) || (me && me.name) || "")+"から", att: a, locked: locked });
     });
     // カードに届いて、まだ登録していないファイル
@@ -5273,7 +5272,7 @@
     // 届いたプランボード・定価で、おうちノートにまだ出ていないもの
     liveAttachments().filter(function(a){ return a.projectId===pid && a.vendorId===vid && a.kind==="quote" && quoteSharable(a) && !a.reflected && !a.hideInRecord && !vfAttShown(a); }).forEach(function(a){
       var p = pn(a.specPart);
-      steps.push({ i:"🏠", tx: "届いた"+quoteTypeNorm(a.quoteType)+(p?"（"+p+"）":"")+"をお客様に見せるなら、おうちノートに出す", btn: b("おうちノートに出す", "quotereflect", ' data-att="'+escapeHtml(a.id)+'"') });
+      steps.push({ i:"🏠", tx: "届いた"+qtLabel(a.quoteType)+(p?"（"+p+"）":"")+"をお客様に見せるなら、おうちノートに出す", btn: b("おうちノートに出す", "quotereflect", ' data-att="'+escapeHtml(a.id)+'"') });
     });
     // お客様が決定したのに、まだ発注していない
     if(!t.ordered){
@@ -5323,7 +5322,7 @@
   // この依頼の書類（左が最新）：登録済みの見積の書類＋カードに届いてまだ登録していないファイル
   function estReqDocs(t, r){
     var reg = state.attachments.filter(function(a){ return a && !a.deletedAt && a.requestId===r.id; }).map(function(a){
-      return { url:a.url, ct:a.contentType||"", name:a.name||"", d: a.receivedAt||a.uploadedAt||String(a.createdAt||"").slice(0,10), type: a.kind==="quote" ? quoteTypeNorm(a.quoteType) : (a.kind==="plan"?"図面":""), att:a };
+      return { url:a.url, ct:a.contentType||"", name:a.name||"", d: a.receivedAt||a.uploadedAt||String(a.createdAt||"").slice(0,10), type: a.kind==="quote" ? qtLabel(a.quoteType) : (a.kind==="plan"?"図面":""), att:a };
     });
     var regUrls = {}; state.attachments.forEach(function(a){ if(a && !a.deletedAt && a.fromTaskId===t.id) regUrls[a.url] = 1; });
     var pend = (t.attachments||[]).filter(function(f){ return f && f.url && f.fromVendorId===r.vendorId && !regUrls[f.url]; }).map(function(f){
@@ -7216,10 +7215,13 @@
   function methodPill(method){ return '<span class="pill method">'+(method==="gmail"?"Gmail":(method==="verbal"?"口頭":"FAX"))+'</span>'; }
   // 書類の種類：プランボード（お客様に出せる）／定価／NET（NETは暗証番号でロック。お客様に出せるのはプランボードだけ）。
   // 以前の「見積もり」は定価、「仕切り」はNETとして扱う（保存済みのデータは書き換えない）。
-  var QUOTE_TYPES = ["プランボード","見積","定価","NET"]; // 見積＝社内用（ロックなし・お客様には出さない）
-  function quoteTypeNorm(t){ return t==="見積もり" ? "定価" : (t==="仕切り" ? "NET" : (t||"")); }
+  // 書類の種類は3つ：プラン・図面（保存値「プランボード」）／定価見積（保存値「定価」。以前の「見積」「見積もり」も同じ）／NET（以前の「仕切り」も同じ）
+  var QUOTE_TYPES = ["プランボード","定価","NET"];
+  var QUOTE_TYPE_LABEL = { "プランボード":"プラン・図面", "定価":"定価見積", "NET":"NET" };
+  function quoteTypeNorm(t){ return (t==="見積もり" || t==="見積") ? "定価" : (t==="仕切り" ? "NET" : (t||"")); }
+  function qtLabel(t){ var n = quoteTypeNorm(t); return QUOTE_TYPE_LABEL[n] || n; }
   function quoteLocked(t){ return quoteTypeNorm(t) === "NET"; }
-  function quotePill(qt){ var n = quoteTypeNorm(qt); return n ? '<span class="pill quote-'+n+'">'+n+'</span>' : ""; }
+  function quotePill(qt){ var n = quoteTypeNorm(qt); return n ? '<span class="pill quote-'+n+'">'+qtLabel(n)+'</span>' : ""; }
 
   function renderProjectTable(){
     var body = document.getElementById("projectTableBody");
@@ -7312,13 +7314,13 @@
   function hrFilesListHtml(ra){
     var groups = {}, order = QUOTE_TYPES.concat(["図面","その他"]);
     ra.forEach(function(a){
-      var k = a.kind==="quote" ? (quoteTypeNorm(a.quoteType)||"見積") : (a.kind==="plan" ? "図面" : "その他");
+      var k = a.kind==="quote" ? (quoteTypeNorm(a.quoteType)||"定価") : (a.kind==="plan" ? "図面" : "その他");
       (groups[k] = groups[k] || []).push(a);
     });
     return '<div class="hrflist">'+Object.keys(groups).sort(function(x,y){ return order.indexOf(x)-order.indexOf(y); }).map(function(k){
       var list = groups[k];
       if(k==="NET" && !state.quoteUnlocked) return '<div class="hrfgroup"><div class="hrfhead">NET</div><div class="lockbox hrfline" style="cursor:pointer;">🔒 '+list.length+'件（タップして解除）</div></div>';
-      return '<div class="hrfgroup"><div class="hrfhead">'+escapeHtml(k)+'</div>'+list.map(function(a){
+      return '<div class="hrfgroup"><div class="hrfhead">'+escapeHtml(QUOTE_TYPE_LABEL[k]||k)+'</div>'+list.map(function(a){
         return '<div class="hrfline" data-openatt="'+a.id+'" title="'+escapeHtml(a.name)+'">📄 '+escapeHtml(a.name)+'</div>';
       }).join("")+'</div>';
     }).join("")+'</div>';
@@ -7788,7 +7790,7 @@
     var isQ = a.kind==="quote", qn = isQ ? quoteTypeNorm(a.quoteType) : "";
     var h = '<div class="docedit" data-docbox="'+a.id+'">';
     if(isQ && qn!=="NET"){
-      h += '<label>種類<select data-doctype="'+a.id+'">'+["プランボード","見積","定価"].map(function(t){ return '<option value="'+t+'"'+(t===qn?" selected":"")+'>'+t+(t==="見積"?"（社内用）":"")+'</option>'; }).join("")+'</select></label>';
+      h += '<label>種類<select data-doctype="'+a.id+'">'+["プランボード","定価"].map(function(t){ return '<option value="'+t+'"'+(t===qn?" selected":"")+'>'+qtLabel(t)+'</option>'; }).join("")+'</select></label>';
     } else {
       h += '<label>種類<input type="text" value="'+escapeHtml(isQ ? qn : (a.kind==="plan" ? "図面" : "その他"))+'" disabled></label>';
     }
@@ -7868,7 +7870,7 @@
   var DH_PERIODS = [["1y","過去1年",366],["3m","過去3か月",92],["all","すべて",0]];
   var dhShowAll = false;
   function dhState(){ if(!state.docsF) state.docsF = { dept:"", proj:"", vend:"", type:"", cat:"all", period:"1y", q:"" }; return state.docsF; }
-  function dhTypeOf(a){ return a.kind==="quote" ? (quoteTypeNorm(a.quoteType)||"見積") : (a.kind==="plan" ? "図面" : "その他"); }
+  function dhTypeOf(a){ return a.kind==="quote" ? (quoteTypeNorm(a.quoteType)||"定価") : (a.kind==="plan" ? "図面" : "その他"); }
   function dhBaseRows(){
     var f = dhState(), now = Date.now();
     var per = DH_PERIODS.find(function(x){ return x[0]===f.period; }) || DH_PERIODS[0];
@@ -7905,7 +7907,7 @@
     liveAttachments().forEach(function(a){
       if(!a || !a.url || !a.vendorId) return;
       push(a.vendorId, { kind:"att", att:a, url:a.url, ct:a.contentType||"", name:a.name||"", pid:a.projectId||"",
-        d: String(a.receivedAt||a.uploadedAt||a.createdAt||"").slice(0,10), type: a.kind==="quote" ? quoteTypeNorm(a.quoteType) : (a.kind==="plan"?"図面":"") });
+        d: String(a.receivedAt||a.uploadedAt||a.createdAt||"").slice(0,10), type: a.kind==="quote" ? qtLabel(a.quoteType) : (a.kind==="plan"?"図面":"") });
     });
     // 未整理：メール・見積依頼のカードに届いたまま、まだ見積の書類に登録していないファイル
     state.tasks.forEach(function(t){
@@ -8065,7 +8067,7 @@
       '<label>部門<select data-dhf="dept">'+opt("", "すべての部門", !f.dept)+PROJECT_TYPES.map(function(t){ return opt(t, deptLabel(t), f.dept===t); }).join("")+'</select></label>'+
       '<label>案件<select data-dhf="proj">'+opt("", f.dept ? "この部門のすべての案件" : "すべての案件", !f.proj)+projs.map(function(p){ return opt(p.id, p.name||p.customer||"（名前なし）", f.proj===p.id); }).join("")+'</select></label>'+
       '<label>業者<select data-dhf="vend">'+opt("", "すべての業者", !f.vend)+vends.map(function(v){ return opt(v.id, v.name, f.vend===v.id); }).join("")+'</select></label>'+
-      '<label>種類<select data-dhf="type">'+opt("", "すべて", !f.type)+["プランボード","見積","定価","NET","図面","その他"].map(function(t){ return opt(t, t, f.type===t); }).join("")+'</select></label>'+
+      '<label>種類<select data-dhf="type">'+opt("", "すべて", !f.type)+["プランボード","定価","NET","図面","その他"].map(function(t){ return opt(t, qtLabel(t), f.type===t); }).join("")+'</select></label>'+
       '<label class="dhmobsel">分類<select data-dhf="cat">'+cats.map(function(c){ return opt(c[0], c[1].replace(/^📁 |^🗂 |^📄 /,"")+"（"+catN(c[0])+"）", f.cat===c[0]); }).join("")+'</select></label>'+
       '<label>期間<select data-dhf="period">'+DH_PERIODS.map(function(x){ return opt(x[0], x[1], f.period===x[0]); }).join("")+'</select></label>'+
       '<label>キーワード<input type="search" data-dhq value="'+escapeHtml(f.q||"")+'" placeholder="ファイル名・コメント・案件名"></label></div>';
@@ -10938,7 +10940,7 @@
     var st = 'style="cursor:pointer; border:none; font-family:inherit;"';
     // 操作メニュー（記録・写真・PDFのカードと同じ並び）
     var ops = uniOpsSections("att", a.id, drawCtx ? specDrawBtnsHtml(opsId, [a], drawCtx, true) : "",
-      { reflected: a.reflected && sharable, reflectNote: sharable ? "" : "この種類（"+(quoteTypeNorm(a.quoteType)||"")+"）はお客様には出ません", ask: a.askDecision, home: a.homeShow },
+      { reflected: a.reflected && sharable, reflectNote: sharable ? "" : "この種類（"+(qtLabel(a.quoteType)||"")+"）はお客様には出ません", ask: a.askDecision, home: a.homeShow },
       specSentInfo(a));
     return '<div class="spectl-card spectl-type-vendor-border'+(a.reflected && sharable ? ' reflected' : '')+'">'+
       '<a class="spectl-thumb" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+thumb+'</a>'+
@@ -14856,6 +14858,17 @@
       return '<option value="'+p.id+'"'+(p.id===pid?' selected':'')+'>'+escapeHtml(p.name||p.customer||"（名前なし）")+'</option>';
     }).join("")+'</select>';
   }
+  // 打合せ記録・写真PDF・登録済みの書類に、同じ名前のファイルがすでに入っているか（取り込みの一覧で薄くして登録できなくする）。
+  // タスクの添付は見ない（Gmailから来たタスクは添付を自動で持っているので、全部が「ある」になってしまうため）。
+  function inboxNameKey(n){ return String(n||"").normalize("NFKC").replace(/\s+/g,"").toLowerCase(); }
+  function inboxRecordNames(){
+    var map = {}, add = function(n, where){ var k = inboxNameKey(n); if(k.replace(/\.[^.]+$/,"").length < 6 || /^(scan|image|img|document|file|写真|画像)\d*$/i.test(k.replace(/\.[^.]+$/,""))) return; if(!map[k]) map[k] = where; };
+    state.meetingNotes.forEach(function(n){ if(!n.deletedAt) noteAllFiles(n).forEach(function(f){ add(f.name, "打合せ記録"); }); });
+    liveSpecPhotos().forEach(function(sp){ if(sp.kind!=="note") add(sp.fileName||sp.name, "記録の写真・PDF"); });
+    liveAttachments().forEach(function(a){ add(a.name, a.kind==="plan" ? "図面" : "登録済みの書類"); });
+    return map;
+  }
+  function inboxInRecord(it, names){ if(!it || it.already || it.local) return ""; return (names || inboxRecordNames())[inboxNameKey(it.filename)] || ""; }
   function renderInbox(){
     var body = document.getElementById("inboxBody"); if(!body) return;
     if(inbox.busy){ body.innerHTML = '<div class="muted" style="margin-block-start:10px;">'+escapeHtml(inbox.msg||"探しています…")+'</div>'; return; }
@@ -14865,7 +14878,15 @@
     var html = '';
     if(inbox.msg) html += '<div class="muted" style="margin-block-start:10px; font-size:.9rem;">'+escapeHtml(inbox.msg)+'</div>';
     if(items.length){
+      var recNames = inboxRecordNames();
+      items.forEach(function(it){ it.inRec = inboxInRecord(it, recNames); if(it.inRec) it.checked = false; });
       html += '<div class="rcvlist" style="margin-block-start:10px;">'+items.map(function(it, i){
+        if(it.inRec && !it.already){
+          return '<div class="rcvitem done"><label class="rcvrow done"><input type="checkbox" disabled>'+
+            '<span class="rcvthumb" data-rcvthumb="'+i+'"><span class="rcvic">📄</span></span>'+
+            '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+(it.date?escapeHtml(rcvDate(it.date))+'　':'')+'✓ '+escapeHtml(it.inRec)+'にあります（同じ名前のファイル）'+(it.subject?'　'+escapeHtml(String(it.subject).slice(0,40)):'')+'</small></span></label>'+
+            '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button></div></div>';
+        }
         var isImg = /^image\//.test(it.mimeType||"");
         var isPdf = /pdf/i.test(it.mimeType||"") || /\.pdf$/i.test(it.filename||"");
         return '<div class="rcvitem'+(it.already?' done':'')+'"><label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-incheck="'+i+'"'+(it.already?' disabled':(it.checked?' checked':''))+'>'+
@@ -14873,7 +14894,7 @@
           '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+(inbox.vendorId==="__all" && it.src ? '✉️ '+escapeHtml((vendorById(it.src)||{}).name||"")+'　' : '')+escapeHtml(fmtSize(it.size))+(it.local?'　パソコンから':(it.date?'　'+escapeHtml(rcvDate(it.date)):""))+(it.already?'　✓取り込み済み':'')+(it.subject?'　'+escapeHtml(String(it.subject).slice(0,40)):'')+'</small>'+
             (it.doneInfo?'<span class="rcvdone">✓ 登録しました（'+escapeHtml(it.doneInfo)+'）</span>':'')+'</span></label>'+
           (it.already ? '' : '<div class="rcvbar"><button type="button" class="btn small ghost" data-rcvview="'+i+'">👁 見る</button>'+inboxProjSel(i, it.pid)+
-            '<select class="rcvtype" data-intype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+QUOTE_TYPES.map(function(q){ return '<option value="'+q+'"'+(it.qt===q?' selected':'')+'>'+q+'</option>'; }).join("")+'</select>'+
+            '<select class="rcvtype" data-intype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+QUOTE_TYPES.map(function(q){ return '<option value="'+q+'"'+(it.qt===q?' selected':'')+'>'+qtLabel(q)+'</option>'; }).join("")+'</select>'+
             inboxPartSel(i, it.part, projectById(it.pid))+inboxVendorSel(i, it.vid||it.src||inbox.vendorId, it.src)+
             '<label class="rcvdate" title="届いた日（経緯はこの日付の順に並びます）">📅<input type="date" data-indate="'+i+'" value="'+escapeHtml(it.dt||"")+'"></label>'+inboxReflHtml(i, it)+'</div>'+
             '<div class="rcvextra">'+inboxCatSel(i, it)+inboxRecHtml(i, it)+
@@ -14888,7 +14909,7 @@
         '<div class="muted" style="font-size:.85rem;">添付ではなくリンクで届くため、ここには取り込めません。Gmailで開いてPDFを保存し、「📎 パソコンのファイルを追加」で付けてください。</div>'+
         links.map(function(l){ return '<a class="rcvlink" href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener">📧 '+escapeHtml(l.subject||"(件名なし)")+(l.date?'<small>'+escapeHtml(rcvDate(l.date))+'</small>':'')+' ›</a>'; }).join("")+'</div>';
     }
-    if(items.some(function(it){ return !it.already; })){
+    if(items.some(function(it){ return !it.already && !it.inRec; })){
       html += '<div class="row" style="gap:8px; flex-wrap:wrap; align-items:flex-end; margin-block-start:10px;">'+
         '<label class="field" style="margin:0;">受領者<select id="inboxBy">'+staff.map(function(n){ return '<option'+(n===me?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+'<option value="">（未設定）</option></select></label>'+
         '<button class="btn" id="inboxRegister">チェックした書類を登録</button></div>';
@@ -14897,7 +14918,7 @@
     var lc = document.getElementById("inboxCard");
     rcvLoadThumbs(lc, items.map(function(it){ return it.local ? {local:true} : it; }));
   }
-  function inboxGuessType(name, subj){ name = String(name||""); return /定価/.test(name) ? "定価" : (/ネット|NET|仕切/i.test(name) ? "NET" : (/プラン/.test(name) ? "プランボード" : (/見積/.test(name+" "+(subj||"")) ? "見積" : ""))); }
+  function inboxGuessType(name, subj){ name = String(name||""); return /定価/.test(name) ? "定価" : (/ネット|NET|仕切/i.test(name) ? "NET" : (/プラン|図面|提案ボード/.test(name) ? "プランボード" : (/見積/.test(name+" "+(subj||"")) ? "定価" : ""))); }
   function inboxDateOf(ms){ var d = ms ? new Date(Number(ms)) : null; if(!d || isNaN(d)) return ""; return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   async function inboxSearchAll(){
     var vs = inboxVendors().filter(function(v){ return vendorMailInfo(v).email; });
@@ -14970,8 +14991,10 @@
     var body = document.getElementById("inboxBody");
     var chosen = [], missing = 0;
     body.querySelectorAll(".need").forEach(function(x){ x.classList.remove("need"); });
+    var recNames = inboxRecordNames();
     inbox.items.forEach(function(it, i){
       if(it.already) return;
+      if(inboxInRecord(it, recNames)) return; // 打合せ記録などにすでに入っているファイルは登録しない
       if(onlyIdx!=null ? i!==onlyIdx : !it.checked) return;
       var ok = true;
       if(!it.pid){ ok = false; var ps = body.querySelector('[data-inproj="'+i+'"]'); if(ps) ps.classList.add("need"); }
@@ -15037,7 +15060,7 @@
           if(c.vid && c.vid!==srcOf(c).id){ att.viaVendorId = srcOf(c).id; touched = true; }
           if(c.dt){ att.receivedAt = c.dt; touched = true; tg.lastDt = (!tg.lastDt || c.dt>tg.lastDt) ? c.dt : tg.lastDt; }
           if(touched) await saveDoc("attachments", att.id, att);
-          c.doneInfo = [(pj0&&pj0.name)||"", quoteTypeNorm(att.quoteType), docInRecord(att)?"記録に出しました":"", (att.reflected&&quoteSharable(att))?"おうちノートに出しました":""].filter(Boolean).join("・");
+          c.doneInfo = [(pj0&&pj0.name)||"", qtLabel(att.quoteType), docInRecord(att)?"記録に出しました":"", (att.reflected&&quoteSharable(att))?"おうちノートに出しました":""].filter(Boolean).join("・");
         }
       }catch(e){ failN++; }
     }
@@ -15292,7 +15315,7 @@
     var rowsHtml = items.map(function(it, i){
       var isImg = /^image\//.test(it.mimeType||"");
       var sel = it.already ? '' : '<select class="rcvtype" data-rcvtype="'+i+'" aria-label="書類の種類"><option value="">種類を選ぶ</option>'+
-        QUOTE_TYPES.map(function(q){ return '<option value="'+q+'">'+q+'</option>'; }).join("")+'</select>';
+        QUOTE_TYPES.map(function(q){ return '<option value="'+q+'">'+qtLabel(q)+'</option>'; }).join("")+'</select>';
       return '<div class="rcvitem'+(it.already?' done':'')+'"><label class="rcvrow'+(it.already?' done':'')+'"><input type="checkbox" data-rcv="'+i+'"'+(it.already?' disabled':(isImg?'':' checked'))+'>'+
         '<span class="rcvthumb" data-rcvthumb="'+i+'"><span class="rcvic">'+(/pdf/i.test(it.mimeType||"")||/\.pdf$/i.test(it.filename||"")?"📄":(isImg?"🖼":"📎"))+'</span></span>'+
         '<span class="rcvtx"><b>'+escapeHtml(it.filename||"添付")+'</b><small>'+escapeHtml(fmtSize(it.size))+(it.date?'　'+escapeHtml(rcvDate(it.date)):"")+(it.already?'　✓取り込み済み':'')+'</small></span></label>'+
@@ -15592,12 +15615,12 @@
     var rowHtml = function(pj){
       return files.map(function(f, i){
         var isImg = /^image\//.test(f.contentType||"") || /\.(jpe?g|png|gif|webp)$/i.test(f.name||"");
-        var guessQt = /定価/.test(f.name||"") ? "定価" : (/ネット|NET|仕切/i.test(f.name||"") ? "NET" : (/プラン/.test(f.name||"") ? "プランボード" : (/見積/.test((f.name||"")+subj) ? "見積" : "")));
+        var guessQt = /定価/.test(f.name||"") ? "定価" : (/ネット|NET|仕切/i.test(f.name||"") ? "NET" : (/プラン|図面|提案ボード/.test(f.name||"") ? "プランボード" : (/見積/.test((f.name||"")+subj) ? "定価" : "")));
         return '<div class="tqrow" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 0; border-top:1px solid var(--border);">'+
           '<label style="display:flex; align-items:center; gap:6px; flex:1 1 220px; min-width:0;"><input type="checkbox" data-tqchk="'+i+'"'+(isImg?'':' checked')+'> <span style="overflow-wrap:anywhere;">'+escapeHtml(f.name||"添付")+'</span></label>'+
           ' <a class="linkbtn" href="'+escapeHtml(f.url)+'" target="_blank" rel="noopener">👁 見る</a>'+
           (isEst ? '<select data-tqvend="'+i+'">'+estVendors.map(function(v){ return '<option value="'+escapeHtml(v.id)+'"'+(v.id===(f.fromVendorId||(sv&&sv.id))?' selected':'')+'>'+escapeHtml(v.name)+'の分</option>'; }).join("")+'</select>' : '')+
-          '<select data-tqtype="'+i+'"><option value="">種類</option>'+QUOTE_TYPES.map(function(q){ return '<option'+(q===guessQt?' selected':'')+'>'+escapeHtml(q)+'</option>'; }).join("")+'</select>'+
+          '<select data-tqtype="'+i+'"><option value="">種類</option>'+QUOTE_TYPES.map(function(q){ return '<option value="'+q+'"'+(q===guessQt?' selected':'')+'>'+escapeHtml(qtLabel(q))+'</option>'; }).join("")+'</select>'+
           inboxPartSel("tq"+i, (cardPartKeys.length===1 ? cardPartKeys[0] : "") || inboxGuessPart((f.name||"")+" "+subj) || cardPartKeys[0] || (sv&&sv.defaultPart) || "", pj)+
         '</div>';
       }).join("");
@@ -15883,10 +15906,10 @@
     if(!a || a.kind!=="quote") return;
     var cur = quoteTypeNorm(a.quoteType);
     if(cur==="NET"){ toast("NETの書類は種類を変えられません"); return; }
-    var opts = ["プランボード","見積","定価"].filter(function(t){ return t!==cur; }).map(function(t){
-      return {label:t+(t==="見積" ? "（社内用・お客様には出さない）" : "（お客様に出せる）"), value:t};
+    var opts = ["プランボード","定価"].filter(function(t){ return t!==cur; }).map(function(t){
+      return {label:qtLabel(t)+"（お客様に出せる）", value:t};
     });
-    askChoice("種類を変える", "いまの種類：「"+cur+"」\n「"+a.name+"」", opts, async function(t){
+    askChoice("種類を変える", "いまの種類：「"+qtLabel(cur)+"」\n「"+a.name+"」", opts, async function(t){
       if(!t) return;
       var before = { quoteType:a.quoteType, reflected:a.reflected, reflectedAt:a.reflectedAt };
       a.quoteType = t;
@@ -16698,7 +16721,7 @@
     liveAttachments().forEach(function(a){
       if(a.projectId!==pid || (a.kind!=="plan" && a.kind!=="quote")) return;
       if(a.kind==="quote" && quoteLocked(a.quoteType) && !state.quoteUnlocked) return;
-      add(a.kind==="plan" ? "📐 図面" : "📄 見積の書類", { id:a.assetId, url:a.url, contentType:a.contentType, name:a.name||"書類" }, a.uploadedAt||a.createdAt, a.kind==="plan" ? "" : quoteTypeNorm(a.quoteType||""));
+      add(a.kind==="plan" ? "📐 図面" : "📄 見積の書類", { id:a.assetId, url:a.url, contentType:a.contentType, name:a.name||"書類" }, a.uploadedAt||a.createdAt, a.kind==="plan" ? "" : qtLabel(a.quoteType||""));
     });
     liveSpecPhotos().forEach(function(p){
       if(p.projectId!==pid || p.kind==="note" || !p.url) return;
@@ -16951,7 +16974,7 @@
     ov.innerHTML = '<div class="taskform-card" style="max-width:760px; width:100%;"><div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">📐 この案件の図面から選ぶ</h3><button type="button" class="btn secondary small" data-tfp-close>閉じる</button></div>'+
       '<div class="muted" style="font-size:.85rem; margin-block:4px 8px;">絵を押すと選べます（いくつでも）。「✏️ 書き込む」は書き込んだ版を付けます（元の図面はそのまま）。</div>'+
       '<div class="ftgrid">'+rows.map(function(a){
-        var kindLbl = a.kind==="plan" ? "図面" : quoteTypeNorm(a.quoteType||"");
+        var kindLbl = a.kind==="plan" ? "図面" : qtLabel(a.quoteType||"");
         return '<div class="fttile tfptile" data-tfp="'+a.id+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(a.url, a.contentType, a.name)+'<span class="tfpcheck">✓</span></div>'+
           '<div class="ftbody"><div class="ftname">'+escapeHtml(a.name||"図面")+'</div><div class="ftmeta"><span class="pill small">'+escapeHtml(kindLbl)+'</span>'+
           '<button type="button" class="btn small ghost" data-tfp-draw="'+a.id+'">✏️ 書き込む</button></div></div></div>';
@@ -17020,7 +17043,7 @@
     ov.style.zIndex = "90";
     ov.innerHTML = '<div class="taskform-card" style="max-width:760px; width:100%;"><div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">📐 この案件の図面から選ぶ</h3><button type="button" class="btn secondary small" data-mnp-close>閉じる</button></div>'+
       '<div class="ftgrid" style="margin-block-start:10px;">'+rows.map(function(a){
-        var kindLbl = a.kind==="plan" ? "図面" : quoteTypeNorm(a.quoteType||"");
+        var kindLbl = a.kind==="plan" ? "図面" : qtLabel(a.quoteType||"");
         return '<div class="fttile" data-mnp="'+a.id+'" style="cursor:pointer;"><div class="ftthumb">'+fileThumbInner(a.url, a.contentType, a.name)+'</div>'+
           '<div class="ftbody"><div class="ftname">'+escapeHtml(a.name||"図面")+'</div><div class="ftmeta"><span class="pill small">'+escapeHtml(kindLbl)+'</span></div></div></div>';
       }).join("")+'</div></div>';
@@ -19757,7 +19780,7 @@
       var thenReceive = pendingReqAttachThenReceive; pendingReqAttachThenReceive = false;
       if(!files.length || !rid) return;
       // ファイルごとに種類を選ぶ（1つずつ聞く）。途中で「やめる」と何も付けない。
-      var qtOpts = QUOTE_TYPES.map(function(q){ return {label:q, value:q}; });
+      var qtOpts = QUOTE_TYPES.map(function(q){ return {label:qtLabel(q), value:q}; });
       var picked = [];
       (function askNext(i){
         if(i>=files.length){
