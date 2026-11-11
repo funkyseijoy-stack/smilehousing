@@ -67,6 +67,12 @@
   .ch{ font-weight:700; font-size:.88rem; margin-bottom:4px; }
   .it{ display:flex; align-items:center; gap:4px; font-size:.84rem; border-bottom:1px dashed var(--line); padding:4px 0; }
   .it span{ flex:1; min-width:0; }
+  .kinds{ display:flex; gap:6px; overflow-x:auto; padding:2px 0 8px; margin-bottom:4px; border-bottom:1px dashed var(--line); }
+  .kcard{ flex:0 0 74px; border:1.5px solid var(--line2); background:#fff; border-radius:10px; padding:4px; cursor:pointer; color:var(--ink); text-align:center; }
+  .kcard svg{ width:100%; height:auto; display:block; border-radius:6px; }
+  .kcard span{ display:block; font-size:.72rem; font-weight:700; line-height:1.3; margin-top:2px; }
+  .kcard.on{ border-color:var(--brown); box-shadow:0 0 0 2px var(--brown) inset; background:#fbf6ee; }
+  .col{ flex-basis:250px !important; }
   .std{ display:inline-block; font-size:.7rem; background:var(--green); color:var(--green-ink); border-radius:6px; padding:0 6px; margin-left:4px; font-weight:700; }
   .left{ font-size:.78rem; color:var(--ink2); margin-top:4px; }
   .adds{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
@@ -151,27 +157,50 @@
     }
     return n;
   }
-  // 場所1つ分の列（幅・標準・足した分）
+  // 列の種類：hang（服掛け）／shelf（棚）／set:<見本ID>（スタッフが作った見本。その幅のものだけ）
+  function setsFor(w){ return (C.sets||[]).filter(function(st){ return st.w===w; }); }
+  function setOf(kind){ return (C.sets||[]).find(function(st){ return "set:"+st.id===kind; }) || null; }
+  function colKind(k, ptype, w){ k = String(k||""); if(C.placeTypes[k]) return k; if(k.indexOf("set:")===0 && setsFor(w).some(function(st){ return "set:"+st.id===k; })) return k; return C.placeTypes[ptype] ? ptype : "hang"; }
+  function stdKind(kind, items){ if(C.placeTypes[kind]) return kind; return items.some(function(id){ var x = part(id); return x && x.type==="rail"; }) ? "hang" : "shelf"; }
+  function kindName(kind){ if(C.placeTypes[kind]) return C.placeTypes[kind].colName || C.placeTypes[kind].name; var st = setOf(kind); return st ? st.name : "見本"; }
+  function sizedOf(type, w){ return C.parts.find(function(x){ return x.type===type && x.size===w; }) || null; }
+  function okW(w){ return function(id){ var x = part(id); return !!(x && x.type!=="upright" && x.type!=="bracket" && x.size===w); }; }
+  // その種類の最初の中身（服掛け＝棚1枚＋ハンガー、棚＝棚4枚、見本＝見本の中身）
+  function defaultItems(kind, w, max){
+    if(kind.indexOf("set:")===0){ var st = setOf(kind); return st ? st.items.filter(okW(w)).slice(0, max) : []; }
+    var sh = sizedOf("shelf", w), n = Math.min(max, typeInfo(kind).stdShelves), a = [];
+    for(var i=0; i<n && sh; i++) a.push(sh.id);
+    if(kind==="hang"){ var ra = sizedOf("rail", w); if(ra && a.length < max) a.push(ra.id); }
+    return a;
+  }
+  function kindsFor(w){ return ["hang","shelf"].concat(setsFor(w).map(function(st){ return "set:"+st.id; })); }
+  // 1列分（幅・種類・部品・どれが標準か）。標準＝その列の種類の棚の枚数まで（金額に入れない。外すこともできる）
+  function colOf(w, kind, items, max){
+    var left = Math.min(max, typeInfo(stdKind(kind, items)).stdShelves);
+    var stdArr = items.map(function(id){ var x = part(id); return (left>0 && x && x.type==="shelf") ? (left--, id) : ""; });
+    return { w:w, kind:kind, items:items, stdArr:stdArr, std:stdArr.filter(Boolean) };
+  }
   function placeCols(p){
-    var up = part(p.height) || uprights()[0], max = maxOf(up);
-    var ws = colsFor(p);
-    var stdN = Math.min(max, typeInfo(p.type).stdShelves);
+    var up = uprights()[0], max = maxOf(up), ws = colsFor(p);
     var cols = ws.map(function(w, i){
-      var sh = C.parts.find(function(x){ return x.type==="shelf" && x.size===w; });
-      var std = sh ? Array.from({length:stdN}, function(){ return sh.id; }) : [];
-      var ex = ((p.cols[i] && p.cols[i].extras) || []).filter(function(id){ var x = part(id); return x && x.size===w; });
-      return { w:w, std:std, extras:ex, items:std.concat(ex) };
+      var sc = (p.cols && p.cols[i]) || {}, kind = colKind(sc.kind, p.type, w);
+      var items = Array.isArray(sc.items) ? sc.items.filter(okW(w)) : defaultItems(kind, w, max);
+      return colOf(w, kind, items, max);
     });
     return { up:up, max:max, cols:cols, type:p.type };
   }
-  // 幅が変わったら、足した分を新しい幅の同じ部品に入れ替える
+  // 列の並びを幅に合わせる（幅が変わったら同じ部品の新しい幅に入れ替える・以前の形の下書きも直す）
   function syncCols(p){
-    var ws = colsFor(p);
+    var ws = colsFor(p), max = maxOf(uprights()[0]);
     var old = p.cols || [], oldW = p._ws || [];
     p.cols = ws.map(function(w, i){
-      var ex = (old[i] && old[i].extras) || [];
-      if(oldW[i] && oldW[i]!==w) ex = ex.map(function(id){ var x = part(id); var q = x && C.parts.find(function(y){ return y.type===x.type && y.name===x.name && y.size===w; }); return q ? q.id : null; }).filter(Boolean);
-      return { extras: ex };
+      var o = old[i];
+      if(!o) { var k0 = colKind("", p.type, w); return { kind:k0, items:defaultItems(k0, w, max) }; }
+      var kind = colKind(o.kind, p.type, w), ow = oldW[i] || w, items;
+      if(Array.isArray(o.items)) items = o.items.slice();
+      else { var sh = sizedOf("shelf", ow), n = Math.min(max, typeInfo(p.type).stdShelves); items = []; for(var j=0;j<n && sh;j++) items.push(sh.id); items = items.concat(o.extras || []); }
+      if(ow!==w) items = items.map(function(id){ var x = part(id); var q = x && C.parts.find(function(y){ return y.type===x.type && y.name===x.name && y.size===w; }); return q ? q.id : null; }).filter(Boolean);
+      return { kind: String(o.kind||"").indexOf("set:")===0 && kind!==o.kind ? colKind("", p.type, w) : kind, items: items.filter(okW(w)) };
     });
     p._ws = ws;
   }
@@ -183,7 +212,7 @@
       if(!pc.cols.length) return { pc:pc, sub:0, partial:false };
       add(pcount, pc.up.id, pc.cols.length + 1); add(pstd, pc.up.id, pc.cols.length + 1); // 縦レールは標準（棚を付けるのに必ず要るため）
       pc.cols.forEach(function(c){ c.items.forEach(function(id){ add(pcount, id, 1); }); c.std.forEach(function(id){ add(pstd, id, 1); }); });
-      if(br){ add(pcount, br.id, bracketCount(pc.cols.map(function(c){ return c.items; }))); add(pstd, br.id, bracketCount(pc.cols.map(function(c){ return c.std; }))); }
+      if(br){ add(pcount, br.id, bracketCount(pc.cols.map(function(c){ return c.items; }))); add(pstd, br.id, bracketCount(pc.cols.map(function(c){ return c.stdArr; }))); }
       var sub = 0, partial = false;
       Object.keys(pcount).forEach(function(id){ var x = part(id), pay = pcount[id] - Math.min(pcount[id], pstd[id]||0); add(count, id, pcount[id]); add(std, id, pstd[id]||0); if(pay){ if(x.price!=null) sub += x.price*pay; else partial = true; } });
       return { pc:pc, sub:sub, partial:partial };
@@ -224,42 +253,98 @@
     if(last > limit){ var k = (limit - top) / Math.max(1, last - top); ys = ys.map(function(y){ return top + (y - top)*k; }); }
     return ys;
   }
+  var svgSeq = 0;
+  var CLOTH_COLORS = ["#cdb9a3","#8ea2b7","#ece1d3","#76866f","#d7a49c","#4f5d75","#f3ece2","#a5896b","#b9c6cf","#7e5f55"];
   function svgOf(pc, mini){
-    var cols = pc.cols, H = pc.up ? pc.up.size : 200;
-    var W = Math.max(40, cols.reduce(function(a,c){ return a + c.w; }, 0) + (cols.length+1)*UPRIGHT_CM);
-    var pad = 8, out = [], slots = Math.max(pc.max, cols.reduce(function(a,c){ return Math.max(a, c.items.length); }, 0), 1);
-    out.push('<rect x="0" y="0" width="'+(W+pad*2)+'" height="'+(H+pad*2+14)+'" fill="#fff"/>');
-    out.push('<rect x="'+pad+'" y="'+pad+'" width="'+W+'" height="'+H+'" fill="#f6f2ec" stroke="#e2d8cc" stroke-width=".6"/>');
-    var ys = rowYs(pc, H), CLOTH = 95;
-    var x = pad + UPRIGHT_CM;
+    var cols = pc.cols, H = pc.up ? pc.up.size : 200, U = UPRIGHT_CM;
+    var W = Math.max(40, cols.reduce(function(a,c){ return a + c.w; }, 0) + (cols.length+1)*U);
+    var D = 9, TW = W + D*2, TH = H + D*2 + (mini ? 0 : 12), g = "bx" + (++svgSeq), out = [];
+    var f = function(n){ return Math.round(n*100)/100; };
+    out.push('<defs>'+
+      '<linearGradient id="'+g+'wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf8f3"/><stop offset="1" stop-color="#ece4d8"/></linearGradient>'+
+      '<radialGradient id="'+g+'light" cx=".5" cy="0" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'+
+      '<linearGradient id="'+g+'sideL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9cfc2"/><stop offset="1" stop-color="#e9e1d5"/></linearGradient>'+
+      '<linearGradient id="'+g+'sideR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#d4c9bb"/><stop offset="1" stop-color="#e6ddd0"/></linearGradient>'+
+      '<linearGradient id="'+g+'ceil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3dace"/><stop offset="1" stop-color="#efe8de"/></linearGradient>'+
+      '<linearGradient id="'+g+'floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b99a76"/><stop offset="1" stop-color="#8f7254"/></linearGradient>'+
+      '<linearGradient id="'+g+'metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2e2e2e"/><stop offset=".45" stop-color="#8c8c8c"/><stop offset="1" stop-color="#3a3a3a"/></linearGradient>'+
+      '<linearGradient id="'+g+'rod" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6e6e6"/><stop offset=".5" stop-color="#9a9a9a"/><stop offset="1" stop-color="#5a5a5a"/></linearGradient>'+
+      '<linearGradient id="'+g+'woodTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7d3b4"/><stop offset="1" stop-color="#d7bd97"/></linearGradient>'+
+      '<linearGradient id="'+g+'woodEdge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c49f73"/><stop offset="1" stop-color="#9c7a52"/></linearGradient>'+
+      '<linearGradient id="'+g+'shadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2e22" stop-opacity=".22"/><stop offset="1" stop-color="#3b2e22" stop-opacity="0"/></linearGradient>'+
+      '<linearGradient id="'+g+'cloth" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>'+
+      '<pattern id="'+g+'mesh" width="3" height="3" patternUnits="userSpaceOnUse"><path d="M0 0 L3 3 M3 0 L0 3" stroke="#8a8f94" stroke-width=".35"/></pattern>'+
+      '<pattern id="'+g+'grain" width="14" height="3" patternUnits="userSpaceOnUse"><path d="M0 1.2 C4 .6 9 1.9 14 1.1" stroke="#b08a5f" stroke-width=".25" fill="none" opacity=".55"/></pattern>'+
+    '</defs>');
+    // 部屋（天井・左右の壁・床・奥の壁）
+    out.push('<rect x="0" y="0" width="'+TW+'" height="'+TH+'" fill="#fff"/>');
+    out.push('<polygon points="0,0 '+TW+',0 '+(TW-D)+','+D+' '+D+','+D+'" fill="url(#'+g+'ceil)"/>');
+    out.push('<polygon points="0,0 '+D+','+D+' '+D+','+(D+H)+' 0,'+(H+2*D)+'" fill="url(#'+g+'sideL)"/>');
+    out.push('<polygon points="'+TW+',0 '+(TW-D)+','+D+' '+(TW-D)+','+(D+H)+' '+TW+','+(H+2*D)+'" fill="url(#'+g+'sideR)"/>');
+    out.push('<polygon points="0,'+(H+2*D)+' '+D+','+(D+H)+' '+(TW-D)+','+(D+H)+' '+TW+','+(H+2*D)+'" fill="url(#'+g+'floor)"/>');
+    out.push('<rect x="'+D+'" y="'+D+'" width="'+W+'" height="'+H+'" fill="url(#'+g+'wall)"/>');
+    out.push('<rect x="'+D+'" y="'+D+'" width="'+W+'" height="'+H+'" fill="url(#'+g+'light)"/>');
+    out.push('<rect x="'+D+'" y="'+(D+H-6)+'" width="'+W+'" height="6" fill="url(#'+g+'shadow)" transform="rotate(180 '+(D+W/2)+' '+(D+H-3)+')"/>');
+    var ys = rowYs(pc, H), CLOTH = 95, x = D + U, back = [], front = [];
     cols.forEach(function(c){
-      var yOf = function(i){ return pad + ys[i]; };
+      var yOf = function(i){ return D + ys[i]; };
       c.items.forEach(function(id, i){
         var it = part(id); if(!it) return;
-        var y = yOf(i), x0 = x + 1, w = c.w - 2;
-        if(BRACKETED.indexOf(it.type)>=0) out.push('<path d="M'+(x)+' '+(y+1)+' l3 0 l-3 4 z M'+(x+c.w)+' '+(y+1)+' l-3 0 l3 4 z" fill="#4a4a4a"/>');
-        if(it.type==="shelf") out.push('<rect x="'+x0+'" y="'+(y-1.2)+'" width="'+w+'" height="2.4" fill="#c4ad8e" stroke="#8d7556" stroke-width=".4"/>');
-        else if(it.type==="basket"){ out.push('<rect x="'+x0+'" y="'+(y-8)+'" width="'+w+'" height="16" fill="none" stroke="#7d7d7d" stroke-width=".8"/>'); for(var g=1;g<6;g++) out.push('<line x1="'+(x0+w*g/6)+'" y1="'+(y-8)+'" x2="'+(x0+w*g/6)+'" y2="'+(y+8)+'" stroke="#b5b5b5" stroke-width=".4"/>'); }
-        else if(it.type==="rail"){
+        var y = yOf(i), x0 = x + .6, w = c.w - 1.2;
+        if(it.type==="shelf"){
+          back.push('<rect x="'+x0+'" y="'+f(y+2.2)+'" width="'+w+'" height="9" fill="url(#'+g+'shadow)"/>');
+          front.push('<polygon points="'+f(x0+1.6)+','+f(y-3.6)+' '+f(x0+w-1.6)+','+f(y-3.6)+' '+f(x0+w)+','+y+' '+x0+','+y+'" fill="url(#'+g+'woodTop)"/>'+
+            '<polygon points="'+f(x0+1.6)+','+f(y-3.6)+' '+f(x0+w-1.6)+','+f(y-3.6)+' '+f(x0+w)+','+y+' '+x0+','+y+'" fill="url(#'+g+'grain)"/>'+
+            '<rect x="'+x0+'" y="'+y+'" width="'+w+'" height="2.2" fill="url(#'+g+'woodEdge)" rx=".3"/>');
+        } else if(it.type==="basket"){
+          var bt = y - 7, bh = 15;
+          back.push('<rect x="'+(x0+1)+'" y="'+f(bt+bh)+'" width="'+(w-2)+'" height="6" fill="url(#'+g+'shadow)"/>');
+          front.push('<polygon points="'+f(x0+2)+','+f(bt-3)+' '+f(x0+w-2)+','+f(bt-3)+' '+f(x0+w-.6)+','+bt+' '+f(x0+.6)+','+bt+'" fill="#d4d7da" stroke="#7b8085" stroke-width=".4"/>'+
+            '<rect x="'+f(x0+.6)+'" y="'+bt+'" width="'+f(w-1.2)+'" height="'+bh+'" fill="#eef0f2" stroke="#6f7479" stroke-width=".6" rx=".6"/>'+
+            '<rect x="'+f(x0+.6)+'" y="'+bt+'" width="'+f(w-1.2)+'" height="'+bh+'" fill="url(#'+g+'mesh)" rx=".6"/>'+
+            '<rect x="'+f(x0+.6)+'" y="'+bt+'" width="'+f(w-1.2)+'" height="1.2" fill="#5f6469"/>'+
+            '<rect x="'+f(x0+w/2-4)+'" y="'+f(bt+2.5)+'" width="8" height="2" fill="#fff" stroke="#6f7479" stroke-width=".35" rx="1"/>');
+        } else if(it.type==="rail"){
           // ハンガーは棚の下に付く：すぐ上が棚ならその直下、無ければこの段に描く
           var prev = i>0 ? part(c.items[i-1]) : null;
-          var ry = prev && prev.type==="shelf" ? yOf(i-1) + 5 : y;
-          // 服の長さ：約95cm（次の段の部品・床の手前まで）
-          var below = H + pad - 3;
-          for(var j=i+1;j<c.items.length;j++){ var nx = part(c.items[j]); if(nx){ below = yOf(j) - (nx.type==="basket" ? 9 : 3); break; } }
+          var ry = prev && prev.type==="shelf" ? yOf(i-1) + 6 : y;
+          var below = H + D - 2;
+          for(var j=i+1;j<c.items.length;j++){ var nx = part(c.items[j]); if(nx){ below = yOf(j) - (nx.type==="basket" ? 11 : 5); break; } }
           var clen = Math.max(12, Math.min(CLOTH, below - ry - 7));
-          out.push('<line x1="'+x0+'" y1="'+ry+'" x2="'+(x0+w)+'" y2="'+ry+'" stroke="#6b6b6b" stroke-width="1.4"/>');
-          var nh = Math.max(2, Math.round(w/12));
-          for(var k=1;k<nh;k++){ var hx = x0 + w*k/nh; out.push('<path d="M'+hx+' '+ry+' l-5 7 h10 z" fill="none" stroke="#9a8f86" stroke-width=".6"/><rect x="'+(hx-4)+'" y="'+(ry+7)+'" width="8" height="'+clen+'" fill="#e9dfd3" stroke="#cbbba8" stroke-width=".4" rx="1.5"/>'); }
+          var nh = Math.max(3, Math.round(w/9)), cl = [];
+          for(var k=0;k<nh;k++){
+            var hx = x0 + 4 + (w-8)*k/(nh-1), col = CLOTH_COLORS[(k*7 + Math.round(x)) % CLOTH_COLORS.length];
+            var len = clen * (k%3===1 ? .62 : (k%4===2 ? .85 : 1)), sw = 6.4, top = ry + 6;
+            cl.push('<path d="M'+f(hx)+' '+f(ry-.6)+' q1.4 -1.8 0 -2.6" fill="none" stroke="#777" stroke-width=".45" transform="translate(0 3)"/>'+
+              '<path d="M'+f(hx-sw/2)+' '+f(top)+' L'+f(hx)+' '+f(ry+2.6)+' L'+f(hx+sw/2)+' '+f(top)+'" fill="none" stroke="#6d6d6d" stroke-width=".45"/>'+
+              '<path d="M'+f(hx-sw/2)+' '+f(top)+' Q'+f(hx-sw/2-1.2)+' '+f(top+len*.5)+' '+f(hx-sw/2+.2)+' '+f(top+len)+' L'+f(hx+sw/2-.2)+' '+f(top+len)+' Q'+f(hx+sw/2+1.2)+' '+f(top+len*.5)+' '+f(hx+sw/2)+' '+f(top)+' Q'+f(hx)+' '+f(top-1.6)+' '+f(hx-sw/2)+' '+f(top)+' Z" fill="'+col+'" stroke="rgba(0,0,0,.22)" stroke-width=".35"/>'+
+              '<path d="M'+f(hx-sw/2)+' '+f(top)+' Q'+f(hx-sw/2-1.2)+' '+f(top+len*.5)+' '+f(hx-sw/2+.2)+' '+f(top+len)+' L'+f(hx+sw/2-.2)+' '+f(top+len)+' Q'+f(hx+sw/2+1.2)+' '+f(top+len*.5)+' '+f(hx+sw/2)+' '+f(top)+' Z" fill="url(#'+g+'cloth)"/>');
+          }
+          back.push('<rect x="'+x0+'" y="'+f(ry+3)+'" width="'+w+'" height="'+f(clen+6)+'" fill="#3b2e22" opacity=".05"/>');
+          front.push(cl.join("")+'<rect x="'+x0+'" y="'+f(ry-1)+'" width="'+w+'" height="2" fill="url(#'+g+'rod)" rx="1"/>'+
+            '<rect x="'+f(x0-.4)+'" y="'+f(ry-1.6)+'" width="1.4" height="3.2" fill="#555" rx=".4"/><rect x="'+f(x0+w-1)+'" y="'+f(ry-1.6)+'" width="1.4" height="3.2" fill="#555" rx=".4"/>');
+        } else {
+          front.push('<rect x="'+f(x0+.6)+'" y="'+f(y-6)+'" width="'+f(w-1.2)+'" height="12" fill="url(#'+g+'woodTop)" stroke="#9c7a52" stroke-width=".5" rx=".8"/>'+
+            '<rect x="'+f(x0+w/2-5)+'" y="'+f(y-1)+'" width="10" height="1.6" fill="#7a6a60" rx=".8"/>');
         }
-        else out.push('<rect x="'+x0+'" y="'+(y-5)+'" width="'+w+'" height="10" fill="none" stroke="#9a8f86" stroke-dasharray="2 1.5" stroke-width=".6"/>');
+        if(BRACKETED.indexOf(it.type)>=0){
+          var by = it.type==="basket" ? y - 7 : y + 2.2;
+          front.push('<path d="M'+(x-.2)+' '+f(by)+' h3.2 l-3.2 4.2 z M'+(x+c.w+.2)+' '+f(by)+' h-3.2 l3.2 4.2 z" fill="#3a3a3a"/>');
+        }
       });
-      if(!mini) out.push('<text x="'+(x + c.w/2)+'" y="'+(pad+H+10)+'" font-size="5" text-anchor="middle" fill="#5c534d">'+c.w+'cm</text>');
-      x += c.w + UPRIGHT_CM;
+      if(!mini) out.push('<text x="'+f(x + c.w/2)+'" y="'+(TH-2)+'" font-size="5.2" text-anchor="middle" fill="#5c534d" font-family="sans-serif">'+c.w+'cm</text>');
+      x += c.w + U;
     });
-    var xx = pad;
-    for(var u=0; u<=cols.length; u++){ out.push('<rect x="'+xx+'" y="'+pad+'" width="'+UPRIGHT_CM+'" height="'+H+'" fill="#4a4a4a"/>'); if(u<cols.length) xx += cols[u].w + UPRIGHT_CM; }
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+(W+pad*2)+' '+(H+pad*2+14)+'">'+out.join("")+'</svg>';
+    out.push(back.join(""));
+    var xx = D;
+    for(var u=0; u<=cols.length; u++){
+      out.push('<rect x="'+f(xx+.6)+'" y="'+D+'" width="'+U+'" height="'+H+'" fill="#000" opacity=".12"/>'+
+        '<rect x="'+f(xx)+'" y="'+D+'" width="'+U+'" height="'+H+'" fill="url(#'+g+'metal)"/>'+
+        '<line x1="'+f(xx+U/2)+'" y1="'+(D+2)+'" x2="'+f(xx+U/2)+'" y2="'+(D+H-2)+'" stroke="#1d1d1d" stroke-width=".35" stroke-dasharray="1.2 2.2"/>');
+      if(u<cols.length) xx += cols[u].w + U;
+    }
+    out.push(front.join(""));
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+TW+' '+TH+'">'+out.join("")+'</svg>';
   }
 
   // ---- 下書き ----
@@ -269,7 +354,7 @@
     S.contact = S.contact || {name:"",phone:"",email:"",addr:""};
     var ups = uprights();
     S.places = S.places.filter(function(p){ return p && p.id; }).slice(0, 12);
-    S.places.forEach(function(p){ if(!part(p.height)) p.height = ups[0].id; if(!typeInfo(p.type)) p.type = "hang"; p.height = ups[0].id; p.cols = p.cols || []; p._ws = colsFor(p); });
+    S.places.forEach(function(p){ if(!C.placeTypes[p.type]) p.type = "hang"; p.height = ups[0].id; p.cols = p.cols || []; if(!p._ws) p._ws = colsFor(p); syncCols(p); });
   }
   function save(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(S)); }catch(e){} }
 
@@ -293,27 +378,33 @@
         '<div class="chips" style="margin-top:8px;">'+MASU_CHOICES.map(function(m){ return '<button type="button" class="chip'+(Number(f.masu)===m?' on':'')+'" data-fmasu="'+m+'">'+masuText(m)+'</button>'; }).join("")+'</div>' :
         '<input class="in" data-ff="cm" inputmode="decimal" placeholder="例：125" value="'+esc(f.cm||"")+'" style="margin-top:8px;"><div class="note">収納の内側の壁から壁までを、メジャーで測った幅（cm）。</div>')+
       '<div id="fitBox">'+(placeInner(f) ? fitText(f) : '')+'</div>'+
-      '<label class="lbl">種類</label>'+
+      '<label class="lbl">最初の種類<span class="note">（あとで列ごとに「服掛け」「棚」などに変えられます）</span></label>'+
       '<div class="seg">'+Object.keys(C.placeTypes).map(function(k){ var t = C.placeTypes[k]; return '<button type="button" class="tcard'+(f.type===k?' on':'')+'" data-ftype="'+k+'"><b>'+(k==="hang"?"👕 ":"📚 ")+esc(t.name)+'</b><span>'+(k==="hang"?"上に棚1枚＋その下にハンガー。服をかける収納":"棚"+t.stdShelves+"段。食品・小物を置く収納")+'</span></button>'; }).join("")+'</div>'+
       '<label class="lbl">高さ</label><div class="note">'+(ups[0]?ups[0].size:200)+'cm（縦レールの長さは1種類です）</div>'+
       '<div class="seg" style="margin-top:14px;"><button type="button" class="btn ghost" data-fcancel="1">やめる</button><button type="button" class="btn dk" data-fok="1">'+(f.editId?"この内容にする":"この場所を足す")+'</button></div>'+
     '</div>';
   }
+  function kindCardHtml(idx, ci, c, k, max){
+    var items = defaultItems(k, c.w, max), on = c.kind===k;
+    var mini = svgOf({ up:uprights()[0], max:max, cols:[colOf(c.w, k, items, max)] }, true);
+    return '<button type="button" class="kcard'+(on?' on':'')+'" data-ckind="'+idx+'|'+ci+'|'+esc(k)+'">'+mini+'<span>'+(k==="hang"?"👕 ":(k==="shelf"?"📚 ":"⭐ "))+esc(kindName(k))+'</span></button>';
+  }
   function placeHtml(p, r, idx){
-    var pc = r.pc, ti = typeInfo(p.type);
+    var pc = r.pc;
     var addTypes = ["shelf","basket","rail"];
-    var head = '<div class="phd"><div class="t"><h3>'+esc(p.name)+'</h3><div class="pmeta">'+(p.wmode==="cm" ? "内側の幅 "+esc(p.cm)+"cm" : masuText(p.masu)+"（約"+Math.round(Number(p.masu)*(C.masuCm||91))+"cm）")+'・'+esc(ti.name)+'・高さ'+(pc.up?pc.up.size:"")+'cm</div></div>'+
+    var head = '<div class="phd"><div class="t"><h3>'+esc(p.name)+'</h3><div class="pmeta">'+(p.wmode==="cm" ? "内側の幅 "+esc(p.cm)+"cm" : masuText(p.masu)+"（約"+Math.round(Number(p.masu)*(C.masuCm||91))+"cm）")+'・'+esc(pc.cols.map(function(c){ return kindName(c.kind); }).join("＋"))+'・高さ'+(pc.up?pc.up.size:"")+'cm</div></div>'+
       '<button type="button" class="mini" data-pedit="'+idx+'">✏️ 直す</button><button type="button" class="mini" data-pdel="'+idx+'">✕</button></div>';
     if(!pc.cols.length) return '<div class="place">'+head+'<div class="warn">この幅では、ボーアクセルが入りません。「直す」で幅をご確認ください。</div></div>';
     return '<div class="place">'+head+
       '<div class="svg">'+svgOf(pc)+'</div>'+
-      '<div class="note">絵は、だいたいのイメージです。標準の棚（'+ti.name+'は1列に'+ti.stdShelves+'枚）は最初から入っています。</div>'+
+      '<div class="note">絵は、だいたいのイメージです。列ごとに種類を選べます。標準（金額に入らない分）は、服掛けの列は棚1枚、棚の列は棚4枚です。標準の棚も、外したり並べ替えたりできます。</div>'+
       '<div class="cols" style="margin-top:8px;">'+pc.cols.map(function(c, ci){
         var left = pc.max - c.items.length;
         return '<div class="col'+(left<0?' over':'')+'"><div class="ch">'+(ci+1)+'列目（幅'+c.w+'cm）</div>'+
-          c.items.map(function(id, i){ var x = part(id), isStd = i < c.std.length, ei = i - c.std.length;
+          '<div class="kinds">'+kindsFor(c.w).map(function(k){ return kindCardHtml(idx, ci, c, k, pc.max); }).join("")+'</div>'+
+          c.items.map(function(id, i){ var x = part(id), isStd = !!c.stdArr[i];
             return '<div class="it"><span>'+(i+1)+'段目 '+esc(x?x.name:"")+(isStd?'<em class="std">標準</em>':'')+'</span>'+
-              (isStd ? '' : '<button type="button" class="mini" data-imv="'+idx+'|'+ci+'|'+ei+'|-1"'+(ei===0?' disabled':'')+'>▲</button><button type="button" class="mini" data-imv="'+idx+'|'+ci+'|'+ei+'|1"'+(ei===c.extras.length-1?' disabled':'')+'>▼</button><button type="button" class="mini" data-idel="'+idx+'|'+ci+'|'+ei+'">✕</button>')+'</div>';
+              '<button type="button" class="mini" data-imv="'+idx+'|'+ci+'|'+i+'|-1"'+(i===0?' disabled':'')+'>▲</button><button type="button" class="mini" data-imv="'+idx+'|'+ci+'|'+i+'|1"'+(i===c.items.length-1?' disabled':'')+'>▼</button><button type="button" class="mini" data-idel="'+idx+'|'+ci+'|'+i+'">✕</button></div>';
           }).join("")+
           (left<0 ? '<div class="warn">高さ'+(pc.up?pc.up.size:"")+'cmでは'+pc.max+'段までです。'+(-left)+'つ外してください。</div>' : '<div class="left">あと'+left+'段</div>')+
           '<div class="adds">'+C.parts.filter(function(x){ return addTypes.indexOf(x.type)>=0 && x.size===c.w; }).map(function(x){ return '<button type="button" data-iadd="'+idx+'|'+ci+'|'+esc(x.id)+'"'+(left>0?'':' disabled')+'>＋'+esc(x.name)+'</button>'; }).join("")+'</div></div>';
@@ -386,10 +477,16 @@
       if(e.target.closest("[data-fcancel]")){ form = null; render(); return; }
       if(e.target.closest("[data-fok]")){ commitForm(); return; }
     }
-    if((t = e.target.closest("[data-iadd]"))){ var a = t.dataset.iadd.split("|"), p = S.places[+a[0]], pc = placeCols(p), c = pc.cols[+a[1]];
-      if(c && c.items.length < pc.max){ p.cols[+a[1]] = p.cols[+a[1]] || {extras:[]}; p.cols[+a[1]].extras.push(a[2]); save(); render(); } return; }
-    if((t = e.target.closest("[data-idel]"))){ var d = t.dataset.idel.split("|"); S.places[+d[0]].cols[+d[1]].extras.splice(+d[2], 1); save(); render(); return; }
-    if((t = e.target.closest("[data-imv]"))){ var m = t.dataset.imv.split("|"), ex = S.places[+m[0]].cols[+m[1]].extras, i = +m[2], j = i + (+m[3]);
+    var colAt = function(pi, ci){ var p = S.places[pi]; syncCols(p); return p.cols[ci]; };
+    if((t = e.target.closest("[data-ckind]"))){ var kk = t.dataset.ckind.split("|"), pp = S.places[+kk[0]], cc = colAt(+kk[0], +kk[1]), w0 = placeCols(pp).cols[+kk[1]].w, mx = placeCols(pp).max, nk = kk.slice(2).join("|");
+      if(!cc || cc.kind===nk) return;
+      var cur = JSON.stringify(cc.items), def = JSON.stringify(defaultItems(cc.kind, w0, mx));
+      if(cur!==def && !confirm((+kk[1]+1)+"列目の中身を「"+kindName(nk)+"」に入れ替えますか？（いまの棚・カゴの並びは消えます）")) return;
+      cc.kind = nk; cc.items = defaultItems(nk, w0, mx); save(); render(); return; }
+    if((t = e.target.closest("[data-iadd]"))){ var a = t.dataset.iadd.split("|"), pc = placeCols(S.places[+a[0]]), c = colAt(+a[0], +a[1]);
+      if(c && c.items.length < pc.max){ c.items.push(a[2]); save(); render(); } return; }
+    if((t = e.target.closest("[data-idel]"))){ var d = t.dataset.idel.split("|"); colAt(+d[0], +d[1]).items.splice(+d[2], 1); save(); render(); return; }
+    if((t = e.target.closest("[data-imv]"))){ var m = t.dataset.imv.split("|"), ex = colAt(+m[0], +m[1]).items, i = +m[2], j = i + (+m[3]);
       if(j>=0 && j<ex.length){ var tmp = ex[i]; ex[i] = ex[j]; ex[j] = tmp; save(); render(); } return; }
     if(e.target.closest("#send")) await send(e.target.closest("#send"));
   });
@@ -421,7 +518,7 @@
           var y = 30;
           blocks.forEach(function(img, i){
             var p = S.places[i]; g.fillStyle = "#2f2925"; g.font = "bold 34px sans-serif";
-            g.fillText(p.name + "（" + (p.wmode==="cm" ? p.cm+"cm" : masuText(p.masu)) + "・" + typeInfo(p.type).name + "）", 40, y + 40);
+            g.fillText(p.name + "（" + (p.wmode==="cm" ? p.cm+"cm" : masuText(p.masu)) + "・" + placeCols(p).cols.map(function(c){ return kindName(c.kind); }).join("＋") + "）", 40, y + 40);
             if(img){ var w = Math.round(img.width * hs[i] / img.height); g.drawImage(img, (W-w)/2, y + 60, w, hs[i]); }
             y += hs[i] + 90;
           });
@@ -442,7 +539,7 @@
       var image = await planImage();
       var hp = main.querySelector("[data-hp]");
       var res = await fetch("/api/shuno", { method:"POST", headers: Object.assign({"Content-Type":"application/json"}, staffCode ? {"x-staff-code":staffCode} : {}),
-        body: JSON.stringify({ p:P, t:T, action:"request", plan:{ places: S.places.map(function(p){ return { name:p.name, type:p.type, masu:p.wmode==="cm"?0:p.masu, cm:p.wmode==="cm"?p.cm:0, height:p.height, cols:p.cols }; }) },
+        body: JSON.stringify({ p:P, t:T, action:"request", plan:{ places: S.places.map(function(p){ return { name:p.name, type:p.type, masu:p.wmode==="cm"?0:p.masu, cm:p.wmode==="cm"?p.cm:0, height:p.height, cols:(p.cols||[]).map(function(c){ return { kind:c.kind, items:c.items }; }) }; }) },
           note:S.note||"", image:image, name:S.contact.name, phone:S.contact.phone, email:S.contact.email, addr:S.contact.addr, website: hp ? hp.value : "" }) });
       var j = await res.json().catch(function(){ return {}; });
       if(!res.ok) throw new Error(j.error||"error");

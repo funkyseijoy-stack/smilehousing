@@ -65,7 +65,7 @@ export default async (req: Request, context: Context) => {
     return json({
       mode, preview: staff && (mode === "public" ? !boaxelForPublic(settings) : !boaxelForNote(settings, project)),
       customer: mode === "note" ? (project.customer || "") : "",
-      parts: cat.parts, note: cat.note, placeTypes: PLACE_TYPES, masuCm: MASU_CM, requests,
+      parts: cat.parts, sets: cat.sets || [], note: cat.note, placeTypes: PLACE_TYPES, masuCm: MASU_CM, requests,
     });
   }
 
@@ -124,7 +124,7 @@ export default async (req: Request, context: Context) => {
   const yen = (n: number) => n.toLocaleString("ja-JP") + "円";
   const who = mode === "note" ? ((project.customer ? project.customer + "様" : "お客様") + "（" + (project.name || "") + "）") : (contact.name + "様（公開ページ）");
   const placeTxt = pp.places.map((pl: any) => "■ " + pl.name + "（" + pl.typeName + "・" + (pl.cm ? "内寸" + pl.cm + "cm" : pl.masu + "マス") + "・高さ" + pl.height + "cm）\n　" +
-    pl.cols.map((c: any, i: number) => (i + 1) + "列目 " + c.w + "cm：" + c.items.length + "段（うち標準" + c.std + "）").join("／")).join("\n");
+    pl.cols.map((c: any, i: number) => (i + 1) + "列目 " + c.w + "cm・" + (c.kindName || "") + "：" + c.items.length + "段（うち標準" + c.std + "）").join("／")).join("\n");
   const lineTxt = pp.lines.map((l: any) => `・${l.name}${l.size ? " " + l.size + "cm" : ""}${l.code ? "（" + l.code + "）" : ""} × ${l.qty}${l.std ? "（うち標準" + l.std + "）" : ""}${l.sub ? "　" + yen(l.sub) : ""}`).join("\n");
   const content = "【収納プランのご依頼】" + who +
     (contact ? "\n連絡先：" + [contact.phone, contact.email].filter(Boolean).join("／") + (contact.addr ? "\n住所・お家：" + contact.addr : "") : "") +

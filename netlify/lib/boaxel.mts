@@ -19,7 +19,19 @@ export const BOAXEL_DEFAULTS: any[] = [
   { id: "ra80", type: "rail", name: "ハンガーパイプ", code: "", size: 80, price: "" },
 ];
 // 場所の種類と、1列（1マス分の列）ごとに標準で付く棚の数（棚・ブラケットは金額に入れない）
-export const PLACE_TYPES: any = { hang: { name: "ハンガー収納", stdShelves: 1 }, shelf: { name: "棚収納", stdShelves: 4 } };
+export const PLACE_TYPES: any = { hang: { name: "ハンガー収納", colName: "服掛け", stdShelves: 1 }, shelf: { name: "棚収納", colName: "棚", stdShelves: 4 } };
+// 列の種類：hang／shelf／set:<見本ID>（その幅の見本だけ）。無ければ場所の種類。
+export function boaxelColKind(kind: any, placeType: string, sets: any[], w: number) {
+  const k = String(kind || "");
+  if (PLACE_TYPES[k]) return k;
+  if (k.startsWith("set:") && (sets || []).some((st: any) => "set:" + st.id === k && st.w === w)) return k;
+  return PLACE_TYPES[placeType] ? placeType : "hang";
+}
+// 標準の数を決める種類（見本はハンガーが入っていれば服掛け、無ければ棚）
+export function boaxelStdKind(kind: string, items: string[], byId: any) {
+  if (PLACE_TYPES[kind]) return kind;
+  return items.some((id) => byId[id] && byId[id].type === "rail") ? "hang" : "shelf";
+}
 export const MASU_CM = 91; // 1マス＝910mm
 export const WALL_CM = 5; // マスから内側の幅を出すときに引く分（1マス91cm→内側86cm＝80cmの1列）
 export const UPRIGHT_CM = 2; // 縦レール1本の幅（だいたい）
@@ -46,7 +58,14 @@ export function boaxelParts(settings: any) {
   if (!parts.some((x: any) => x.type === "upright")) return null;
   // 棚板が無い幅は列にできない
   if (!parts.some((x: any) => x.type === "shelf")) return null;
-  return { parts, note: String((bx && bx.note) || "").slice(0, 500) };
+  // 見本（スタッフが「業者・設定」で作った列1つ分の組み合わせ）。お客様は列ごとに見本を選べる。
+  const byId: any = {}; parts.forEach((x: any) => { byId[x.id] = x; });
+  const sets = (bx && Array.isArray(bx.sets) ? bx.sets : []).slice(0, 40).map((st: any) => {
+    const w = Number(st && st.w) || 0;
+    return { id: String((st && st.id) || "").slice(0, 40), name: String((st && st.name) || "").trim().slice(0, 30), w,
+      items: (Array.isArray(st && st.items) ? st.items : []).map((id: any) => String(id)).filter((id: string) => byId[id] && !["upright", "bracket"].includes(byId[id].type) && byId[id].size === w).slice(0, 30) };
+  }).filter((st: any) => st.id && st.name && st.w > 0 && st.items.length);
+  return { parts, sets, note: String((bx && bx.note) || "").slice(0, 500) };
 }
 
 // おうちノートのお客様に出すか（試しの間はデモの案件だけ）
@@ -125,14 +144,25 @@ export function boaxelPlan(cat: any, plan: any) {
     // マスが整数なら1マス＝80cmの1列ずつ（画面の colsFor と同じ）
     const ws = !(Number(p && p.cm) > 0) && masuN > 0 && masuN === Math.floor(masuN) && widths.includes(80) ? Array.from({ length: Math.min(10, masuN) }, () => 80) : colsForInner(inner, widths);
     if (!ws.length) return { error: "too_narrow", place: String(p && p.name || "") };
-    const stdN = Math.min(max, PLACE_TYPES[type].stdShelves);
     const srcCols = Array.isArray(p && p.cols) ? p.cols : [];
+    // 列ごとに種類（服掛け／棚／見本）と部品の並び（上から）。標準＝その列の種類の棚の数まで（金額に入れない）。
     const cols = ws.map((w, i) => {
-      const sh = shelfOf(w);
-      const stdItems = sh ? Array.from({ length: stdN }, () => sh.id) : [];
-      const extras = (Array.isArray(srcCols[i] && srcCols[i].extras) ? srcCols[i].extras : []).slice(0, 30).map((id: any) => String(id))
-        .filter((id: string) => byId[id] && !["upright", "bracket"].includes(byId[id].type) && byId[id].size === w);
-      return { w, std: stdItems, extras, items: stdItems.concat(extras) };
+      const sc = srcCols[i] || {};
+      const kind = boaxelColKind(sc.kind, type, cat.sets, w);
+      const okId = (id: string) => byId[id] && !["upright", "bracket"].includes(byId[id].type) && byId[id].size === w;
+      let items: string[];
+      if (Array.isArray(sc.items)) items = sc.items.slice(0, 30).map((id: any) => String(id)).filter(okId);
+      else {
+        // 以前の形（標準の棚＋足した分 extras）
+        const sh = shelfOf(w);
+        items = (sh ? Array.from({ length: Math.min(max, PLACE_TYPES[type].stdShelves) }, () => sh.id) : [])
+          .concat((Array.isArray(sc.extras) ? sc.extras : []).slice(0, 30).map((id: any) => String(id)).filter(okId));
+      }
+      const stdN = Math.min(max, PLACE_TYPES[boaxelStdKind(kind, items, byId)].stdShelves);
+      let left = stdN;
+      const stdArr = items.map((id) => (left > 0 && byId[id].type === "shelf" ? (left--, id) : ""));
+      const kindName = kind.startsWith("set:") ? ((cat.sets.find((st: any) => "set:" + st.id === kind) || {}).name || "見本") : PLACE_TYPES[kind].colName;
+      return { w, kind, kindName, items, stdArr, std: stdArr.filter(Boolean) };
     });
     if (cols.some((c) => c.items.length > max)) return { error: "too_many_items", place: String(p && p.name || "") };
     // 縦レールは列の数＋1本（標準＝金額に入れない。棚を付けるのに必ず要るため）
@@ -142,14 +172,14 @@ export function boaxelPlan(cat: any, plan: any) {
     cols.forEach((c) => c.std.forEach((id: string) => add(std, id, 1)));
     if (br) {
       add(count, br.id, bracketCount(cols.map((c) => c.items), byId));
-      add(std, br.id, bracketCount(cols.map((c) => c.std), byId));
+      add(std, br.id, bracketCount(cols.map((c) => c.stdArr), byId));
     }
     places.push({
       name: String(p && p.name || "").trim().slice(0, 40) || "収納",
       type, typeName: PLACE_TYPES[type].name,
       masu: Number(p && p.masu) || 0, cm: Number(p && p.cm) || 0, inner: Math.round(inner),
       height: up.size, upright: up.id, max,
-      cols: cols.map((c) => ({ w: c.w, std: c.std.length, items: c.items })),
+      cols: cols.map((c) => ({ w: c.w, kind: c.kind, kindName: c.kindName, std: c.std.length, items: c.items })),
     });
   }
   if (!places.length) return null;
