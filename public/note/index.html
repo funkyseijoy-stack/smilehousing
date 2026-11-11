@@ -531,6 +531,17 @@
   .drawbtn{ background:#fff4f0; border:1.5px solid #c8553d; color:#b24a33; border-radius:999px; padding:8px 14px; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; }
   .chgthr .ctimgs{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
   .chgthr .ctimgs img{ width:120px; max-height:120px; object-fit:contain; background:#fff; border:1px solid var(--line2); border-radius:8px; cursor:pointer; }
+  .chgdl{ margin-top:10px; padding:10px; border:1px solid var(--line2,#e5dccf); border-radius:10px; background:#fbf8f3; font-size:.85rem; }
+  .chgdl b{ display:block; margin-bottom:6px; }
+  .chgdl button{ display:block; width:100%; text-align:left; margin-top:6px; padding:8px 10px; border:1px solid var(--line2,#e5dccf); border-radius:8px; background:#fff; font:inherit; font-size:.85rem; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chgatt{ margin-top:10px; }
+  .chgattbtn{ display:inline-block; padding:8px 14px; border:1px solid #c8553d; color:#c8553d; border-radius:999px; font-weight:700; font-size:.88rem; cursor:pointer; background:#fff; }
+  .chgatthint{ font-size:.78rem; color:var(--sub,#8a7a66); margin-top:4px; }
+  #chgFiles .cf{ display:flex; align-items:center; gap:8px; margin-top:6px; font-size:.85rem; }
+  #chgFiles .cf img{ width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--line2,#e5dccf); }
+  #chgFiles .cf span{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #chgFiles .cf button{ border:0; background:none; font-size:1.1rem; cursor:pointer; color:#999; }
+  .ctpdf{ display:inline-block; padding:6px 10px; border:1px solid var(--line2,#e5dccf); border-radius:8px; background:#fff; font-size:.85rem; text-decoration:none; color:inherit; }
   #drawModal{ position:fixed; inset:0; z-index:90; background:#2b2622; display:flex; flex-direction:column; }
   #drawModal[hidden]{ display:none; }
   #drawModal .dtop{ display:flex; align-items:center; gap:6px; padding:calc(8px + env(safe-area-inset-top)) 10px 8px; background:#3a332d; color:#fff; flex-wrap:wrap; }
@@ -788,6 +799,12 @@
     <h2 id="chgTitle">✏️ 変更したいところ</h2>
     <p class="help-lead" id="chgWhat"></p>
     <textarea id="chgInput" class="meminput" placeholder="例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい"></textarea>
+    <div id="chgDlBox" class="chgdl" hidden></div>
+    <div id="chgAttBox" class="chgatt" hidden>
+      <label class="chgattbtn">📎 写真・PDFを付ける<input type="file" id="chgFile" accept="image/*,application/pdf" multiple hidden></label>
+      <div id="chgFiles"></div>
+      <div class="chgatthint">ご自分で書き込んだ図面や写真を付けられます（3つまで）</div>
+    </div>
     <button class="btn dk" id="chgSend" style="width:100%; margin-top:10px;">スタッフに送る</button>
     <p class="help-lead" style="margin-top:8px;">メッセージとしてスタッフに届きます。お返事は「メッセージ」に届きます。</p>
   </div>
@@ -1862,7 +1879,7 @@ function homeHtml(){ return homeParts().main; }
       if(m.fromCustomer) txt = txt.replace(/^【(変更のご依頼|お返事)】[^\n]*\n?/, "").trim() || txt;
       var imgs = (m.files||[]).filter(function(f){ return f && f.url; });
       return '<div class="ct '+(m.fromCustomer?'me':'st')+'"><div class="cth">'+(m.fromCustomer?(isRep?'💬 あなたのお返事':'✏️ 変更のご依頼'):'💬 スタッフからのお返事')+'（'+fmtD(m.createdAt)+'）'+(m.fromCustomer || String(m.createdAt||"")<lastMine ? '':nwTag(m.createdAt))+'</div>'+esc(txt)+
-        (imgs.length ? '<div class="ctimgs">'+imgs.map(function(f){ return '<img src="'+esc(f.url)+'" alt="'+(m.fromCustomer?'あなたが書き込んだ図面':'図面')+'" data-img="'+esc(f.url)+'">'; }).join("")+'</div>' : '')+'</div>';
+        (imgs.length ? '<div class="ctimgs">'+imgs.map(function(f){ return isPdf(f) ? '<a class="ctpdf" href="'+esc(f.url)+'" target="_blank" rel="noopener">📄 '+esc(f.name||"PDF")+'</a>' : '<img src="'+esc(f.url)+'" alt="'+(m.fromCustomer?'あなたが送った図面・写真':'図面')+'" data-img="'+esc(f.url)+'">'; }).join("")+'</div>' : '')+'</div>';
     }).join("")+(hasStaff ? '<button class="ctrep" data-chgreply="'+esc(key)+'" data-chglabel="'+esc(label0)+'">💬 このやりとりに返信する</button>' : '')+'</div>';
   }
   function chgDone(c, x){
@@ -2749,6 +2766,7 @@ function homeHtml(){ return homeParts().main; }
     if(mode==="decided") chgSheet("💬 決めたことを伝える", "「"+text+"」について、決めたことを書いてください。", "例：深型にします", "スタッフに伝える");
     else chgSheet("❓ 相談したい", "「"+text+"」について、迷っていること・聞きたいことを書いてください。", "例：深型と浅型で、入る食器の量はどのくらい違いますか？", "スタッフに送る");
     document.getElementById("chgInput").value = "";
+    chgPrepare();
     openSheet("chgModal");
     setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
   }
@@ -2806,10 +2824,78 @@ function homeHtml(){ return homeParts().main; }
     var b = e.target.closest("[data-sample]"); if(!b) return;
     e.preventDefault(); smpOpen(b.dataset.sample||"");
   });
+  // ---------- 変更のご依頼：図面のダウンロードと、お客様の端末のファイルの添付 ----------
+  var chgAtt = [];
+  function chgCardKey(){ return chgCur && (chgCur.prefix==="【変更のご依頼】" || chgCur.prefix==="【お返事】") && chgCur.key && /^[ntsla]:/.test(chgCur.key) ? chgCur.key : ""; }
+  function chgPrepare(){
+    chgAtt = []; renderChgFiles();
+    var key = chgCardKey();
+    document.getElementById("chgAttBox").hidden = !key;
+    var dl = document.getElementById("chgDlBox"), fs = key ? drawFilesOfKey(key) : [];
+    dl.hidden = !fs.length;
+    dl.innerHTML = fs.length ? '<b>⬇ このカードの図面・写真を保存する</b><div style="color:var(--sub,#8a7a66);">保存して、お手持ちのアプリで書き込んでから「📎 写真・PDFを付ける」で送れます。</div>'+
+      fs.map(function(f, i){ return '<button type="button" data-chgdl="'+i+'">⬇ '+esc(f.name || ((isPdf(f)?"図面（PDF）":"写真")+" "+(i+1)))+'</button>'; }).join("") : "";
+  }
+  function renderChgFiles(){
+    var box = document.getElementById("chgFiles"); if(!box) return;
+    box.innerHTML = chgAtt.map(function(a, i){ return '<div class="cf">'+(a.type==="application/pdf" ? '<span style="flex:none; font-size:1.4rem;">📄</span>' : '<img src="'+a.data+'" alt="">')+'<span>'+esc(a.name)+'</span><button type="button" data-chgrm="'+i+'" aria-label="外す">×</button></div>'; }).join("");
+  }
+  async function dlFile(f){
+    try{
+      var r = await fetch(f.url); if(!r.ok) throw new Error("x");
+      var b = await r.blob(), u = URL.createObjectURL(b), a = document.createElement("a");
+      var nm = f.name || ("図面" + (isPdf(f) ? ".pdf" : ".jpg"));
+      a.href = u; a.download = nm; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(u); }, 30000);
+      toast("保存しました（保存されない場合は、開いた画面から保存してください）");
+    }catch(e){ window.open(f.url, "_blank"); }
+  }
+  function readAsDataUrl(blob){ return new Promise(function(ok, ng){ var fr = new FileReader(); fr.onload = function(){ ok(fr.result); }; fr.onerror = ng; fr.readAsDataURL(blob); }); }
+  function shrinkImage(file){
+    return new Promise(function(ok){
+      var u = URL.createObjectURL(file), im = new Image();
+      im.onload = function(){
+        var k = Math.min(1, 1800 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas");
+        c.width = Math.round(im.naturalWidth*k); c.height = Math.round(im.naturalHeight*k);
+        var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", 0.85));
+      };
+      im.onerror = function(){ URL.revokeObjectURL(u); ok(null); };
+      im.src = u;
+    });
+  }
+  document.getElementById("chgDlBox").addEventListener("click", function(e){
+    var b = e.target.closest("[data-chgdl]"); if(!b) return;
+    var fs = drawFilesOfKey(chgCardKey()), f = fs[+b.getAttribute("data-chgdl")]; if(f) dlFile(f);
+  });
+  document.getElementById("chgFiles").addEventListener("click", function(e){
+    var b = e.target.closest("[data-chgrm]"); if(!b) return;
+    chgAtt.splice(+b.getAttribute("data-chgrm"), 1); renderChgFiles();
+  });
+  document.getElementById("chgFile").addEventListener("change", async function(){
+    var files = Array.prototype.slice.call(this.files||[]); this.value = "";
+    for(var i=0;i<files.length;i++){
+      if(chgAtt.length >= 3){ toast("付けられるのは3つまでです"); break; }
+      var f = files[i], isP = /pdf/i.test(f.type||"") || /\.pdf$/i.test(f.name||"");
+      var data = null;
+      if(isP){
+        if(f.size > 3.5*1024*1024){ toast("PDFが大きすぎます（3.5MBまで）"); continue; }
+        data = await readAsDataUrl(f);
+      } else if(/^image\//.test(f.type||"") || /\.(jpe?g|png|heic|webp)$/i.test(f.name||"")){
+        data = await shrinkImage(f);
+        if(!data){ toast("この写真は読み込めませんでした"); continue; }
+      } else { toast("写真かPDFを選んでください"); continue; }
+      chgAtt.push({ name: (f.name||"").replace(/\.(heic|webp|png|jpe?g)$/i, isP ? "" : ".jpg") || (isP ? "添付.pdf" : "写真.jpg"), type: isP ? "application/pdf" : "image/jpeg", data: data });
+    }
+    var total = chgAtt.reduce(function(a, x){ return a + x.data.length*0.75; }, 0);
+    if(total > 4*1024*1024){ toast("合わせて大きすぎます。数を減らしてください"); chgAtt.pop(); }
+    renderChgFiles();
+  });
   function chgReplyOpen(label, key){
     chgCur = {label:label, key:key, prefix:"【お返事】"};
     chgSheet("💬 お返事", "「"+label+"」についてのやりとりに、お返事を書いてください。", "例：やっぱり手すりは付けてください", "スタッフに送る");
     document.getElementById("chgInput").value = "";
+    chgPrepare();
     openSheet("chgModal");
     setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
   }
@@ -2817,6 +2903,7 @@ function homeHtml(){ return homeParts().main; }
     chgCur = {label:label, key:key, prefix:"【変更のご依頼】"};
     chgSheet("✏️ 変更したいところ", "「"+label+"」について、変えたいところを書いてください。", "例：吊り戸棚はなしにしたい／扉の色をもう少し明るくしたい", "スタッフに送る");
     document.getElementById("chgInput").value = "";
+    chgPrepare();
     openSheet("chgModal");
     setTimeout(function(){ document.getElementById("chgInput").focus(); }, 60);
   }
@@ -2824,14 +2911,16 @@ function homeHtml(){ return homeParts().main; }
   document.getElementById("chgModal").addEventListener("click", function(e){ if(e.target.id==="chgModal") closeSheet("chgModal"); });
   document.getElementById("chgSend").addEventListener("click", async function(){
     var text = (document.getElementById("chgInput").value||"").trim();
+    var att = chgCardKey() ? chgAtt.slice() : [];
+    if(!text && att.length) text = "ファイルを付けました。ご確認ください。";
     if(!text || !chgCur){ toast("内容を書いてください"); return; }
     var btn = this; btn.disabled = true;
-    var full = chgCur.prefix+chgCur.label+"\n"+text;
+    var full = chgCur.prefix+chgCur.label+(att.length ? "\n📎 ファイルを付けました（"+att.length+"件）" : "")+"\n"+text;
     try{
-      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: ((chgCur.prefix==="【変更のご依頼】" || chgCur.prefix==="【お返事】") && chgCur.key && /^[ntsla]:/.test(chgCur.key)) ? chgCur.key : "" }) });
+      var res = await fetch("/api/note-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"message", text:full, chgKey: chgCardKey(), attachFiles: att.map(function(a){ return { name:a.name, data:a.data }; }) }) });
       var j = await res.json();
       if(!res.ok) throw new Error(j.error||"error");
-      data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:(j.message && j.message.chgKey)||"", chgReply: chgCur.prefix==="【お返事】", createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
+      data.messages.push({ content:full, sender:"", fromCustomer:true, chgKey:(j.message && j.message.chgKey)||"", chgReply: chgCur.prefix==="【お返事】", files:(j.message && j.message.files)||[], createdAt:(j.message && j.message.createdAt) || new Date().toISOString() });
       chgSent[chgCur.key] = true;
       try{ var cs = JSON.parse(localStorage.getItem("okaiChg:"+P)||"{}"); cs[chgCur.key] = new Date().toISOString(); localStorage.setItem("okaiChg:"+P, JSON.stringify(cs)); }catch(er){}
       closeSheet("chgModal"); render(); toast("スタッフに送りました");

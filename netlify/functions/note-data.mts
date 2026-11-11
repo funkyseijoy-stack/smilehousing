@@ -387,6 +387,27 @@ export default async (req: Request, context: Context) => {
         doc.files = [drawFile];
         doc.drawing = true;
       }
+      // お客様が自分の端末から付けた写真・PDF（「✏️ 変更したい」「このやりとりに返信」で。3つまで・合わせて約4MBまで）
+      const custAtt: any[] = [];
+      if (chgKey && Array.isArray(body.attachFiles) && body.attachFiles.length) {
+        let total = 0;
+        for (const f of body.attachFiles.slice(0, 3)) {
+          const am = /^data:(image\/(?:jpeg|png)|application\/pdf);base64,(.+)$/.exec(String((f && f.data) || ""));
+          if (!am) return json({ error: "invalid_attach" }, 400);
+          let bytes: Uint8Array;
+          try { bytes = Uint8Array.from(Buffer.from(am[2], "base64")); } catch { return json({ error: "invalid_base64" }, 400); }
+          total += bytes.length;
+          if (!bytes.length || bytes.length > IMAGE_MAX_BYTES || total > 4 * 1024 * 1024) return json({ error: "too_large" }, 413);
+          const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+          await getStore("customerPhotos").set(`${projectId}/${key}`, bytes, { metadata: { contentType: am[1] } });
+          const ext = am[1] === "application/pdf" ? "pdf" : (am[1] === "image/png" ? "png" : "jpg");
+          let nm = String((f && f.name) || "").replace(/[\u0000-\u001f\u007f\/\\]/g, "").trim().slice(0, 80);
+          if (!nm) nm = "お客様の添付_" + now.slice(5, 10).replace("-", "") + "." + ext;
+          custAtt.push({ id: genId("att"), url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`, contentType: am[1], name: nm, fromCustomer: true });
+        }
+        if (custAtt.length) doc.files = (Array.isArray(doc.files) ? doc.files : []).concat(custAtt);
+      }
+      const custFiles: any[] = (drawFile ? [drawFile] : []).concat(custAtt);
       await store.setJSON(`messages/${id}`, doc);
       // カードの下のやりとりへのお客様の「お返事」：新しいタスクは作らず、その依頼のタスク（いちばん新しいもの）に追記する
       let appended = false;
@@ -401,7 +422,7 @@ export default async (req: Request, context: Context) => {
             const who = (project.customer ? project.customer + "様" : "お客様") + "（お客様）";
             const rv = { result: "返信", by: who, to: t.assignee || "", note: "【お客様からのお返事】" + text.replace(/^【お返事】[^\n]*\n?/, "").trim(), at: now, fromCustomer: true };
             t.reviews = Array.isArray(t.reviews) ? t.reviews : (t.review ? [t.review] : []);
-            if (drawFile) { (rv as any).files = [drawFile]; t.attachments = (Array.isArray(t.attachments) ? t.attachments : []).concat([drawFile]); }
+            if (custFiles.length) { (rv as any).files = custFiles; t.attachments = (Array.isArray(t.attachments) ? t.attachments : []).concat(custFiles); }
             t.reviews.push(rv); t.review = rv;
             // お客様からお返事が来たら、どの進捗からでも「未着手」に戻す（こちらが動く番）
             if ((t.status || "") !== "未着手") { t.status = "未着手"; t.completedAt = null; t.archivedAt = null; }
@@ -421,10 +442,10 @@ export default async (req: Request, context: Context) => {
           const taskId = genId("task");
           const body2 = text.replace(/^【(変更のご依頼|お返事)】/, "");
           await store.setJSON(`tasks/${taskId}`, {
-            id: taskId, projectId, content: "【お客様から変更のご依頼】" + (drawFile ? (body.drawn === false ? "（図面を添付・書き込みなし）" : "（✏️ 図面に書き込みあり）") : "") + body2,
+            id: taskId, projectId, content: "【お客様から変更のご依頼】" + (drawFile ? (body.drawn === false ? "（図面を添付・書き込みなし）" : "（✏️ 図面に書き込みあり）") : "") + (custAtt.length ? "（📎 お客様の添付" + custAtt.length + "件）" : "") + body2,
             assignee: "", instructor: "お客様", creator: "おうちノート",
             hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
-            attachmentAssetIds: [], attachments: (drawFile ? [drawFile] : []).concat(card.files || []),
+            attachmentAssetIds: [], attachments: custFiles.concat(card.files || []),
             vendorSpec: card.part, private: false, reflected: false, reflectedAt: null,
             status: "未着手", fromCustomerChange: { messageId: id, cardKey: chgKey },
             createdAt: now, updatedAt: now,
