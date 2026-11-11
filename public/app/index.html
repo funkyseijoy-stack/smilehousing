@@ -4041,7 +4041,75 @@
     return true;
   }
   // 担当の割り振り待ち：担当者がいない・自分だけのタスクでない・完了でない
-  function isAssignWaiting(t){ return !!t && !t.assignee && !t.private && (t.status||"未着手")!=="完了"; }
+  // 担当者なしでも「📁 案件に登録」したタスク（projAssigned）は割り振り待ちから外す（案件の「タスク」タブで見る）
+  function isAssignWaiting(t){ return !!t && !t.assignee && !t.private && !t.projAssigned && (t.status||"未着手")!=="完了"; }
+  // 担当者を決めずに、タスクを案件に登録する（割り振り待ちから外れて、その案件の「タスク」タブの未着手へ）
+  function projectTaskQuick(id){
+    var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
+    var projs = liveProjects().slice().sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""),"ja"); });
+    var guess = t.projectId || inboxGuessProject(String(t.content||"")) || "";
+    var optsHtml = function(q){
+      q = String(q||"").replace(/\s+/g,"").toLowerCase();
+      var hit = projs.filter(function(p){ if(!q) return true; return (String(p.name||"")+String(p.customer||"")).replace(/\s+/g,"").toLowerCase().indexOf(q)>=0; });
+      var h = '<option value="">（選んでください）</option>';
+      PROJECT_TYPES.forEach(function(d){
+        var g = hit.filter(function(p){ return deptOfProject(p)===d; });
+        if(!g.length) return;
+        h += '<optgroup label="'+escapeHtml(deptLabel(d))+'">'+g.map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.name||p.customer||"（名前なし）")+(p.customer && p.name && String(p.name).indexOf(p.customer)<0 ? "（"+escapeHtml(p.customer)+"様）" : "")+'</option>'; }).join("")+'</optgroup>';
+      });
+      return h + '<option value="__new">＋ 新しい案件を作る…</option>';
+    };
+    var ov = document.createElement("div");
+    ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+    ov.innerHTML = '<div class="taskform-card" style="max-width:480px; width:100%;"><h3 style="margin:0 0 6px;">📁 案件に登録（担当者は決めない）</h3>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-end:8px; white-space:pre-line;">'+escapeHtml(String(t.content||"").slice(0,120))+'</div>'+
+      '<label style="display:block; font-size:.9rem;">案件を探す（案件名・お客様名）<input type="search" data-pq placeholder="例：東" style="width:100%; box-sizing:border-box;"></label>'+
+      '<label style="display:block; font-size:.9rem; margin-block-start:8px;">案件<select data-ps style="width:100%; box-sizing:border-box;">'+optsHtml("")+'</select></label>'+
+      '<div data-pnew hidden style="margin-block-start:8px;"><label style="display:block; font-size:.9rem;">新しい案件の名前<input type="text" data-pn style="width:100%; box-sizing:border-box;"></label>'+
+        '<label style="display:block; font-size:.9rem; margin-block-start:6px;">部門<select data-pd style="width:100%; box-sizing:border-box;">'+PROJECT_TYPES.map(function(d){ return '<option value="'+d+'">'+escapeHtml(deptLabel(d))+'</option>'; }).join("")+'</select></label></div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-start:8px;">登録すると「👤 割り振り待ち」から外れて、その案件の「タスク」タブの未着手に入ります。担当者はあとから決められます。</div>'+
+      '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" data-ok>登録する</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
+    document.body.appendChild(ov);
+    var sel = ov.querySelector("[data-ps]"), q = ov.querySelector("[data-pq]"), nw = ov.querySelector("[data-pnew]");
+    if(guess && projs.some(function(p){ return p.id===guess; })) sel.value = guess;
+    var syncNew = function(){ nw.hidden = sel.value!=="__new"; };
+    q.addEventListener("input", function(){ var keep = sel.value; sel.innerHTML = optsHtml(q.value); if(Array.prototype.some.call(sel.options, function(o){ return o.value===keep; })) sel.value = keep; syncNew(); });
+    sel.addEventListener("change", syncNew);
+    setTimeout(function(){ q.focus(); }, 50);
+    var busy = false;
+    ov.addEventListener("click", async function(e){
+      if(e.target.closest("[data-cancel]") || e.target===ov){ ov.remove(); return; }
+      if(!e.target.closest("[data-ok]") || busy) return;
+      var pid = sel.value, newProj = null;
+      if(!pid){ toast("案件を選んでください"); sel.focus(); return; }
+      busy = true;
+      if(pid==="__new"){
+        var name = ov.querySelector("[data-pn]").value.trim(), dept = ov.querySelector("[data-pd]").value || "その他";
+        if(!name){ busy = false; toast("新しい案件の名前を入れてください"); ov.querySelector("[data-pn]").focus(); return; }
+        var same = liveProjects().find(function(p){ return String(p.name||"").trim()===name; });
+        if(same){ pid = same.id; toast("同じ名前の案件「"+name+"」があるので、それに登録します"); }
+        else {
+          newProj = { id:uid("proj"), name:name, customer:"", type:dept, folderId:pfForDept(dept), progressTag:(state.settings.progressTags||[])[0]||"", createdAt: todayStr() };
+          state.projects.push(newProj);
+          var okp = await saveDoc("projects", newProj.id, newProj);
+          if(okp===false){ state.projects = state.projects.filter(function(x){ return x.id!==newProj.id; }); busy = false; toast("案件を作れませんでした。もう一度お試しください"); return; }
+          logActivity("案件「"+name+"」を作成しました（タスクの案件登録から）");
+          pid = newProj.id;
+        }
+      }
+      ov.remove();
+      var prev = {projectId:t.projectId, dept:t.dept, projAssigned:t.projAssigned};
+      t.projectId = pid;
+      delete t.dept; // 部門は案件から自動で決まる
+      t.projAssigned = {by: state.currentUser||"", at: nowIso()};
+      t.updatedAt = nowIso();
+      var ok = await saveDoc("tasks", t.id, t);
+      if(!ok){ t.projectId = prev.projectId; if(prev.dept) t.dept = prev.dept; t.projAssigned = prev.projAssigned; if(!prev.projAssigned) delete t.projAssigned; renderKanban(); return; }
+      var pj = projectById(pid);
+      toast("「"+((pj&&(pj.name||pj.customer))||"案件")+"」のタスクに登録しました（担当者なし・案件の「タスク」タブの未着手）", 6000);
+      render();
+    });
+  }
   // 担当者と期限（空欄可）を選んで、そのタスクに入れる（朋子の「割り振り待ち」から）
   function assignTaskQuick(id){
     var t = state.tasks.find(function(x){ return x.id===id; }); if(!t) return;
@@ -4861,11 +4929,12 @@
   function kanStackCard(t){
     var st = t.status||"未着手";
     var src = t.fromGmail ? "✉️ メール" : (t.fromBoaxel ? "🧺 収納プラン" : t.fromSampleRequest ? "📦 サンプル請求" : (t.fromCustomerMessage||t.fromCustomerChange ? "🏠 お客様から" : (t.quoteReg ? "📄 見積" : "")));
-    var waiting = isAssignWaiting(t);
+    var waiting = isAssignWaiting(t) || (!!t.projAssigned && !t.assignee && !t.private && st!=="完了");
     return '<div class="kwaititem">'+
       ((st!=="未着手" && st!=="完了") || src ? '<div class="kmst">'+(st!=="未着手" && st!=="完了" ? '<span class="kmstpill" style="--c:'+(STATUS_COLORS[st]||"var(--muted)")+'">'+escapeHtml(st)+'</span>' : '')+(src?'<span class="kwaitsrc">'+src+'</span>':'')+'</div>' : '')+
       kanCardHtml(t, st)+
       (waiting ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
+        (!t.projectId ? '<button type="button" class="btn small secondary kassignbtn" data-projtask="'+escapeHtml(t.id)+'">📁 案件に登録</button>' : '')+
         (t.custEstimate ? '' : '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'">✅ 確認して閉じる</button>') : '')+
       custEstBtnsHtml(t)+
       '</div>';
@@ -5663,6 +5732,7 @@
             var src = t.creator==="Gmail" ? "✉️ Gmailから" : (t.fromBoaxel ? "🧺 おうちノートから（収納プランのご依頼）" : t.creator==="おうちノート" ? "🏠 おうちノートから" : (t.creator==="お打合せの記録ページ" ? "📝 お打合せの記録ページから" : (t.creator ? "作成："+t.creator : "")));
             return '<div class="kwaititem">'+(src?'<div class="kwaitsrc">'+escapeHtml(src)+'</div>':'')+kanCardHtml(t, t.status||"未着手")+
               '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>'+
+              '<button type="button" class="btn small secondary kassignbtn" data-projtask="'+escapeHtml(t.id)+'" title="担当者を決めずに、案件のタスクとして登録する">📁 案件に登録'+(t.projectId ? "（"+escapeHtml((projectById(t.projectId)||{}).name||"案件")+"）" : "")+'</button>'+
               (isCustomerTask(t) ? '<button type="button" class="btn small secondary kassignbtn" data-taskact="custreply" data-id="'+escapeHtml(t.id)+'">💬 お客様に返信</button>' : '')+
               '<button type="button" class="btn small secondary kassignbtn" data-taskact="quickclose" data-id="'+escapeHtml(t.id)+'" title="対応がいらないものを、確認したことにして完了の列へ移す">✅ 確認して閉じる</button>'+'</div>';
           }).join("")+'</div></div></div>';
@@ -20351,6 +20421,8 @@
       }
       var asg = e.target.closest("[data-assigntask]");
       if(asg){ assignTaskQuick(asg.dataset.assigntask); return; }
+      var pjt = e.target.closest("[data-projtask]");
+      if(pjt){ projectTaskQuick(pjt.dataset.projtask); return; }
       var stc = e.target.closest("[data-stepchk]");
       if(stc){ taskStepToggle(stc.dataset.stepchk, stc.dataset.sid); return; }
       var std = e.target.closest("[data-stepdel]");
