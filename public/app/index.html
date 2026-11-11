@@ -4349,7 +4349,7 @@
     var last = proj && proj.lineNotifiedAt;
     st.textContent = !hasBeacon ? "「業者・設定」タブで、プロラインの発動用URLを先に保存してください。"
       : !saved.length ? "送る人のプロラインIDを入れて保存すると、送れるようになります。"
-      : (last ? "前回の送信：" + String(last).slice(0,16).replace("T"," ") + (proj.lineNotifiedBy ? "（"+proj.lineNotifiedBy+"）" : "") : "");
+      : (last ? "前回の送信：" + String(last).slice(0,16).replace("T"," ") + (proj.lineNotifiedBy ? "（"+proj.lineNotifiedBy+"）" : "") + "　" : "") + "※夜8時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回にまとめて送ります";
   }
   function addProlineRow(){
     var rows = readProlineRows(); rows.push({ uid:"", name:"" });
@@ -4398,6 +4398,11 @@
     renderLineNotifyBox(proj);
   }
   var lineNotifying = false;
+  // LINEのお知らせの結果の言い方（夜20時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回まで。サーバーの netlify/lib/line-queue.mts）
+  function lineResultText(d){
+    if(d && d.queued) return "📱 LINEのお知らせは "+(d.sendAtLabel||"あとで")+" にまとめて送ります（同じお客様へは1回にまとめます）";
+    return "📱 LINEでお知らせしました";
+  }
   async function sendLineNotify(){
     var proj = projectById(state.currentProjectId);
     var recips = prolineRecipients(proj);
@@ -4407,13 +4412,16 @@
     lineNotifying = true;
     var btn = document.getElementById("btnLineNotify"); if(btn) btn.disabled = true;
     try{
-      var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: proj.id }) });
+      var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: proj.id, by: state.currentUser||"" }) });
       var data = {}; try{ data = await res.json(); }catch(e){}
       if(res.ok && data.ok && data.failed && data.failed.length){
         var fn = data.failed.map(function(u){ var r = recips.find(function(x){ return x.uid===u; }); return (r && r.name) || u; }).join("、");
         toast("⚠ "+data.sent+"人に送りました。送れなかった人：" + fn);
       }
-      if(res.ok && data.ok){
+      if(res.ok && data.ok && data.queued){
+        toast(lineResultText(data), 7000);
+        logActivity("LINEのお知らせを"+(data.sendAtLabel||"あとで")+"に送る予定に入れました（"+(proj.customer||proj.name||"")+"）");
+      } else if(res.ok && data.ok){
         proj.lineNotifiedAt = new Date().toISOString();
         proj.lineNotifiedBy = state.currentUser || "";
         await saveDoc("projects", proj.id, proj);
@@ -6421,9 +6429,9 @@
       renderStaffComment();
       if(!line){ toast(text ? "✓ 保存しました（おうちノートのホームに出ます）" : "✓ ひとことを消しました"); return; }
       try{
-        var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"comment" }) });
+        var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"comment", by: state.currentUser||"" }) });
         var data = {}; try{ data = await res.json(); }catch(e){}
-        toast(res.ok && data.ok ? "✓ 保存して、LINEでお知らせしました" : "✓ 保存しました（⚠ LINEのお知らせは送れませんでした）");
+        toast(res.ok && data.ok ? "✓ 保存しました。"+lineResultText(data) : "✓ 保存しました（⚠ LINEのお知らせは送れませんでした）", 7000);
       }catch(e){ toast("✓ 保存しました（⚠ LINEのお知らせは送れませんでした）"); }
     };
     ov.addEventListener("click", function(e){
@@ -9192,7 +9200,7 @@
         noteLineExtrasHtml(n)+
         msgHtml+
         filesHtml+
-        quickTogglesHtml("n", n.id, { reflected: n.reflected, ask: n.askDecision, home: n.homeShow })+
+        quickTogglesHtml("n", n.id, { reflected: n.reflected, ask: n.askDecision, home: n.homeShow, cmt: !!String(n.message||"").trim() })+
         menuHtml+
         '</div>';
     };
@@ -9445,7 +9453,7 @@
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     // 表示は新しいものを上に（タブの印の数え方は古い順の rows のまま）
     var html = rows.slice().reverse().map(function(m){
-      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : '')+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+'</div>';
+      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : (m.lineQueuedAt ? ' ・ 📱LINEは'+escapeHtml(fmtTs(m.lineQueuedAt))+'ごろ送ります' : ''))+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+'</div>';
     }).join("");
     // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
@@ -9531,14 +9539,14 @@
     if(okMsg===false){ toast("⚠ メッセージを保存できませんでした"); return; }
     if(lineOn){
       try{
-        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message" }) });
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message", by: state.currentUser||"" }) });
         var lj = await lres.json().catch(function(){ return {}; });
         if(lineCb) lineCb.checked = false;
         if(lres.ok && lj.ok){
-          m.lineNotifiedAt = nowIso();
+          if(lj.queued) m.lineQueuedAt = lj.sendAt; else m.lineNotifiedAt = nowIso();
           saveDoc("messages", m.id, m);
           renderMessages();
-          toast("📱 お客様のLINEにお知らせしました" + (lj.failed && lj.failed.length ? "（送れなかった人："+lj.failed.length+"人）" : ""));
+          toast(lineResultText(lj) + (lj.failed && lj.failed.length ? "（送れなかった人："+lj.failed.length+"人）" : ""), 7000);
           logActivity("メッセージを送り、LINEでお知らせしました（"+((projectById(m.projectId)||{}).customer||"")+"）");
         } else toast("メッセージは保存しましたが、LINEのお知らせは送れませんでした");
       }catch(e){ toast("メッセージは保存しましたが、LINEのお知らせは送れませんでした"); }
@@ -10789,12 +10797,14 @@
       b("refl", "反映", !!f.reflected, f.reflected ? "おうちノートに出しています（押すと外す）" : "おうちノートの家づくりの項目に出す")+
       b("home", "🏠ホーム", !!f.home, f.home ? "おうちノートのホームに出しています（押すと外す）" : "おうちノートのホームに出す（反映もします）")+
       b("ask", "🔘決定ボタン", !!f.ask, f.ask ? "お客様の決定ボタンを出しています（押すと出さない）" : "お客様に決定ボタンを出す（反映もします）")+
+      b("cmt", "💬お客様へ", !!f.cmt, f.cmt ? "お客様へのひとことを入れています（押すと書き直せます）" : "このカードにお客様へのひとことを書く（おうちノートに「スタッフから：」と出ます）")+
       '</div>';
   }
   var qtgBusy = false;
   async function quickToggle(act, kind, id){
     if(qtgBusy) return; qtgBusy = true;
     try{
+      if(act==="cmt"){ await editCardComment(kind, id); return; }
       if(act!=="ask"){ await runUniOp(act, kind, id); return; }
       // 決定ボタンを出すときは、まだ反映していなければ一緒に反映する
       var doc = null, coll = "", askOn = false;
@@ -11046,7 +11056,7 @@
       (a.staffMemo ? '<div class="docmemo staff" style="margin-block-start:3px;">🔒 社内：'+escapeHtml(a.staffMemo)+'</div>' : '')+
       (a.customerNote && sharable ? '<div class="docmemo cust" style="margin-block-start:3px;">💬 お客様へ：'+escapeHtml(a.customerNote)+'</div>' : '')+
       '</div>'+
-      quickTogglesHtml("att", a.id, { reflected: a.reflected && sharable, ask: a.askDecision, home: a.homeShow, noShare: !sharable })+
+      quickTogglesHtml("att", a.id, { reflected: a.reflected && sharable, ask: a.askDecision, home: a.homeShow, noShare: !sharable, cmt: !!String(a.customerNote||"").trim() })+
       specOpsHtml(opsId, ops)+
       '</div>';
   }
@@ -11190,9 +11200,9 @@
     };
     var opsDel = "";
     var qtgHtml = (function(){
-      if(p.kind==="note") return relatedNote ? quickTogglesHtml("n", relatedNote.id, { reflected: relatedNote.reflected, ask: relatedNote.askDecision, home: relatedNote.homeShow }) : "";
+      if(p.kind==="note") return relatedNote ? quickTogglesHtml("n", relatedNote.id, { reflected: relatedNote.reflected, ask: relatedNote.askDecision, home: relatedNote.homeShow, cmt: !!String(relatedNote.message||"").trim() }) : "";
       var st = p.source && p.source.taskId ? state.tasks.find(function(t){ return t.id===p.source.taskId; }) : null;
-      return quickTogglesHtml("sp", p.id, { reflected: p.reflected, ask: st ? st.askDecision : p.askDecision, home: p.homeShow });
+      return quickTogglesHtml("sp", p.id, { reflected: p.reflected, ask: st ? st.askDecision : p.askDecision, home: p.homeShow, cmt: !!String(p.customerNote||"").trim() });
     })();
     // 打合せ記録に複数の候補写真が添付されている場合は、横一列の大きいサムネイルで
     // 並べて見せる（お客様に見せる「1つの打ち合わせ」の単位）。それ以外は従来どおり
@@ -13232,12 +13242,12 @@
     if(okCount && lineOn){
       st.textContent = "LINEでお知らせしています…";
       try{
-        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo" }) });
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo", by: state.currentUser||"" }) });
         var lj = await lres.json().catch(function(){ return {}; });
         if(lres.ok && lj.ok){
-          lineDone = true;
-          proj.lineNotifiedAt = nowIso(); proj.lineNotifiedBy = state.currentUser || "";
-          saveDoc("projects", proj.id, proj);
+          lineDone = lj.queued ? "q" : true;
+          if(lj.queued) notes.push("LINEのお知らせは "+(lj.sendAtLabel||"あとで")+" にまとめて送ります");
+          else { proj.lineNotifiedAt = nowIso(); proj.lineNotifiedBy = state.currentUser || ""; saveDoc("projects", proj.id, proj); }
           if(lj.failed && lj.failed.length) notes.push("LINEが送れなかった人："+lj.failed.length+"人");
         } else notes.push("LINEのお知らせは送れませんでした");
       }catch(e){ notes.push("LINEのお知らせは送れませんでした"); }
@@ -13248,7 +13258,7 @@
     sps.files = []; spsRenderThumbs();
     document.getElementById("sendPhotoModal").hidden = true;
     render();
-    var msg = "✅ "+okCount+"枚を送りました"+(lineDone?"・LINEでお知らせしました":"");
+    var msg = "✅ "+okCount+"枚を送りました"+(lineDone===true?"・LINEでお知らせしました":"");
     if(okCount < files.length) msg += "（"+(files.length-okCount)+"枚は送れていません）";
     if(notes.length) msg += "（"+notes.join("／")+"）";
     toast(msg, notes.length || okCount<files.length ? 9000 : undefined);
@@ -15868,9 +15878,9 @@
       var rec = { by: state.currentUser||"", at: m.createdAt, text: text, msgId: m.id, line: false };
       if(lineOn){
         try{
-          var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message" }) });
+          var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message", by: state.currentUser||"" }) });
           var lj = await lres.json().catch(function(){ return {}; });
-          if(lres.ok && lj.ok){ m.lineNotifiedAt = nowIso(); rec.line = true; saveDoc("messages", m.id, m); }
+          if(lres.ok && lj.ok){ if(lj.queued){ m.lineQueuedAt = lj.sendAt; rec.lineQueued = lj.sendAtLabel||""; } else m.lineNotifiedAt = nowIso(); rec.line = true; saveDoc("messages", m.id, m); }
           else toast("返信は送りましたが、LINEのお知らせは送れませんでした");
         }catch(err){ toast("返信は送りましたが、LINEのお知らせは送れませんでした"); }
       }
@@ -15881,7 +15891,7 @@
       if(isCustomerTask(t) && !t.assignee && state.currentUser && isStaffName(state.currentUser)){ t.assignee = state.currentUser; selfAssigned = true; }
       t.updatedAt = nowIso();
       await saveDoc("tasks", t.id, t);
-      toast("💬 お客様に返信しました"+(rec.line?"（📱LINEでもお知らせしました）":"")+(movedToDoing?"・進捗を「対応中」にしました":"")+(selfAssigned?"・担当を"+state.currentUser+"さんにしました":""));
+      toast("💬 お客様に返信しました"+(rec.line?(rec.lineQueued?"（📱LINEは"+rec.lineQueued+"にまとめて送ります）":"（📱LINEでもお知らせしました）"):"")+(movedToDoing?"・進捗を「対応中」にしました":"")+(selfAssigned?"・担当を"+state.currentUser+"さんにしました":""));
       logActivity("タスクからお客様に返信しました（"+((proj&&proj.customer)||(proj&&proj.name)||"")+"）");
       render();
       if(typeof onSent==="function") onSent();
@@ -17638,6 +17648,51 @@
     if(v===null) return false;
     if(v) doc[field] = v; else if(kind!=="n") delete doc[field]; else doc[field] = "";
     return true;
+  }
+  // 記録の一覧のカードの「💬お客様へ」：お客様へのひとことをいつでも書く・直す・消す（記録＝message、写真・PDF・見積の書類＝customerNote）。
+  // まだ反映していないカードは、お客様に出ないので「保存して反映する」も出す。
+  function editCardComment(kind, id){
+    var doc = kind==="n" ? state.meetingNotes.find(function(x){ return x.id===id; })
+      : kind==="sp" ? state.specPhotos.find(function(x){ return x.id===id; })
+      : kind==="att" ? state.attachments.find(function(x){ return x.id===id; }) : null;
+    if(!doc) return Promise.resolve();
+    var coll = kind==="n" ? "meetingNotes" : kind==="sp" ? "specPhotos" : "attachments";
+    var field = kind==="n" ? "message" : "customerNote";
+    var prev = String(doc[field]||"");
+    return new Promise(function(resolve){
+      var ov = document.createElement("div");
+      ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
+      ov.innerHTML = '<div class="taskform-card rcpop" style="max-width:520px; width:100%;"><h3 style="margin:0 0 6px;">💬 お客様へのひとこと</h3>'+
+        '<div class="muted" style="font-size:.85rem; margin-block-end:6px;">おうちノートのこのカードに「スタッフから：〜」と出ます。'+(doc.reflected ? '' : '<br><b>このカードはまだ反映していないので、お客様には出ていません。</b>')+'</div>'+
+        '<textarea rows="4" style="width:100%; box-sizing:border-box;" maxlength="500" placeholder="例：前回のご要望で、収納を広げた図面です。ご確認ください。"></textarea>'+
+        '<div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap;">'+
+          (doc.reflected ? '<button type="button" class="btn" data-ok>保存する</button>' : '<button type="button" class="btn" data-okr>保存して反映する</button><button type="button" class="btn secondary" data-ok>保存だけ</button>')+
+          (prev ? '<button type="button" class="btn danger-ghost" data-clear>消す</button>' : '')+
+          '<button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
+      document.body.appendChild(ov);
+      var ta = ov.querySelector("textarea"); ta.value = prev; setTimeout(function(){ ta.focus(); }, 50);
+      var busy = false;
+      ov.addEventListener("click", async function(e){
+        if(e.target.closest("[data-cancel]") || e.target===ov){ ov.remove(); resolve(); return; }
+        var ok = e.target.closest("[data-ok]"), okr = e.target.closest("[data-okr]"), clr = e.target.closest("[data-clear]");
+        if(!(ok || okr || clr) || busy) return;
+        if(clr && !confirm("お客様へのひとことを消しますか？")) return;
+        busy = true;
+        var v = clr ? "" : ta.value.trim().slice(0,500);
+        ov.remove();
+        if(v) doc[field] = v; else if(kind==="n") doc[field] = ""; else delete doc[field];
+        doc.updatedAt = nowIso();
+        if(okr && !doc.reflected){
+          await runUniOp0("refl", kind, id); // ひとことは入れたので、反映の画面は出さない
+          toast(v ? "✓ ひとことを入れて反映しました（おうちノートに出ます）" : "✓ 反映しました");
+        } else {
+          var saved = await saveDoc(coll, id, doc);
+          if(saved===false){ if(prev) doc[field] = prev; else if(kind==="n") doc[field] = ""; else delete doc[field]; toast("⚠ 保存できませんでした"); render(); resolve(); return; }
+          toast(!v ? "✓ ひとことを消しました" : (doc.reflected ? "✓ 保存しました（おうちノートに出ます）" : "✓ 保存しました（反映すると、おうちノートに出ます）"));
+        }
+        render(); resolve();
+      });
+    });
   }
   // 追加見積りの題名と金額（税抜き・空欄可）を入れる小さな画面。やめる→null
   function askEstimateInput(defTitle){
