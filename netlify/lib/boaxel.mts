@@ -21,7 +21,7 @@ export const BOAXEL_DEFAULTS: any[] = [
 // 場所の種類と、1列（1マス分の列）ごとに標準で付く棚の数（棚・ブラケットは金額に入れない）
 export const PLACE_TYPES: any = { hang: { name: "ハンガー収納", stdShelves: 1 }, shelf: { name: "棚収納", stdShelves: 4 } };
 export const MASU_CM = 91; // 1マス＝910mm
-export const WALL_CM = 10.5; // マスから内側の幅を出すときに引く壁の厚み（だいたい）
+export const WALL_CM = 5; // マスから内側の幅を出すときに引く分（1マス91cm→内側86cm＝80cmの1列）
 export const UPRIGHT_CM = 2; // 縦レール1本の幅（だいたい）
 
 export function boaxelMax(up: any) { const m = Number(up && up.max); if (m > 0) return Math.min(30, Math.round(m)); const h = Number(up && up.size) || 0; return h >= 200 ? 8 : h >= 120 ? 5 : 3; }
@@ -118,10 +118,12 @@ export function boaxelPlan(cat: any, plan: any) {
   const src = Array.isArray(plan && plan.places) ? plan.places.slice(0, 12) : [];
   for (const p of src) {
     const type = PLACE_TYPES[p && p.type] ? p.type : "hang";
-    const up = byId[String(p && p.height || "")] && byId[String(p.height)].type === "upright" ? byId[String(p.height)] : ups[0];
+    const up = ups[0]; // 高さは200cm（いちばん長い縦レール）だけ
     const max = boaxelMax(up);
     const inner = placeInner(p);
-    const ws = colsForInner(inner, widths);
+    const masuN = Number(p && p.masu) || 0;
+    // マスが整数なら1マス＝80cmの1列ずつ（画面の colsFor と同じ）
+    const ws = !(Number(p && p.cm) > 0) && masuN > 0 && masuN === Math.floor(masuN) && widths.includes(80) ? Array.from({ length: Math.min(10, masuN) }, () => 80) : colsForInner(inner, widths);
     if (!ws.length) return { error: "too_narrow", place: String(p && p.name || "") };
     const stdN = Math.min(max, PLACE_TYPES[type].stdShelves);
     const srcCols = Array.isArray(p && p.cols) ? p.cols : [];

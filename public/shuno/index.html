@@ -111,7 +111,7 @@
   var NAME_PRESETS = ["ファミリークローゼット","パントリー","子供部屋 クローゼット","ウォークイン 奥の壁","ウォークイン 右の壁","ウォークイン 左の壁","玄関収納","寝室 クローゼット"];
   var MASU_CHOICES = [1,1.5,2,2.5,3,3.5,4];
   var BRACKETED = ["shelf","basket"];
-  var UPRIGHT_CM = 2, WALL_CM = 10.5;
+  var UPRIGHT_CM = 2, WALL_CM = 5; // 1マス（91cm）→ 内側86cm＝80cmの1列
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
   function toast(m){ var d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 3200); }
@@ -136,6 +136,12 @@
     }
     return best;
   }
+  // マスが整数なら1マス＝80cmの1列ずつ（例：2マス＝80＋80）。半マス・測った幅は、入るいちばん広い組み合わせ
+  function colsFor(p){
+    var m = Number(p.masu)||0;
+    if(p.wmode!=="cm" && m>0 && m===Math.floor(m) && widths().indexOf(80)>=0) return Array.from({length:m}, function(){ return 80; });
+    return colsForInner(placeInner(p));
+  }
   function bracketCount(cols){
     var n = 0, rows = cols.reduce(function(a,c){ return Math.max(a, c.length); }, 0);
     for(var r=0; r<rows; r++){
@@ -148,7 +154,7 @@
   // 場所1つ分の列（幅・標準・足した分）
   function placeCols(p){
     var up = part(p.height) || uprights()[0], max = maxOf(up);
-    var ws = colsForInner(placeInner(p));
+    var ws = colsFor(p);
     var stdN = Math.min(max, typeInfo(p.type).stdShelves);
     var cols = ws.map(function(w, i){
       var sh = C.parts.find(function(x){ return x.type==="shelf" && x.size===w; });
@@ -160,7 +166,7 @@
   }
   // 幅が変わったら、足した分を新しい幅の同じ部品に入れ替える
   function syncCols(p){
-    var ws = colsForInner(placeInner(p));
+    var ws = colsFor(p);
     var old = p.cols || [], oldW = p._ws || [];
     p.cols = ws.map(function(w, i){
       var ex = (old[i] && old[i].extras) || [];
@@ -263,13 +269,13 @@
     S.contact = S.contact || {name:"",phone:"",email:"",addr:""};
     var ups = uprights();
     S.places = S.places.filter(function(p){ return p && p.id; }).slice(0, 12);
-    S.places.forEach(function(p){ if(!part(p.height)) p.height = ups[0].id; if(!typeInfo(p.type)) p.type = "hang"; p.cols = p.cols || []; p._ws = colsForInner(placeInner(p)); });
+    S.places.forEach(function(p){ if(!part(p.height)) p.height = ups[0].id; if(!typeInfo(p.type)) p.type = "hang"; p.height = ups[0].id; p.cols = p.cols || []; p._ws = colsFor(p); });
   }
   function save(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(S)); }catch(e){} }
 
   // ---- 画面 ----
   function fitText(p){
-    var ws = colsForInner(placeInner(p));
+    var ws = colsFor(p);
     if(!ws.length) return '<div class="warn">この幅では、ボーアクセルが入りません（幅をご確認ください）</div>';
     return '<div class="fit">→ ' + ws.map(function(w){ return w+"cm"; }).join("＋") + "の" + ws.length + "列が入ります</div>";
   }
@@ -289,8 +295,7 @@
       '<div id="fitBox">'+(placeInner(f) ? fitText(f) : '')+'</div>'+
       '<label class="lbl">種類</label>'+
       '<div class="seg">'+Object.keys(C.placeTypes).map(function(k){ var t = C.placeTypes[k]; return '<button type="button" class="tcard'+(f.type===k?' on':'')+'" data-ftype="'+k+'"><b>'+(k==="hang"?"👕 ":"📚 ")+esc(t.name)+'</b><span>'+(k==="hang"?"上に棚1枚＋その下にハンガー。服をかける収納":"棚"+t.stdShelves+"段。食品・小物を置く収納")+'</span></button>'; }).join("")+'</div>'+
-      '<label class="lbl">高さ（縦レールの長さ）</label>'+
-      '<select class="in" data-ff="height">'+ups.map(function(u){ return '<option value="'+esc(u.id)+'"'+(u.id===f.height?' selected':'')+'>'+u.size+'cm'+(u.size>=200?'（ふつうはこちら）':'')+'</option>'; }).join("")+'</select>'+
+      '<label class="lbl">高さ</label><div class="note">'+(ups[0]?ups[0].size:200)+'cm（縦レールの長さは1種類です）</div>'+
       '<div class="seg" style="margin-top:14px;"><button type="button" class="btn ghost" data-fcancel="1">やめる</button><button type="button" class="btn dk" data-fok="1">'+(f.editId?"この内容にする":"この場所を足す")+'</button></div>'+
     '</div>';
   }
@@ -353,13 +358,13 @@
   function openForm(idx){
     var ups = uprights();
     if(idx==null) form = { name:"", wmode:"masu", masu:1, cm:"", type:"hang", height:ups[0].id };
-    else { var p = S.places[idx]; form = { editId:p.id, name:p.name, wmode:p.wmode||"masu", masu:p.masu||1, cm:p.cm||"", type:p.type, height:p.height }; }
+    else { var p = S.places[idx]; form = { editId:p.id, name:p.name, wmode:p.wmode||"masu", masu:p.masu||1, cm:p.cm||"", type:p.type, height:ups[0].id }; }
     render();
   }
   function commitForm(){
     var f = form, name = String(f.name||"").trim();
     if(!name){ toast("どこの収納か選ぶか、書いてください"); return; }
-    if(!placeInner(f) || !colsForInner(placeInner(f)).length){ toast("幅をご確認ください（この幅では入りません）"); return; }
+    if(!placeInner(f) || !colsFor(f).length){ toast("幅をご確認ください（この幅では入りません）"); return; }
     var p = f.editId ? S.places.find(function(x){ return x.id===f.editId; }) : null;
     if(!p){ p = { id:uid(), cols:[] }; S.places.push(p); }
     p.name = name.slice(0,40); p.wmode = f.wmode; p.masu = Number(f.masu)||0; p.cm = f.wmode==="cm" ? Number(f.cm)||0 : 0; p.type = f.type; p.height = f.height;
