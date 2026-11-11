@@ -156,7 +156,7 @@
       var ex = ((p.cols[i] && p.cols[i].extras) || []).filter(function(id){ var x = part(id); return x && x.size===w; });
       return { w:w, std:std, extras:ex, items:std.concat(ex) };
     });
-    return { up:up, max:max, cols:cols };
+    return { up:up, max:max, cols:cols, type:p.type };
   }
   // 幅が変わったら、足した分を新しい幅の同じ部品に入れ替える
   function syncCols(p){
@@ -188,15 +188,46 @@
   }
 
   // ---- 絵 ----
+  // 段（上から何段目）ごとの高さ（縦レールの上からcm）。どの列も同じ段は同じ高さにそろえる。
+  // ハンガーパイプの無い場所は、高さを段の数で均等に割る（棚収納など）。
+  // ハンガーがある場所は、上の棚→その下にハンガーと服（約95cm）→その下にカゴ・棚、の順に実際に近い位置に置き、
+  // 入りきらないときは縦レールの長さに合わせて縮める。
+  function rowYs(pc, H){
+    var cols = pc.cols, n = cols.reduce(function(a,c){ return Math.max(a, c.items.length); }, 0);
+    if(!n) return [];
+    var typeAt = function(c, r){ var x = c.items[r] ? part(c.items[r]) : null; return x ? x.type : ""; };
+    var hasRail = cols.some(function(c){ return c.items.some(function(id){ var x = part(id); return x && x.type==="rail"; }); });
+    var ys = [], r;
+    if(!hasRail){ for(r=0;r<n;r++) ys.push(H*(r+1)/(n+1)); return ys; }
+    var top = 22, gapOf = { shelf:30, basket:28, rail:102, drawer:28, shoe:25, other:28 };
+    ys.push(top);
+    for(r=1;r<n;r++){
+      var need = ys[r-1] + 18;
+      cols.forEach(function(c){
+        var t = typeAt(c, r), pt = typeAt(c, r-1);
+        if(!t || !pt) return;
+        if(t==="rail" && pt!=="rail") need = Math.max(need, ys[r-1] + 5);
+        else need = Math.max(need, ys[r-1] + (gapOf[pt]||28) + (t==="basket" ? 8 : 0));
+      });
+      // ハンガーの段のすぐ後だけ詰めてよい（棚の直下にハンガーを付けるため）
+      if(cols.every(function(c){ var t = typeAt(c, r); return !t || t==="rail"; }) && cols.some(function(c){ return typeAt(c, r)==="rail" && typeAt(c, r-1)==="shelf"; })) need = Math.min(need, ys[r-1] + 5);
+      ys.push(need);
+    }
+    // 縦レールに入りきらないときは縮める
+    var last = ys[n-1], limit = H - 12;
+    if(last > limit){ var k = (limit - top) / Math.max(1, last - top); ys = ys.map(function(y){ return top + (y - top)*k; }); }
+    return ys;
+  }
   function svgOf(pc, mini){
     var cols = pc.cols, H = pc.up ? pc.up.size : 200;
     var W = Math.max(40, cols.reduce(function(a,c){ return a + c.w; }, 0) + (cols.length+1)*UPRIGHT_CM);
     var pad = 8, out = [], slots = Math.max(pc.max, cols.reduce(function(a,c){ return Math.max(a, c.items.length); }, 0), 1);
     out.push('<rect x="0" y="0" width="'+(W+pad*2)+'" height="'+(H+pad*2+14)+'" fill="#fff"/>');
     out.push('<rect x="'+pad+'" y="'+pad+'" width="'+W+'" height="'+H+'" fill="#f6f2ec" stroke="#e2d8cc" stroke-width=".6"/>');
+    var ys = rowYs(pc, H), CLOTH = 95;
     var x = pad + UPRIGHT_CM;
     cols.forEach(function(c){
-      var yOf = function(i){ return pad + H*(i+1)/(slots+1); };
+      var yOf = function(i){ return pad + ys[i]; };
       c.items.forEach(function(id, i){
         var it = part(id); if(!it) return;
         var y = yOf(i), x0 = x + 1, w = c.w - 2;
@@ -206,10 +237,14 @@
         else if(it.type==="rail"){
           // ハンガーは棚の下に付く：すぐ上が棚ならその直下、無ければこの段に描く
           var prev = i>0 ? part(c.items[i-1]) : null;
-          var ry = prev && prev.type==="shelf" ? yOf(i-1) + 6 : y;
+          var ry = prev && prev.type==="shelf" ? yOf(i-1) + 5 : y;
+          // 服の長さ：約95cm（次の段の部品・床の手前まで）
+          var below = H + pad - 3;
+          for(var j=i+1;j<c.items.length;j++){ var nx = part(c.items[j]); if(nx){ below = yOf(j) - (nx.type==="basket" ? 9 : 3); break; } }
+          var clen = Math.max(12, Math.min(CLOTH, below - ry - 7));
           out.push('<line x1="'+x0+'" y1="'+ry+'" x2="'+(x0+w)+'" y2="'+ry+'" stroke="#6b6b6b" stroke-width="1.4"/>');
           var nh = Math.max(2, Math.round(w/12));
-          for(var k=1;k<nh;k++){ var hx = x0 + w*k/nh; out.push('<path d="M'+hx+' '+ry+' l-5 7 h10 z" fill="none" stroke="#9a8f86" stroke-width=".6"/><rect x="'+(hx-4)+'" y="'+(ry+7)+'" width="8" height="'+Math.min(40, H/(slots+1)*1.6)+'" fill="#e9dfd3" stroke="#cbbba8" stroke-width=".4" rx="1.5"/>'); }
+          for(var k=1;k<nh;k++){ var hx = x0 + w*k/nh; out.push('<path d="M'+hx+' '+ry+' l-5 7 h10 z" fill="none" stroke="#9a8f86" stroke-width=".6"/><rect x="'+(hx-4)+'" y="'+(ry+7)+'" width="8" height="'+clen+'" fill="#e9dfd3" stroke="#cbbba8" stroke-width=".4" rx="1.5"/>'); }
         }
         else out.push('<rect x="'+x0+'" y="'+(y-5)+'" width="'+w+'" height="10" fill="none" stroke="#9a8f86" stroke-dasharray="2 1.5" stroke-width=".6"/>');
       });
