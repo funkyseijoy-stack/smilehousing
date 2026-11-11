@@ -1105,6 +1105,9 @@
   .pill.spectl-type-note{ background:var(--blue-soft); color:var(--blue); }
   .pill.spectl-type-vendor{ background:var(--orange-soft); color:var(--orange); }
   .pill.spectl-type-manual{ background:var(--gray-soft); color:var(--muted); }
+  /* iPhoneのSafariで、スクロールする表の中の見本から「PDF」の帯が外へ飛び出すのを防ぐ（枠で必ず閉じ込める） */
+  *:has(> .pdfbadge){ position:relative; contain:paint; }
+  .reqcontent .partchip{ white-space:nowrap; }
   .pdfbadge{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.62); color:#fff; font-size:.85rem; font-weight:700; text-align:center; padding:1px 0; pointer-events:none; letter-spacing:.02em; }
   .pill.reflect{ background:var(--gray-soft); color:var(--muted); cursor:pointer; border:none; font-family:inherit; }
   .pill.reflect.on{ background:var(--accent); color:#fff; font-weight:700; }
