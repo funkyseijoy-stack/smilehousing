@@ -5627,21 +5627,9 @@
           sec("✅", "完了（60日以内）", doneShown, "なし", doneMore.length ? '<details class="ktaxmore"><summary>ほか '+doneMore.length+'件</summary><div class="klist">'+doneMore.map(taxCard).join("")+'</div></details>' : "")+
         '</div></div>';
     }
-    // 🔴 お客様決定済み：おうちノートでお客様が「決定」を押したもの（完了にすると外れる）
+    // 🔴 お客様決定済み：ホーム（進捗ごと）には出さない（案件ごとの表示・案件の「タスク」タブで見る）
     var decCol = "";
-    {
-      var decs = tasks.filter(function(t){ return isDecTask(t) && !waitIds[t.id] && (t.status||"未着手")!=="完了"; });
-      decs.forEach(function(t){ waitIds[t.id] = true; });
-      decs.sort(function(a,b){ return decAtOf(b).localeCompare(decAtOf(a)); });
-      if(decs.length){
-        decCol = '<div class="kcol kdec" style="--sc:#d23c32">'+
-          '<div class="khead"><span class="kandot" style="background:#d23c32"></span><span>🔴 お客様決定済み</span><span class="kn tabular">'+decs.length+'</span></div>'+
-          '<div class="kbody"><div class="klist">'+decs.map(function(t){
-            return '<div class="kwaititem">'+kanCardHtml(t, t.status||"未着手")+
-              (!t.assignee ? '<button type="button" class="btn small kassignbtn" data-assigntask="'+escapeHtml(t.id)+'">👤 担当者を割り振る</button>' : '<div class="kwaitsrc">担当：'+escapeHtml(t.assignee)+'　進捗：'+escapeHtml(t.status||"未着手")+'</div>')+custEstBtnsHtml(t)+'</div>';
-          }).join("")+'</div></div></div>';
-      }
-    }
+    tasks.forEach(function(t){ if(isDecTask(t)) waitIds[t.id] = true; });
     {
       var waiting = tasks.filter(function(t){ return isAssignWaiting(t) && !waitIds[t.id]; });
       waiting.forEach(function(t){ waitIds[t.id] = true; });
