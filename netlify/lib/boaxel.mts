@@ -159,8 +159,12 @@ export function boaxelPlan(cat: any, plan: any) {
           .concat((Array.isArray(sc.extras) ? sc.extras : []).slice(0, 30).map((id: any) => String(id)).filter(okId));
       }
       const stdN = Math.min(max, PLACE_TYPES[boaxelStdKind(kind, items, byId)].stdShelves);
-      let left = stdN;
-      const stdArr = items.map((id) => (left > 0 && byId[id].type === "shelf" ? (left--, id) : ""));
+      let left = stdN, railLeft = boaxelStdKind(kind, items, byId) === "hang" ? 1 : 0; // 服掛けはハンガーパイプ1本も標準
+      const stdArr = items.map((id) => {
+        if (left > 0 && byId[id].type === "shelf") { left--; return id; }
+        if (railLeft > 0 && byId[id].type === "rail") { railLeft--; return id; }
+        return "";
+      });
       const kindName = kind.startsWith("set:") ? ((cat.sets.find((st: any) => "set:" + st.id === kind) || {}).name || "見本") : PLACE_TYPES[kind].colName;
       return { w, kind, kindName, items, stdArr, std: stdArr.filter(Boolean) };
     });

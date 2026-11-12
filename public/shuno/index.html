@@ -176,8 +176,8 @@
   function kindsFor(w){ return ["hang","shelf"].concat(setsFor(w).map(function(st){ return "set:"+st.id; })); }
   // 1列分（幅・種類・部品・どれが標準か）。標準＝その列の種類の棚の枚数まで（金額に入れない。外すこともできる）
   function colOf(w, kind, items, max){
-    var left = Math.min(max, typeInfo(stdKind(kind, items)).stdShelves);
-    var stdArr = items.map(function(id){ var x = part(id); return (left>0 && x && x.type==="shelf") ? (left--, id) : ""; });
+    var sk = stdKind(kind, items), left = Math.min(max, typeInfo(sk).stdShelves), railLeft = sk==="hang" ? 1 : 0; // 服掛けはハンガーパイプ1本も標準
+    var stdArr = items.map(function(id){ var x = part(id); if(!x) return ""; if(left>0 && x.type==="shelf"){ left--; return id; } if(railLeft>0 && x.type==="rail"){ railLeft--; return id; } return ""; });
     return { w:w, kind:kind, items:items, stdArr:stdArr, std:stdArr.filter(Boolean) };
   }
   function placeCols(p){
@@ -397,7 +397,7 @@
     if(!pc.cols.length) return '<div class="place">'+head+'<div class="warn">この幅では、ボーアクセルが入りません。「直す」で幅をご確認ください。</div></div>';
     return '<div class="place">'+head+
       '<div class="svg">'+svgOf(pc)+'</div>'+
-      '<div class="note">絵は、だいたいのイメージです。列ごとに種類を選べます。標準（金額に入らない分）は、服掛けの列は棚1枚、棚の列は棚4枚です。標準の棚も、外したり並べ替えたりできます。</div>'+
+      '<div class="note">絵は、だいたいのイメージです。列ごとに種類を選べます。標準（金額に入らない分）は、服掛けの列は棚1枚とハンガーパイプ1本、棚の列は棚4枚です。標準の棚も、外したり並べ替えたりできます。</div>'+
       '<div class="cols" style="margin-top:8px;">'+pc.cols.map(function(c, ci){
         var left = pc.max - c.items.length;
         return '<div class="col'+(left<0?' over':'')+'"><div class="ch">'+(ci+1)+'列目（幅'+c.w+'cm）</div>'+
