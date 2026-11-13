@@ -299,7 +299,8 @@ export default async (req: Request, context: Context) => {
   if (!project.noteToken) {
     return json({ error: "token_not_set", debug: { projectId, hasToken: !!project.noteToken } }, 403);
   }
-  if (project.noteToken !== token) {
+  // お打合せの記録ページ（/kiroku/）のリンク（earlyToken）でも開ける＝同じURLで切り替えられる（おうちノートのリンクを発行した案件だけ）
+  if (project.noteToken !== token && !(project.earlyToken && project.earlyToken === token)) {
     return json({ error: "token_mismatch", debug: { projectId, expected: project.noteToken?.slice(0, 8), got: token?.slice(0, 8) } }, 403);
   }
 
@@ -1175,6 +1176,7 @@ export default async (req: Request, context: Context) => {
     })(),
     // 収納プラン（IKEA ボーアクセル）を出すか（ページは /shuno/。試しの間はデモの案件だけ）
     boaxel: !!boaxelForNote(bxSettings, project),
+    kiroku: !!project.earlyToken, // お打合せの記録ページのリンクを発行済み＝メニューから切り替えられる
     // サンプル請求（お客様が送ったもの。状態はタスクの進捗：未着手＝受付済み／完了＝お渡し済み／それ以外＝準備中）
     sampleRequests: tasks.filter((t: any) => t.fromSampleRequest && !t.deletedAt)
       .map((t: any) => ({

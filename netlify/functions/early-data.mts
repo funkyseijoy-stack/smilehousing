@@ -42,7 +42,8 @@ export default async (req: Request, context: Context) => {
 
   const store = getStore("staffData");
   const project: any = await store.get(`projects/${projectId}`, { type: "json" });
-  if (!project || project.deletedAt || !project.earlyToken || project.earlyToken !== token) {
+  // おうちノートのリンク（noteToken）でも開ける＝同じURLで切り替えられる（記録ページのリンクを発行した案件だけ）
+  if (!project || project.deletedAt || !project.earlyToken || (project.earlyToken !== token && !(project.noteToken && project.noteToken === token))) {
     return json({ error: "invalid_link" }, 403);
   }
 
@@ -153,6 +154,7 @@ export default async (req: Request, context: Context) => {
   const policy = pt || px ? { title: pt, text: px } : null;
 
   return json({
+    note: !!project.noteToken, // おうちノートのリンクを発行済み＝上のボタンから切り替えられる
     customer: String(project.customer || project.name || ""),
     today,
     records,

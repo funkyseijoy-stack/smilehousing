@@ -47,7 +47,7 @@ export default async (req: Request, context: Context) => {
   if (p || t) {
     if (!p || !t) return json({ error: "missing_link" }, 400);
     project = await store.get(`projects/${p}`, { type: "json" }).catch(() => null);
-    if (!project || project.deletedAt || !project.noteToken || project.noteToken !== t) return json({ error: "invalid_link" }, 403);
+    if (!project || project.deletedAt || !project.noteToken || (project.noteToken !== t && !(project.earlyToken && project.earlyToken === t))) return json({ error: "invalid_link" }, 403);
     mode = "note";
   }
   const cat = mode === "note" ? (boaxelForNote(settings, project) || (staff ? boaxelParts(settings) : null))
