@@ -6468,7 +6468,16 @@
       '<button class="spdel" data-delimageboard="'+escapeHtml(p.id)+'">×</button>'+
       (p.note?'<span class="spnote" title="'+escapeHtml(p.note)+'">💬 '+escapeHtml(p.note)+'</span>':'')+'</div>';
   }
+  // ヒアリングタブで文字を入力している間は、同じタブのほかの欄を描き直さない（iPhoneで漢字の変換候補が消えるため）。
+  // 入力欄から離れたら、まとめて描き直す。
+  var hearDeferred = {};
+  function hearTyping(){
+    var ae = document.activeElement, sub = document.getElementById("sub-hearing");
+    return !!(ae && sub && sub.contains(ae) && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !/^(checkbox|radio|file|date|button)$/i.test(ae.type||""));
+  }
+  function hearDefer(name, fn){ if(hearTyping()){ hearDeferred[name] = fn; return true; } return false; }
   function renderGalleryLikes(){
+    if(hearDefer("gal", renderGalleryLikes)) return;
     var card = document.getElementById("galLikeCard"), wrap = document.getElementById("galLikeWrap");
     if(!card || !wrap) return;
     var sel = document.getElementById("hearImgPlace");
@@ -6497,6 +6506,7 @@
   }
   // ヒアリングタブ上の「次回のご予約」（お打合せの記録ページ・おうちノートと同じく、今日以降の予約）
   function renderHearingNextRes(){
+    if(hearDefer("next", renderHearingNextRes)) return;
     var el = document.getElementById("hearNextRes");
     if(!el) return;
     var pid = state.currentProjectId, today = todayJst();
@@ -6514,6 +6524,7 @@
   }
   // ---- お客様へのひとこと（project.staffComment={text,at,by}） ----
   function renderStaffComment(){
+    if(document.activeElement && document.activeElement.id!=="staffCommentInput" && hearDefer("sc", renderStaffComment)) return;
     var ta = document.getElementById("staffCommentInput");
     if(!ta) return;
     var pid = state.currentProjectId;
@@ -6637,6 +6648,7 @@
   function todayJst(){ var d = new Date(Date.now()+9*3600*1000); return d.toISOString().slice(0,10); }
   function earlyUrl(p){ return location.origin + "/kiroku/?p=" + encodeURIComponent(p.id) + "&t=" + encodeURIComponent(p.earlyToken); }
   function renderEarlyMeetings(){
+    if(hearDefer("early", renderEarlyMeetings)) return;
     var listEl = document.getElementById("earlyList");
     if(!listEl) return;
     var p = projectById(state.currentProjectId);
@@ -6961,6 +6973,7 @@
   var finSaving = false;
   function finList(p){ return ((p && p.financeDocs) || []).filter(function(d){ return !d.deletedAt; }); }
   function renderFinanceDocs(){
+    if(hearDefer("fin", renderFinanceDocs)) return;
     var el = document.getElementById("finList");
     if(!el) return;
     var p = projectById(state.currentProjectId);
@@ -9610,6 +9623,7 @@
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
       var wrap = document.getElementById(ids[0]), empty = document.getElementById(ids[1]);
       if(!wrap) return;
+      if(ids[0]==="hearMsgList" && hearTyping() && document.activeElement.id!=="hearMsgInput"){ hearDeferred.msg = renderMessages; return; }
       var atTop = wrap.scrollTop < 40;
       if(empty) empty.hidden = rows.length !== 0;
       wrap.innerHTML = html;
@@ -20777,6 +20791,13 @@
     });
     document.getElementById("tfNewProjName").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); tfCreateProject(); } });
     document.getElementById("tfNewProjCancel").addEventListener("click", function(){ document.getElementById("tfNewProjRow").hidden = true; });
+    document.getElementById("sub-hearing").addEventListener("focusout", function(){
+      setTimeout(function(){
+        if(hearTyping()) return;
+        var fns = hearDeferred; hearDeferred = {};
+        Object.keys(fns).forEach(function(k){ try{ fns[k](); }catch(e){} });
+      }, 300);
+    });
     document.getElementById("hearingForm").addEventListener("input", function(){ this.dataset.dirty = "1"; var st=document.getElementById("hearingStatus"); if(st) st.textContent="未保存の変更があります"; });
     document.getElementById("btnHearingSave").addEventListener("click", saveProjectHearing);
     wireEarlyMeetings();
