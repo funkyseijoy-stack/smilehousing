@@ -1728,7 +1728,7 @@
           </div>
           <div id="noteViewBox" style="margin-block-start:12px; padding:10px; background:var(--surface-2); border-radius:9px;"></div>
           <div id="lineNotifyBox" style="margin-block-start:12px; padding:10px; background:var(--surface-2); border-radius:9px;">
-            <div style="font-weight:700; font-size:.9rem;">📱 LINEでお知らせ（プロライン経由）</div>
+            <div style="font-weight:700; font-size:.9rem;">📣 お客様へのお知らせ（LINE・スマホの通知）</div>
             <p class="muted help" style="margin:4px 0 8px; font-size:.85rem;">押したときだけ、お客様のLINEに「おうちノートが更新されました。」が届きます（文面はプロラインのシナリオで設定）。プロラインIDは、プロラインの友だちの詳細画面に出る英数字のユーザーID（uid）です。</p>
             <div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">送る人（プロラインID）</div>
             <div id="prolineUidRows" style="display:flex; flex-direction:column; gap:6px;"></div>
@@ -1736,7 +1736,9 @@
               <button class="btn secondary small" id="btnProlineUidAdd">＋ 送る人を追加</button>
               <button class="btn secondary small" id="btnProlineUidSave">保存</button>
             </div>
-            <button class="btn small" id="btnLineNotify" style="margin-block-start:8px;" disabled>📱 LINEで「おうちノートが更新されました」を送る</button>
+            <p class="muted help" style="margin:6px 0 4px; font-size:.85rem;">お客様がおうちノート・お打合せの記録ページで「🔔 受け取る」を押した端末には、LINEと同じ時にスマホの通知が届きます。通知で届く人は、送る人の行で「🔔 通知で届く：〇〇」を選ぶと、LINEを送らなくなります（その端末に届かなくなったら、自動でLINEに戻ります）。</p>
+            <div id="pushDevBox" style="margin-block:8px 4px;"></div>
+            <button class="btn small" id="btnLineNotify" style="margin-block-start:8px;" disabled>📣 お客様に「おうちノートが更新されました」を知らせる</button>
             <div id="lineNotifyStatus" class="muted" style="font-size:.85rem; margin-block-start:4px;"></div>
           </div>
           <div id="newNoteDecisions" style="margin-block-start:12px;"></div>
@@ -3472,6 +3474,7 @@
     syncNoteCheckTasks();
     scheduleEstSync();
     loadActivityBackground();
+    loadPushSubs().then(function(){ try{ refreshMessageLine(); var pp = projectById(state.currentProjectId); if(pp) renderLineNotifyBox(pp); }catch(e){} });
   }
   // 2026年11月：お客様の「変更のご依頼」から社内タスクを自動で作る機能（11/2公開）より前に届いた依頼（11/1〜）を、
   // 1回だけ社内タスクにする。タスクIDは task_chg_<メッセージID> で固定（複数の端末で動いても重ならない）
@@ -3866,6 +3869,7 @@
       }
       syncCols.forEach(function(c, i){ state[c] = results[i]; });
       if(!silent) loadActivityBackground();
+      loadPushSubs();
       // backwards compat: ensure all tasks have reflected/reflectedAt
       (state.tasks||[]).forEach(function(t){ if(!('reflected' in t)){ t.reflected=false; t.reflectedAt=null; } });
       migrateLegacyTaskStatus();
@@ -4350,12 +4354,57 @@
     if(Array.isArray(proj.prolineUids)) return proj.prolineUids.filter(function(r){ return r && r.uid; });
     return proj.prolineUid ? [{ uid: proj.prolineUid, name: "" }] : [];
   }
+  // ── プッシュ通知（お客様がおうちノート・お打合せの記録ページで「受け取る」にした端末。/api/push、netlify/lib/push.mts） ──
+  var pushSubsCache = {}, pushSubsLoadedAt = 0, pushSubsLoading = null;
+  function loadPushSubs(force){
+    if(!force && pushSubsLoading) return pushSubsLoading;
+    if(!force && Date.now() - pushSubsLoadedAt < 60000) return Promise.resolve(pushSubsCache);
+    pushSubsLoading = fetch('/api/push', { headers:{'X-Staff-Token': getStaffToken()}, cache:"no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var c = {};
+        (j && j.subs || []).forEach(function(x){ (c[x.projectId] = c[x.projectId] || []).push(x); });
+        pushSubsCache = c; pushSubsLoadedAt = Date.now();
+        return c;
+      })
+      .catch(function(){ return pushSubsCache; })
+      .then(function(c){ pushSubsLoading = null; return c; });
+    return pushSubsLoading;
+  }
+  function pushSubsOf(p){ return (p && pushSubsCache[p.id]) || []; }
+  function activePushOf(p){ return pushSubsOf(p).filter(function(x){ return !x.disabledAt; }); }
+  // LINEを送る人（プッシュ通知で届く端末を選んだ人は除く。その端末が届かなくなっていればLINEを送る）
+  function lineTargetsOf(p){
+    var act = {}; activePushOf(p).forEach(function(x){ act[x.id] = 1; });
+    return prolineRecipients(p).filter(function(r){ return !(r.pushSub && act[r.pushSub]); });
+  }
+  function canNotifyProj(p){
+    if(!p) return false;
+    var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
+    return (lineTargetsOf(p).length>0 && hasBeacon) || activePushOf(p).length>0;
+  }
+  // 「誰に届くか」の言い方（LINE：奥様／🔔通知：ご主人のスマホ）
+  function notifyWhoText(p){
+    var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
+    var parts = [];
+    var ln = hasBeacon ? lineTargetsOf(p).map(function(r){ return r.name || r.uid; }) : [];
+    if(ln.length) parts.push("LINE："+ln.join("、"));
+    var ps = activePushOf(p).map(function(x){ return x.name || "名前なし"; });
+    if(ps.length) parts.push("🔔通知："+ps.join("、"));
+    return parts.join("／");
+  }
   var prolineRowsDraft = null; // 編集中の行（保存までは画面だけ）
   var prolineDraftPid = null;  // 編集中の行がどの案件のものか
   function prolineRowHtml(r, i){
+    var subs = pushSubsOf(projectById(state.currentProjectId));
+    var opts = '<option value="">📱 LINEで送る</option>'+subs.map(function(x){
+      return '<option value="'+escapeHtml(x.id)+'"'+(r.pushSub===x.id?' selected':'')+'>🔔 通知で届く：'+escapeHtml(x.name||"名前なし")+(x.disabledAt?'（止まっている→LINEで送る）':'')+'（LINEは送らない）</option>';
+    }).join("");
+    if(r.pushSub && !subs.some(function(x){ return x.id===r.pushSub; })) opts += '<option value="'+escapeHtml(r.pushSub)+'" selected>🔔 通知（見つからない端末→LINEで送る）</option>';
     return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">'+
       '<input type="text" autocomplete="off" data-plname="'+i+'" value="'+escapeHtml(r.name||"")+'" placeholder="名前（例：ご主人）" style="flex:1; min-width:110px;">'+
       '<input type="text" autocomplete="off" data-pluid="'+i+'" value="'+escapeHtml(r.uid||"")+'" placeholder="プロラインID（例：abc1234）" style="flex:1; min-width:150px;">'+
+      (subs.length ? '<select data-plpush="'+i+'" style="flex:1 1 220px; min-width:180px;" title="この人への送り方">'+opts+'</select>' : '')+
       '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>';
   }
   function readProlineRows(){
@@ -4363,7 +4412,12 @@
     document.querySelectorAll("#prolineUidRows [data-pluid]").forEach(function(inp){
       var i = inp.dataset.pluid;
       var nm = document.querySelector('#prolineUidRows [data-plname="'+i+'"]');
-      rows.push({ uid: (inp.value||"").trim(), name: (nm && nm.value || "").trim() });
+      var ps = document.querySelector('#prolineUidRows [data-plpush="'+i+'"]');
+      var row = { uid: (inp.value||"").trim(), name: (nm && nm.value || "").trim() };
+      var keep = prolineRecipients(projectById(state.currentProjectId)).filter(function(x){ return x.uid===row.uid; })[0];
+      if(ps){ if(ps.value) row.pushSub = ps.value; }
+      else if(keep && keep.pushSub) row.pushSub = keep.pushSub;
+      rows.push(row);
     });
     return rows;
   }
@@ -4378,19 +4432,49 @@
     var editing = !switched && wrap.contains(document.activeElement);
     if(!editing){
       if(switched){ prolineRowsDraft = null; prolineDraftPid = proj && proj.id; }
-      var rows = prolineRowsDraft || prolineRecipients(proj).map(function(r){ return { uid:r.uid, name:r.name||"" }; });
+      var rows = prolineRowsDraft || prolineRecipients(proj).map(function(r){ var o = { uid:r.uid, name:r.name||"" }; if(r.pushSub) o.pushSub = r.pushSub; return o; });
       if(!rows.length) rows = [{ uid:"", name:"" }];
       wrap.innerHTML = rows.map(prolineRowHtml).join("");
       wrap.dataset.pid = pid;
     }
     var saved = prolineRecipients(proj);
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
-    btn.disabled = !(saved.length && hasBeacon);
-    btn.textContent = saved.length > 1 ? "📱 LINEで「おうちノートが更新されました」を送る（"+saved.length+"人）" : "📱 LINEで「おうちノートが更新されました」を送る";
+    var can = canNotifyProj(proj);
+    btn.disabled = !can;
+    btn.textContent = "📣 お客様に「おうちノートが更新されました」を知らせる";
     var last = proj && proj.lineNotifiedAt;
-    st.textContent = !hasBeacon ? "「業者・設定」タブで、プロラインの発動用URLを先に保存してください。"
-      : !saved.length ? "送る人のプロラインIDを入れて保存すると、送れるようになります。"
-      : (last ? "前回の送信：" + String(last).slice(0,16).replace("T"," ") + (proj.lineNotifiedBy ? "（"+proj.lineNotifiedBy+"）" : "") + "　" : "") + "※夜8時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回にまとめて送ります";
+    var who = notifyWhoText(proj);
+    st.textContent = !can ? (!hasBeacon && saved.length ? "「業者・設定」タブで、プロラインの発動用URLを先に保存してください。" : "送る人のプロラインIDを入れて保存するか、お客様がおうちノートで通知を「受け取る」にすると送れます。")
+      : "届く人：" + who + "　" + (last ? "前回の送信：" + String(last).slice(0,16).replace("T"," ") + (proj.lineNotifiedBy ? "（"+proj.lineNotifiedBy+"）" : "") + "　" : "") + "※夜8時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回にまとめて送ります";
+    renderPushDevBox(proj);
+    if(proj && !pushSubsLoadedAt){ loadPushSubs().then(function(){ if(state.currentProjectId===pid){ prolineRowsDraft = prolineRowsDraft || null; var w2 = document.getElementById("prolineUidRows"); if(w2) w2.dataset.pid = ""; renderLineNotifyBox(projectById(pid)); } }); }
+  }
+  // お客様が「受け取る」にした端末の一覧（名前を直す・テスト・外す）
+  function renderPushDevBox(proj){
+    var box = document.getElementById("pushDevBox");
+    if(!box) return;
+    var subs = pushSubsOf(proj).slice().sort(function(a,b){ return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    if(!subs.length){ box.innerHTML = '<div class="muted" style="font-size:.85rem;">🔔 通知を受け取っている端末：まだありません（お客様がおうちノート・お打合せの記録ページで「受け取る」を押すと、ここに出ます）'+
+      ' <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'; return; }
+    box.innerHTML = '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">🔔 通知を受け取っている端末 <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'+
+      subs.map(function(x){
+        var st = x.disabledAt ? '<span class="pill" style="background:#f3d6d0;">止まっている（'+(x.disabledWhy==="customer"?"お客様がやめた":x.disabledWhy==="staff"?"外した":"届かない")+'）</span>' : '<span class="pill" style="background:var(--accent); color:#fff;">届く</span>';
+        return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center; padding:4px 0; border-top:1px solid var(--border);">'+
+          '<b>'+escapeHtml(x.name||"名前なし")+'</b>'+st+
+          '<span class="muted" style="font-size:.85rem;">'+(x.page==="kiroku"?"お打合せの記録ページ":"おうちノート")+'・'+String(x.createdAt||"").slice(5,10).replace("-","/")+'登録'+(x.lastOkAt?'・最後に届いた '+String(x.lastOkAt).slice(5,10).replace("-","/"):'')+'</span>'+
+          (x.disabledAt ? '' : '<button class="btn secondary small" data-pushtest="'+escapeHtml(x.id)+'">テスト送信</button>'+
+            '<button class="btn secondary small" data-pushrename="'+escapeHtml(x.id)+'">名前を直す</button>'+
+            '<button class="btn secondary small" data-pushremove="'+escapeHtml(x.id)+'">外す</button>')+
+        '</div>';
+      }).join("");
+  }
+  async function pushStaffAct(action, id, extra){
+    var proj = projectById(state.currentProjectId); if(!proj) return null;
+    try{
+      var r = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify(Object.assign({ action:action, projectId:proj.id, id:id }, extra||{})) });
+      var j = await r.json().catch(function(){ return {}; });
+      return { ok: r.ok && j.ok, j: j };
+    }catch(e){ return { ok:false, j:{} }; }
   }
   function addProlineRow(){
     var rows = readProlineRows(); rows.push({ uid:"", name:"" });
@@ -4441,15 +4525,17 @@
   var lineNotifying = false;
   // LINEのお知らせの結果の言い方（夜20時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回まで。サーバーの netlify/lib/line-queue.mts）
   function lineResultText(d){
-    if(d && d.queued) return "📱 LINEのお知らせは "+(d.sendAtLabel||"あとで")+" にまとめて送ります（同じお客様へは1回にまとめます）";
+    if(d && d.queued) return "📣 お知らせ（LINE・通知）は "+(d.sendAtLabel||"あとで")+" にまとめて送ります（同じお客様へは1回にまとめます）";
+    if(d && d.pushSent && !d.sent) return "🔔 通知でお知らせしました";
+    if(d && d.pushSent) return "📣 LINEと通知でお知らせしました";
     return "📱 LINEでお知らせしました";
   }
   async function sendLineNotify(){
     var proj = projectById(state.currentProjectId);
     var recips = prolineRecipients(proj);
-    if(!proj || !recips.length || lineNotifying) return;
-    var who = recips.map(function(r){ return r.name || r.uid; }).join("、");
-    if(!confirm((proj.customer||proj.name||"お客様")+"（"+who+"）のLINEに「おうちノートが更新されました。」を送りますか？")) return;
+    if(!proj || !canNotifyProj(proj) || lineNotifying) return;
+    var who = notifyWhoText(proj);
+    if(!confirm((proj.customer||proj.name||"お客様")+"に「おうちノートが更新されました。」を知らせますか？\n（"+who+"）")) return;
     lineNotifying = true;
     var btn = document.getElementById("btnLineNotify"); if(btn) btn.disabled = true;
     try{
@@ -4467,9 +4553,9 @@
         proj.lineNotifiedBy = state.currentUser || "";
         await saveDoc("projects", proj.id, proj);
         logActivity("LINEで「おうちノートが更新されました」を送りました（"+(proj.customer||proj.name||"")+"）");
-        if(!(data.failed && data.failed.length)) toast("✅ LINEでお知らせを送りました" + (data.sent > 1 ? "（"+data.sent+"人）" : ""));
+        if(!(data.failed && data.failed.length)) toast("✅ お知らせを送りました（"+[data.sent?"LINE "+data.sent+"人":"", data.pushSent?"🔔通知 "+data.pushSent+"台":""].filter(Boolean).join("・")+"）");
       } else {
-        var why = { no_uid:"プロラインIDが入っていません", bad_uid:"プロラインIDの形が正しくありません", no_beacon:"「業者・設定」でプロラインの発動用URLが保存されていません", bad_beacon:"プロラインの発動用URLの形が正しくありません（[[uid]] が必要です）", proline_failed:"プロラインが受け付けませんでした", proline_unreachable:"プロラインにつながりませんでした", unauthorized:"ログインし直してください" }[data.error] || "送れませんでした";
+        var why = { no_uid:"プロラインIDが入っていません", bad_uid:"プロラインIDの形が正しくありません", no_beacon:"「業者・設定」でプロラインの発動用URLが保存されていません", bad_beacon:"プロラインの発動用URLの形が正しくありません（[[uid]] が必要です）", proline_failed:"プロラインが受け付けませんでした", proline_unreachable:"プロラインにつながりませんでした", push_failed:"通知を届けられませんでした（お客様の端末で通知が止まっている可能性があります）", unauthorized:"ログインし直してください" }[data.error] || "送れませんでした";
         toast("⚠ " + why);
       }
     }catch(e){ toast("⚠ 通信できませんでした"); }
@@ -6446,7 +6532,7 @@
     var p = projectById(state.currentProjectId); if(!p) return;
     var pid = p.id;
     var sc = p.staffComment || {};
-    var canLine = prolineRecipients(p).length>0 && !!(state.settings && state.settings.prolineBeaconUrl);
+    var canLine = canNotifyProj(p);
     var ov = document.createElement("div");
     ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
     ov.innerHTML = '<div class="card" style="max-width:560px; width:calc(100% - 24px); max-height:86vh; overflow:auto;">'+
@@ -6454,7 +6540,7 @@
       '<div class="muted" style="margin:4px 0 8px; font-size:.85rem;">'+escapeHtml(p.customer||p.name||"")+'様のおうちノートのホームの「💬 スタッフから」に出ます。'+
         (sc.text && sc.at ? '<br>いま表示中（'+String(sc.at).slice(5,10).replace("-","/")+(sc.by?"・"+escapeHtml(sc.by):"")+'）' : '<br>いまは表示していません')+'</div>'+
       '<textarea id="scPopText" rows="5" maxlength="500" style="width:100%;" placeholder="例：今日はキッチンの仕様を決めました。次回は照明を決めましょう。">'+escapeHtml(sc.text||"")+'</textarea>'+
-      (canLine ? '<label class="row" style="gap:6px; margin-block-start:8px; align-items:center;"><input type="checkbox" id="scPopLine"> お客様のLINEに「おうちノートが更新されました」を知らせる</label>' : '')+
+      (canLine ? '<label class="row" style="gap:6px; margin-block-start:8px; align-items:center;"><input type="checkbox" id="scPopLine"> お客様に「おうちノートが更新されました」を知らせる（'+escapeHtml(notifyWhoText(p))+'）</label>' : '')+
       '<div class="row" style="gap:8px; margin-block-start:10px; flex-wrap:wrap;">'+
         '<button type="button" class="btn" data-sc-save>保存する</button>'+
         (sc.text ? '<button type="button" class="btn secondary" data-sc-clear>ひとことを消す</button>' : '')+
@@ -9547,13 +9633,12 @@
     var wrap = document.getElementById(wid), lab = document.getElementById(lid), cb = document.getElementById(cid);
     if(!wrap || !lab || !cb) return;
     var proj = projectById(state.currentProjectId);
-    var recips = prolineRecipients(proj);
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
-    var can = !!(proj && recips.length && hasBeacon);
+    var can = canNotifyProj(proj);
     if((wrap.dataset.pid || "") !== ((proj && proj.id) || "")){ cb.checked = false; wrap.dataset.pid = (proj && proj.id) || ""; }
     cb.disabled = !can;
     if(!can) cb.checked = false;
-    lab.textContent = can ? "お客様のLINEに「おうちノートが更新されました」を送って知らせる（"+recips.map(function(r){ return r.name || r.uid; }).join("、")+"。メッセージの内容は送りません）"
+    lab.textContent = can ? "お客様に「おうちノートが更新されました」を知らせる（"+notifyWhoText(proj)+"。メッセージの内容は送りません）"
       : !hasBeacon ? "LINEのお知らせ：「業者・設定」でプロラインの発動用URLを保存すると使えます"
       : "LINEのお知らせ：「おうちノート連携」タブの「LINEでお知らせ」で、お客様のプロラインIDを登録すると、ここから送れるようになります";
   }
@@ -13189,13 +13274,12 @@
   }
   function spsRenderLine(){
     var proj = projectById(document.getElementById("spsProject").value);
-    var recips = prolineRecipients(proj);
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
-    var can = !!(proj && recips.length && hasBeacon);
+    var can = canNotifyProj(proj);
     var cb = document.getElementById("spsLine");
     cb.disabled = !can; cb.checked = can; // 送れるお客様は最初からチェック（送りたくない日だけ外す）
     document.getElementById("spsLineLabel").textContent = can
-      ? "お客様のLINEに「おうちノートが更新されました」を送る（"+recips.map(function(r){ return r.name || r.uid; }).join("、")+"）"
+      ? "お客様に「おうちノートが更新されました」を知らせる（"+notifyWhoText(proj)+"）"
       : !hasBeacon ? "LINEのお知らせ：「業者・設定」でプロラインの発動用URLを保存すると使えます"
       : "LINEのお知らせ：このお客様はプロラインIDが未登録です（「おうちノート連携」タブの「LINEでお知らせ」で登録）";
   }
@@ -15895,14 +15979,14 @@
     var orig = src.messageId ? state.messages.find(function(m){ return m.id===src.messageId; }) : null;
     var origText = orig ? String(orig.content||"") : String(t.content||"").replace(/^【お客様[^】]*】\s*/, "");
     var recips = prolineRecipients(proj);
-    var canLine = !!(recips.length && state.settings && state.settings.prolineBeaconUrl);
+    var canLine = canNotifyProj(proj);
     var ov = document.createElement("div");
     ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
     ov.innerHTML = '<div class="taskform-card" style="max-width:560px; width:100%;"><h3 style="margin:0 0 6px;">💬 お客様に返信</h3>'+
       '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">'+escapeHtml((proj&&proj.name)||"")+(proj&&proj.customer?'（'+escapeHtml(proj.customer)+'様）':'')+'</div>'+
       '<div style="background:var(--surface-2); border-inline-start:4px solid #e8b04a; border-radius:8px; padding:8px 10px; font-size:.9rem; white-space:pre-wrap; max-height:30vh; overflow:auto;">'+escapeHtml(origText)+'</div>'+
       '<label class="field" style="display:block; margin-block-start:10px;">返信<textarea data-cr rows="5" style="width:100%; box-sizing:border-box;" placeholder="お客様へのお返事を書いてください"></textarea></label>'+
-      '<label style="display:flex; gap:8px; align-items:flex-start; font-size:.9rem; margin-block-start:6px;"><input type="checkbox" data-crline'+(canLine?' checked':' disabled')+'> <span>'+(canLine ? 'お客様のLINEに「おうちノートが更新されました」を送って知らせる（'+escapeHtml(recips.map(function(r){ return r.name||r.uid; }).join("、"))+'）' : 'LINEのお知らせ：「おうちノート連携」タブでお客様のプロラインIDを登録すると送れます')+'</span></label>'+
+      '<label style="display:flex; gap:8px; align-items:flex-start; font-size:.9rem; margin-block-start:6px;"><input type="checkbox" data-crline'+(canLine?' checked':' disabled')+'> <span>'+(canLine ? 'お客様に「おうちノートが更新されました」を知らせる（'+escapeHtml(notifyWhoText(proj))+'）' : 'LINEのお知らせ：「おうちノート連携」タブでお客様のプロラインIDを登録すると送れます')+'</span></label>'+
       '<div class="muted" style="font-size:.85rem; margin-block-start:6px;">返信は案件の「💬 メッセージ」に入り、お客様のおうちノート・お打合せの記録ページのメッセージに出ます。'+(onSent ? '送るとこのタスクは完了になります。' : 'タスクの進捗は変わりません。')+'</div>'+
       '<div class="row" style="gap:8px; margin-block-start:12px;"><button type="button" class="btn" data-ok>送る</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
     document.body.appendChild(ov);
@@ -20210,7 +20294,19 @@
       var d = e.target.closest("[data-pldel]"); if(d) removeProlineRow(d.dataset.pldel);
     });
     document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
+    document.getElementById("prolineUidRows").addEventListener("change", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
     document.getElementById("btnLineNotify").addEventListener("click", sendLineNotify);
+    document.getElementById("pushDevBox").addEventListener("click", async function(e){
+      var proj = projectById(state.currentProjectId); if(!proj) return;
+      var redraw = async function(){ await loadPushSubs(true); var w = document.getElementById("prolineUidRows"); if(w && !w.contains(document.activeElement)) w.dataset.pid = ""; renderLineNotifyBox(projectById(proj.id)); refreshMessageLine(); };
+      if(e.target.closest("[data-pushreload]")){ await redraw(); toast("通知の端末を取り直しました"); return; }
+      var t = e.target.closest("[data-pushtest]");
+      if(t){ t.disabled = true; var r = await pushStaffAct("test", t.dataset.pushtest); toast(r && r.ok ? "🔔 テストの通知を送りました（お客様の端末に届きます）" : (r && r.j.error==="gone" ? "⚠ この端末にはもう届きません（お客様が通知をやめた可能性があります）" : "⚠ 送れませんでした")); await redraw(); return; }
+      var rn = e.target.closest("[data-pushrename]");
+      if(rn){ var cur = (pushSubsOf(proj).filter(function(x){ return x.id===rn.dataset.pushrename; })[0]||{}).name || ""; var nm = prompt("端末の名前（例：奥様のスマホ）", cur); if(nm==null) return; var r2 = await pushStaffAct("rename", rn.dataset.pushrename, {name:nm}); toast(r2 && r2.ok ? "名前を直しました" : "⚠ 直せませんでした"); await redraw(); return; }
+      var rm = e.target.closest("[data-pushremove]");
+      if(rm){ if(!confirm("この端末への通知をやめますか？（この端末で「通知で届く」にしていた人には、LINEを送るようになります）")) return; var r3 = await pushStaffAct("remove", rm.dataset.pushremove); toast(r3 && r3.ok ? "外しました" : "⚠ 外せませんでした"); await redraw(); return; }
+    });
     document.getElementById("btnSaveProlineBeacon").addEventListener("click", saveProlineBeacon);
     document.getElementById("btnNewNoteOpen").addEventListener("click", function(){
       var proj = projectById(state.currentProjectId);

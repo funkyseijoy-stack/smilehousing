@@ -1,10 +1,13 @@
 import { getStore } from "@netlify/blobs";
+import { listSubs, isActive, sendPushToProject } from "./push.mts";
 
 // お客様へのLINEのお知らせ（プロライン経由）を、時間帯でまとめて送る。
 // - 夜（20:00〜翌10:00、日本時間）に頼まれた分は、朝10:00に1回だけ送る（同じお客様へ何人が何回頼んでも1回）。
 // - 昼（10:00〜20:00）は、同じお客様へ前に送ってから30分たっていればすぐ送り、30分以内なら
 //   「前回＋30分」に1回だけ送る（その間に頼まれた分はまとめる）。
 // - たまった分は line-queue-flush.mts（5分おきの定期関数）が送る。
+// - プッシュ通知（netlify/lib/push.mts、2026年11月〜）も同じ時に一緒に送る。送る人の行に pushSub（端末ID）が付いていて、
+//   その端末に通知が届いたら、その人にはLINEを送らない（届かなかった・止まっている端末なら、その人にもLINEを送る）。
 // 状態は "lineQueue" ストアの <案件ID> に {projectId,lastSentAt,lastSentBy,pending:{sendAt,firstAt,kinds,by}}。
 export const NIGHT_START_MIN = 20 * 60; // 20:00
 export const MORNING_MIN = 10 * 60;     // 10:00
@@ -35,11 +38,35 @@ export function jstLabel(ms: number) {
   return (sameDay ? "" : "明日") + hm;
 }
 
-export function recipientsOf(project: any): string[] {
-  const list: string[] = Array.isArray(project && project.prolineUids)
-    ? project.prolineUids.map((r: any) => String((r && r.uid) || "").trim()).filter(Boolean)
-    : (project && project.prolineUid ? [String(project.prolineUid).trim()] : []);
+// LINEを送る人。activePush（届く端末のIDの集合）を渡すと、プッシュ通知で届く人（行の pushSub が届く端末）は外す
+export function recipientsOf(project: any, activePush?: Set<string>): string[] {
+  const rows: any[] = Array.isArray(project && project.prolineUids)
+    ? project.prolineUids
+    : (project && project.prolineUid ? [{ uid: project.prolineUid }] : []);
+  const list: string[] = rows
+    .filter((r: any) => !(activePush && r && r.pushSub && activePush.has(String(r.pushSub))))
+    .map((r: any) => String((r && r.uid) || "").trim()).filter(Boolean);
   return Array.from(new Set(list)).slice(0, 10);
+}
+export async function activePushIds(projectId: string) {
+  return new Set((await listSubs(projectId)).filter(isActive).map((x: any) => String(x.id)));
+}
+// いま送る：LINE（プッシュ通知で届く人を除く）とプッシュ通知の両方
+export async function deliverNow(projectId: string, beacon: string | null) {
+  const store = getStore("staffData");
+  const project: any = await store.get(`projects/${projectId}`, { type: "json", consistency: "strong" } as any);
+  if (!project || project.deletedAt) return { sent: 0, failed: [] as string[], pushSent: 0, pushTotal: 0 };
+  // 先に通知を送り、届いた端末を選んでいる人にだけLINEを送らない（届かなかった人にはこの回もLINEを送る）
+  const act = await activePushIds(projectId);
+  let p = { sent: 0, total: 0 };
+  let okIds = new Set<string>();
+  if (act.size) {
+    try { const pr = await sendPushToProject(projectId, { title: "おうちノート", body: "おうちノートが更新されました。" }); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
+    catch (e) { console.error("push failed", e); }
+  }
+  const uids = recipientsOf(project, okIds);
+  const r = beacon && uids.length ? await sendBeacon(beacon, uids) : { sent: 0, failed: [] as string[] };
+  return { sent: r.sent, failed: r.failed, pushSent: p.sent, pushTotal: p.total };
 }
 export function checkBeacon(settings: any): string | null {
   const beacon = String((settings && settings.prolineBeaconUrl) || "").trim();
@@ -58,7 +85,7 @@ export async function sendBeacon(beacon: string, uids: string[]) {
 }
 
 // 頼まれたときに呼ぶ。すぐ送るか、まとめて送る予定に入れるかを決める。
-export async function requestLineNotify(opts: { projectId: string; kind: string; by: string; beacon: string; uids: string[] }) {
+export async function requestLineNotify(opts: { projectId: string; kind: string; by: string; beacon: string | null; uids?: string[] }) {
   const q = getStore("lineQueue");
   const now = Date.now();
   const cur: any = (await q.get(opts.projectId, { type: "json", consistency: "strong" } as any)) || { projectId: opts.projectId };
@@ -81,8 +108,8 @@ export async function requestLineNotify(opts: { projectId: string; kind: string;
     await q.setJSON(opts.projectId, cur);
     return { queued: true, sendAt: cur.pending.sendAt };
   }
-  const r = await sendBeacon(opts.beacon, opts.uids);
-  if (r.sent) {
+  const r = await deliverNow(opts.projectId, opts.beacon);
+  if (r.sent || r.pushSent) {
     cur.lastSentAt = new Date(now).toISOString();
     cur.lastSentBy = opts.by || "";
     await q.setJSON(opts.projectId, cur);
@@ -106,16 +133,13 @@ export async function flushLineQueue() {
     if (Date.parse(cur.pending.sendAt) > now) continue;
     // 昼に予約した分でも、送る時刻が夜（20時以降）にずれ込んだら、翌朝10時へ回す
     if (isNight(now)) { cur.pending.sendAt = new Date(nextMorning(now)).toISOString(); await q.setJSON(b.key, cur); continue; }
-    const project: any = await store.get(`projects/${b.key}`, { type: "json" });
-    const uids = recipientsOf(project);
-    if (!project || project.deletedAt || !uids.length || !beacon) { delete cur.pending; await q.setJSON(b.key, cur); continue; }
-    const r = await sendBeacon(beacon, uids);
+    const r = await deliverNow(b.key, beacon);
     cur.lastSentAt = new Date(now).toISOString();
     cur.lastSentBy = (cur.pending.by || []).join("、");
-    cur.lastResult = { sent: r.sent, failed: r.failed, kinds: cur.pending.kinds || [] };
+    cur.lastResult = { sent: r.sent, failed: r.failed, pushSent: r.pushSent, pushTotal: r.pushTotal, kinds: cur.pending.kinds || [] };
     delete cur.pending;
     await q.setJSON(b.key, cur);
-    sentCount += r.sent ? 1 : 0;
+    sentCount += (r.sent || r.pushSent) ? 1 : 0;
   }
   return { sent: sentCount };
 }

@@ -652,6 +652,7 @@
 </style>
 <!-- PDFの1ページ目をサムネイル画像として表示するために使用（住まいるアプリ本体と同じバージョン） -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="/push-client.js"></script>
 <script>
 /* 日本語の文字（埋め込まれていないフォント）を描くための文字表・標準フォントを、このサイトの /pdfjs/ から読む。
    これが無いと、業者さんのPDFで線だけが出て文字が出ないことがある。 */
@@ -886,6 +887,9 @@
       <li>アドレス欄の右にある「インストール」のマーク（または右上の「⋮」）をクリック</li>
       <li>「インストール」／「アプリとしてインストール」を選ぶ</li>
     </ol>
+    <h3>🔔 更新のお知らせ（通知）</h3>
+    <p class="help-lead">ホーム画面に追加したアイコンから開いて「受け取る」を押すと、おうちノートが更新されたときにスマホに通知が届きます（iPhoneはホーム画面のアイコンから開いたときだけ設定できます）。</p>
+    <div data-pushslot="sheet"></div>
     <button class="a2more" id="addHomeHelp">❔ 画面の見方・使い方を見る</button>
     <button class="a2done" id="addHomeDone">✅ 追加できたよ（この案内をホームに出さない）</button>
   </div>
@@ -1051,6 +1055,8 @@
       data = j;
       initSeen();
       document.getElementById("nav").hidden = false;
+      // 更新のお知らせ（プッシュ通知）。状態がわかったら描き直す
+      if(window.SumaiPush){ try{ SumaiPush.init({p:P, t:T, page:"note"}).then(function(){ mountPush(); }); }catch(e){} }
       render();
     }catch(e){
       main.innerHTML = '<div class="center">読み込みに失敗しました。<br>通信状況をご確認のうえ、もう一度開いてください。</div>';
@@ -1091,6 +1097,16 @@
     if(view.tab==="resv" && !rv.loaded && !rv.loading) loadAvail();
     if(view.infoJump){ var jid = view.infoJump; view.infoJump = null; setTimeout(function(){ flashTo(jid); }, 50); }
     addDrawButtons();
+    mountPush();
+  }
+  // 「🔔 更新のお知らせ」の欄（public/push-client.js）。ホームは未設定のときだけ・「あとで」で消える
+  function mountPush(){
+    if(!window.SumaiPush) return;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pushslot]"), function(el){
+      var k = el.getAttribute("data-pushslot");
+      SumaiPush.mount(el, k==="home" ? {dismissKey:"okaiPushLater:"+P, hideWhenDone:true, onHowTo:function(){ openSheet("addHomeModal"); }}
+        : {onHowTo: k==="sheet" ? null : function(){ openSheet("addHomeModal"); }});
+    });
   }
   // その場所までスクロールして少し光らせる
   function flashTo(id){
@@ -1408,6 +1424,7 @@ function homeHtml(){ return homeParts().main; }
       (nmText ? '<div class="qdetail nmtext">📝 '+esc(nmText)+'</div>' : '')+'</div>';
     // ホームの上から：スタッフより → NEW → わが家のアルバム → 最新の打合せ記録 → 次の打合せ → 家づくりの進行状況 → ご検討いただく事
     out += a2hsBannerHtml();
+    out += '<div data-pushslot="home"></div>';
     // 写真が重ならないよう、ホームの写真は「🆕 新しい写真」（最後に送った写真）だけ。アルバムは下のタブから
     out += newPhotosHtml();
     out += staffCommentHtml();
@@ -3134,7 +3151,8 @@ function homeHtml(){ return homeParts().main; }
     };
     var emo = function(e){ return '<span class="memo">'+e+'</span>'; };
     var out = '<h2 class="big">メニュー</h2>'+
-      '<button class="mtop" data-menusheet="addHomeModal">📲 アプリの便利な使い方（デスクトップへの貼り付け方）<span class="ug">›</span></button>';
+      '<button class="mtop" data-menusheet="addHomeModal">📲 アプリの便利な使い方（デスクトップへの貼り付け方）<span class="ug">›</span></button>'+
+      '<div data-pushslot="menu"></div>';
     // 家づくりの項目（写真があればいちばん新しい写真、無ければ印）
     var cats = (data.categories||[]).filter(function(c){ return c.id!=="plan" && catAllItems(c).length; });
     if(cats.length){

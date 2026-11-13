@@ -168,6 +168,7 @@
   window.pdfjsLib = w;
 })();
 </script>
+<script src="/push-client.js"></script>
 <script>
 (function(){
   var main = document.getElementById("main");
@@ -198,6 +199,8 @@
       if(res.j.view==="note"){ location.replace("/note/?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T)); return; }
       data = res.j; data.reservations = data.reservations || [];
       initSeen();
+      // 更新のお知らせ（プッシュ通知、public/push-client.js）
+      if(window.SumaiPush){ try{ SumaiPush.init({p:P, t:T, page:"kiroku"}).then(mountPush); }catch(e){} }
       renderAll();
     })
     .catch(function(){ main.innerHTML = '<div class="err">読み込めませんでした。通信状況を確認して、もう一度開いてください。</div>'; });
@@ -250,6 +253,7 @@
     html += '<div class="jump">'+'<a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-img">イメージ</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
     html += staffCommentHtml();
     html += updatesHtml();
+    html += '<div data-pushslot="top"></div>';
     html += '<div id="nextBox">'+nextHtml()+'</div>';
     html += '<h2 class="sec" id="sec-rec">お打合せの記録</h2><p class="secsub">新しいものから順に並んでいます。資料は押すと開きます。</p>';
     if(!data.records || !data.records.length){
@@ -318,6 +322,7 @@
     }
     html += '<div class="foot">住まいるハウジング</div>';
     main.innerHTML = html;
+    mountPush();
     renderResv();
     drawPdfThumbs();
   }
@@ -534,6 +539,12 @@
     if(e.target.closest("#rvBook")) bookNow();
   });
 
+  function mountPush(){
+    if(!window.SumaiPush) return;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pushslot]"), function(el){
+      SumaiPush.mount(el, el.getAttribute("data-pushslot")==="top" ? {dismissKey:"kirokuPushLater:"+P, hideWhenDone:true, onHowTo:openHelp} : {});
+    });
+  }
   // 「使い方」（ホーム画面への追加方法と画面の見方）。おうちノートの「？」と同じ考え方
   function openHelp(){
     var el = document.getElementById("khelp");
@@ -553,6 +564,9 @@
       '<ol><li>画面下の共有ボタン（四角に↑のマーク）をタップ</li><li>「ホーム画面に追加」をタップ</li><li>右上の「追加」をタップ</li></ol>'+
       '<div class="hsub">Android（Chrome）の場合</div>'+
       '<ol><li>右上の「⋮」（メニュー）をタップ</li><li>「ホーム画面に追加」または「アプリをインストール」をタップ</li><li>「追加」をタップ</li></ol>'+
+      '<h3>🔔 更新のお知らせ（通知）</h3>'+
+      '<p class="lead">ホーム画面に追加したアイコンから開いて「受け取る」を押すと、このページが更新されたときにスマホに通知が届きます（iPhoneはホーム画面のアイコンから開いたときだけ設定できます）。</p>'+
+      '<div data-pushslot="help"></div>'+
       '<h3>📄 画面の見方</h3>'+
       '<ul>'+
         '<li><b>記録</b>：お打合せのメモをご覧いただけます。資料は押すと開きます</li>'+
@@ -566,6 +580,7 @@
       '</ul>'+
       '<button class="close2" type="button" data-khelpx>閉じる</button>'+
     '</div>';
+    mountPush();
     el.hidden = false;
   }
 
