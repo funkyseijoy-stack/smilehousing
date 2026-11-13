@@ -150,9 +150,16 @@
       }
     });
   }
+  // ページを開いたら、アプリのアイコンの数字と、届いている通知を消す
+  function clearBadge(){
+    try{ if(navigator.clearAppBadge) navigator.clearAppBadge().catch(function(){}); }catch(e){}
+    try{ if(window.caches) caches.open("sumai-badge").then(function(c){ return c.put("/__badge", new Response("0")); }).catch(function(){}); }catch(e){}
+    try{ if(navigator.serviceWorker) navigator.serviceWorker.getRegistration("/").then(function(r){ if(r && r.getNotifications) r.getNotifications().then(function(ns){ ns.forEach(function(n){ n.close(); }); }); }).catch(function(){}); }catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible" && cfg) clearBadge(); });
   window.SumaiPush = {
     init: function(c){
-      cfg = c; addHead(); css();
+      cfg = c; addHead(); css(); clearBadge();
       if(supported() && !inLine){ getReg().catch(function(){}); }
       return refresh();
     },
