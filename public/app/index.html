@@ -1445,18 +1445,19 @@
         <!-- 初期の打合せ記録（手書きメモをPDFで。お客様には専用の簡単なページで見せる） -->
         <div class="card" id="earlyCard">
           <div class="row" style="justify-content:space-between; gap:8px; flex-wrap:wrap; margin-block-end:6px;">
-            <h3 style="margin:0;">初期の打合せ記録</h3>
+            <h3 style="margin:0;">📝 契約前の打合せ記録</h3>
             <button type="button" class="btn" id="btnEarlyOpen">＋ 記録する</button>
           </div>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">来店・初回のお打合せの手書きメモを、スマホで撮影するかスキャンしたPDFで日付ごとに残します。撮影した写真は1つのPDFにまとめて保存します。「お客様に見せる」にした記録だけ、下のリンクのページでお客様が見られます（おうちノートとは別の簡単なページです）。</p>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">契約前のお客様のお打合せを、日付ごとに文章で記録します（手書きメモの写真・PDFも付けられます）。撮影した写真は1つのPDFにまとめて保存します。「お客様に見せる」にした記録だけ、下のリンクのページでお客様が見られます（おうちノートとは別の簡単なページです）。</p>
           <div id="earlyForm" hidden style="border:1px solid var(--border); border-radius:12px; padding:12px; margin-block-end:12px; background:var(--gray-soft);">
             <div style="font-weight:700; margin-block-end:8px;" id="earlyFormTitle">新しい記録</div>
             <div class="row" style="gap:10px; flex-wrap:wrap;">
               <label class="field" style="flex:0 0 auto;">打合せ日<input type="date" id="earlyDate"></label>
               <label class="field" style="flex:1 1 220px;">題名<input type="text" id="earlyTitle" placeholder="例：初回ご来店・ご要望のヒアリング"></label>
             </div>
-            <label class="field">ひとことメモ<textarea id="earlyMemo" rows="2" placeholder="例：次回は土地の候補を一緒に見に行きます"></textarea></label>
-            <div style="font-weight:700; font-size:.9rem; margin-block:6px 4px;">手書きメモ</div>
+            <label class="field">記録の内容（お客様に見せるときは、この文章が出ます）<textarea id="earlyMemo" rows="8" style="min-height:10em;" placeholder="例：&#10;・ご家族4人（小学生2人）、2027年春の入居希望&#10;・平屋か2階建てで迷っている&#10;・次回は土地の候補を一緒に見に行きます"></textarea></label>
+            <label class="field">🔒 社内メモ（お客様には出しません）<textarea id="earlyInternal" rows="3" placeholder="例：予算はご主人の方が慎重。他社（〇〇ホーム）とも比較中"></textarea></label>
+            <div style="font-weight:700; font-size:.9rem; margin-block:6px 4px;">手書きメモ・写真・PDF（なくても大丈夫）</div>
             <div class="row" style="gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn secondary" data-earlyfile="earlyCamera">📷 撮影する</button>
               <button type="button" class="btn secondary" data-earlyfile="earlyPick">📄 写真・PDFを選ぶ</button>
@@ -6548,8 +6549,9 @@
           '<span style="font-weight:700;">'+escapeHtml(r.title||"（題名なし）")+'</span>'+
           (r.shared ? '<span class="pill" style="background:var(--accent); color:#fff;">お客様に見せる</span>' : '<span class="pill">社内だけ</span>')+
         '</div>'+
-        (r.memo ? '<div style="white-space:pre-wrap; margin-block-start:4px;">'+escapeHtml(r.memo)+'</div>' : '')+
-        (r.files && r.files.length ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml(r.files, 96)+'</div>' : '<div class="muted" style="font-size:.85rem; margin-block-start:4px;">手書きメモなし</div>')+
+        (r.memo ? '<div style="white-space:pre-wrap; margin-block-start:4px; line-height:1.7;">'+escapeHtml(r.memo)+'</div>' : '')+
+        (r.internal ? '<div style="white-space:pre-wrap; margin-block-start:6px; padding:6px 8px; border-radius:8px; background:var(--gray-soft); font-size:.9rem;">🔒 社内メモ：'+escapeHtml(r.internal)+'</div>' : '')+
+        (r.files && r.files.length ? '<div style="margin-block-start:6px;">'+fileThumbRowHtml(r.files, 96)+'</div>' : '')+
         '<div class="row" style="gap:6px; margin-block-start:8px; flex-wrap:wrap;">'+
           '<button class="btn secondary small" data-earlyshare="'+r.id+'">'+(r.shared?'社内だけにする':'お客様に見せる')+'</button>'+
           '<button class="btn secondary small" data-earlyedit="'+r.id+'">✏️ 編集・追加</button>'+
@@ -6601,6 +6603,7 @@
     document.getElementById("earlyDate").value = r ? (r.date||"") : todayJst();
     document.getElementById("earlyTitle").value = r ? (r.title||"") : "";
     document.getElementById("earlyMemo").value = r ? (r.memo||"") : "";
+    document.getElementById("earlyInternal").value = r ? (r.internal||"") : "";
     document.getElementById("earlyShared").checked = r ? !!r.shared : true;
     document.getElementById("btnEarlySave").textContent = r ? "更新する" : "記録する";
     document.getElementById("earlyStatus").textContent = "";
@@ -6659,9 +6662,10 @@
     var date = document.getElementById("earlyDate").value;
     var title = document.getElementById("earlyTitle").value.trim();
     var memo = document.getElementById("earlyMemo").value.trim();
+    var internal = document.getElementById("earlyInternal").value.trim();
     var shared = document.getElementById("earlyShared").checked;
     if(!date){ toast("打合せ日を入れてください"); return; }
-    if(!title && !memo && !earlyDraft.files.length && !earlyDraft.keep.length){ toast("題名・メモ・手書きメモのどれかを入れてください"); return; }
+    if(!title && !memo && !internal && !earlyDraft.files.length && !earlyDraft.keep.length){ toast("題名・記録の内容・手書きメモのどれかを入れてください"); return; }
     var st = document.getElementById("earlyStatus");
     var btn = document.getElementById("btnEarlySave");
     earlySaving = true; btn.disabled = true;
@@ -6689,9 +6693,9 @@
       if(earlyDraft.editId){
         var idx = p.earlyMeetings.findIndex(function(x){ return x.id===earlyDraft.editId; });
         if(idx<0) throw new Error("編集中の記録が見つかりません（削除された可能性があります）");
-        p.earlyMeetings[idx] = Object.assign({}, p.earlyMeetings[idx], {date:date, title:title, memo:memo, shared:shared, files:earlyDraft.keep.concat(newFiles), updatedAt:now, updatedBy:who});
+        p.earlyMeetings[idx] = Object.assign({}, p.earlyMeetings[idx], {date:date, title:title, memo:memo, internal:internal, shared:shared, files:earlyDraft.keep.concat(newFiles), updatedAt:now, updatedBy:who});
       } else {
-        p.earlyMeetings.push({id:"em"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date:date, title:title, memo:memo, shared:shared, files:newFiles, createdAt:now, createdBy:who});
+        p.earlyMeetings.push({id:"em"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date:date, title:title, memo:memo, internal:internal, shared:shared, files:newFiles, createdAt:now, createdBy:who});
       }
       st.textContent = "保存しています…";
       var ok = await saveDoc("projects", p.id, p);
