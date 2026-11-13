@@ -1,5 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { listSubs, isActive, sendPushToProject } from "./push.mts";
+import { isDemoProject } from "./boaxel.mts";
 
 // お客様へのLINEのお知らせ（プロライン経由）を、時間帯でまとめて送る。
 // - 夜（20:00〜翌10:00、日本時間）に頼まれた分は、朝10:00に1回だけ送る（同じお客様へ何人が何回頼んでも1回）。
@@ -94,6 +95,16 @@ export async function requestLineNotify(opts: { projectId: string; kind: string;
     p.by = Array.from(new Set([...(p.by || []), opts.by || ""].filter(Boolean)));
     return p;
   };
+  // デモの案件（練習用）は試しやすいよう、夜・30分の間隔に関係なくいつもすぐ送る（たまっていた予定も消す）
+  const proj: any = await getStore("staffData").get(`projects/${opts.projectId}`, { type: "json", consistency: "strong" } as any);
+  if (isDemoProject(proj)) {
+    const r = await deliverNow(opts.projectId, opts.beacon);
+    delete cur.pending;
+    cur.lastSentAt = new Date(now).toISOString();
+    cur.lastSentBy = opts.by || "";
+    await q.setJSON(opts.projectId, cur);
+    return { queued: false, demo: true, ...r };
+  }
   if (cur.pending && cur.pending.sendAt) {
     cur.pending = merge(cur.pending);
     await q.setJSON(opts.projectId, cur);
