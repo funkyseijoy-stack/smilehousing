@@ -87,9 +87,17 @@ export async function deliverNow(projectId: string, beacon: string | null) {
     try { const pr = await sendPushToProject(projectId, { title: "おうちノート", body: "おうちノートが更新されました。" }); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
     catch (e) { console.error("push failed", e); }
   }
-  const uids = recipientsOf(remapPushRows(project, await listSubs(projectId)), okIds);
+  const subsAfter = await listSubs(projectId);
+  const remapped = remapPushRows(project, subsAfter);
+  const uids = recipientsOf(remapped, okIds);
   const r = beacon && uids.length ? await sendBeacon(beacon, uids) : { sent: 0, failed: [] as string[] };
-  return { sent: r.sent, failed: r.failed, pushSent: p.sent, pushTotal: p.total };
+  // 誰に何で届けたか（画面に出す・ログに残す）
+  const rows: any[] = Array.isArray(remapped && remapped.prolineUids) ? remapped.prolineUids : [];
+  const nameOfUid = (u: string) => { const row = rows.find((x: any) => x && String(x.uid) === u); return (row && row.name) || u; };
+  const lineTo = beacon ? uids.map(nameOfUid) : [];
+  const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id))).map((x: any) => x.name || "名前なし");
+  console.log("deliverNow", projectId, JSON.stringify({ rows: rows.map((x: any) => ({ uid: x && x.uid, pushSub: x && x.pushSub })), okIds: Array.from(okIds), lineTo: uids }));
+  return { sent: r.sent, failed: r.failed, pushSent: p.sent, pushTotal: p.total, lineTo, pushTo };
 }
 export function checkBeacon(settings: any): string | null {
   const beacon = String((settings && settings.prolineBeaconUrl) || "").trim();

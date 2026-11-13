@@ -4539,9 +4539,10 @@
   // LINEのお知らせの結果の言い方（夜20時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回まで。サーバーの netlify/lib/line-queue.mts）
   function lineResultText(d){
     if(d && d.queued) return "📣 お知らせ（LINE・通知）は "+(d.sendAtLabel||"あとで")+" にまとめて送ります（同じお客様へは1回にまとめます）";
-    if(d && d.pushSent && !d.sent) return "🔔 通知でお知らせしました";
-    if(d && d.pushSent) return "📣 LINEと通知でお知らせしました";
-    return "📱 LINEでお知らせしました";
+    var who = (d && d.pushTo && d.pushTo.length ? "🔔通知："+d.pushTo.join("、") : "") + (d && d.lineTo && d.lineTo.length ? (d.pushTo && d.pushTo.length ? "／" : "")+"📱LINE："+d.lineTo.join("、") : "");
+    if(d && d.pushSent && !d.sent) return "🔔 通知でお知らせしました" + (who ? "（"+who+"）" : "");
+    if(d && d.pushSent) return "📣 LINEと通知でお知らせしました" + (who ? "（"+who+"）" : "");
+    return "📱 LINEでお知らせしました" + (who ? "（"+who+"）" : "");
   }
   async function sendLineNotify(){
     var proj = projectById(state.currentProjectId);
@@ -20307,7 +20308,9 @@
       var d = e.target.closest("[data-pldel]"); if(d) removeProlineRow(d.dataset.pldel);
     });
     document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
-    document.getElementById("prolineUidRows").addEventListener("change", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
+    document.getElementById("prolineUidRows").addEventListener("change", function(e){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null;
+      // 送り方（📱LINE／🔔通知）は選んだらすぐ保存する（保存ボタンの押し忘れで、LINEも届いてしまうのを防ぐ）
+      if(e.target && e.target.matches("[data-plpush]")) saveProlineUid(); });
     document.getElementById("btnLineNotify").addEventListener("click", sendLineNotify);
     document.getElementById("pushDevBox").addEventListener("click", async function(e){
       var proj = projectById(state.currentProjectId); if(!proj) return;
