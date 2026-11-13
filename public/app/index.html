@@ -6473,8 +6473,15 @@
   var hearDeferred = {};
   function hearTyping(){
     var ae = document.activeElement, sub = document.getElementById("sub-hearing");
-    return !!(ae && sub && sub.contains(ae) && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !/^(checkbox|radio|file|date|button)$/i.test(ae.type||""));
+    // 見えていない（閉じた入力欄の中の）ものは入力中とみなさない。iPhoneはボタンを押しても入力欄からカーソルが外れないことがあるため
+    return !!(ae && sub && sub.contains(ae) && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !/^(checkbox|radio|file|date|button)$/i.test(ae.type||"") && ae.getClientRects().length > 0);
   }
+  function hearFlush(){
+    if(hearTyping()) return;
+    var fns = hearDeferred; hearDeferred = {};
+    Object.keys(fns).forEach(function(k){ try{ fns[k](); }catch(e){} });
+  }
+  setInterval(function(){ if(Object.keys(hearDeferred).length) hearFlush(); }, 1500);
   function hearDefer(name, fn){ if(hearTyping()){ hearDeferred[name] = fn; return true; } return false; }
   function renderGalleryLikes(){
     if(hearDefer("gal", renderGalleryLikes)) return;
@@ -6648,7 +6655,6 @@
   function todayJst(){ var d = new Date(Date.now()+9*3600*1000); return d.toISOString().slice(0,10); }
   function earlyUrl(p){ return location.origin + "/kiroku/?p=" + encodeURIComponent(p.id) + "&t=" + encodeURIComponent(p.earlyToken); }
   function renderEarlyMeetings(){
-    if(hearDefer("early", renderEarlyMeetings)) return;
     var listEl = document.getElementById("earlyList");
     if(!listEl) return;
     var p = projectById(state.currentProjectId);
@@ -6814,8 +6820,10 @@
       if(ok===false) throw new Error("保存できませんでした。もう一度押してください");
       logActivity("案件「"+p.name+"」の初期の打合せ記録を"+(earlyDraft.editId?"更新":"追加")+"しました（"+date+"）");
       toast(earlyDraft.editId ? "✓ 記録を更新しました" : "✓ 記録しました");
+      try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(er){}
       closeEarlyForm();
       renderEarlyMeetings();
+      hearFlush();
     }catch(e){
       st.textContent = "";
       toast("⚠ " + ((e && (e.userMessage||e.message)) || "保存できませんでした"), 9000);
@@ -6973,7 +6981,6 @@
   var finSaving = false;
   function finList(p){ return ((p && p.financeDocs) || []).filter(function(d){ return !d.deletedAt; }); }
   function renderFinanceDocs(){
-    if(hearDefer("fin", renderFinanceDocs)) return;
     var el = document.getElementById("finList");
     if(!el) return;
     var p = projectById(state.currentProjectId);
