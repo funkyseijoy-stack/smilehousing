@@ -1718,6 +1718,7 @@
             <button class="btn secondary small" id="btnNewNoteCopy" hidden>リンクをコピー</button>
             <button class="btn secondary small" id="btnNewNoteOpen" hidden>開いて確認</button>
           </div>
+          <div id="noteViewBox" style="margin-block-start:12px; padding:10px; background:var(--surface-2); border-radius:9px;"></div>
           <div id="lineNotifyBox" style="margin-block-start:12px; padding:10px; background:var(--surface-2); border-radius:9px;">
             <div style="font-weight:700; font-size:.9rem;">📱 LINEでお知らせ（プロライン経由）</div>
             <p class="muted help" style="margin:4px 0 8px; font-size:.85rem;">押したときだけ、お客様のLINEに「おうちノートが更新されました。」が届きます（文面はプロラインのシナリオで設定）。プロラインIDは、プロラインの友だちの詳細画面に出る英数字のユーザーID（uid）です。</p>
@@ -4282,6 +4283,7 @@
     area.innerHTML = has ? '<span class="muted">お客様用リンク：</span><br>'+escapeHtml(newNoteUrl(proj)) : '<span class="muted">まだ発行されていません。</span>';
     issueBtn.textContent = has ? "リンクを作り直す（古いリンクは無効になります）" : "リンクを発行する";
     copyBtn.hidden = !has; openBtn.hidden = !has;
+    renderNoteViewBox(proj);
     renderLineNotifyBox(proj);
     var dWrap = document.getElementById("newNoteDecisions");
     var ds = (state.noteDecisions||[]).filter(function(d){ return proj && d.projectId===proj.id && !d.deletedAt && d.status!=="検討中"; })
@@ -4290,6 +4292,37 @@
       return '<div class="row" style="gap:6px; font-size:.85rem;"><span class="pill" style="'+(d.status==="決定"?'background:var(--accent); color:#fff;':'background:var(--orange-soft); color:var(--orange);')+'">'+escapeHtml(d.status)+'</span>'+
         escapeHtml(noteDecisionName(proj, d))+'<span class="muted">（'+escapeHtml((d.decidedAt||"").slice(0,10))+'）</span></div>';
     }).join("") : "";
+  }
+  // お客様のリンクで開くページ（スタッフが切り替える）。project.noteView＝"kiroku"／"note"／未設定（それぞれのリンクがそれぞれのページ）。
+  // おうちノート・お打合せの記録ページのどちらのリンクでも、選んだページが開く（同じURLのまま。note-data／early-data が view を返し、画面が移る）。
+  function newToken(){ var arr = new Uint8Array(18); (window.crypto||window.msCrypto).getRandomValues(arr); return Array.prototype.map.call(arr, function(b){ return ("0"+b.toString(16)).slice(-2); }).join(""); }
+  function renderNoteViewBox(proj){
+    var box = document.getElementById("noteViewBox"); if(!box) return;
+    if(!proj){ box.innerHTML = ""; return; }
+    var v = proj.noteView || "";
+    var links = [];
+    if(proj.earlyToken) links.push('📝 お打合せの記録ページのリンク：<br>'+escapeHtml(earlyUrl(proj)));
+    if(proj.noteToken) links.push('🏠 おうちノートのリンク：<br>'+escapeHtml(newNoteUrl(proj)));
+    var btn = function(val, label){ var on = v===val; return '<button type="button" class="btn small'+(on?'':' secondary')+'" data-noteview="'+val+'"'+(on?' disabled':'')+'>'+(on?'✓ ':'')+label+'</button>'; };
+    box.innerHTML = '<div style="font-weight:700; font-size:.9rem;">👁 お客様のリンクで開くページ</div>'+
+      '<p class="muted" style="margin:4px 0 8px; font-size:.85rem;">いま：<b>'+(v==="kiroku"?"📝 お打合せの記録ページ":v==="note"?"🏠 おうちノート":"それぞれのページ（まだ選んでいません）")+'</b>。選ぶと、お客様にお渡ししたリンク（下のどちらでも）を開いたときに、選んだページが出ます。URLは変わりません（契約したら「おうちノート」に切り替える、など）。</p>'+
+      '<div class="row" style="gap:6px; flex-wrap:wrap;">'+btn("kiroku","📝 お打合せの記録ページ")+btn("note","🏠 おうちノート")+'</div>'+
+      (links.length ? '<div class="muted" style="margin-top:8px; font-size:.85rem; word-break:break-all;">'+links.join('<br>')+'</div>' : '');
+  }
+  async function setNoteView(val){
+    var proj = projectById(state.currentProjectId);
+    if(!proj || (val!=="kiroku" && val!=="note")) return;
+    var name = val==="kiroku" ? "お打合せの記録ページ" : "おうちノート";
+    if(!confirm("お客様のリンクで開くページを「"+name+"」にします。\nお客様にお渡ししたリンクを開くと、"+name+"が出るようになります。よろしいですか？")) return;
+    var prev = { v: proj.noteView, n: proj.noteToken, e: proj.earlyToken };
+    // 両方のページを開けるよう、まだ無いリンクの鍵も作っておく（今あるリンクはそのまま使える）
+    if(!proj.noteToken) proj.noteToken = newToken();
+    if(!proj.earlyToken) proj.earlyToken = newToken();
+    proj.noteView = val;
+    render();
+    var ok = await saveDoc("projects", proj.id, proj);
+    if(ok){ logActivity("お客様のリンクで開くページを「"+name+"」にしました"); toast("✅ お客様のリンクで「"+name+"」が開くようになりました"); }
+    else { proj.noteView = prev.v; proj.noteToken = prev.n; proj.earlyToken = prev.e; render(); }
   }
   async function issueNewNoteLink(){
     var proj = projectById(state.currentProjectId);
@@ -20156,6 +20189,7 @@
     document.getElementById("staffCommentInput").addEventListener("input", function(e){ e.target.dataset.dirty = "1"; });
     document.getElementById("hearMsgInput").addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); sendMessage("hear"); } });
     document.getElementById("btnNewNoteIssue").addEventListener("click", issueNewNoteLink);
+    document.getElementById("noteViewBox").addEventListener("click", function(e){ var b = e.target.closest("[data-noteview]"); if(b) setNoteView(b.dataset.noteview); });
     document.getElementById("btnNewNoteCopy").addEventListener("click", copyNewNoteLink);
     document.getElementById("btnProlineUidSave").addEventListener("click", saveProlineUid);
     document.getElementById("btnProlineUidAdd").addEventListener("click", addProlineRow);

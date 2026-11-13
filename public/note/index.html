@@ -1046,6 +1046,8 @@
         main.innerHTML = '<div class="center">リンクが無効になっています。<br>お手数ですが、住まいるハウジングまでお問い合わせください。</div>';
         return;
       }
+      // スタッフが「お客様のリンクで開くページ」をお打合せの記録ページにしているときは、同じリンクのまま記録ページへ
+      if(j.view==="kiroku"){ location.replace("/kiroku/?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T)); return; }
       data = j;
       initSeen();
       document.getElementById("nav").hidden = false;
@@ -3152,7 +3154,6 @@ function homeHtml(){ return homeParts().main; }
       .map(function(m){ return tile('data-menujump="'+m[0]+'"', emo(m[1]), m[2]); });
     if(infoTiles.length) out += '<div class="mhd">わが家の情報</div><div class="mgrid">'+infoTiles.join("")+'</div>';
     out += '<div class="mhd">そのほか</div><div class="mgrid">'+
-      (data.kiroku ? '<a class="mtile" href="/kiroku/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" style="text-decoration:none;"><span class="mpic">'+emo("📝")+'</span><span class="mnm">お打合せの記録・ご要望</span></a>' : '')+
       tile('data-go="resv"', emo("📅"), "ご予約")+
       tile('data-go="msg"', emo("💬"), "メッセージ")+
       tile('data-go="album"', emo("🌷"), "わが家のアルバム")+

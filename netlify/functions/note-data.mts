@@ -1176,7 +1176,7 @@ export default async (req: Request, context: Context) => {
     })(),
     // 収納プラン（IKEA ボーアクセル）を出すか（ページは /shuno/。試しの間はデモの案件だけ）
     boaxel: !!boaxelForNote(bxSettings, project),
-    kiroku: !!project.earlyToken, // お打合せの記録ページのリンクを発行済み＝メニューから切り替えられる
+    view: project.noteView === "kiroku" ? "kiroku" : (project.noteView === "note" ? "note" : ""), // スタッフが選んだ「お客様のリンクで開くページ」
     // サンプル請求（お客様が送ったもの。状態はタスクの進捗：未着手＝受付済み／完了＝お渡し済み／それ以外＝準備中）
     sampleRequests: tasks.filter((t: any) => t.fromSampleRequest && !t.deletedAt)
       .map((t: any) => ({

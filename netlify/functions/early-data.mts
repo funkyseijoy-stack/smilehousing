@@ -154,7 +154,7 @@ export default async (req: Request, context: Context) => {
   const policy = pt || px ? { title: pt, text: px } : null;
 
   return json({
-    note: !!project.noteToken, // おうちノートのリンクを発行済み＝上のボタンから切り替えられる
+    view: project.noteView === "kiroku" ? "kiroku" : (project.noteView === "note" ? "note" : ""), // スタッフが選んだ「お客様のリンクで開くページ」
     customer: String(project.customer || project.name || ""),
     today,
     records,

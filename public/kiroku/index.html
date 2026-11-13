@@ -43,7 +43,6 @@
   .jump{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
   .jump a{ flex:1 1 72px; white-space:nowrap; text-align:center; text-decoration:none; color:var(--ink); background:var(--card); border:1.5px solid var(--line); border-radius:999px; padding:9px 4px; font-size:.85rem; font-weight:700; }
   .jump a.helpbtn{ background:var(--chip); }
-  .jump a.notebtn{ background:#5d5049; color:#fff; border-color:#5d5049; }
   .khelp{ position:fixed; inset:0; z-index:50; background:rgba(40,32,28,.45); display:flex; align-items:flex-end; justify-content:center; }
   .khelp[hidden]{ display:none; }
   .khelp-card{ position:relative; background:var(--bg); width:100%; max-width:560px; max-height:88vh; overflow-y:auto; border-radius:20px 20px 0 0; padding:22px 20px calc(28px + env(safe-area-inset-bottom)); box-sizing:border-box; }
@@ -178,6 +177,8 @@
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
     .then(function(res){
       if(!res.ok){ main.innerHTML = '<div class="err">このリンクは開けません。お手数ですが、担当者にお問い合わせください。</div>'; return; }
+      // スタッフが「お客様のリンクで開くページ」をおうちノートにしているときは、同じリンクのままおうちノートへ
+      if(res.j.view==="note"){ location.replace("/note/?p="+encodeURIComponent(P)+"&t="+encodeURIComponent(T)); return; }
       data = res.j; data.reservations = data.reservations || [];
       initSeen();
       renderAll();
@@ -229,7 +230,7 @@
     var html = '<h1>'+(name?esc(name):'お客様')+'</h1><p class="sub">住まいるハウジングとのお打合せの記録です。</p>';
     var fins = data.financeDocs || [];
     var hear = data.hearing || [];
-    html += '<div class="jump">'+(data.note?'<a href="/note/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" class="notebtn">🏠 おうちノート</a>':'')+'<a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
+    html += '<div class="jump">'+'<a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
     html += staffCommentHtml();
     html += updatesHtml();
     html += '<div id="nextBox">'+nextHtml()+'</div>';
