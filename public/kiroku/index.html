@@ -118,6 +118,23 @@
   .fin .old{ display:flex; justify-content:space-between; gap:8px; padding:8px 2px; border-top:1px solid var(--line); text-decoration:none; color:var(--ink); font-size:.9rem; }
   .fin .old b{ color:var(--brown); flex-shrink:0; }
   .about{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; white-space:pre-wrap; color:var(--ink2); font-size:.95rem; }
+  .imgadd{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; }
+  .imgadd .row{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .imgadd .row label{ flex:none; font-weight:700; font-size:.9rem; width:4.5em; }
+  .imgadd select, .imgadd input[type=text]{ flex:1; min-width:0; font:inherit; font-size:16px; padding:9px 10px; border:1.5px solid var(--line2); border-radius:12px; background:#fff; box-sizing:border-box; }
+  .imgadd .pick{ display:block; text-align:center; border-radius:14px; padding:13px 6px; font-weight:700; background:var(--brown); color:#fff; cursor:pointer; }
+  .imgadd .pick.busy{ opacity:.55; cursor:default; }
+  .imgadd .hint{ color:var(--muted); font-size:.78rem; margin-top:8px; line-height:1.6; }
+  .imggrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+  @media (max-width:420px){ .imggrid{ grid-template-columns:1fr 1fr; } }
+  .imgcell{ position:relative; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .imgcell a{ display:block; aspect-ratio:1/1; background:var(--chip); }
+  .imgcell img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .imgcell .ic{ font-size:.72rem; color:var(--muted); padding:4px 6px 0; }
+  .imgcell .in{ font-size:.8rem; color:var(--ink2); padding:2px 6px 6px; white-space:pre-wrap; word-break:break-word; }
+  .imgcell .by{ position:absolute; top:5px; left:5px; background:rgba(255,255,255,.92); color:var(--ink); font-size:.7rem; font-weight:700; border-radius:999px; padding:1px 7px; }
+  .imgcell .by.me{ background:var(--brown); color:#fff; }
+  .imgcell .del{ position:absolute; top:4px; right:4px; width:28px; height:28px; border-radius:50%; border:none; background:rgba(0,0,0,.55); color:#fff; font-size:1rem; line-height:1; cursor:pointer; }
   .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#3a302b; color:#fff; padding:10px 18px; border-radius:999px; font-size:.9rem; z-index:9; max-width:90vw; text-align:center; }
 </style>
 </head>
@@ -230,7 +247,7 @@
     var html = '<h1>'+(name?esc(name):'お客様')+'</h1><p class="sub">住まいるハウジングとのお打合せの記録です。</p>';
     var fins = data.financeDocs || [];
     var hear = data.hearing || [];
-    html += '<div class="jump">'+'<a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
+    html += '<div class="jump">'+'<a href="#sec-rec">記録</a>'+(hear.length?'<a href="#sec-hear">ご要望</a>':'')+(fins.length?'<a href="#sec-fin">資金計画</a>':'')+'<a href="#sec-msg">メッセージ</a><a href="#sec-gal">施工事例</a><a href="#sec-img">イメージ</a><a href="#sec-resv">ご予約</a>'+((data.companyIntro||data.policy)?'<a href="#sec-about">会社について</a>':'')+'<a href="#help" class="helpbtn" data-khelp>❔ 使い方</a></div>';
     html += staffCommentHtml();
     html += updatesHtml();
     html += '<div id="nextBox">'+nextHtml()+'</div>';
@@ -288,6 +305,7 @@
     html += '<h2 class="sec" id="sec-gal">施工事例・イメージ集</h2><p class="secsub">住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと、「いいね」にまとまります。</p>'+
       '<a class="gal" href="/gallery/?p='+encodeURIComponent(P)+'&t='+encodeURIComponent(T)+'" target="_blank" rel="noopener"><span class="gi"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 2-2 5 5"/></svg></span>'+
       '<span class="gt"><b>イメージ集を見る</b><span>外観・LDK・水まわりなど</span></span><span class="ga">ひらく ›</span></a>';
+    html += '<h2 class="sec" id="sec-img">お家のイメージ</h2><p class="secsub">「こんなお家にしたい」という写真を追加できます。インスタグラムや雑誌のスクリーンショットもどうぞ。追加した写真は担当者にも届きます。</p><div id="imgBox">'+imageHtml()+'</div>';
     html += '<h2 class="sec" id="sec-resv">ご予約</h2><p class="secsub">「予約する」を押すと、空いている日時を選んで予約できます。</p>'+
       '<button class="rvopen'+(rv.open?" on":"")+'" id="rvToggle">'+(rv.open?"▲ 閉じる":"📅 予約する")+'</button><div id="rvBox"'+(rv.open?"":" hidden")+'></div>';
     // 会社紹介の文章のあとに、家づくりの進め方（ご契約の考え方）を小さな見出し＋ふつうの文章で添える
@@ -303,6 +321,84 @@
     renderResv();
     drawPdfThumbs();
   }
+
+  // ---------- お家のイメージ（おうちノートの「イメージ」と同じ写真。/api/early-data に POST） ----------
+  var img = { place:"", busy:false };
+  function imageHtml(){
+    var places = data.imagePlaces || [];
+    if(!img.place) img.place = places[0] || "その他";
+    var imgs = data.images || [];
+    var out = '<div class="imgadd"><div class="row"><label for="imgPlace">場所</label><select id="imgPlace">'+
+      places.map(function(pl){ return '<option value="'+esc(pl)+'"'+(pl===img.place?' selected':'')+'>'+esc(pl)+'</option>'; }).join("")+'</select></div>'+
+      '<div class="row"><label for="imgNote">ひとこと</label><input type="text" id="imgNote" maxlength="200" placeholder="例：この色の床がいいな（なくても大丈夫です）"></div>'+
+      '<label class="pick'+(img.busy?' busy':'')+'" for="imgFile">'+(img.busy?'追加しています…':'📷 写真を追加')+'</label>'+
+      '<input type="file" id="imgFile" accept="image/*" multiple hidden'+(img.busy?' disabled':'')+'>'+
+      '<div class="hint">何枚でも追加できます。ご自身が追加した写真は、あとから×で削除できます。</div></div>';
+    if(!imgs.length) return out + '<div class="empty" style="margin-top:12px;">まだ写真はありません。</div>';
+    return out + '<div class="imggrid">'+imgs.map(function(x){
+      var mine = x.by==="customer" && !x.gallery;
+      var d = new Date(x.createdAt||""), dl = isNaN(d) ? "" : (d.getMonth()+1)+"/"+d.getDate();
+      return '<div class="imgcell"><a href="'+esc(x.url)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+esc(x.url)+'" alt=""></a>'+
+        '<span class="by'+(mine?' me':'')+'">'+(x.gallery?'🩷 イメージ集':(mine?'あなた':'スタッフ'))+'</span>'+
+        (mine?'<button class="del" type="button" data-imgdel="'+esc(x.id)+'" aria-label="この写真を削除">×</button>':'')+
+        '<div class="ic">'+esc(x.place)+(dl?' ・ '+dl:'')+'</div>'+(x.note?'<div class="in">'+esc(x.note)+'</div>':'<div style="height:6px"></div>')+'</div>';
+    }).join("")+'</div>';
+  }
+  function redrawImages(){ var box = document.getElementById("imgBox"); if(box) box.innerHTML = imageHtml(); }
+  function shrinkImage(file, maxDim, quality){
+    return new Promise(function(resolve, reject){
+      var fr = new FileReader();
+      fr.onerror = function(){ reject(new Error("read")); };
+      fr.onload = function(){
+        var im = new Image();
+        im.onerror = function(){ reject(new Error("decode")); };
+        im.onload = function(){
+          var scale = Math.min(1, maxDim/Math.max(im.naturalWidth, im.naturalHeight));
+          var w = Math.max(1, Math.round(im.naturalWidth*scale)), h = Math.max(1, Math.round(im.naturalHeight*scale));
+          var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(im, 0, 0, w, h);
+          resolve(cv.toDataURL("image/jpeg", quality));
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  async function addImages(fileList){
+    if(img.busy) return;
+    var files = Array.prototype.slice.call(fileList||[]).filter(function(f){ return /^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name||""); });
+    if(!files.length){ toast("写真を選んでください"); return; }
+    var noteEl = document.getElementById("imgNote"), note = ((noteEl && noteEl.value)||"").trim();
+    img.busy = true; redrawImages();
+    var ok = 0, fail = 0, full = false;
+    for(var i=0;i<files.length;i++){
+      try{
+        var dataUrl = await shrinkImage(files[i], 1600, 0.82);
+        if(dataUrl.length > 5000000) dataUrl = await shrinkImage(files[i], 1200, 0.7);
+        var res = await fetch("/api/early-data", { method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ p:P, t:T, action:"imageAdd", place:img.place, note:note, dataUrl:dataUrl, fileName:files[i].name||"" }) });
+        var j = await res.json();
+        if(!res.ok){ if(j && j.error==="limit_reached") full = true; throw new Error(j.error||"error"); }
+        data.images = data.images || []; data.images.unshift(j.image); ok++;
+      }catch(e){ fail++; }
+      if(full) break;
+    }
+    img.busy = false; redrawImages();
+    toast(full ? "追加できる枚数の上限に達しました" : fail ? (ok+"枚追加しました（"+fail+"枚は追加できませんでした）") : ok+"枚追加しました");
+  }
+  async function deleteImage(id){
+    if(!window.confirm("この写真を削除しますか？")) return;
+    try{
+      var res = await fetch("/api/early-data", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ p:P, t:T, action:"imageDelete", id:id }) });
+      if(!res.ok) throw new Error("error");
+      data.images = (data.images||[]).filter(function(x){ return x.id!==id; });
+      redrawImages(); toast("削除しました");
+    }catch(e){ toast("削除できませんでした。もう一度お試しください"); }
+  }
+  main.addEventListener("change", function(e){
+    if(e.target.id==="imgPlace"){ img.place = e.target.value; return; }
+    if(e.target.id==="imgFile"){ var fs = e.target.files; addImages(fs).then(function(){ var n = document.getElementById("imgNote"); if(n) n.value = ""; }); e.target.value = ""; }
+  });
 
   // ---------- メッセージ（おうちノートと同じやりとり。/api/early-data に POST） ----------
   function msgListHtml(){
@@ -427,6 +523,7 @@
     if(e.target.closest("[data-khelp]")){ e.preventDefault(); openHelp(); return; }
     if(e.target.closest("#rvToggle")){ setResvOpen(!rv.open); return; }
     if(e.target.closest("#msgSend")){ sendMsg(); return; }
+    var idl = e.target.closest("[data-imgdel]"); if(idl){ deleteImage(idl.dataset.imgdel); return; }
     if(e.target.closest("[data-updok]")){ updDismissed = true; var ub = document.getElementById("updBox"); if(ub) ub.remove(); return; }
     var ur = e.target.closest('.upd a.ur[href="#sec-resv"]'); if(ur) setResvOpen(true);
     if(e.target.closest('.jump a[href="#sec-resv"]')) setResvOpen(true);
@@ -463,6 +560,7 @@
         (fins.length ? '<li><b>資金計画・お見積り</b>：資金計画書やお見積りをご覧いただけます</li>' : '')+
         '<li><b>メッセージ</b>：ご質問・ご相談を送れます。担当者からのお返事もここに届きます</li>'+
         '<li><b>施工事例・イメージ集</b>：住まいるハウジングで建てたお家の写真です。気に入った写真に🩷を押すと「いいね」にまとまります</li>'+
+        '<li><b>お家のイメージ</b>：「こんなお家にしたい」という写真を追加できます。ご自身が追加した写真は×で削除できます</li>'+
         '<li><b>ご予約</b>：「📅 予約する」から、次回のご来店やご相談を予約できます</li>'+
         (about ? '<li><b>会社について</b>：住まいるハウジングのご紹介です</li>' : '')+
       '</ul>'+

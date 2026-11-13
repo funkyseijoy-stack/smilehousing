@@ -209,7 +209,7 @@ const IMAGE_MAX_PER_PROJECT = 200; // お客様が追加できる枚数の上限
 
 function imageOf(x: any) {
   return { id: x.id, url: x.url, place: x.place || "その他", by: x.by === "customer" ? "customer" : "staff", createdAt: x.createdAt || "",
-    gallery: x.source === "gallery" ? String(x.galleryGroup || "イメージ集") : "" };
+    gallery: x.source === "gallery" ? String(x.galleryGroup || "イメージ集") : "", note: String(x.note || "").slice(0, 200) };
 }
 
 // 打合せ記録の並び順用の時刻（UTCのISO文字列）。記録を書いた日が打合せ日と同じ（日本時間）なら、書いた時刻を使う。
@@ -627,7 +627,7 @@ export default async (req: Request, context: Context) => {
       const doc = {
         id, projectId, place, by: "customer", contentType,
         url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
-        fileName: String(body.fileName || "").slice(0, 120), createdAt: now, updatedAt: now,
+        fileName: String(body.fileName || "").slice(0, 120), note: String(body.note || "").trim().slice(0, 200), createdAt: now, updatedAt: now,
       };
       await store.setJSON(`imageBoard/${id}`, doc);
       return json({ ok: true, image: imageOf(doc) });

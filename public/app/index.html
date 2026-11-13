@@ -888,6 +888,8 @@
   .specphoto .spdate{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.7); color:#fff; border:none; font-size:.85rem; text-align:center; padding:1px 0; cursor:pointer; z-index:2; }
   .specphoto .splabel{ position:absolute; bottom:0; left:0; right:0; background:rgba(20,16,12,.55); color:#fff; font-size:.85rem; text-align:center; padding:1px 0; pointer-events:none; }
   .specphoto .spby{ position:absolute; top:2px; left:2px; background:rgba(255,255,255,.9); color:var(--text); font-size:.85rem; font-weight:700; border-radius:999px; padding:0 5px; pointer-events:none; }
+  #galLikeWrap .specphoto, #imageBoardWrap .specphoto{ width:112px; height:112px; }
+  .specphoto .spnote{ position:absolute; left:2px; right:2px; bottom:2px; background:rgba(255,255,255,.92); color:var(--text); font-size:.85rem; border-radius:6px; padding:1px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
   .specphoto .spby.cust{ background:#b45b6a; color:#fff; }
   .specphoto.specadd{ display:flex; align-items:center; justify-content:center; cursor:pointer; border-style:dashed; color:var(--muted); font-size:1.3rem; }
   .specphoto-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
@@ -1511,9 +1513,14 @@
           </div>
           <div id="finList"></div>
         </div>
-        <div class="card" id="galLikeCard" hidden>
-          <h3 style="margin:0 0 4px;">🩷 イメージ集でいいねした写真 <span class="muted" id="galLikeCount" style="font-weight:400; font-size:.85rem;"></span></h3>
-          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様が、お打合せの記録・おうちノートから開いた「施工事例・イメージ集」で🩷を押した写真です。新しい順に並びます。写真を押すと大きく開きます。</p>
+        <div class="card" id="galLikeCard">
+          <h3 style="margin:0 0 4px;">📷 お家のイメージ <span class="muted" id="galLikeCount" style="font-weight:400; font-size:.85rem;"></span></h3>
+          <p class="muted help" style="margin:0 0 10px; font-size:.85rem;">お客様がお打合せの記録ページ・おうちノートから追加した写真、イメージ集で🩷を押した写真、スタッフが追加した写真です（「写真・アルバム」タブの「お家のイメージ」と同じもの）。新しい順に並びます。写真を押すと大きく開きます。</p>
+          <div class="row" style="margin-block-end:10px; gap:6px; align-items:center; flex-wrap:wrap;">
+            <select id="hearImgPlace"></select>
+            <label class="btn secondary small" for="hearImgFile" style="cursor:pointer;">＋ 写真を追加</label>
+            <input type="file" id="hearImgFile" accept="image/*" multiple hidden>
+          </div>
           <div id="galLikeWrap" class="specphotos"></div>
         </div>
         <div class="card">
@@ -6351,18 +6358,24 @@
     {k:"other", label:"その他・メモ", ph:"気になっていること、ほかに検討している会社など"}
   ];
   // イメージ集（/gallery/）でお客様がいいねした写真（imageBoard の source:"gallery"。netlify/functions/gallery-like.mts が保存）
+  // ヒアリングタブの「お家のイメージ」（imageBoard 全部。お客様の追加・イメージ集のいいね・スタッフの写真。新しい順）
+  function imageCellHtml(p){
+    var cust = p.by==="customer", gal = p.source==="gallery";
+    return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+escapeHtml(p.thumbUrl||p.url)+'" alt="">'+
+      '<a href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
+      '<span class="spby'+(cust?' cust':'')+'">'+(gal?'🩷 '+escapeHtml(p.galleryGroup||"イメージ集"):(cust?'お客様':'スタッフ'))+'</span>'+
+      '<button class="spdel" data-delimageboard="'+escapeHtml(p.id)+'">×</button>'+
+      (p.note?'<span class="spnote" title="'+escapeHtml(p.note)+'">💬 '+escapeHtml(p.note)+'</span>':'')+'</div>';
+  }
   function renderGalleryLikes(){
     var card = document.getElementById("galLikeCard"), wrap = document.getElementById("galLikeWrap");
     if(!card || !wrap) return;
-    var list = state.imageBoard.filter(function(p){ return !p.deletedAt && p.projectId===state.currentProjectId && p.source==="gallery"; })
+    var sel = document.getElementById("hearImgPlace");
+    if(sel && !sel.options.length) sel.innerHTML = IMAGE_PLACES.map(function(pl){ return '<option value="'+pl+'">'+pl+'</option>'; }).join("");
+    var list = state.imageBoard.filter(function(p){ return !p.deletedAt && p.projectId===state.currentProjectId && p.url; })
       .sort(function(a,b){ return String(b.createdAt||"").localeCompare(String(a.createdAt||"")); });
-    card.hidden = !list.length;
     var c = document.getElementById("galLikeCount"); if(c) c.textContent = list.length ? "（"+list.length+"枚）" : "";
-    wrap.innerHTML = list.map(function(p){
-      return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+escapeHtml(p.thumbUrl||p.url)+'" alt="">'+
-        '<a href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
-        '<span class="spby cust">'+escapeHtml(p.galleryGroup||"イメージ集")+'</span></div>';
-    }).join("");
+    wrap.innerHTML = list.length ? list.map(imageCellHtml).join("") : '<div class="empty">まだ写真がありません。</div>';
   }
   // ヒアリング・写真タブを開いたとき、お客様のいいねを取り直す（3分ごとの自動更新を待たずに出すため）
   var galLikeLoading = false;
@@ -6373,8 +6386,9 @@
       var items = await apiGet("imageBoard");
       var byId = {}; items.forEach(function(x){ if(x && x.id) byId[x.id] = x; });
       var seen = {};
-      state.imageBoard = state.imageBoard.map(function(x){ seen[x.id]=1; return (x.source==="gallery" && byId[x.id]) ? byId[x.id] : x; });
-      items.forEach(function(x){ if(x && x.id && !seen[x.id] && x.source==="gallery") state.imageBoard.push(x); });
+      // お客様の追加（お打合せの記録ページ・おうちノート）とイメージ集のいいねを取り込む（サーバーのほうが新しいものだけ入れ替える）
+      state.imageBoard = state.imageBoard.map(function(x){ seen[x.id]=1; var y = byId[x.id]; return (y && String(y.updatedAt||"") >= String(x.updatedAt||"")) ? y : x; });
+      items.forEach(function(x){ if(x && x.id && !seen[x.id]) state.imageBoard.push(x); });
       renderGalleryLikes();
       if(typeof renderImageBoard==="function") renderImageBoard();
     }catch(e){ /* 取り直せなくても画面はそのまま */ }
@@ -13466,12 +13480,7 @@
       if(!list.length) return;
       html += '<div style="margin-block-end:12px;"><strong>'+pl+'</strong>（'+list.length+'）<div class="specphotos" style="margin-block-start:6px;">'+
         list.map(function(p){
-          var cust = p.by==="customer";
-          var gal = p.source==="gallery";
-          return '<div class="specphoto"><img loading="lazy" decoding="async" src="'+(p.thumbUrl||p.url)+'" alt="">'+
-            '<a href="'+p.url+'" target="_blank" rel="noopener" style="position:absolute; inset:0;"></a>'+
-            '<span class="spby'+(cust?' cust':'')+'">'+(gal?'🩷 イメージ集':(cust?'お客様':'スタッフ'))+'</span>'+
-            '<button class="spdel" data-delimageboard="'+p.id+'">×</button></div>';
+          return imageCellHtml(p);
         }).join("")+'</div></div>';
     });
     wrap.innerHTML = html;
@@ -20403,6 +20412,17 @@
       var place = document.getElementById("imgBoardPlace").value || "その他";
       input.value = "";
       uploadImageBoard(files, place);
+    });
+    document.getElementById("hearImgFile").addEventListener("change", function(e){
+      var input = e.target;
+      var files = Array.prototype.slice.call(input.files||[]);
+      var place = document.getElementById("hearImgPlace").value || "その他";
+      input.value = "";
+      uploadImageBoard(files, place);
+    });
+    document.getElementById("galLikeWrap").addEventListener("click", function(e){
+      var del = e.target.closest("[data-delimageboard]");
+      if(del){ e.preventDefault(); if(confirm2()){ var p = state.imageBoard.find(function(x){ return x.id===del.dataset.delimageboard; }); softDelete("imageBoard","imageBoard", del.dataset.delimageboard, (p && p.by==="customer") ? "お客様のイメージ写真" : "イメージ写真"); } }
     });
     document.getElementById("imageBoardWrap").addEventListener("click", function(e){
       var del = e.target.closest("[data-delimageboard]");

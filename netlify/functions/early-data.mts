@@ -8,6 +8,8 @@ import { sendNotifyMail } from "../lib/google.mts";
 // 会社紹介の文章（settings/main.companyIntro）を返す。社内の情報は返さない。予約の受付は note-calendar.mts（earlyToken でも可）。
 // メッセージ：おうちノートと同じ messages コレクションのやりとりを返し、POST {p,t,action:"message",text} でお客様から送れる
 // （fromCustomer:true で保存し、スタッフへ通知メール）。
+// お家のイメージ：おうちノートと同じ imageBoard を返し、POST action:"imageAdd"／"imageDelete" でお客様が写真を足す・自分の写真を消す
+// （場所タグ IMAGE_PLACES は note-data.mts・住まいるアプリと同じ内容にすること）。
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +22,19 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
+}
+
+const IMAGE_PLACES = ["外観", "玄関", "LDK", "キッチン", "お風呂", "洗面・脱衣", "トイレ", "階段", "寝室", "子供部屋", "その他"];
+const IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+const IMAGE_MAX_PER_PROJECT = 200;
+function imageOf(x: any) {
+  return { id: x.id, url: x.url, place: x.place || "その他", by: x.by === "customer" ? "customer" : "staff", createdAt: x.createdAt || "",
+    gallery: x.source === "gallery" ? String(x.galleryGroup || "イメージ集") : "", note: String(x.note || "").slice(0, 200) };
+}
+async function listImages(store: any, projectId: string) {
+  const { blobs } = await store.list({ prefix: "imageBoard/" });
+  const all = await Promise.all(blobs.map((bl: any) => store.get(bl.key, { type: "json" }).catch(() => null)));
+  return all.filter((x: any) => x && x.projectId === projectId && !x.deletedAt);
 }
 
 // 「前回からの更新」用：作った時刻と直した時刻（お客様に見せる切り替えも含む）の新しいほう
@@ -47,6 +62,38 @@ export default async (req: Request, context: Context) => {
     return json({ error: "invalid_link" }, 403);
   }
 
+  if (body && body.action === "imageAdd") {
+    const place = String(body.place || "");
+    if (!IMAGE_PLACES.includes(place)) return json({ error: "unknown_place" }, 400);
+    const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(String(body.dataUrl || ""));
+    if (!m) return json({ error: "invalid_image" }, 400);
+    let bytes: Uint8Array;
+    try { bytes = Uint8Array.from(Buffer.from(m[2], "base64")); } catch { return json({ error: "invalid_base64" }, 400); }
+    if (!bytes.length) return json({ error: "invalid_image" }, 400);
+    if (bytes.length > IMAGE_MAX_BYTES) return json({ error: "too_large" }, 413);
+    const existing = await listImages(store, projectId);
+    if (existing.filter((x: any) => x.by === "customer" && x.source !== "gallery").length >= IMAGE_MAX_PER_PROJECT) return json({ error: "limit_reached" }, 429);
+    const key = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await getStore("customerPhotos").set(`${projectId}/${key}`, bytes, { metadata: { contentType: m[1] } });
+    const id = "img_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const now = new Date().toISOString();
+    const doc = {
+      id, projectId, place, by: "customer", source: "kiroku", contentType: m[1],
+      url: `/api/get-photo?slug=${encodeURIComponent(projectId)}&key=${encodeURIComponent(key)}`,
+      fileName: String(body.fileName || "").slice(0, 120), note: String(body.note || "").trim().slice(0, 200), createdAt: now, updatedAt: now,
+    };
+    await store.setJSON(`imageBoard/${id}`, doc);
+    return json({ ok: true, image: imageOf(doc) });
+  }
+  if (body && body.action === "imageDelete") {
+    const id = String(body.id || "");
+    const doc: any = id && !id.includes("/") ? await store.get(`imageBoard/${id}`, { type: "json" }) : null;
+    if (!doc || doc.projectId !== projectId || doc.deletedAt) return json({ error: "not_found" }, 404);
+    if (doc.by !== "customer" || doc.source === "gallery") return json({ error: "forbidden" }, 403);
+    const now = new Date().toISOString();
+    await store.setJSON(`imageBoard/${id}`, { ...doc, deletedAt: now, updatedAt: now });
+    return json({ ok: true });
+  }
   if (body) {
     if (body.action !== "message") return json({ error: "unknown_action" }, 400);
     const text = String(body.text || "").trim().slice(0, 2000);
@@ -153,7 +200,13 @@ export default async (req: Request, context: Context) => {
   const px = ciOn && typeof ci.policyText === "string" ? ci.policyText.trim().slice(0, 3000) : "";
   const policy = pt || px ? { title: pt, text: px } : null;
 
+  // お家のイメージ（おうちノートと同じ imageBoard。新しい順）
+  const images = (await listImages(store, projectId)).filter((x: any) => x.url).map(imageOf)
+    .sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
+
   return json({
+    imagePlaces: IMAGE_PLACES,
+    images,
     view: project.noteView === "kiroku" ? "kiroku" : (project.noteView === "note" ? "note" : ""), // スタッフが選んだ「お客様のリンクで開くページ」
     customer: String(project.customer || project.name || ""),
     today,

@@ -1548,7 +1548,7 @@ function homeHtml(){ return homeParts().main; }
         }).join("")+'</div>';
       out += '<div class="imggrid">'+shown.map(function(x){
         var mine = x.by==="customer";
-        return '<div class="imgcell"><button class="th" data-img="'+esc(x.url)+'"><img loading="lazy" src="'+esc(x.url)+'" alt=""><span class="cap">'+esc(x.place)+' ・ '+fmtD(x.createdAt)+'</span></button>'+
+        return '<div class="imgcell"><button class="th" data-img="'+esc(x.url)+'"><img loading="lazy" src="'+esc(x.url)+'" alt=""><span class="cap">'+esc(x.place)+' ・ '+fmtD(x.createdAt)+(x.note?'<br>💬 '+esc(x.note):'')+'</span></button>'+
           '<span class="by'+(mine?' me':'')+'">'+(x.gallery?'🩷 イメージ集':(mine?'あなた':'スタッフ'))+'</span>'+
           (mine?'<button class="imgdel" data-imgdel="'+esc(x.id)+'" aria-label="この写真を削除">×</button>':'')+'</div>';
       }).join("")+'</div>';
