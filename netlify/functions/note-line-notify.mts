@@ -1,6 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { requestLineNotify, recipientsOf, jstLabel, activePushIds } from "../lib/line-queue.mts";
+import { requestLineNotify, recipientsOf, jstLabel, activePushIds, projectForSend } from "../lib/line-queue.mts";
 
 // スタッフが「LINEでお知らせ」を押したとき、プロライン経由でお客様のLINEに
 // 「おうちノートが更新されました。」を送る。
@@ -49,7 +49,7 @@ export default async (req: Request, context: Context) => {
   const act = await activePushIds(projectId);
   const allUids = recipientsOf(project);
   if (allUids.some((u) => !/^[A-Za-z0-9_-]{1,64}$/.test(u))) return json({ ok: false, error: "bad_uid" }, 400);
-  const uids = recipientsOf(project, act);
+  const uids = recipientsOf(await projectForSend({ ...project, id: projectId }), act);
   const settings: any = await store.get("settings/main", { type: "json" });
   const beaconRaw = String((settings && settings.prolineBeaconUrl) || "").trim();
   const beaconOk = !!beaconRaw && beaconRaw.startsWith(BEACON_PREFIX) && beaconRaw.includes("[[uid]]");

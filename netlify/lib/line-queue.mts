@@ -49,6 +49,28 @@ export function recipientsOf(project: any, activePush?: Set<string>): string[] {
     .map((r: any) => String((r && r.uid) || "").trim()).filter(Boolean);
   return Array.from(new Set(list)).slice(0, 10);
 }
+// 行に選んだ端末が止まっていても、同じ名前の届く端末があればそちらを選んだものとして扱う
+// （同じ人が登録し直した・2台目を外したときに、LINEが勝手に復活しないように）
+export function remapPushRows(project: any, subs: any[]) {
+  if (!project || !Array.isArray(project.prolineUids)) return project;
+  const byId: Record<string, any> = {};
+  subs.forEach((x: any) => { byId[String(x.id)] = x; });
+  const rows = project.prolineUids.map((r: any) => {
+    if (!r || !r.pushSub) return r;
+    const cur = byId[String(r.pushSub)];
+    if (cur && isActive(cur)) return r;
+    const nm = String((cur && cur.name) || "").trim();
+    if (!nm) return r;
+    const alt = subs.filter((x: any) => isActive(x) && String(x.name || "").trim() === nm)
+      .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
+    return alt ? { ...r, pushSub: String(alt.id) } : r;
+  });
+  return { ...project, prolineUids: rows };
+}
+export async function projectForSend(project: any) {
+  if (!project || !project.id) return project;
+  return remapPushRows(project, await listSubs(project.id));
+}
 export async function activePushIds(projectId: string) {
   return new Set((await listSubs(projectId)).filter(isActive).map((x: any) => String(x.id)));
 }
@@ -65,7 +87,7 @@ export async function deliverNow(projectId: string, beacon: string | null) {
     try { const pr = await sendPushToProject(projectId, { title: "おうちノート", body: "おうちノートが更新されました。" }); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
     catch (e) { console.error("push failed", e); }
   }
-  const uids = recipientsOf(project, okIds);
+  const uids = recipientsOf(remapPushRows(project, await listSubs(projectId)), okIds);
   const r = beacon && uids.length ? await sendBeacon(beacon, uids) : { sent: 0, failed: [] as string[] };
   return { sent: r.sent, failed: r.failed, pushSent: p.sent, pushTotal: p.total };
 }

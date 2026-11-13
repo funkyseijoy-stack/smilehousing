@@ -4374,9 +4374,19 @@
   function pushSubsOf(p){ return (p && pushSubsCache[p.id]) || []; }
   function activePushOf(p){ return pushSubsOf(p).filter(function(x){ return !x.disabledAt; }); }
   // LINEを送る人（プッシュ通知で届く端末を選んだ人は除く。その端末が届かなくなっていればLINEを送る）
+  // 行の端末が止まっていても、同じ名前の届く端末があればそちらとみなす（サーバーの remapPushRows と同じ考え方）
+  function effPushSub(p, r){
+    if(!r || !r.pushSub) return "";
+    var subs = pushSubsOf(p), cur = subs.filter(function(x){ return x.id===r.pushSub; })[0];
+    if(cur && !cur.disabledAt) return cur.id;
+    var nm = String((cur && cur.name) || "").trim(); if(!nm) return r.pushSub;
+    var alt = subs.filter(function(x){ return !x.disabledAt && String(x.name||"").trim()===nm; })
+      .sort(function(a,b){ return String(b.createdAt||"").localeCompare(String(a.createdAt||"")); })[0];
+    return alt ? alt.id : r.pushSub;
+  }
   function lineTargetsOf(p){
     var act = {}; activePushOf(p).forEach(function(x){ act[x.id] = 1; });
-    return prolineRecipients(p).filter(function(r){ return !(r.pushSub && act[r.pushSub]); });
+    return prolineRecipients(p).filter(function(r){ var e = effPushSub(p, r); return !(e && act[e]); });
   }
   function canNotifyProj(p){
     if(!p) return false;
@@ -4397,15 +4407,18 @@
   var prolineDraftPid = null;  // 編集中の行がどの案件のものか
   function prolineRowHtml(r, i){
     var subs = pushSubsOf(projectById(state.currentProjectId));
-    var opts = '<option value="">📱 LINEで送る</option>'+subs.map(function(x){
-      return '<option value="'+escapeHtml(x.id)+'"'+(r.pushSub===x.id?' selected':'')+'>🔔 通知で届く：'+escapeHtml(x.name||"名前なし")+(x.disabledAt?'（止まっている→LINEで送る）':'')+'（LINEは送らない）</option>';
+    var opts = '<option value="">📱 LINEで送る</option>'+subs.filter(function(x){ return !x.disabledAt || r.pushSub===x.id; }).map(function(x){
+      var when = (x.page==="kiroku"?"記録ページ":"おうちノート")+"・"+String(x.createdAt||"").slice(5,16).replace("-","/").replace("T"," ")+"登録";
+      return '<option value="'+escapeHtml(x.id)+'"'+(r.pushSub===x.id?' selected':'')+'>🔔 通知で届く：'+escapeHtml(x.name||"名前なし")+'（'+when+'）'+(x.disabledAt?'（止まっている）':'')+'・LINEは送らない</option>';
     }).join("");
     if(r.pushSub && !subs.some(function(x){ return x.id===r.pushSub; })) opts += '<option value="'+escapeHtml(r.pushSub)+'" selected>🔔 通知（見つからない端末→LINEで送る）</option>';
     return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">'+
       '<input type="text" autocomplete="off" data-plname="'+i+'" value="'+escapeHtml(r.name||"")+'" placeholder="名前（例：ご主人）" style="flex:1; min-width:110px;">'+
       '<input type="text" autocomplete="off" data-pluid="'+i+'" value="'+escapeHtml(r.uid||"")+'" placeholder="プロラインID（例：abc1234）" style="flex:1; min-width:150px;">'+
       (subs.length ? '<select data-plpush="'+i+'" style="flex:1 1 220px; min-width:180px;" title="この人への送り方">'+opts+'</select>' : '')+
-      '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>';
+      '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>'+
+      (r.uid ? (function(){ var pp = projectById(state.currentProjectId), e = effPushSub(pp, r), ok = e && activePushOf(pp).some(function(x){ return x.id===e; });
+        return '<div class="muted" style="font-size:.85rem; margin:-2px 0 6px;">→ いま：'+(ok ? '🔔 通知で届くので、LINEは送りません' : (r.pushSub ? '📱 選んだ端末が止まっているので、LINEで送ります' : '📱 LINEで送ります'))+'</div>'; })() : '');
   }
   function readProlineRows(){
     var rows = [];
