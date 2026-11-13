@@ -21306,5 +21306,16 @@
 })();
 </script>
 
+<script>
+// 住まいるアプリの中でおうちノートの通知を登録してしまった端末では、アイコンに数字が付く。アプリを開いたら消す（2026年11月13日〜）
+(function(){
+  function clr(){
+    try{ if(navigator.clearAppBadge) navigator.clearAppBadge().catch(function(){}); }catch(e){}
+    try{ if(window.caches) caches.open("sumai-badge").then(function(c){ return c.put("/__badge", new Response("0")); }).catch(function(){}); }catch(e){}
+  }
+  clr();
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") clr(); });
+})();
+</script>
 </body>
 </html>

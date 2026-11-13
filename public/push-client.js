@@ -71,6 +71,9 @@
       }
     }catch(e){}
     lsSet(lsKey(), null);
+    // 住まいるアプリ（スタッフ用）をホーム画面から開いた中でおうちノートを見ているときは、登録させない
+    // （登録すると、お客様向けの通知が住まいるアプリに届き、アイコンに数字が付いてしまうため）
+    try{ if(standalone() && localStorage.getItem("sumairu_staff_token")) return { s: "staffapp" }; }catch(e){}
     return { s: "ready" };
   }
   async function subscribe(name){
@@ -107,6 +110,7 @@
     if(st.s === "line") return '<div class="spush">'+head+'<div class="spt">LINEの中の画面では設定できません。右上の「⋯」（︙）から「ブラウザで開く」（Safari・Chrome）を選んで開き直してください。</div>'+(o.dismissKey?'<div class="spr"><button type="button" class="spl" data-spno>あとで</button></div>':'')+'</div>';
     if(st.s === "ios") return '<div class="spush">'+head+'<div class="spt">iPhoneは、このページを「ホーム画面に追加」して、ホーム画面のアイコンから開くと、更新のお知らせを受け取れます。</div>'+
       '<div class="spr">'+(o.onHowTo?'<button type="button" class="spb" data-sphow>ホーム画面への追加の仕方</button>':'')+(o.dismissKey?'<button type="button" class="spl" data-spno>あとで</button>':'')+'</div></div>';
+    if(st.s === "staffapp") return o.dismissKey ? "" : '<div class="spush">'+head+'<div class="spt">いまは住まいるアプリ（スタッフ用）の中で開いているため、ここでは登録できません。おうちノートのアイコンから開いて登録してください。</div></div>';
     if(st.s === "unsupported") return o.dismissKey ? "" : '<div class="spush">'+head+'<div class="spt">この端末・ブラウザでは受け取れません。</div></div>';
     if(st.s === "denied") return '<div class="spush">'+head+'<div class="spt">通知がオフになっています。端末の「設定」で、このアプリ（ブラウザ）の通知を許可すると受け取れます。</div></div>';
     return '<div class="spush">'+head+'<div class="spt">更新があったとき、このスマホに通知でお知らせします。ご家族それぞれのスマホで設定できます。</div>'+
