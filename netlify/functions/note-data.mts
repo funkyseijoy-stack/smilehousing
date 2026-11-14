@@ -276,6 +276,10 @@ function fileOf(f: any) {
 
 // 収納プラン（IKEA ボーアクセル）の部品・計算は netlify/lib/boaxel.mts、ページは /shuno/（API /api/shuno）。
 
+// お客様の画面に出すスタッフの名前（社内の名前→お客様に見せる名前。2026年11月〜）
+const STAFF_PUBLIC_NAMES: Record<string, string> = { "朋子": "小野寺" };
+function publicSender(m: any) { const s = String((m && m.sender) || ""); return (m && m.fromCustomer) ? s : (STAFF_PUBLIC_NAMES[s.trim()] || s); }
+
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
 
@@ -1118,7 +1122,7 @@ export default async (req: Request, context: Context) => {
     messages: messages
       .map((m) => {
         const orig: any = !m.chgKey && m.replyTo ? messages.find((x: any) => x && x.id === m.replyTo) : null;
-        return { content: m.content || "", sender: m.sender || "", fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) || !!m.chgReply,
+        return { content: m.content || "", sender: publicSender(m), fromCustomer: !!m.fromCustomer, createdAt: m.createdAt || "", chgKey: m.chgKey || (orig && orig.chgKey) || "", chgReply: !!(orig && orig.chgKey) || !!m.chgReply,
           files: Array.isArray(m.files) ? m.files.filter((f: any) => f && f.url).map((f: any) => ({ url: f.url, contentType: f.contentType || "", name: f.name || "" })) : [] };
       })
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),

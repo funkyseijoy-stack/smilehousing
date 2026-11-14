@@ -42,6 +42,10 @@ function updAt(...xs: any[]): string {
   return xs.map((x) => String(x || "")).reduce((m, x) => (x > m ? x : m), "");
 }
 
+// お客様の画面に出すスタッフの名前（社内の名前→お客様に見せる名前。2026年11月〜）
+const STAFF_PUBLIC_NAMES: Record<string, string> = { "朋子": "小野寺" };
+function publicSender(m: any) { const s = String((m && m.sender) || ""); return (m && m.fromCustomer) ? s : (STAFF_PUBLIC_NAMES[s.trim()] || s); }
+
 export default async (req: Request, context: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
   if (req.method !== "GET" && req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -187,7 +191,7 @@ export default async (req: Request, context: Context) => {
     .filter((m: any) => m && m.projectId === projectId && !m.deletedAt)
     // おうちノートのカードへの「変更のご依頼」とその返信は、おうちノートのカードの下に出すので、ここには出さない
     .filter((m: any, _i: number, all: any[]) => !m.chgKey && !(m.replyTo && all.some((x: any) => x && x.id === m.replyTo && x.chgKey)))
-    .map((m: any) => ({ content: String(m.content || ""), sender: String(m.sender || ""), fromCustomer: !!m.fromCustomer, createdAt: String(m.createdAt || "") }))
+    .map((m: any) => ({ content: String(m.content || ""), sender: publicSender(m), fromCustomer: !!m.fromCustomer, createdAt: String(m.createdAt || "") }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   // 会社紹介（住まいるアプリの「業者・設定」で保存した文章。未保存なら出さない）
