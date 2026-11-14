@@ -280,6 +280,18 @@
   .recpartbox{ border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-block-end:12px; background:var(--surface-2); }
   .recpartbox textarea{ width:100%; box-sizing:border-box; }
   .recday{ margin-block-end:12px; }
+  /* 記録の「部位ごと」：部位を縦に並べ、各部位は横にスクロール */
+  .recrow{ margin-block-end:16px; border-block-end:1px solid var(--border); padding-block-end:10px; }
+  .recrow-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:6px; }
+  .recrow-name{ font-weight:700; font-size:1.05rem; }
+  .recrow-head .btn{ margin-inline-start:auto; }
+  .recstrip{ display:flex; gap:12px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; padding:2px 2px 10px; align-items:flex-start; -webkit-overflow-scrolling:touch; }
+  .recslot{ flex:0 0 360px; max-width:360px; scroll-snap-align:start; }
+  .recslot-date{ font-size:.85rem; font-weight:700; color:var(--muted); margin-block-end:4px; }
+  .recslot .noteitem, .recslot .rectl{ margin:0; }
+  @media (max-width:760px){ .recslot{ flex-basis:84vw; max-width:84vw; } .recrow-hint{ display:none; } }
+  /* 横スクロールの中では操作メニューが切れるので、画面の真ん中に出す */
+  .recstrip .noteitem.notemenu-open .notemenu, .recstrip .spectl-ops[open] .opsmenu{ position:fixed; left:50%; transform:translateX(-50%); right:auto; width:min(420px, calc(100vw - 24px)); top:calc(env(safe-area-inset-top) + 64px); bottom:auto; max-height:calc(100vh - 160px); z-index:120; }
   .recday .rectl{ margin-block-end:8px; }
   .recday .noteitem{ margin-block-end:8px; }
   .ri-row{ display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); flex-wrap:wrap; }
@@ -8792,8 +8804,12 @@
       opt("checkopen", "🔒 社内で確認・未確認（"+mcount("checkopen")+"件）", mk==="checkopen")+
       opt("check", "🔒 社内で確認・すべて（"+mcount("check")+"件）", mk==="check")+'</select></label>';
     if(f.big || mk) html += '<button type="button" class="btn secondary small" data-recclear>絞り込みを解除</button>';
+    else html += '<label class="field recsel">並べ方<select data-reclayout>'+opt("parts", "部位ごと（横にスクロール）", recLayout()==="parts")+opt("time", "日付順", recLayout()==="time")+'</select></label>';
     bar.innerHTML = html;
   }
+  // 記録の並べ方：parts＝部位ごとに縦に並べ、各部位は横にスクロール（初期）／time＝日付順の1つの一覧。端末ごとに覚える
+  function recLayout(){ try{ return localStorage.getItem("sumairu_reclayout")==="time" ? "time" : "parts"; }catch(e){ return "parts"; } }
+  function setRecLayout(v){ try{ localStorage.setItem("sumairu_reclayout", v==="time"?"time":"parts"); }catch(e){} renderMeetingNotes(); }
   function setRecFilter(big, sub){
     state.recFilter = {big: big||"", sub: sub||""};
     renderMeetingNotes();
@@ -9300,8 +9316,8 @@
     renderNoteSpecFilterBar();
     renderRecPartBox();
     var filter = state.recFilter || {big:"", sub:""};
-    var rows = liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; })
-      .filter(function(n){ return recMatch(n.specPart, filter) || noteLinePartsMatch(n, filter).length>0; })
+    var notesFor = function(f){ return liveNotes().filter(function(n){ return n.projectId === state.currentProjectId; })
+      .filter(function(n){ return recMatch(n.specPart, f) || noteLinePartsMatch(n, f).length>0; })
       .filter(function(n){ return noteHasMark(n, state.recMark||""); })
       .slice()
       .sort(function(a,b){
@@ -9311,7 +9327,7 @@
         var db = b.date || (b.createdAt||"").slice(0,10);
         if(da !== db) return db.localeCompare(da);
         return (b.createdAt||"").localeCompare(a.createdAt||"");
-      });
+      }); };
     // 部位で絞っていて、記録そのものの部位は違うが「行」にその部位が付いているとき：その行だけのカード
     var partialCardOf = function(n){
       var ls = noteLinePartsMatch(n, filter);
@@ -9380,32 +9396,68 @@
     var pad = function(n){ return String(n).padStart(2,"0"); };
     var localKey = function(iso){ var d = iso ? new Date(iso) : null; if(!d || isNaN(d.getTime())) return String(iso||"");
       return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); };
-    var items = rows.map(function(n){
-      var day = n.date || localKey(n.createdAt).slice(0,10);
-      return { t:"n", n:n, key: day+"T"+(localKey(n.noteAt||n.createdAt).slice(11)||"00:00:00") };
-    });
-    liveSpecPhotos().forEach(function(p){
-      if(p.projectId!==pid || p.kind==="note" || state.recMark) return;
-      if(!recMatch({scope:p.scope, category:p.category, roomId:p.roomId, side:p.side}, filter)) return;
-      items.push({ t:"s", p:p, key: localKey(p.createdAt) });
-    });
-    liveAttachments().forEach(function(a){
-      if(a.projectId!==pid || !isTimelineQuote(a) || !a.specPart || state.recMark) return;
-      if(!recMatch(a.specPart, filter)) return;
-      var k = a.receivedAt || a.createdAt || a.uploadedAt || "";
-      items.push({ t:"a", a:a, key: /^\d{4}-\d{2}-\d{2}$/.test(k) ? k+"T00:00:00" : localKey(k) });
-    });
-    items.sort(function(x, y){ return (y.key||"").localeCompare(x.key||""); });
+    var itemsFor = function(f){
+      var items = notesFor(f).map(function(n){
+        var day = n.date || localKey(n.createdAt).slice(0,10);
+        return { t:"n", n:n, key: day+"T"+(localKey(n.noteAt||n.createdAt).slice(11)||"00:00:00") };
+      });
+      liveSpecPhotos().forEach(function(p){
+        if(p.projectId!==pid || p.kind==="note" || state.recMark) return;
+        if(!recMatch({scope:p.scope, category:p.category, roomId:p.roomId, side:p.side}, f)) return;
+        items.push({ t:"s", p:p, key: localKey(p.createdAt) });
+      });
+      liveAttachments().forEach(function(a){
+        if(a.projectId!==pid || !isTimelineQuote(a) || !a.specPart || state.recMark) return;
+        if(!recMatch(a.specPart, f)) return;
+        var k = a.receivedAt || a.createdAt || a.uploadedAt || "";
+        items.push({ t:"a", a:a, key: /^\d{4}-\d{2}-\d{2}$/.test(k) ? k+"T00:00:00" : localKey(k) });
+      });
+      items.sort(function(x, y){ return (y.key||"").localeCompare(x.key||""); });
+      return items;
+    };
+    var itemHtml = function(it){
+      if(it.t==="n") return cardOf(it.n);
+      if(it.t==="s"){ var p = it.p; return '<div class="spectl rectl">'+specTimelineCardHtml(p, p.scope, p.category||null, p.roomId||null, p.side||null, {scope:p.scope, category:p.category||null, roomId:p.roomId||null, side:p.side||null}, true)+'</div>'; }
+      var a = it.a, sp = a.specPart; return '<div class="spectl rectl">'+quoteTimelineCardHtml(a, "att:"+a.id, {scope:sp.scope, category:sp.category||null, roomId:sp.roomId||null, side:sp.side||null, showPart:true})+'</div>';
+    };
+    var cnt = document.getElementById("recCount");
+    // 部位ごと：部位を縦に並べ、それぞれの部位の中は横にスクロール（新しいものが左）
+    if(recLayout()==="parts" && !filter.big && !state.recMark){
+      var proj = projectById(pid);
+      var bigs = recBigs(proj).concat([{key:"none", label:"❔ 部位なし"}]);
+      var total = 0, rowsHtml = [];
+      bigs.forEach(function(b){
+        filter = {big:b.key, sub:""};
+        var its = itemsFor(filter);
+        if(!its.length) return;
+        total += its.length;
+        rowsHtml.push('<div class="recrow"><div class="recrow-head"><span class="recrow-name">'+escapeHtml(b.label)+'</span><span class="muted">'+its.length+'件</span>'+
+          (its.length>1 ? '<span class="muted recrow-hint">← 横にスクロール</span>' : '')+
+          '<button type="button" class="btn ghost small" data-recrowopen="'+escapeHtml(b.key)+'">この部位だけ見る ›</button></div>'+
+          '<div class="recstrip" data-rowkey="'+escapeHtml(b.key)+'">'+its.map(function(it){
+            var d = (it.key||"").slice(0,10);
+            return '<div class="recslot"><div class="recslot-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</div>'+itemHtml(it)+'</div>';
+          }).join("")+'</div></div>');
+      });
+      filter = {big:"", sub:""};
+      empty.hidden = total !== 0;
+      if(cnt) cnt.textContent = rowsHtml.length ? rowsHtml.length+"部位" : "";
+      // 描き直しても、それぞれの部位の横の位置はそのまま
+      var keepX = {};
+      wrap.querySelectorAll(".recstrip[data-rowkey]").forEach(function(el){ keepX[el.dataset.rowkey] = el.scrollLeft; });
+      wrap.innerHTML = rowsHtml.join("");
+      wrap.querySelectorAll(".recstrip[data-rowkey]").forEach(function(el){ if(keepX[el.dataset.rowkey]) el.scrollLeft = keepX[el.dataset.rowkey]; });
+      return;
+    }
+    var items = itemsFor(filter);
     empty.hidden = items.length !== 0;
-    var cnt = document.getElementById("recCount"); if(cnt) cnt.textContent = items.length ? items.length+"件" : "";
+    if(cnt) cnt.textContent = items.length ? items.length+"件" : "";
     var groups = [];
     items.forEach(function(it){
       var d = (it.key||"").slice(0,10);
       var g = groups.length ? groups[groups.length-1] : null;
       if(!g || g.date!==d){ g = {date:d, html:[]}; groups.push(g); }
-      if(it.t==="n") g.html.push(cardOf(it.n));
-      else if(it.t==="s"){ var p = it.p; g.html.push('<div class="spectl rectl">'+specTimelineCardHtml(p, p.scope, p.category||null, p.roomId||null, p.side||null, {scope:p.scope, category:p.category||null, roomId:p.roomId||null, side:p.side||null}, true)+'</div>'); }
-      else { var a = it.a, sp = a.specPart; g.html.push('<div class="spectl rectl">'+quoteTimelineCardHtml(a, "att:"+a.id, {scope:sp.scope, category:sp.category||null, roomId:sp.roomId||null, side:sp.side||null, showPart:true})+'</div>'); }
+      g.html.push(itemHtml(it));
     });
     wrap.innerHTML = groups.map(function(g, gi){
       return '<div class="recday"><div class="spectl-datehead">'+escapeHtml(g.date ? g.date.replace(/-/g,".") : "日付不明")+(gi===0?'<span class="pill tag small">最新</span>':'')+'</div>'+g.html.join("")+'</div>';
@@ -20839,6 +20891,11 @@
       state.taskAssigneeFilter = chip.dataset.taskassigneefilter || null;
       renderKanban();
     });
+    var recListEl = document.getElementById("meetingNoteList");
+    if(recListEl) recListEl.addEventListener("click", function(e){
+      var ro = e.target.closest("[data-recrowopen]");
+      if(ro){ setRecFilter(ro.dataset.recrowopen, ""); var bar = document.getElementById("noteSpecFilterBar"); if(bar) bar.scrollIntoView({block:"start", behavior:"smooth"}); }
+    });
     var noteSpecFilterBarEl = document.getElementById("noteSpecFilterBar");
     if(noteSpecFilterBarEl){
       noteSpecFilterBarEl.addEventListener("change", function(e){
@@ -20849,6 +20906,8 @@
         }
         var mkSel = e.target.closest("[data-recmark]");
         if(mkSel){ state.recMark = mkSel.value || ""; renderMeetingNotes(); return; }
+        var lay = e.target.closest("[data-reclayout]");
+        if(lay){ setRecLayout(lay.value); return; }
         var sub = e.target.closest("[data-recsub]");
         if(sub){
           if(sub.value==="__addroom"){ recAddRoom(); return; }
