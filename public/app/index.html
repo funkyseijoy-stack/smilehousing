@@ -6595,7 +6595,7 @@
       renderStaffComment();
       if(!line){ toast(text ? "✓ 保存しました（おうちノートのホームに出ます）" : "✓ ひとことを消しました"); return; }
       try{
-        var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"comment", by: state.currentUser||"" }) });
+        var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"comment", text: text, by: state.currentUser||"" }) });
         var data = {}; try{ data = await res.json(); }catch(e){}
         toast(res.ok && data.ok ? "✓ 保存しました。"+lineResultText(data) : "✓ 保存しました（⚠ LINEのお知らせは送れませんでした）", 7000);
       }catch(e){ toast("✓ 保存しました（⚠ LINEのお知らせは送れませんでした）"); }
@@ -9710,7 +9710,7 @@
     if(okMsg===false){ toast("⚠ メッセージを保存できませんでした"); return; }
     if(lineOn){
       try{
-        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message", by: state.currentUser||"" }) });
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message", text: m.content, by: state.currentUser||"" }) });
         var lj = await lres.json().catch(function(){ return {}; });
         if(lineCb) lineCb.checked = false;
         if(lres.ok && lj.ok){
@@ -13412,7 +13412,7 @@
     if(okCount && lineOn){
       st.textContent = "LINEでお知らせしています…";
       try{
-        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo", by: state.currentUser||"" }) });
+        var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo", count: okCount, text: comment||"", by: state.currentUser||"" }) });
         var lj = await lres.json().catch(function(){ return {}; });
         if(lres.ok && lj.ok){
           lineDone = lj.queued ? "q" : true;
@@ -16043,7 +16043,7 @@
       var rec = { by: state.currentUser||"", at: m.createdAt, text: text, msgId: m.id, line: false };
       if(lineOn){
         try{
-          var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message", by: state.currentUser||"" }) });
+          var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: m.projectId, kind:"message", text: m.content, by: state.currentUser||"" }) });
           var lj = await lres.json().catch(function(){ return {}; });
           if(lres.ok && lj.ok){ if(lj.queued){ m.lineQueuedAt = lj.sendAt; rec.lineQueued = lj.sendAtLabel||""; } else m.lineNotifiedAt = nowIso(); rec.line = true; saveDoc("messages", m.id, m); }
           else toast("返信は送りましたが、LINEのお知らせは送れませんでした");

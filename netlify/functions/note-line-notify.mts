@@ -1,6 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { requestLineNotify, recipientsOf, jstLabel, activePushIds, projectForSend } from "../lib/line-queue.mts";
+import { requestLineNotify, recipientsOf, jstLabel, activePushIds, projectForSend, makeItem } from "../lib/line-queue.mts";
 
 // スタッフが「LINEでお知らせ」を押したとき、プロライン経由でお客様のLINEに
 // 「おうちノートが更新されました。」を送る。
@@ -15,6 +15,8 @@ import { requestLineNotify, recipientsOf, jstLabel, activePushIds, projectForSen
 //   （netlify/lib/line-queue.mts、まとめた分は line-queue-flush.mts が送る）。予定に入れたときは {ok:true, queued:true, sendAt, sendAtLabel}。
 // - プッシュ通知（2026年11月〜）：お客様が登録した端末にも同じ時に送る（netlify/lib/push.mts）。LINEの送る人が0人でも、
 //   届く端末があれば送れる。行に pushSub が付いた人は、その端末に届く間はLINEを送らない。
+// - スマホの通知の文（2026年11月〜）：body の text（メッセージの本文・ひとこと）・count（写真の枚数）から、何が更新されたかを出す
+//   （line-queue.mts の pushPayload。まとめて送るときは全部をまとめた文）。LINEの文面は変わらない。
 // 認証は他の機能と同じ合言葉（X-Staff-Token）。
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +62,7 @@ export default async (req: Request, context: Context) => {
     if (!beaconOk) return json({ ok: false, error: "bad_beacon" }, 400);
   }
 
-  const r: any = await requestLineNotify({ projectId, kind: String(body.kind || "manual"), by: String(body.by || ""), beacon });
+  const r: any = await requestLineNotify({ projectId, kind: String(body.kind || "manual"), by: String(body.by || ""), beacon, item: makeItem(body) });
   if (r.queued) return json({ ok: true, queued: true, sendAt: r.sendAt, sendAtLabel: jstLabel(Date.parse(r.sendAt)), push: act.size, line: uids.length });
   if (!r.sent && !r.pushSent) return json({ ok: false, error: act.size ? "push_failed" : "proline_failed", failed: r.failed }, 502);
   return json({ ok: true, sent: r.sent, failed: r.failed, pushSent: r.pushSent, pushTotal: r.pushTotal, lineTo: r.lineTo || [], pushTo: r.pushTo || [] });

@@ -57,7 +57,8 @@ export async function saveSub(doc: any) {
 }
 
 // この案件の届く端末すべてに送る
-export async function sendPushToProject(projectId: string, payload: { title: string; body: string }) {
+// payload は {title,body} か、端末のページ（note／kiroku）ごとに文を作る関数
+export async function sendPushToProject(projectId: string, payload: { title: string; body: string } | ((page: string) => { title: string; body: string })) {
   const subs = (await listSubs(projectId)).filter(isActive);
   const okIds = new Set<string>();
   if (!subs.length) return { sent: 0, failed: 0, total: 0, okIds };
@@ -66,8 +67,10 @@ export async function sendPushToProject(projectId: string, payload: { title: str
   let sent = 0, failed = 0;
   const now = new Date().toISOString();
   await Promise.all(subs.map(async (x) => {
-    const title = x.page === "kiroku" ? "お打合せの記録" : (payload.title || "おうちノート");
-    const body = x.page === "kiroku" ? "お打合せの記録が更新されました。" : payload.body;
+    const pl = typeof payload === "function" ? payload(x.page || "note")
+      : (x.page === "kiroku" ? { title: "お打合せの記録", body: "お打合せの記録が更新されました。" } : payload);
+    const title = pl.title || "おうちノート";
+    const body = pl.body || "更新されました。";
     try {
       await webpush.sendNotification(x.sub, JSON.stringify({ title, body, url: x.url || "/" }), { TTL: 60 * 60 * 24 * 3, urgency: "normal" } as any);
       sent++; okIds.add(String(x.id));
