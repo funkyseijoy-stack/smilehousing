@@ -358,6 +358,9 @@
   .hslot.big .pdfpages > .th{ flex-basis:100%; }
   .hslot.big .ovstamp{ top:100px; right:22px; width:84px; height:84px; font-size:1.35rem; }
   .hslot .fcard{ margin:0; }
+  /* ホームの段のカードはすっきり：文は3行まで（全部は押して全画面で） */
+  .hslot .section-item-desc{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .hslot .section-item-title{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .hdate{ font-size:12px; font-weight:700; color:var(--muted); margin:0 2px 4px; }
   .hplan{ border-left-color:var(--green-ink); }
   .hplan .pnm{ font-weight:700; margin-top:6px; word-break:break-all; }
@@ -413,9 +416,9 @@
   .stamp small{ font-size:.62rem; font-weight:700; letter-spacing:0; margin-top:3px; border-top:1.5px solid #d23c32; padding-top:2px; font-family:inherit; }
   .cdec .cnow{ font-size:.8rem; color:var(--ink2); margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   /* 決定・変更のボタンは小さめの横1列（大きすぎて2行に折れていたため） */
-  .cdec .btns, .pcard .btns, .combo .btns{ display:flex; flex-wrap:wrap; gap:6px; }
-  .cdec .btn, .pcard .btns .btn, .combo .btns .btn{ flex:0 1 auto; padding:7px 12px; font-size:.82rem; letter-spacing:.02em; border-radius:999px; white-space:nowrap; }
-  .btn.drawbtn{ padding:7px 12px; font-size:.82rem; letter-spacing:.02em; border-radius:999px; white-space:nowrap; flex:0 1 auto; }
+  /* 決定・変更・書き込むのボタンは、どんな幅のカードでも横1列（折り返さない） */
+  .cdec .btns, .pcard .btns, .combo .btns{ display:flex; flex-wrap:nowrap; gap:5px; }
+  .cdec .btn, .pcard .btns .btn, .combo .btns .btn, .btn.drawbtn{ flex:1 1 0; min-width:0; padding:7px 4px; font-size:.78rem; letter-spacing:0; border-radius:999px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .combo-go{ padding:9px 12px; font-size:.88rem; }
   .cdec .cwait{ color:var(--ink2); font-weight:700; }
 
@@ -782,7 +785,7 @@
   <div class="help-card">
     <button class="x" id="helpX" aria-label="閉じる">×</button>
     <h2>おうちノートの使い方</h2>
-    <div class="help-key">✅ <b>「これで決定」を押していただくと、スタッフに届き、最終決定となります。</b><br>変えたいところがあるときは「✏️ 変更したい」から、どこをどう変えたいかを書いて送ってください。</div>
+    <div class="help-key">✅ <b>「決定」を押していただくと、スタッフに届き、最終決定となります。</b><br>変えたいところがあるときは「✏️ 変更」から、どこをどう変えたいかを書いて送ってください。</div>
 
     <h3>🏠 画面の見方</h3>
     <ul>
@@ -800,10 +803,10 @@
       <li><b>わたしのメモ</b>：気になったことを自由に書き留められます（この端末にのみ保存されます）</li>
     </ul>
 
-    <h3>✏️ 変更したい・✅ これで決定</h3>
+    <h3>✏️ 変更・🖊 書き込む・✅ 決定</h3>
     <ul>
       <li>プランボードには<b>「✏️ 変更したい」</b>ボタンがあります。押して変えたいところを書くと、どのプランボードの話かが分かる形でスタッフに届きます</li>
-      <li>スタッフが確認をお願いしたカードには<b>「✅ これで決定」</b>も出ます。決めたカードは緑色になります（決定すると赤い「決定」のはんこが付きます。あとから「はんこを外す」で検討中に戻すこともできます）</li>
+      <li>スタッフが確認をお願いしたカードには<b>「✅ 決定」</b>も出ます（図面・写真のあるカードは「🖊 書き込む」で、図面に直接書き込んで送れます）。決めたカードは緑色になります（決定すると赤い「決定」のはんこが付きます。あとから「はんこを外す」で検討中に戻すこともできます）</li>
       <li>ホームの<b>「🙋 お願いしたいこと」</b>に、ご確認・ご検討をお願いしたいことがまとまっています。「決めたことを伝える」「相談したい」からスタッフに送れます</li>
       <li>送った内容は「メッセージ」に残り、お返事もそこに届きます</li>
     </ul>
@@ -1889,7 +1892,7 @@ function homeHtml(){ return homeParts().main; }
     var label = chgLabelOf(c, x);
     var sent = chgSent[x.key || label];
     return '<div class="chgrow">'+(sent ? '<span class="chgdone">✓ 変更のご依頼を送りました</span>' : '')+
-      '<button class="chgbtn" data-chg="'+esc(label)+'" data-chgkey="'+esc(x.key||label)+'">✏️ 変更したい</button></div>';
+      '<button class="chgbtn" data-chg="'+esc(label)+'" data-chgkey="'+esc(x.key||label)+'">✏️ 変更</button></div>';
   }
   function feedKindTag(x){
     if(x.type==="note") return '<span class="tag note">💬 打合せ記録'+((x.partial||x.lineCard)?'の一部':'')+'</span>';
@@ -1908,7 +1911,7 @@ function homeHtml(){ return homeParts().main; }
     if(x.type==="note"){
       if(x.title) h += '<div class="section-item-title">'+esc(x.title)+'</div>';
       if(x.decided) h += '<div class="section-item-desc"><strong>打合せで仮決定したこと：</strong>'+esc(x.decided)+'</div>';
-      if(x.open) h += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(x.open)+'</div>'+consBtnsHtml(x.open, (c?c.name+'・':'')+(x.title||fmtD(e.at)));
+      if(x.open) h += '<div class="section-item-desc"><strong>ご検討いただきたいこと：</strong>'+esc(x.open)+'</div>'+(opt.row ? '' : consBtnsHtml(x.open, (c?c.name+'・':'')+(x.title||fmtD(e.at))));
       if(x.talk) h += '<div class="section-item-desc"><strong>内容：</strong>'+esc(x.talk)+'</div>';
       if(x.message) h += '<div class="section-item-desc"><strong>スタッフから：</strong>'+esc(x.message)+'</div>';
       if(x.files && x.files.length) h += '<div class="section-thumbs">'+x.files.map(function(f){ return thumbHtml(f,""); }).join("")+'</div>';
@@ -2166,7 +2169,7 @@ function homeHtml(){ return homeParts().main; }
           var d = new Date(x.at), last = i===r.pbs.length-1;
           return '<div class="pbc'+(last?' latest':'')+'"><div class="pbno">'+(last ? '最新' : (i+1)+'回目')+'</div>'+thumbHtml(x.file,"")+
             '<div class="pbm"><span class="dt">'+(isNaN(d)?"":(d.getMonth()+1)+'/'+d.getDate())+'</span>'+nwTag(x.upd)+'</div>'+
-            (last ? '<button class="pbchg" data-chg="'+esc(chgLabelOf(r.c, x))+'" data-chgkey="'+esc(x.key||"")+'">✏️ 変更したい</button>' : '')+'</div>'+
+            (last ? '<button class="pbchg" data-chg="'+esc(chgLabelOf(r.c, x))+'" data-chgkey="'+esc(x.key||"")+'">✏️ 変更</button>' : '')+'</div>'+
             (last ? '' : '<div class="pbarrow">→</div>');
         }).join("")+'</div></div>';
     }).join("");
@@ -2280,7 +2283,7 @@ function homeHtml(){ return homeParts().main; }
         (comboEstOf(x) ? '' : (x.type==="note" && !x.partial ? noteEstHtml(x) : ''))+
         (e.stamped
           ? stampDoneHtml(x.key, x.cardDecidedAt, ra, x.cardByStaff)
-          : comboEstOf(x) ? comboDecHtml(comboEstOf(x), ra, chgLabelOf(c, x), x.key) : '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更を依頼</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定する</button></div>')+
+          : comboEstOf(x) ? comboDecHtml(comboEstOf(x), ra, chgLabelOf(c, x), x.key) : '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabelOf(c, x))+'" data-chgkey="'+esc(x.key)+'">✏️ 変更</button><button class="btn ol pdec" data-cdecide="決定"'+ra+'>✅ 決定</button></div>')+
         '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
       if(!e.stamped) pendN++;
     };
@@ -2358,7 +2361,9 @@ function homeHtml(){ return homeParts().main; }
           var f = noteDecItem(e.n);
           if(f && f.x.showDecide && f.x.key) homeRefKeys[f.x.key] = 1;
           var link = f ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
-          return '<div class="tli flat">'+noteBody(e.n, true, true, !!(f && comboEstOf(f.x)))+homeDecHtml(e.n, f)+link+'</div>';
+          // 行ごとに「決定してもらう」ボタンが出ている記録は、カード全体の決定ボタンを重ねて出さない（決定済みのはんこは出す）
+          var dupDec = noteHasAskLines(e.n) && !(f && f.x.cardStatus==="決定");
+          return '<div class="tli flat">'+noteBody(e.n, true, true, !!(f && comboEstOf(f.x)))+(dupDec ? '' : homeDecHtml(e.n, f))+link+'</div>';
         }
         var x = e.x, c = e.c;
         if(x.showDecide && x.key) homeRefKeys[x.key] = 1;
@@ -2441,8 +2446,8 @@ function homeHtml(){ return homeParts().main; }
     var ce = comboEstOf(f.x); if(ce) return comboDecHtml(ce, ra, chgLabelOf(f.c, f.x), key);
     var nowTxt = status==="仮決定" ? '<span class="status s-仮決定" style="margin-left:0;">仮決定</span>' : '';
     return '<div class="cdec">'+((nowTxt||chgSent[key]) ? '<div class="cnow">'+(nowTxt ? 'このカードの状態：'+nowTxt : '')+(chgSent[key]?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>' : '')+
-      '<div class="btns"><button class="btn ol" data-chg="'+esc(chgLabelOf(f.c, f.x))+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
-      '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ これで決定</button></div>'+
+      '<div class="btns"><button class="btn ol" data-chg="'+esc(chgLabelOf(f.c, f.x))+'" data-chgkey="'+esc(key)+'">✏️ 変更</button>'+
+      '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ 決定</button></div>'+
       (status==="仮決定"?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':'')+'</div>';
   }
   // 決めていただきたいこと：承認待ちの追加見積り・決定ボタンのカード・打合せ記録の💭を1行ずつ。押すとその場所へ移動
@@ -2585,6 +2590,9 @@ function homeHtml(){ return homeParts().main; }
     }).join("")+'</div>';
   }
   // 「この行をお客様に決定してもらう」の行：記録の中のその行のすぐ下に「変更したい／これで決定」（各部位の行のカードと同じ決定）
+  function noteHasAskLines(n){
+    return (n && n.lines || []).some(function(l){ var g = l.key ? decItemByKey(l.key) : null; return !!(g && g.x.showDecide); });
+  }
   function lineDecInline(l){
     var f = l.key ? decItemByKey(l.key) : null;
     if(f && f.x.showDecide){
@@ -2623,7 +2631,7 @@ function homeHtml(){ return homeParts().main; }
   function comboDecHtml(e, ra, chgLabel, key){
     return '<div class="combo">'+(e.title ? '<div class="combo-ttl">追加のお見積り：'+esc(e.title)+'</div>' : '')+'<div class="combo-amt">追加金額<b>'+esc(estAmountText(e))+'</b><small>（税抜き）</small></div>'+
       '<button class="btn ol pdec combo-go" data-combodecide="'+esc(e.id)+'"'+ra+'>✅ この内容と金額で決定する</button>'+
-      '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabel)+'" data-chgkey="'+esc(key)+'">✏️ 変更を依頼</button><button class="btn ol" data-estresp="見送り" data-estid="'+esc(e.id)+'">見送る（追加しない）</button></div></div>';
+      '<div class="btns pcb"><button class="btn ol" data-chg="'+esc(chgLabel)+'" data-chgkey="'+esc(key)+'">✏️ 変更</button><button class="btn ol" data-estresp="見送り" data-estid="'+esc(e.id)+'">見送る</button></div></div>';
   }
   function noteBody(n, showPart, noOpen, noEst){
     if(hasLines(n)){
@@ -2747,9 +2755,9 @@ function homeHtml(){ return homeParts().main; }
       var nowTxt = (status==="決定"||status==="仮決定")
         ? '<span class="status s-'+esc(status)+'" style="margin-left:0;">'+esc(status)+'</span>' : '';
       return '<div class="cdec">'+stampHtml+((nowTxt||sent) ? '<div class="cnow">'+(nowTxt ? 'このカードの状態：'+nowTxt : '')+(sent?'<span class="chgdone">✓ 変更のご依頼を送りました</span>':'')+'</div>' : '')+
-        '<div class="btns"><button class="btn ol" data-chg="'+esc(cl)+'" data-chgkey="'+esc(key)+'">✏️ 変更したい</button>'+
+        '<div class="btns"><button class="btn ol" data-chg="'+esc(cl)+'" data-chgkey="'+esc(key)+'">✏️ 変更</button>'+
         (done ? '<button class="btn dk" disabled>✅ 決定しました</button>'
-              : '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ これで決定</button>')+'</div>'+
+              : '<button class="btn ol" data-cdecide="決定"'+ra+'>✅ 決定</button>')+'</div>'+
         (status==="決定"?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>🔴 はんこを外す（検討中に戻す）</button>':(status==="仮決定"?'<button class="linkbtn" data-cdecide="検討中"'+ra+'>検討中に戻す</button>':''))+'</div>';
     }
     if(feed.length){
@@ -3301,7 +3309,7 @@ function homeHtml(){ return homeParts().main; }
       var d = document.createElement("button");
       d.className = (b.className||"") + " drawbtn"; d.type = "button";
       d.setAttribute("data-drawchg", key); d.setAttribute("data-drawlabel", b.getAttribute("data-chg")||"");
-      d.textContent = "✏️ 書き込んで送る";
+      d.textContent = "🖊 書き込む";
       b.parentNode.insertBefore(d, b.nextSibling);
     });
   }

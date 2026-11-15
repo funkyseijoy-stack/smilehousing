@@ -4340,7 +4340,8 @@
     if(scope==="exterior") return "exterior";
     if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"rooms","ランドリーバー":"rooms","トイレ":"toilet","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
-    if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
+    // 各部屋（家全体）の「ドア」は、お客様画面では「建具（内部ドア）」の項目に出す（note-data.mts の noteCatFor と同じ）
+    if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : (category==="ドア" ? "tategu" : "interior"));
     if(scope==="room") return "rooms";
     if(scope==="storage") return "storage";
     if(scope==="naiso") return "naiso";

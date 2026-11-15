@@ -40,7 +40,7 @@ const NOTE_CATS = [
   { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
   { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
   { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
-  { id: "interior", name: "インテリア（メイン）", sub: "床・建具・クロス・配色", icon: "sofa" },
+  { id: "interior", name: "インテリア（メイン）", sub: "床・クロス・配色", icon: "sofa" },
   // 部屋別インテリア。部屋ごとに分けて表示し、「仮決定／決定」も部屋単位で受け付ける
   { id: "rooms", name: "インテリア（部屋別）", sub: "天井・壁・アクセント", icon: "room" },
   // 収納（パントリー・クローゼットなど。部位「収納」）
@@ -146,6 +146,7 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   if (scope === "interiorColor") {
     if (category === "浴室枠") return "bath";
     if (category === "玄関枠") return "exterior";
+    if (category === "ドア") return "tategu"; // 内部ドアは「建具（内部ドア）」の項目に出す（住まいるアプリの noteCatIdFor と同じ）
     return "interior";
   }
   if (scope === "room") return "rooms";
