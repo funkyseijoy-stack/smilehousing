@@ -412,7 +412,11 @@
   @keyframes stampPop{ 0%{ transform:rotate(-14deg) scale(2.6); opacity:0; } 60%{ transform:rotate(-14deg) scale(.92); opacity:1; } 100%{ transform:rotate(-14deg) scale(1); opacity:.92; } }
   .stamp small{ font-size:.62rem; font-weight:700; letter-spacing:0; margin-top:3px; border-top:1.5px solid #d23c32; padding-top:2px; font-family:inherit; }
   .cdec .cnow{ font-size:.8rem; color:var(--ink2); margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .cdec .btn{ padding:12px 6px; font-size:.95rem; }
+  /* 決定・変更のボタンは小さめの横1列（大きすぎて2行に折れていたため） */
+  .cdec .btns, .pcard .btns, .combo .btns{ display:flex; flex-wrap:wrap; gap:6px; }
+  .cdec .btn, .pcard .btns .btn, .combo .btns .btn{ flex:0 1 auto; padding:7px 12px; font-size:.82rem; letter-spacing:.02em; border-radius:999px; white-space:nowrap; }
+  .btn.drawbtn{ padding:7px 12px; font-size:.82rem; letter-spacing:.02em; border-radius:999px; white-space:nowrap; flex:0 1 auto; }
+  .combo-go{ padding:9px 12px; font-size:.88rem; }
   .cdec .cwait{ color:var(--ink2); font-weight:700; }
 
   /* home */
