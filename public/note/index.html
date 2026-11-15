@@ -1027,13 +1027,28 @@
   // 生成には時間がかかるため、先に簡易アイコンを出しつつ裏で読み込み、
   // 出来上がったら render() を呼んで差し替える。
   var pdfThumbCache = {};
-  var PDF_THUMB_MAX = 6;
+  var PDF_THUMB_MAX = 3;
+  // iPhone はPDFを一度にたくさん開くとメモリ不足で画面ごと落ちる（「問題が繰り返し起きました」）。
+  // 見本づくりは同時に1件ずつ順番に、終わったPDFは閉じて、描き直しはまとめて1回にする
+  var pdfThumbQ = [], pdfThumbBusy = false, pdfThumbRenderT = null;
+  function pdfThumbRender(){
+    if(pdfThumbRenderT) return;
+    pdfThumbRenderT = setTimeout(function(){ pdfThumbRenderT = null; render(); }, 700);
+  }
   function loadPdfThumb(url){
     pdfThumbCache[url] = {status:"pending"};
+    pdfThumbQ.push(url);
+    pdfThumbPump();
+  }
+  function pdfThumbPump(){
+    if(pdfThumbBusy || !pdfThumbQ.length) return;
+    pdfThumbBusy = true;
+    var url = pdfThumbQ.shift();
     (async function(){
+      var doc = null;
       try{
         if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
-        var doc = await pdfjsLib.getDocument(url).promise;
+        doc = await pdfjsLib.getDocument({url:url}).promise;
         // 複数ページのPDFは、PDF_THUMB_MAX ページまで見本を作って横に並べる（それ以上は「ほか n ページ」）
         var n = Math.min(doc.numPages||1, PDF_THUMB_MAX), pages = [];
         for(var pi=1; pi<=n; pi++){
@@ -1047,14 +1062,19 @@
           canvas.height = viewport.height;
           var ctx = canvas.getContext("2d");
           await page.render({canvasContext:ctx, viewport:viewport}).promise;
-          pages.push(canvas.toDataURL("image/png"));
-          if(pi===1){ pdfThumbCache[url] = {status:"done", dataUrl:pages[0], pages:pages.slice(), numPages:doc.numPages||1}; if(n>1) render(); }
+          pages.push(canvas.toDataURL("image/jpeg", 0.8));
+          canvas.width = canvas.height = 0;
+          try{ page.cleanup(); }catch(_){}
+          if(pi===1){ pdfThumbCache[url] = {status:"done", dataUrl:pages[0], pages:pages.slice(), numPages:doc.numPages||1}; }
         }
         pdfThumbCache[url] = {status:"done", dataUrl:pages[0], pages:pages, numPages:doc.numPages||1};
       }catch(e){
         pdfThumbCache[url] = {status:"error"};
       }
-      render();
+      try{ if(doc) await doc.destroy(); }catch(_){}
+      pdfThumbBusy = false;
+      pdfThumbRender();
+      pdfThumbPump();
     })();
   }
   function thumbHtml(f, cap){
@@ -1992,27 +2012,34 @@ function homeHtml(){ return homeParts().main; }
   async function hpvRender(box, f){
     if(isImg(f)){ box.innerHTML = '<div class="hpvp"><img src="'+esc(f.url)+'" alt=""></div>'; return; }
     if(!isPdf(f)){ box.innerHTML = '<a href="'+esc(f.url)+'" target="_blank" rel="noopener">開く</a>'; return; }
+    var doc = null;
     try{
       if(typeof pdfjsLib==="undefined") throw new Error("nopdfjs");
-      var doc = await pdfjsLib.getDocument({url:f.url}).promise;
+      doc = await pdfjsLib.getDocument({url:f.url}).promise;
       box.innerHTML = "";
-      var max = Math.min(doc.numPages, 30);
+      // iPhone のメモリ不足で落ちないよう、ページ数・大きさを抑え、描いたページは画像にしてキャンバスを捨てる
+      var max = Math.min(doc.numPages, 15);
       var w = Math.max(box.clientWidth || 360, 320);
-      var target = Math.min(2200, Math.round(w * Math.min(3, window.devicePixelRatio||1) * 1.6));
+      var target = Math.min(1600, Math.round(w * Math.min(2, window.devicePixelRatio||1) * 1.5));
       for(var i=1;i<=max;i++){
-        if(!box.isConnected) return;
+        if(!box.isConnected) break;
         var page = await doc.getPage(i), v1 = page.getViewport({scale:1});
         var vp = page.getViewport({scale: target / v1.width});
         var c = document.createElement("canvas"); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-        var wrap = document.createElement("div"); wrap.className = "hpvp"; wrap.appendChild(c);
+        await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+        var img = document.createElement("img"); img.alt = "";
+        img.src = c.toDataURL("image/jpeg", 0.85);
+        c.width = c.height = 0;
+        try{ page.cleanup(); }catch(_){}
+        var wrap = document.createElement("div"); wrap.className = "hpvp"; wrap.appendChild(img);
         if(doc.numPages>1){ var pn = document.createElement("span"); pn.className = "pn"; pn.textContent = i+"/"+doc.numPages; wrap.appendChild(pn); }
         box.appendChild(wrap);
-        await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
       }
       if(doc.numPages>max){ var more = document.createElement("div"); more.className = "muted"; more.style.fontSize = "13px"; more.innerHTML = 'ほか '+(doc.numPages-max)+' ページは<a href="'+esc(f.url)+'" target="_blank" rel="noopener">こちら</a>から'; box.appendChild(more); }
     }catch(err){
       box.innerHTML = '<div class="muted" style="font-size:13px;">表示できませんでした。<a href="'+esc(f.url)+'" target="_blank" rel="noopener">こちらから開く</a></div>';
     }
+    try{ if(doc) await doc.destroy(); }catch(_){}
   }
   function hfsClose(){ if(hfsCur) hfsCur.ov.remove(); hfsCur = null; }
   // PDFを押したら、別のタブではなくこの画面の上で開く（左上に「✕ 閉じる」。ホーム画面のアイコンから開くと戻れなくなるため）
