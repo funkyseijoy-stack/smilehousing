@@ -1115,7 +1115,8 @@
       if(window.SumaiPush){ try{ SumaiPush.init({p:P, t:T, page:"note"}).then(function(){ mountPush(); }); }catch(e){} }
       render();
     }catch(e){
-      main.innerHTML = '<div class="center">読み込みに失敗しました。<br>通信状況をご確認のうえ、もう一度開いてください。</div>';
+      try{ console.error(e); }catch(_){}
+      main.innerHTML = '<div class="center">読み込みに失敗しました。<br>通信状況をご確認のうえ、もう一度開いてください。<div style="font-size:11px;color:#999;margin-top:10px;word-break:break-all;">（'+esc(String(e && e.message || e))+(e && e.stack ? ' / '+esc(String(e.stack).split("\n").slice(0,2).join(" ")) : '')+'）</div></div>';
     }
   }
 
@@ -1589,7 +1590,7 @@ function homeHtml(){ return homeParts().main; }
     var procs = data.notices.filter(function(n){ return n.kind==="process"; });
     if(procs.length) out += '<div class="sechd" id="sec-proc"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
     // 決定のはんこを押したものは、ホームのいちばん下にまとめる
-    return { main: mainOut + pendingCardsHtml("stamped") + homeRowsHtml(), rest: out };
+    return { main: mainOut + safeHtml("決定したもの", function(){ return pendingCardsHtml("stamped"); }) + safeHtml("家づくりの記録", homeRowsHtml), rest: out };
   }
   function noticeHtml(n){
     return '<div class="ntc-wrap">'+(n.tag?'<span class="ntag'+(n.kind==="process"?" proc":"")+'">'+esc(n.tag)+'</span>':'')+
@@ -1906,6 +1907,11 @@ function homeHtml(){ return homeParts().main; }
   // ===== ホームの「部位ごとの記録」：いちばん上に図面、その下に部位ごとの段（横にスクロール・新しいものが左） =====
   var hfsReg = [];
   var HROW_LIMIT = 15;
+  // 1つの欄で失敗しても、ほかの欄（ホーム全体）は出す。失敗した欄には理由を小さく出す
+  function safeHtml(label, fn){
+    try{ return fn(); }
+    catch(e){ try{ console.error(label, e); }catch(_){} return '<div class="muted" style="font-size:12px;margin:12px 0;padding:8px 10px;border:1px dashed var(--line2);border-radius:8px;">「'+esc(label)+'」を表示できませんでした（'+esc(String(e && e.message || e))+'）</div>'; }
+  }
   function homeRowsHtml(){
     hfsReg = [];
     var rows = [];
