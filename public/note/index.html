@@ -363,6 +363,7 @@
   .hplan .pnm{ font-weight:700; margin-top:6px; word-break:break-all; }
   .hint{ font-size:12px; color:var(--muted); margin:-2px 2px 10px; }
   /* カードを押すと全画面で開く。下にボタン */
+  .pdfov{ z-index:60; }
   .hfs{ position:fixed; inset:0; z-index:40; background:var(--bg); display:flex; flex-direction:column; }
   .hfs-h{ display:flex; align-items:center; gap:8px; padding:calc(env(safe-area-inset-top) + 10px) 14px 10px; background:var(--card); border-bottom:1px solid var(--line); }
   .hfs-h b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
@@ -1077,7 +1078,7 @@
       }
       return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📄</span><span>PDFを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
     }
-    return '<a class="th pdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📎</span><span>ファイルを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
+    return '<a class="th pdf nonpdf" href="'+esc(f.url)+'" target="_blank" rel="noopener"><span class="pi">📎</span><span>ファイルを開く</span>'+(cap?'<span class="cap">'+esc(cap)+'</span>':'')+'</a>';
   }
   // thumbHtmlの中身だけ（ボタン/リンクで包まない版）。ホームのコンパクトな平面図カードのように、
   // サムネイル自体をクリック可能な行の中に置きたい場合に使う。
@@ -2008,6 +2009,40 @@ function homeHtml(){ return homeParts().main; }
     }
   }
   function hfsClose(){ if(hfsCur) hfsCur.ov.remove(); hfsCur = null; }
+  // PDFを押したら、別のタブではなくこの画面の上で開く（左上に「✕ 閉じる」。ホーム画面のアイコンから開くと戻れなくなるため）
+  function pdfOvOpen(url, name){
+    var old = document.querySelector(".pdfov"); if(old) old.remove();
+    var ov = document.createElement("div");
+    ov.className = "hfs pdfov";
+    ov.innerHTML = '<div class="hfs-h"><button type="button" data-pdfclose>✕ 閉じる</button><b></b><button type="button" class="hz" data-pz="-1">－</button><button type="button" class="hz" data-pz="1">＋</button></div>'+
+      '<div class="hfs-b"><div class="hpv"><div class="hpvin"><div class="hpvpages"><div class="muted" style="font-size:13px;">読み込み中…</div></div></div></div>'+
+      '<div style="text-align:center;margin:6px 0 24px;"><button type="button" class="btn ol" data-pdfclose style="min-width:180px;">✕ 閉じる</button></div></div>';
+    ov.querySelector(".hfs-h b").textContent = name || "資料";
+    document.body.appendChild(ov);
+    var z = 1;
+    ov.addEventListener("click", function(ev){
+      if(ev.target.closest("[data-pdfclose]")){ ov.remove(); return; }
+      var b = ev.target.closest("[data-pz]");
+      if(b){
+        var steps = [1, 1.5, 2, 3], zi = steps.indexOf(z); if(zi<0) zi = 0;
+        zi = Math.max(0, Math.min(steps.length-1, zi + Number(b.dataset.pz)));
+        z = steps[zi]; ov.querySelector(".hpv").style.setProperty("--hz", z);
+      }
+    });
+    hpvRender(ov.querySelector(".hpvpages"), {url:url, name:name||"", contentType:"application/pdf"});
+  }
+  document.addEventListener("click", function(ev){
+    var a = ev.target.closest && ev.target.closest('a[href]');
+    if(!a || ev.defaultPrevented || a.closest(".pdfov")) return;
+    var href = a.getAttribute("href") || "";
+    var isPdfLink = a.classList.contains("pdf") || a.classList.contains("ctpdf") || /\.pdf(\?|#|$)/i.test(href);
+    if(!isPdfLink || /^(mailto|tel):/i.test(href)) return;
+    if(a.classList.contains("nonpdf")) return;
+    ev.preventDefault();
+    var nm = (a.querySelector(".cap") && a.querySelector(".cap").textContent) || a.textContent.replace(/^📄\s*/,"").trim();
+    if(/^(PDFを開く|PDF|ほか \d+ ページ)$/.test(nm)) nm = "";
+    pdfOvOpen(href.split("#")[0], nm);
+  }, true);
   function hfsOrig(){
     if(!hfsCur) return null;
     for(var i=0;i<hfsReg.length;i++){ if(hfsKeyOf(hfsReg[i])===hfsCur.key){ hfsCur.e = hfsReg[i]; return main.querySelector('[data-hfs="'+i+'"] .fcard'); } }

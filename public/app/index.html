@@ -300,6 +300,10 @@
   .recprev .rp-vis{ position:relative; width:100%; aspect-ratio:4/3; border-radius:8px; overflow:hidden; background:#f4f2ec; display:flex; align-items:center; justify-content:center; }
   .recprev .rp-vis img, .recprev .rp-vis video{ width:100%; height:100%; object-fit:contain; }
   .recprev .rp-vis.small{ aspect-ratio:16/9; }
+  /* PDFも写真と同じ見せ方（ページ全体を大きく・黒い「PDF」の帯なし・白地） */
+  .recprev .rp-vis.pdf{ aspect-ratio:4/3; background:#fff; border:1px solid var(--border); }
+  .recprev .rp-vis.pdf .pdfbadge{ display:none; }
+  .recprev .rp-vis.pdf img{ width:100%; height:100%; object-fit:contain; }
   .recprev .rp-vis .rp-more{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.6); color:#fff; font-size:.85rem; font-weight:700; border-radius:999px; padding:1px 8px; }
   .recprev .rp-title{ font-size:.95rem; font-weight:700; line-height:1.4; word-break:break-all; }
   .recprev .rp-text{ font-size:.88rem; line-height:1.6; color:var(--ink); white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
@@ -349,6 +353,15 @@
   .fvpage .fvpn{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.55); color:#fff; font-size:.85rem; border-radius:999px; padding:1px 8px; }
   .fvzoom{ display:flex; gap:4px; align-items:center; }
   .fvzoom button{ min-width:2.4em; }
+  .pmgr-ov{ position:fixed; inset:0; z-index:130; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .pmgr{ background:var(--surface); border-radius:14px; width:min(520px,100%); max-height:calc(100vh - 32px); display:flex; flex-direction:column; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .pmgr-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .pmgr-list{ overflow:auto; }
+  .pmgr-h{ font-weight:700; margin:12px 0 4px; font-size:.9rem; }
+  .pmgr-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); font-size:.92rem; }
+  .pmgr-row.sub{ padding-inline-start:18px; font-size:.88rem; color:var(--muted); }
+  .pmgr-row.off > span{ color:var(--muted); text-decoration:line-through; }
+  .pmgr-row.off > span small{ text-decoration:none; display:inline-block; }
   .fv-stamps{ position:absolute; right:12px; top:44px; display:flex; gap:6px; pointer-events:none; z-index:3; }
   .fv-stamps .rp-st{ width:76px; height:76px; font-size:1.15rem; }
   .fvsec{ font-size:.9rem; font-weight:700; color:var(--muted); margin:14px 0 6px; }
@@ -2815,6 +2828,8 @@
     {label:"外部散水栓・インターホンなど", value:"siteCheck"},
     {label:"インテリア：メイン（家全体の基本色）", value:"interiorColor"},
     {label:"インテリア：部屋別", value:"room"},
+    {label:"内装", value:"naiso"},
+    {label:"建具（内部ドア）", value:"tategu"},
     {label:"収納", value:"storage"},
     {label:"社内だけ（基礎・足場など。お客様に出さない）", value:"internal"}
   ];
@@ -2822,7 +2837,7 @@
   // 文字は中の項目名だけ（例：「🚿 キッチン」「🔥 暖房設備」）。保存している scope／category は変えない。
   var PART_BIG = {
     exterior:{name:"外部", icon:"🏠"}, facility:{name:"水まわり", icon:"🚿"},
-    interiorColor:{name:"各部屋（家全体）", icon:"🎨"}, room:{name:"各部屋", icon:"🎨"}, storage:{name:"収納", icon:"🗄"},
+    interiorColor:{name:"各部屋（家全体）", icon:"🎨"}, room:{name:"各部屋", icon:"🎨"}, storage:{name:"収納", icon:"🗄"}, naiso:{name:"内装", icon:"🖌"}, tategu:{name:"建具（内部ドア）", icon:"🚪"},
     siteCheck:{name:"その他の確認", icon:"🔧"}, internal:{name:"社内だけ", icon:"🔒"},
     general:{name:"総合", icon:"📋"}, custom:{name:"追加した部位", icon:"📌"}
   };
@@ -4328,12 +4343,14 @@
     if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
     if(scope==="room") return "rooms";
     if(scope==="storage") return "storage";
+    if(scope==="naiso") return "naiso";
+    if(scope==="tategu") return "tategu";
     if(scope==="siteCheck") return "other"; // 外部散水栓・インターホン親機・給湯リモコン・床下点検口
     if(scope==="custom") return category ? "cp_"+category : null; // 追加した部位は1つずつ別の項目（note-data.mts の noteCatFor と同じ）
     return null;
   }
   var NOTE_CAT_NAMES = { general:"総合", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", dressing:"脱衣室", toilet:"トイレ",
-    climate:"暖房・換気", electric:"電気・あかり", interior:"各部屋（家全体）", rooms:"各部屋", storage:"収納", other:"その他の確認", planboard:"プランボード" };
+    climate:"暖房・換気", electric:"電気・あかり", interior:"各部屋（家全体）", rooms:"各部屋", storage:"収納", naiso:"内装", tategu:"建具（内部ドア）", other:"その他の確認", planboard:"プランボード" };
   // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
   var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
   function noteDecisionFor(catId, roomId){
@@ -8564,11 +8581,86 @@
       liveNotes().some(function(n){ return n.projectId===pid && n.specPart && n.specPart.scope==="room" && !n.specPart.roomId; });
     if(noRoom) intSubs.push({key:"r:", label:"部屋未設定"});
     list.push({ key:"int", label:"🎨 各部屋", subs: intSubs });
+    list.push({ key:"naiso", label:"🖌 内装", subs:[] });
+    list.push({ key:"tategu", label:"🚪 建具（内部ドア）", subs:[] });
     list.push({ key:"storage", label:"🗄 収納", subs:[] });
     list.push({ key:"other", label:"🔧 その他の確認", subs: SITECHECK_CATS.map(function(c){ return {key:c, label:c}; }) });
     customPartsOf(proj).forEach(function(c){ list.push({ key:"cp:"+c.id, label:"📌 "+c.name, subs:[] }); });
     list.push({ key:"internal", label:"🔒 社内だけ", subs: INTERNAL_CATS.map(function(c){ return {key:c, label:c}; }) });
     return list;
+  }
+  // ===== 部位の整理（使わない部位を、部位を選ぶ一覧から外す。全案件共通＝settings/main.hiddenParts）=====
+  // キーは recBigs の key（例 "storage"／"eq:暖房設備"）か "key/項目"（例 "ext/ポスト"）。外しても記録・資料のデータは消さない
+  function hiddenPartKeys(){ return (state.settings && Array.isArray(state.settings.hiddenParts)) ? state.settings.hiddenParts : []; }
+  function partHidden(big, sub){
+    var h = hiddenPartKeys();
+    return h.indexOf(big)>=0 || (sub!=null && sub!=="" && h.indexOf(big+"/"+sub)>=0);
+  }
+  // 部位を選ぶ一覧用（外した部位・項目を除く。keep に入れたものは外していても残す＝いま選んでいる値）
+  function recBigsPick(proj, keepBig, keepSub){
+    return recBigs(proj).filter(function(b){ return !partHidden(b.key) || b.key===keepBig; }).map(function(b){
+      if(!b.subs.length || b.key==="int") return b;
+      return {key:b.key, label:b.label, subs:b.subs.filter(function(x){ return !partHidden(b.key, x.key) || (b.key===keepBig && x.key===keepSub); })};
+    });
+  }
+  function inboxKeyHidden(key){
+    if(!key) return false;
+    var k = key.split("|"), sc = k[0], cat = k.slice(1).join("|");
+    var map = { general:"general", exterior:"ext", facility:"water", naiso:"naiso", tategu:"tategu", storage:"storage", siteCheck:"other", internal:"internal", interiorColor:"int", room:"int" };
+    if(sc==="equipment") return partHidden("eq:"+cat);
+    var big = map[sc]; if(!big) return false;
+    if(big==="int") return partHidden("int");
+    return partHidden(big, cat||(sc==="exterior"?"_none":""));
+  }
+  async function setPartHidden(key, hide){
+    var h = hiddenPartKeys().filter(function(x){ return x!==key; });
+    if(hide) h.push(key);
+    state.settings.hiddenParts = h;
+    var ok = await saveDoc("settings","main", state.settings);
+    if(!ok) toast("保存できませんでした");
+    return ok;
+  }
+  function openPartManager(){
+    var proj = projectById(state.currentProjectId);
+    var ov = document.createElement("div");
+    ov.className = "pmgr-ov";
+    var draw = function(){
+      var row = function(key, label, sub){
+        var hid = hiddenPartKeys().indexOf(key)>=0;
+        return '<div class="pmgr-row'+(sub?' sub':'')+(hid?' off':'')+'"><span>'+escapeHtml(label)+(hid?' <small>（一覧から外しています）</small>':'')+'</span>'+
+          '<button type="button" class="btn '+(hid?'secondary':'ghost')+' small" data-pmkey="'+escapeHtml(key)+'" data-pmhide="'+(hid?'0':'1')+'">'+(hid?'↩ 戻す':'🗑 削除')+'</button></div>';
+      };
+      var html = '';
+      recBigs(proj).forEach(function(b){
+        if(b.key.indexOf("cp:")===0) return;
+        html += row(b.key, b.label, false);
+        if(b.key!=="int" && hiddenPartKeys().indexOf(b.key)<0) b.subs.forEach(function(x){ html += row(b.key+"/"+x.key, x.label, true); });
+      });
+      var cps = proj ? customPartsOf(proj) : [];
+      if(cps.length){
+        html += '<div class="pmgr-h">📌 この案件で追加した部位</div>'+cps.map(function(c){
+          return '<div class="pmgr-row"><span>'+escapeHtml(c.name)+'</span><button type="button" class="btn ghost small" data-pmcp="'+escapeHtml(c.id)+'">🗑 削除</button></div>';
+        }).join("");
+      }
+      ov.innerHTML = '<div class="pmgr"><div class="pmgr-head"><b>部位の整理</b><button type="button" class="btn ghost small" data-pmclose>✕ 閉じる</button></div>'+
+        '<p class="muted" style="margin:0 0 8px;font-size:.85rem;">「削除」した部位・項目は、部位を選ぶ一覧から外れます（全部の案件で共通）。すでにその部位で残した記録・資料は消えず、そのまま見られます。「戻す」でいつでも元に戻せます。部屋は絞り込みの「各部屋」から削除できます。</p>'+
+        '<div class="pmgr-list">'+html+'</div></div>';
+    };
+    draw();
+    ov.addEventListener("click", async function(e){
+      if(e.target===ov || e.target.closest("[data-pmclose]")){ ov.remove(); renderMeetingNotes(); return; }
+      var b = e.target.closest("[data-pmkey]");
+      if(b){
+        var hide = b.dataset.pmhide==="1";
+        if(hide && !confirm("「"+b.closest(".pmgr-row").querySelector("span").textContent+"」を部位の一覧から削除しますか？\n（記録・資料のデータは消えません。あとで戻せます）")) return;
+        b.disabled = true;
+        await setPartHidden(b.dataset.pmkey, hide);
+        draw(); return;
+      }
+      var c = e.target.closest("[data-pmcp]");
+      if(c){ deleteCustomPart(c.dataset.pmcp); draw(); return; }
+    });
+    document.body.appendChild(ov);
   }
   function recMatch(part, f){
     if(!f || !f.big) return true;
@@ -8588,6 +8680,8 @@
     if(f.big.indexOf("cp:")===0) return sc==="custom" && cat===f.big.slice(3);
     if(f.big==="general") return sc==="general";
     if(f.big==="storage") return sc==="storage";
+    if(f.big==="naiso") return sc==="naiso";
+    if(f.big==="tategu") return sc==="tategu";
     if(f.big==="internal") return sc==="internal" && (!sub || cat===sub);
     return false;
   }
@@ -8599,6 +8693,8 @@
     if(big.indexOf("cp:")===0) return P("custom", big.slice(3));
     if(big==="general") return P("general", null);
     if(big==="storage") return P("storage", null);
+    if(big==="naiso") return P("naiso", null);
+    if(big==="tategu") return P("tategu", null);
     if(!sub) return null;
     if(big==="ext") return P("exterior", sub==="_none" ? null : sub);
     if(big==="water") return P("facility", sub);
@@ -8844,13 +8940,14 @@
     if(!bar) return;
     var proj = projectById(state.currentProjectId);
     var f = state.recFilter || {big:"", sub:""};
-    var bigs = recBigs(proj);
+    var bigs = recBigsPick(proj, f.big, f.sub);
     var cur = bigs.filter(function(b){ return b.key===f.big; })[0];
     var opt = function(v, label, on){ return '<option value="'+escapeHtml(v)+'"'+(on?" selected":"")+'>'+escapeHtml(label)+'</option>'; };
     var html = '<label class="field recsel">部位<select data-recbig>'+opt("", "すべて", !f.big)+
       bigs.map(function(b){ return opt(b.key, b.label, b.key===f.big); }).join("")+
       opt("none", "部位なしの記録", f.big==="none")+
-      opt("__addpart", "＋ 部位を追加…", false)+'</select></label>';
+      opt("__addpart", "＋ 部位を追加…", false)+'</select></label>'+
+      '<button type="button" class="btn ghost small" data-recparts title="使わない部位を一覧から外す">⚙ 部位を整理</button>';
     if(cur && (cur.subs.length || cur.key==="int")){
       html += '<label class="field recsel">'+(cur.key==="int"?"部屋":"項目")+'<select data-recsub>'+opt("", cur.label.replace(/^\S+\s/, "")+"すべて", !f.sub)+
         cur.subs.map(function(x){ return opt(x.key, x.label, x.key===f.sub); }).join("")+
@@ -8927,7 +9024,8 @@
   function recPartOptionsHtml(proj, val){
     var opt = function(v, label){ return '<option value="'+escapeHtml(v)+'"'+(v===val?" selected":"")+'>'+escapeHtml(label)+'</option>'; };
     var html = opt("", "部位なし（総合）");
-    recBigs(proj).forEach(function(b){
+    var vk = String(val||"").split("||");
+    recBigsPick(proj, vk[0], vk[1]).forEach(function(b){
       if(b.key==="general") return;
       if(!b.subs.length){ html += opt(b.key+"||", b.label); return; }
       html += '<optgroup label="'+escapeHtml(b.label)+'">'+b.subs.map(function(x){ return opt(b.key+"||"+x.key, b.label.replace(/^\S+\s/, "")+"・"+x.label); }).join("")+'</optgroup>';
@@ -9376,7 +9474,8 @@
     var vis = "";
     if(files.length){
       var f = files[0];
-      vis = '<div class="rp-vis'+(big?'':' small')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+
+      var isPdfVis = fileKindOf(f.url, f.contentType, f.name)==="pdf";
+      vis = '<div class="rp-vis'+(big?'':' small')+(isPdfVis?' pdf':'')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+
         (stamps ? '<span class="rp-stamps">'+stamps+'</span>' : '')+'</div>';
     }
     var who = doc.author || doc.createdBy || doc.by || doc.receivedBy || "";
@@ -9712,7 +9811,7 @@
   function upsertNoteSpecEntry(note){
     var existing = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===note.id; });
     var part = note.specPart;
-    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || part.scope==="storage" || part.scope==="room");
+    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || part.scope==="storage" || part.scope==="naiso" || part.scope==="tategu" || part.scope==="room");
     if(!usable){
       if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
       return;
@@ -12939,10 +13038,10 @@
     var doc = null;
     try{
       if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
-      doc = await pdfjsLib.getDocument(url).promise;
+      doc = await pdfjsLib.getDocument({url:url}).promise;
       var page = await doc.getPage(1);
       var baseViewport = page.getViewport({scale:1});
-      var scale = 200 / Math.max(baseViewport.width, baseViewport.height);
+      var scale = 560 / Math.max(baseViewport.width, baseViewport.height);
       if(!(scale>0)) scale = 1;
       var viewport = page.getViewport({scale:scale});
       var canvas = document.createElement("canvas");
@@ -15385,7 +15484,7 @@
     [/暖房|ヒーター|床暖/,"equipment","暖房設備"], [/換気|換気扇|ダクト/,"equipment","換気設備"],
     [/照明|あかり|ライティング/,"equipment","あかりプラン"], [/電気|配線|コンセント|スイッチ/,"equipment","電気配線"],
     [/玄関ドア/,"exterior","玄関ドア"], [/外壁|サイディング/,"exterior","外壁"], [/屋根|板金/,"exterior","屋根"],
-    [/クロス|壁紙/,"interiorColor","メインクロス"], [/建具|ドア/,"interiorColor","ドア"], [/フローリング|床材/,"interiorColor","床"],
+    [/内部ドア|室内ドア|建具/,"tategu",""], [/内装/,"naiso",""], [/クロス|壁紙/,"interiorColor","メインクロス"], [/ドア/,"interiorColor","ドア"], [/フローリング|床材/,"interiorColor","床"],
     [/カーテン|ブラインド|窓まわり/,"interiorColor","窓まわり"], [/脱衣|ランドリー/,"room","nr:脱衣室"], [/収納|クローゼット|パントリー/,"storage",""],
     [/基礎/,"internal","基礎"], [/足場/,"internal","足場"]
   ];
@@ -15431,8 +15530,8 @@
   }
   function inboxPartSel(i, key, proj){
     if(key==="facility|脱衣室" || key==="facility|ランドリーバー") key = "room|nr:脱衣室";
-    var opt = function(v, label){ return '<option value="'+escapeHtml(v)+'"'+(v===key?' selected':'')+'>'+escapeHtml(label)+'</option>'; };
-    var grp = function(label, inner){ return '<optgroup label="'+escapeHtml(label)+'">'+inner+'</optgroup>'; };
+    var opt = function(v, label){ return (v!==key && inboxKeyHidden(v)) ? '' : '<option value="'+escapeHtml(v)+'"'+(v===key?' selected':'')+'>'+escapeHtml(label)+'</option>'; };
+    var grp = function(label, inner){ return inner ? '<optgroup label="'+escapeHtml(label)+'">'+inner+'</optgroup>' : ''; };
     var rooms = DEFAULT_ROOMS.slice();
     recRoomsOf(proj).forEach(function(r){ if(r && r.name && rooms.indexOf(r.name)<0) rooms.push(r.name); });
     var html = '<select class="rcvpart" data-inpart="'+i+'" aria-label="部位"><option value="">部位（なし）</option>'+
@@ -15442,6 +15541,7 @@
       grp("🚿 水まわり", FACILITY_CATS.map(function(c){ return opt("facility|"+c, PART_ITEM_ALIAS[c]||c); }).join(""))+
       grp("🎨 各部屋", opt("interiorColor|", "家全体（基本色）")+INTERIOR_COLOR_CATS.map(function(c){ return opt("interiorColor|"+c, "　家全体・"+c); }).join("")+
         rooms.map(function(nm){ return opt("room|nr:"+nm, nm); }).join(""))+
+      opt("naiso|", "🖌 内装")+opt("tategu|", "🚪 建具（内部ドア）")+
       opt("storage|", "🗄 収納")+
       grp("🔧 その他の確認", SITECHECK_CATS.map(function(c){ return opt("siteCheck|"+c, c); }).join(""))+
       (proj && customPartsOf(proj).length ? grp("📌 追加した部位", customPartsOf(proj).map(function(c){ return opt("custom|"+c.id, c.name); }).join("")) : "")+
@@ -18402,7 +18502,7 @@
     if(!vs || !vs.scope) return false;
     if(vs.scope==="internal") return false; // 社内だけの部位はお客様に出さない
     if(vs.category) return true;
-    if(vs.scope==="general" || vs.scope==="storage" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
+    if(vs.scope==="general" || vs.scope==="storage" || vs.scope==="naiso" || vs.scope==="tategu" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
     if(vs.scope==="room" && vs.roomId) return true;
     return false;
   }
@@ -18706,7 +18806,7 @@
   // 部位を選ぶ画面：記録の一覧の絞り込みと同じ「プルダウン2段（部位→項目・部屋）」。インテリアのメインは項目（表・裏）まで選べる
   function askSpecPart(callback, projectId){
     var proj = projectById(projectId || state.currentProjectId);
-    var bigs = recBigs(proj).map(function(b){
+    var bigs = recBigsPick(proj).map(function(b){
       if(b.key!=="int") return b;
       var subs = b.subs.filter(function(x){ return x.key!=="r:"; });
       // リビング・玄関・脱衣室は、案件にまだ無くても最初から選べる（選んだときに作る）
@@ -21267,6 +21367,7 @@
         if(e.target.closest("[data-recclear]")){ state.recMark = ""; setRecFilter("", ""); return; }
         var rr = e.target.closest("[data-recroomrename]"); if(rr){ recRenameRoom(rr.dataset.recroomrename); return; }
         var rd = e.target.closest("[data-recroomdel]"); if(rd){ recDeleteRoom(rd.dataset.recroomdel); return; }
+        if(e.target.closest("[data-recparts]")){ openPartManager(); return; }
         var cr = e.target.closest("[data-customrename]"); if(cr){ renameCustomPart(cr.dataset.customrename); return; }
         var cd = e.target.closest("[data-customdel]"); if(cd){ deleteCustomPart(cd.dataset.customdel); return; }
       });

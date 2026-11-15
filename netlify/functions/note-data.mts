@@ -45,6 +45,8 @@ const NOTE_CATS = [
   { id: "rooms", name: "インテリア（部屋別）", sub: "天井・壁・アクセント", icon: "room" },
   // 収納（パントリー・クローゼットなど。部位「収納」）
   { id: "storage", name: "収納", sub: "パントリー・クローゼット・棚など", icon: "storage" },
+  { id: "naiso", name: "内装", sub: "内装プラン・仕上げなど", icon: "sofa" },
+  { id: "tategu", name: "建具（内部ドア）", sub: "室内ドア・引き戸など", icon: "room" },
   // 外部散水栓・インターホン親機・給湯リモコン・床下点検口（打合せで確認する項目）
   { id: "other", name: "その他の確認", sub: "散水栓・インターホン・給湯リモコン・床下点検口", icon: "house" },
 ];
@@ -92,6 +94,8 @@ function partLabel(project: any, scope?: string, category?: string | null, roomI
   }
   if (scope === "interiorColor" && !category) return "インテリア全体";
   if (scope === "storage") return "収納";
+  if (scope === "naiso") return "内装";
+  if (scope === "tategu") return "建具（内部ドア）";
   return category || "";
 }
 
@@ -147,6 +151,8 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   if (scope === "room") return "rooms";
   if (scope === "siteCheck") return "other";
   if (scope === "storage") return "storage";
+  if (scope === "naiso") return "naiso";
+  if (scope === "tategu") return "tategu";
   // 案件ごとに追加した部位は、1つずつ別の項目（id は cp_<部位ID>）として出す
   if (scope === "custom") return category ? "cp_" + category : null;
   return null;
@@ -755,7 +761,7 @@ export default async (req: Request, context: Context) => {
     const vs = t.vendorSpec || {};
     // 外部仕様（項目を選ばず「外部仕様」だけ）・インテリア全体（項目を選ばない）・部屋そのもの（項目を限定しない）は category が空でも出す
     if (!vs.scope) continue;
-    if (!vs.category && vs.scope !== "general" && vs.scope !== "storage" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
+    if (!vs.category && vs.scope !== "general" && vs.scope !== "storage" && vs.scope !== "naiso" && vs.scope !== "tategu" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
     for (const att of t.attachments || []) {
       if (!att || !att.url || shownUrls.has(att.url)) continue;
       shownUrls.add(att.url);
@@ -785,7 +791,7 @@ export default async (req: Request, context: Context) => {
     if (a.kind !== "quote" || (qt !== "プランボード" && qt !== "定価") || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;
-    if (!sp.category && sp.scope !== "general" && sp.scope !== "storage" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
+    if (!sp.category && sp.scope !== "general" && sp.scope !== "storage" && sp.scope !== "naiso" && sp.scope !== "tategu" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
     push(noteCatFor(sp.scope, sp.category), {
       type: "photo",
       isQuote: true,
