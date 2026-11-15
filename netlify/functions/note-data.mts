@@ -934,7 +934,7 @@ export default async (req: Request, context: Context) => {
   const plans = attachments
     .filter((a) => a.kind === "plan")
     .sort((a, b) => String(a.uploadedAt || "").localeCompare(String(b.uploadedAt || "")))
-    .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "", upd: updAt(a.uploadedAt, a.createdAt) }));
+    .map((a) => ({ ...fileOf(a), id: a.id, date: a.uploadedAt || "", upd: updAt(a.uploadedAt, a.createdAt) }));
 
   // カード1枚ごとの仮決定／決定（key が付いた記録・図面）。まだ選んでいないカードは「検討中」。
   const cardDecByKey: Record<string, any> = {};

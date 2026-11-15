@@ -1887,9 +1887,11 @@ function homeHtml(){ return homeParts().main; }
     if(plans.length){
       rows.push('<div class="hrow"><div class="hrowh"><b>📐 図面</b><span class="cnt">'+plans.length+'件</span><button class="more" data-openplans="1">一覧 ›</button></div>'+
         '<div class="hstrip" data-hrow="__plan">'+plans.map(function(f){
-          var i = hfsReg.push({plan:f}) - 1;
+          var pk = f.id ? "a:"+f.id : "";
+          var i = hfsReg.push({plan:f, x:{key:pk, file:f}}) - 1;
           return '<div class="hslot big" data-hfs="'+i+'"><div class="hdate">'+esc(fmtD(f.date||f.createdAt))+' '+nwTag(f.upd)+'</div>'+
-            '<div class="fcard hplan">'+thumbHtml(f, "")+'<div class="pnm">'+esc(f.name||"図面")+'</div></div></div>';
+            '<div class="fcard hplan">'+thumbHtml(f, "")+'<div class="pnm">'+esc(f.name||"図面")+'</div>'+
+            (pk ? '<div class="chgrow"><button class="chgbtn" data-drawchg="'+esc(pk)+'" data-drawlabel="'+esc("図面（"+(f.name||"")+"）")+'">✏️ 書き込んで送る</button></div>' : '')+'</div></div>';
         }).join("")+'</div></div>');
     }
     (data.categories||[]).forEach(function(c){
@@ -1944,7 +1946,7 @@ function homeHtml(){ return homeParts().main; }
     ov.querySelector(".hfs-h b").textContent = e.plan ? "📐 図面" : (e.c ? e.c.name+"　" : "")+fmtD(e.at);
     var x = e.x || {}, key = x.key || "";
     var st = x.showDecide ? (x.cardStatus || "検討中") : "";
-    var canDraw = !e.plan && key && drawFilesOfKey(key).length>0;
+    var canDraw = !!key && drawFilesOfKey(key).length>0;
     var btn = function(act, ic, label, dis, cls){ return '<button type="button" data-hfsact="'+act+'"'+(cls?' class="'+cls+'"':'')+(dis?' disabled':'')+'><span class="ic">'+ic+'</span><span>'+label+'</span></button>'; };
     ov.querySelector(".hfs-f").innerHTML =
       btn("chg", "✏️", "変更したい") +
@@ -3128,6 +3130,8 @@ function homeHtml(){ return homeParts().main; }
     var take = function(x){ add(x.file); (x.files||[]).forEach(add); (x.lines||[]).forEach(function(l){ ((l && l.files)||[]).forEach(add); }); };
     (data.categories||[]).forEach(function(c){ catAllItems(c).forEach(function(x){ if(x.key===key) take(x); }); });
     if(/^n:/.test(key||"")){ var nid = key.slice(2); (data.notes||[]).forEach(function(n){ if(n.id===nid) take(n); }); }
+    // 平面図（図面）も書き込んで送れる（key は a:<図面のID>）
+    if(/^a:/.test(key||"")){ var aid = key.slice(2); (data.plans||[]).forEach(function(f){ if(f.id===aid) add(f); }); }
     return out;
   }
   // 「✏️ 変更したい」のボタンの横に、図面・写真があるカードだけ「✏️ 書き込んで送る」を足す
