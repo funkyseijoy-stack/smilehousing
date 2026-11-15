@@ -362,6 +362,18 @@
   .hfs-f button .ic{ font-size:20px; }
   .hfs-f button.dec{ border-color:var(--green-ink); color:var(--green-ink); }
   .hfs-f button:disabled{ opacity:.35; cursor:default; }
+  /* 図面・プランボード・写真をそのままの形で見る（PDFはページを縦に並べる。＋／－で拡大） */
+  .hfs-h .hz{ min-width:40px; padding:8px 0; }
+  .hpv{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:14px; }
+  .hpv .hpvin{ width:calc(100% * var(--hz, 1)); }
+  .hpvf{ margin-bottom:14px; }
+  .hpvh{ display:flex; align-items:center; gap:8px; margin-bottom:6px; position:sticky; left:0; }
+  .hpvh b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:500; }
+  .hpvh button{ border:0; background:var(--brown); color:#fff; border-radius:999px; padding:7px 14px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .hpvp{ position:relative; background:#fff; border:1px solid var(--line); border-radius:6px; overflow:hidden; margin-bottom:8px; }
+  .hpvp canvas, .hpvp img{ display:block; width:100%; height:auto; }
+  .hpvp .pn{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.55); color:#fff; font-size:12px; border-radius:999px; padding:1px 8px; }
+  .hpvs{ font-size:13px; font-weight:700; color:var(--muted); margin:14px 0 6px; }
   .fcard::before{ content:""; position:absolute; left:-27px; top:18px; width:14px; height:14px; border-radius:50%; background:var(--line2); border:3px solid var(--page); }
   .fcard.st-仮決定{ background:#fdf3d6; border-color:#e0b23c; }
   .fcard.st-仮決定::before{ background:#e0b23c; }
@@ -1923,11 +1935,54 @@ function homeHtml(){ return homeParts().main; }
     hfsClose();
     var ov = document.createElement("div");
     ov.className = "hfs";
-    ov.innerHTML = '<div class="hfs-h"><b></b><button type="button" data-hfsclose>✕ 閉じる</button></div><div class="hfs-b"></div><div class="hfs-f"></div>';
+    var files = hfsFiles(e), docFirst = !!(e.plan || isPb(e.x||{}) || (e.x && e.x.isQuote) || (files.length && !(e.x && (e.x.type==="note" || /^n:/.test(e.x.key||"")))));
+    ov.innerHTML = '<div class="hfs-h"><b></b>'+(files.length ? '<button type="button" class="hz" data-hz="-1">－</button><button type="button" class="hz" data-hz="1">＋</button>' : '')+'<button type="button" data-hfsclose>✕ 閉じる</button></div>'+
+      '<div class="hfs-b">'+(docFirst && files.length ? '<div class="hpv"><div class="hpvin"></div></div>' : '')+'<div class="hfs-cd"></div>'+
+      (!docFirst && files.length ? '<div class="hpvs">📎 資料をそのまま見る</div><div class="hpv"><div class="hpvin"></div></div>' : '')+'</div><div class="hfs-f"></div>';
     document.body.appendChild(ov);
-    hfsCur = { e:e, ov:ov, key:hfsKeyOf(e) };
+    hfsCur = { e:e, ov:ov, key:hfsKeyOf(e), z:1 };
     ov.addEventListener("click", hfsClick);
     hfsRender();
+    var key = (e.x && e.x.key) || "", canDraw = !!key && drawFilesOfKey(key).length>0;
+    var box = ov.querySelector(".hpvin");
+    if(box){
+      box.innerHTML = files.map(function(f){ return '<div class="hpvf"><div class="hpvh"><b>'+esc(f.name||"資料")+'</b>'+(canDraw && (isPdf(f)||isImg(f)) ? '<button type="button" data-hpvdraw>✏️ 書き込んで送る</button>' : '')+'</div><div class="hpvpages"><div class="muted" style="font-size:13px;">読み込み中…</div></div></div>'; }).join("");
+      Array.prototype.forEach.call(box.querySelectorAll(".hpvpages"), function(el, i){ hpvRender(el, files[i]); });
+    }
+  }
+  // このカードの資料（図面・プランボード・写真・PDF）
+  function hfsFiles(e){
+    var out = [], seen = {};
+    var add = function(f){ if(f && f.url && !seen[f.url]){ seen[f.url] = 1; out.push(f); } };
+    if(e.plan){ add(e.plan); return out; }
+    var x = e.x || {};
+    add(x.file); (x.files||[]).forEach(add); (x.lines||[]).forEach(function(l){ ((l && l.files)||[]).forEach(add); });
+    return out;
+  }
+  async function hpvRender(box, f){
+    if(isImg(f)){ box.innerHTML = '<div class="hpvp"><img src="'+esc(f.url)+'" alt=""></div>'; return; }
+    if(!isPdf(f)){ box.innerHTML = '<a href="'+esc(f.url)+'" target="_blank" rel="noopener">開く</a>'; return; }
+    try{
+      if(typeof pdfjsLib==="undefined") throw new Error("nopdfjs");
+      var doc = await pdfjsLib.getDocument({url:f.url}).promise;
+      box.innerHTML = "";
+      var max = Math.min(doc.numPages, 30);
+      var w = Math.max(box.clientWidth || 360, 320);
+      var target = Math.min(2200, Math.round(w * Math.min(3, window.devicePixelRatio||1) * 1.6));
+      for(var i=1;i<=max;i++){
+        if(!box.isConnected) return;
+        var page = await doc.getPage(i), v1 = page.getViewport({scale:1});
+        var vp = page.getViewport({scale: target / v1.width});
+        var c = document.createElement("canvas"); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        var wrap = document.createElement("div"); wrap.className = "hpvp"; wrap.appendChild(c);
+        if(doc.numPages>1){ var pn = document.createElement("span"); pn.className = "pn"; pn.textContent = i+"/"+doc.numPages; wrap.appendChild(pn); }
+        box.appendChild(wrap);
+        await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+      }
+      if(doc.numPages>max){ var more = document.createElement("div"); more.className = "muted"; more.style.fontSize = "13px"; more.innerHTML = 'ほか '+(doc.numPages-max)+' ページは<a href="'+esc(f.url)+'" target="_blank" rel="noopener">こちら</a>から'; box.appendChild(more); }
+    }catch(err){
+      box.innerHTML = '<div class="muted" style="font-size:13px;">表示できませんでした。<a href="'+esc(f.url)+'" target="_blank" rel="noopener">こちらから開く</a></div>';
+    }
   }
   function hfsClose(){ if(hfsCur) hfsCur.ov.remove(); hfsCur = null; }
   function hfsOrig(){
@@ -1938,11 +1993,11 @@ function homeHtml(){ return homeParts().main; }
   function hfsRender(){
     if(!hfsCur) return;
     var orig = hfsOrig(); if(!orig){ hfsClose(); return; }
-    var e = hfsCur.e, ov = hfsCur.ov, body = ov.querySelector(".hfs-b");
+    var e = hfsCur.e, ov = hfsCur.ov, body = ov.querySelector(".hfs-b"), cd = ov.querySelector(".hfs-cd");
     var top = body.scrollTop;
     var cl = orig.cloneNode(true);
     cl.querySelectorAll("[id]").forEach(function(el){ el.removeAttribute("id"); });
-    body.innerHTML = ""; body.appendChild(cl); body.scrollTop = top;
+    cd.innerHTML = ""; cd.appendChild(cl); body.scrollTop = top; hfsCur.clone = cl;
     ov.querySelector(".hfs-h b").textContent = e.plan ? "📐 図面" : (e.c ? e.c.name+"　" : "")+fmtD(e.at);
     var x = e.x || {}, key = x.key || "";
     var st = x.showDecide ? (x.cardStatus || "検討中") : "";
@@ -1957,6 +2012,14 @@ function homeHtml(){ return homeParts().main; }
   function hfsClick(ev){
     if(!hfsCur) return;
     if(ev.target.closest("[data-hfsclose]")){ hfsClose(); return; }
+    var hz = ev.target.closest("[data-hz]");
+    if(hz){
+      var steps = [1, 1.5, 2, 3], zi = steps.indexOf(hfsCur.z); if(zi<0) zi = 0;
+      zi = Math.max(0, Math.min(steps.length-1, zi + Number(hz.dataset.hz)));
+      hfsCur.z = steps[zi]; Array.prototype.forEach.call(hfsCur.ov.querySelectorAll(".hpv"), function(el){ el.style.setProperty("--hz", hfsCur.z); });
+      return;
+    }
+    if(ev.target.closest("[data-hpvdraw]")){ drawOpen((hfsCur.e.x||{}).key, hfsLabel(hfsCur.e)); return; }
     var b = ev.target.closest("[data-hfsact]");
     var e = hfsCur.e, x = e.x || {}, label = hfsLabel(e);
     if(b){
@@ -1969,14 +2032,14 @@ function homeHtml(){ return homeParts().main; }
       return;
     }
     // 写真・資料などを押したら、元のカードの同じ所を押したことにする（拡大などはそのまま使える）
-    var bodyEl = hfsCur.ov.querySelector(".hfs-b");
-    if(!bodyEl.contains(ev.target) || ev.target.closest("a[href]")) return;
+    var bodyEl = hfsCur.ov.querySelector(".hfs-cd");
+    if(!bodyEl || !bodyEl.contains(ev.target) || ev.target.closest("a[href]")) return;
     var orig = hfsOrig(); if(!orig) return;
     var el = ev.target;
     while(el && el!==bodyEl){
       var hasData = el.attributes && Array.prototype.some.call(el.attributes, function(t){ return /^data-/.test(t.name); });
       if(hasData || /^(BUTTON|IMG)$/.test(el.tagName)){
-        var all = Array.prototype.slice.call(bodyEl.firstElementChild.querySelectorAll("*")), oall = orig.querySelectorAll("*");
+        var all = Array.prototype.slice.call((hfsCur.clone||bodyEl.firstElementChild).querySelectorAll("*")), oall = orig.querySelectorAll("*");
         var k = all.indexOf(el); if(k>=0 && oall[k]){ ev.preventDefault(); oall[k].click(); }
         return;
       }

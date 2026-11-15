@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>住まいるアプリ</title>
 <meta name="description" content="住まいるハウジング・案件統合管理アプリ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
 <link rel="manifest" href="/app/manifest.json">
 <meta name="theme-color" content="#3f7d5c">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +28,6 @@
   })();
 </script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
   :root{
     --bg:#faf7f2; --surface:#ffffff; --surface-2:#f2ede3; --ink:#2b2420; --muted:#8a7f72;
@@ -285,22 +287,33 @@
   .recrow-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:6px; }
   .recrow-name{ font-weight:700; font-size:1.05rem; }
   .recrow-head .btn{ margin-inline-start:auto; }
-  .recstrip{ display:flex; gap:12px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; padding:2px 2px 10px; align-items:flex-start; -webkit-overflow-scrolling:touch; }
-  .recslot{ flex:0 0 360px; max-width:360px; scroll-snap-align:start; }
-  .recslot-date{ font-size:.85rem; font-weight:700; color:var(--muted); margin-block-end:4px; }
-  .recslot .noteitem, .recslot .rectl{ margin:0; }
-  @media (max-width:760px){ .recslot{ flex-basis:84vw; max-width:84vw; } .recrow-hint{ display:none; } }
-  /* プランボード・図面のカードは大きく（スマホは画面幅いっぱい・1枚ずつ止まる）。記録のメモは小さいまま */
-  .recslot.big{ flex-basis:520px; max-width:520px; }
-  .recplan{ border:1px solid var(--accent); border-left:6px solid var(--accent); background:var(--surface); border-radius:12px; padding:10px; cursor:pointer; }
-  .recplan .rpthumb{ width:100%; aspect-ratio:4/3; overflow:hidden; border-radius:8px; background:#f4f2ec; display:flex; align-items:center; justify-content:center; position:relative; }
-  .recplan .rpthumb img{ width:100%; height:100%; object-fit:contain; }
-  .recplan .rpname{ font-weight:700; margin-block-start:8px; word-break:break-all; }
+  .recstrip{ display:flex; gap:10px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; padding:2px 2px 10px; align-items:stretch; -webkit-overflow-scrolling:touch; }
+  /* 横に並ぶのは「見出しだけの小さなカード」。押すと全画面で中身・操作（デモと同じ形） */
+  .recslot{ flex:0 0 min(300px, 80%); max-width:min(300px, 80%); scroll-snap-align:start; display:flex; }
+  .recslot.big{ flex-basis:min(520px, 94%); max-width:min(520px, 94%); }
+  .recslot-date{ display:none; }
+  .recprev{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; cursor:pointer; font-weight:400; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .recprev.on{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .recprev .rp-top{ display:flex; align-items:center; gap:6px; }
+  .recprev .rp-date{ font-size:.85rem; font-weight:700; color:var(--accent-ink); white-space:nowrap; }
+  .recprev .rp-kind{ margin-inline-start:auto; font-size:.85rem; font-weight:500; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .recprev .rp-vis{ position:relative; width:100%; aspect-ratio:4/3; border-radius:8px; overflow:hidden; background:#f4f2ec; display:flex; align-items:center; justify-content:center; }
+  .recprev .rp-vis img, .recprev .rp-vis video{ width:100%; height:100%; object-fit:contain; }
+  .recprev .rp-vis.small{ aspect-ratio:16/9; }
+  .recprev .rp-vis .rp-more{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.6); color:#fff; font-size:.85rem; font-weight:700; border-radius:999px; padding:1px 8px; }
+  .recprev .rp-title{ font-size:.95rem; font-weight:700; line-height:1.4; word-break:break-all; }
+  .recprev .rp-text{ font-size:.88rem; line-height:1.6; color:var(--ink); white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+  .recprev .rp-badges{ display:flex; flex-wrap:wrap; gap:4px; }
+  .recprev .rp-b{ font-size:.85rem; font-weight:500; line-height:1.3; padding:1px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); background:var(--surface); white-space:nowrap; }
+  .recprev .rp-b.g{ border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); }
+  .recprev .rp-b.r{ border-color:#d23c32; color:#b8302a; background:#fdeeed; }
+  .recprev .rp-b.o{ border-color:#d08a2c; color:#a5651a; background:#fdf3e5; }
+  .recprev .rp-foot{ margin-top:auto; font-size:.85rem; color:var(--muted); }
+  .recplan{ flex:1; min-width:0; }
   .recfsw{ cursor:pointer; }
   @media (max-width:760px){
+    .recrow-hint{ display:none; }
     .recstrip{ scroll-snap-type:x mandatory; scroll-padding-inline-start:2px; }
-    .recslot{ flex-basis:72vw; max-width:72vw; }
-    .recslot.big{ flex-basis:calc(100vw - 40px); max-width:calc(100vw - 40px); }
   }
   /* カードを押すと全画面で開く。下に操作ボタン */
   .recfs-ov{ position:fixed; inset:0; z-index:55; background:var(--bg); display:flex; flex-direction:column; }
@@ -308,11 +321,25 @@
   .recfs-head b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .recfs-body{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; font-size:1.05rem; }
   .recfs-body > *{ max-width:900px; margin-inline:auto; }
-  .recfs-body .notemenu, .recfs-body .notemenu-trigger, .recfs-body .spectl-ops, .recfs-body .qtg{ display:none !important; }
-  .recfs-body .noteitem, .recfs-body .spectl-card{ padding-inline-end:14px !important; }
+  .recfs-body .qtg{ display:none !important; }
+  .recfs-body .noteitem.notemenu-open .notemenu, .recfs-body .spectl-ops[open] .opsmenu{ position:fixed; left:50%; transform:translateX(-50%); right:auto; width:min(420px, calc(100vw - 24px)); top:calc(env(safe-area-inset-top) + 64px); bottom:auto; max-height:calc(100vh - 160px); z-index:120; }
+  .recfs-body{ font-weight:400; }
+  /* 図面・プランボード・写真をそのまま見る（PDFはページを縦に並べる。拡大は＋／－） */
+  .fvwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-block-end:12px; }
+  .fvwrap .fvin{ width:calc(100% * var(--fvz, 1)); margin-inline:auto; }
+  .fvfile{ margin-block-end:14px; }
+  .fvfile-h{ display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--muted); margin-block-end:6px; position:sticky; left:0; }
+  .fvfile-h b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-weight:500; }
+  .fvpage{ position:relative; background:#fff; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-block-end:8px; }
+  .fvpage canvas, .fvpage img, .fvpage video{ display:block; width:100%; height:auto; }
+  .fvpage .fvpn{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.55); color:#fff; font-size:.85rem; border-radius:999px; padding:1px 8px; }
+  .fvzoom{ display:flex; gap:4px; align-items:center; }
+  .fvzoom button{ min-width:2.4em; }
+  .fvsec{ font-size:.9rem; font-weight:700; color:var(--muted); margin:14px 0 6px; }
+  .recfs-det > summary{ cursor:pointer; font-size:.9rem; font-weight:700; color:var(--muted); padding:6px 0; }
   .recfs-body img{ max-width:100%; height:auto; }
-  .recfs-bar{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; padding:10px 10px calc(env(safe-area-inset-bottom) + 12px); border-top:1px solid var(--border); background:var(--surface); }
-  .recfs-bar button{ min-height:60px; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:10px; font-family:inherit; font-size:.85rem; font-weight:700; line-height:1.3; cursor:pointer; padding:6px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
+  .recfs-bar{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:6px; padding:10px 10px calc(env(safe-area-inset-bottom) + 12px); border-top:1px solid var(--border); background:var(--surface); }
+  .recfs-bar button{ min-height:56px; white-space:nowrap; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:10px; font-family:inherit; font-size:.85rem; font-weight:700; line-height:1.3; cursor:pointer; padding:6px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
   .recfs-bar button .ic{ font-size:1.2rem; }
   .recfs-bar button.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .recfs-bar button:disabled{ opacity:.4; cursor:default; }
@@ -9295,6 +9322,54 @@
     toast(d.ordered ? "🟢 発注済みのはんこを押しました（社内だけ・お客様には出ません）" : "発注済みのはんこを外しました");
   }
   // カード（記録・写真PDF・見積の書類・タスクの写し）に対応する「発注済み」の決定
+  // 記録タブの「部位ごと」の横並びに出す小さなカード（日付・種類・図面の絵・題名・数行・印・記入者）
+  function recPrevFiles(k, doc){
+    if(!doc) return [];
+    if(k==="n") return noteAllFiles(doc);
+    if(doc.url) return [{ url:doc.url, name:doc.name||doc.fileName||doc.title||"", contentType:doc.contentType||"" }];
+    return [];
+  }
+  function recPrevHtml(k, doc, day, big){
+    var files = recPrevFiles(k, doc), d = String(day||doc.date||doc.receivedAt||doc.createdAt||"").slice(0,10);
+    var kind = k==="n" ? "📝 打合せ記録" : k==="plan" ? "📐 図面" : k==="sp" ? (doc.kind==="planboard" ? "📐 プランボード" : "📷 写真・PDF") : "📄 "+qtLabel(quoteTypeNorm(doc.quoteType));
+    var title = k==="n" ? (doc.title||"") : (doc.title||doc.name||doc.fileName||"");
+    var text = "";
+    if(k==="n"){
+      var parts = [];
+      var dec = doc.decided || doc.content || "";
+      if(dec) parts.push("✅ "+String(dec).trim());
+      if(doc.open) parts.push("💭 "+String(doc.open).trim());
+      if(doc.talk) parts.push(String(doc.talk).trim());
+      if(doc.message) parts.push("💬 "+String(doc.message).trim());
+      text = parts.join("\n");
+    } else {
+      text = String(doc.customerNote||doc.memo||doc.staffMemo||"").trim();
+    }
+    var b = [];
+    if(doc.reflected) b.push('<span class="rp-b g">✓ おうちノート</span>');
+    if(doc.askDecision) b.push('<span class="rp-b o">🔘 決定の確認中</span>');
+    var ck = k==="n" ? "n:"+doc.id : k==="sp" ? ((doc.source && doc.source.taskId) ? "t:"+doc.source.taskId : "s:"+doc.id) : "a:"+doc.id;
+    var dc = (state.noteDecisions||[]).find(function(x){ return x && !x.deletedAt && x.projectId===doc.projectId && x.cardKey===ck && x.status==="決定"; });
+    if(dc) b.push('<span class="rp-b r">🔴 '+(dc.by && dc.by!=="お客様" ? "決定" : "お客様が決定")+'</span>');
+    var od = orderedOf(doc); if(od) b.push('<span class="rp-b r">発注済み</span>');
+    var part = k==="n" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : k==="sp" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : (doc.specPart||null);
+    var pt = (part && part.scope) ? partText(part, doc.projectId) : "";
+    if(pt) b.push('<span class="rp-b">'+escapeHtml(pt)+'</span>');
+    var vis = "";
+    if(files.length){
+      var f = files[0];
+      vis = '<div class="rp-vis'+(big?'':' small')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+'</div>';
+    }
+    var who = doc.author || doc.createdBy || doc.by || doc.receivedBy || "";
+    return '<div class="recprev'+(doc.reflected?' on':'')+'">'+
+      '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span></div>'+
+      vis+
+      (title ? '<div class="rp-title">'+escapeHtml(title)+'</div>' : '')+
+      (text ? '<div class="rp-text">'+escapeHtml(text)+'</div>' : '')+
+      (b.length ? '<div class="rp-badges">'+b.join("")+'</div>' : '')+
+      (who ? '<div class="rp-foot">記入：'+escapeHtml(who)+'</div>' : '')+
+      '</div>';
+  }
   function orderedOf(x){
     if(!x || !x.id) return null;
     var keys = ["n:"+x.id, "s:"+String(x.id).slice(0,78), "a:"+String(x.id).slice(0,78)];
@@ -9442,6 +9517,12 @@
       return items;
     };
     var itemHtml = function(it){ return '<div class="recfsw" data-fsk="'+(it.t==="n"?"n":it.t==="s"?"sp":"att")+'" data-fsid="'+escapeHtml(it.t==="n"?it.n.id:it.t==="s"?it.p.id:it.a.id)+'">'+itemHtml0(it)+'</div>'; };
+    // 部位ごとの横並びでは、見出しだけの小さなカード（押すと全画面で中身・図面・操作）。元のカードは隠して持っておく（操作に使う）
+    var prevHtml = function(it){
+      var fsk = it.t==="n"?"n":it.t==="s"?"sp":"att", doc = it.t==="n"?it.n:it.t==="s"?it.p:it.a;
+      return '<div class="recfsw recprevw" data-fsk="'+fsk+'" data-fsid="'+escapeHtml(doc.id)+'">'+recPrevHtml(fsk, doc, (it.key||"").slice(0,10), isBigItem(it))+
+        '<div class="recfull" hidden>'+itemHtml0(it)+'</div></div>';
+    };
     var isBigItem = function(it){
       if(it.t==="a") return quoteTypeNorm(it.a.quoteType)==="プランボード";
       if(it.t==="s") return it.p.kind==="planboard";
@@ -9467,9 +9548,7 @@
           (plans.length>1 ? '<span class="muted recrow-hint">← 横にスクロール</span>' : '')+'</div>'+
           '<div class="recstrip" data-rowkey="__plans">'+plans.map(function(a){
             var d = String(a.createdAt||a.uploadedAt||"").slice(0,10);
-            return '<div class="recslot big"><div class="recslot-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</div>'+
-              '<div class="recplan" data-recplan="'+escapeHtml(a.id)+'" title="押すと全画面で開きます（書き込みもできます）"><div class="rpthumb">'+fileThumbInner(a.url, a.contentType, a.name)+'</div>'+
-              '<div class="rpname">'+escapeHtml(a.name||"図面")+'</div><div class="muted" style="font-size:.85rem;">押すと全画面で開きます（書き込み・拡大）</div></div></div>';
+            return '<div class="recslot big"><div class="recplan recfsw recprevw" data-fsk="plan" data-fsid="'+escapeHtml(a.id)+'">'+recPrevHtml("plan", a, d, true)+'</div></div>';
           }).join("")+'</div></div>');
       }
       bigs.forEach(function(b){
@@ -9482,7 +9561,7 @@
           '<button type="button" class="btn ghost small" data-recrowopen="'+escapeHtml(b.key)+'">この部位だけ見る ›</button></div>'+
           '<div class="recstrip" data-rowkey="'+escapeHtml(b.key)+'">'+its.map(function(it){
             var d = (it.key||"").slice(0,10);
-            return '<div class="recslot'+(isBigItem(it)?' big':'')+'"><div class="recslot-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</div>'+itemHtml(it)+'</div>';
+            return '<div class="recslot'+(isBigItem(it)?' big':'')+'">'+prevHtml(it)+'</div>';
           }).join("")+'</div></div>');
       });
       filter = {big:"", sub:""};
@@ -11245,49 +11324,127 @@
     if(k==="sp") return (state.specPhotos||[]).find(function(x){ return x.id===id; });
     return state.attachments.find(function(x){ return x.id===id; });
   }
+  // 全画面で写す元のカード（横並びでは隠してある .recfull の中身）
   function recFsOrig(k, id){
+    if(k==="plan") return null;
     var list = document.querySelectorAll('#meetingNoteList .recfsw[data-fsk="'+k+'"]');
-    for(var i=0;i<list.length;i++){ if(list[i].dataset.fsid===id) return list[i]; }
+    for(var i=0;i<list.length;i++){ if(list[i].dataset.fsid===id){ return list[i].querySelector(".recfull") || list[i]; } }
     return null;
   }
   function recFsTitle(k, doc){
     if(!doc) return "";
     if(k==="n") return "📝 打合せ記録 "+(doc.date||String(doc.createdAt||"").slice(0,10))+(doc.title?"　"+doc.title:"");
+    if(k==="plan") return "📐 図面　"+(doc.name||"");
     if(k==="sp") return (doc.kind==="planboard"?"📐 プランボード ":"📷 写真・PDF ")+(doc.title||doc.name||"");
     return "📄 "+qtLabel(quoteTypeNorm(doc.quoteType))+"　"+(doc.name||"");
   }
+  // 書き込める資料（図面は図面のプランボード、ほかはカードの「✏️ 書き込む」と同じ）
+  function recFsDraws(){
+    if(!recFs) return [];
+    if(recFs.k==="plan"){ var d = recFsDoc("plan", recFs.id); return d ? [{ key:"plan", url:d.url, name:d.name||"図面" }] : []; }
+    var orig = recFsOrig(recFs.k, recFs.id); if(!orig) return [];
+    return Array.prototype.slice.call(orig.querySelectorAll("[data-spec-draw]")).map(function(el){
+      var r = specDrawReg[el.dataset.specDraw] || {};
+      return { key:el.dataset.specDraw, url:r.url||"", name:r.name||"" };
+    });
+  }
+  function recFsDraw(key){
+    if(!recFs) return;
+    var k = recFs.k, id = recFs.id;
+    recFsClose();
+    if(k==="plan") openPlanBoard(id); else openSpecDraw(key);
+  }
+  // 図面・写真・PDFを、そのままの形で見る（PDFはページを縦に並べる）
+  var fvSeq = 0;
+  function fvFileHtml(f, drawKey){
+    var n = ++fvSeq;
+    return '<div class="fvfile" data-fvn="'+n+'"><div class="fvfile-h"><b>'+escapeHtml(f.name||"資料")+'</b>'+
+      (drawKey ? '<button type="button" class="btn small" data-fvdraw="'+escapeHtml(drawKey)+'">✏️ 書き込む</button>' : '')+
+      '<a class="btn ghost small" href="'+escapeHtml(f.url||"#")+'" target="_blank" rel="noopener">開く</a></div><div class="fvpages"><div class="muted">読み込み中…</div></div></div>';
+  }
+  async function fvRender(box, f){
+    var k = fileKindOf(f.url, f.contentType, f.name);
+    if(k==="image"){ box.innerHTML = '<div class="fvpage"><img src="'+escapeHtml(f.url)+'" alt=""></div>'; return; }
+    if(k==="video"){ box.innerHTML = '<div class="fvpage"><video src="'+escapeHtml(f.url)+'" controls playsinline></video></div>'; return; }
+    if(k!=="pdf"){ box.innerHTML = '<div class="muted">この形式は画面で表示できません。「開く」から見てください。</div>'; return; }
+    try{
+      if(typeof pdfjsLib==="undefined") throw new Error("nopdfjs");
+      var doc = await pdfjsLib.getDocument({url:f.url}).promise;
+      box.innerHTML = "";
+      var max = Math.min(doc.numPages, 30);
+      var w = Math.max(box.clientWidth || 360, 320);
+      var target = Math.min(2200, Math.round(w * Math.min(3, window.devicePixelRatio||1) * 1.6));
+      for(var i=1;i<=max;i++){
+        if(!box.isConnected) return;
+        var page = await doc.getPage(i), v1 = page.getViewport({scale:1});
+        var vp = page.getViewport({scale: target / v1.width});
+        var c = document.createElement("canvas"); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        var wrap = document.createElement("div"); wrap.className = "fvpage";
+        wrap.appendChild(c);
+        if(doc.numPages>1){ var pn = document.createElement("span"); pn.className = "fvpn"; pn.textContent = i+"/"+doc.numPages; wrap.appendChild(pn); }
+        box.appendChild(wrap);
+        await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+      }
+      if(doc.numPages>max){ var more = document.createElement("div"); more.className = "muted"; more.textContent = "ほか "+(doc.numPages-max)+" ページは「開く」から見てください"; box.appendChild(more); }
+    }catch(e){
+      box.innerHTML = '<div class="muted">PDFを表示できませんでした。「開く」から見てください。</div>';
+    }
+  }
   function recFsRender(){
     if(!recFs) return;
-    var orig = recFsOrig(recFs.k, recFs.id), doc = recFsDoc(recFs.k, recFs.id);
-    if(!orig || !doc){ recFsClose(); return; }
+    var k = recFs.k, doc = recFsDoc(k, recFs.id);
+    var orig = recFsOrig(k, recFs.id);
+    if(!doc || (k!=="plan" && !orig)){ recFsClose(); return; }
     var body = recFs.ov.querySelector(".recfs-body");
     var top = body.scrollTop;
-    var cl = orig.cloneNode(true);
-    cl.removeAttribute("data-fsk"); cl.classList.remove("recfsw");
-    cl.querySelectorAll("[id]").forEach(function(el){ el.removeAttribute("id"); });
-    body.innerHTML = ""; body.appendChild(cl);
+    var det = recFs.ov.querySelector(".recfs-det");
+    if(orig){
+      var cl = orig.cloneNode(true);
+      cl.removeAttribute("hidden"); cl.removeAttribute("data-fsk"); cl.classList.remove("recfsw");
+      cl.querySelectorAll("[id]").forEach(function(el){ el.removeAttribute("id"); });
+      var holder = det.querySelector(".recfs-detin");
+      holder.innerHTML = ""; holder.appendChild(cl);
+      recFs.clone = cl;
+    }
     body.scrollTop = top;
-    recFs.ov.querySelector(".recfs-head b").textContent = recFsTitle(recFs.k, doc);
-    var share = !!orig.querySelector(".qtg");
+    recFs.ov.querySelector(".recfs-head b").textContent = recFsTitle(k, doc);
+    var share = !!(orig && orig.querySelector(".qtg"));
     var bar = recFs.ov.querySelector(".recfs-bar");
     var refl = !!doc.reflected, ask = !!doc.askDecision;
-    if(recFs.k==="sp" && doc.source && doc.source.taskId){ var tk = state.tasks.find(function(t){ return t.id===doc.source.taskId; }); if(tk) ask = !!tk.askDecision; }
+    if(k==="sp" && doc.source && doc.source.taskId){ var tk = state.tasks.find(function(t){ return t.id===doc.source.taskId; }); if(tk) ask = !!tk.askDecision; }
+    var draws = recFsDraws();
     var btn = function(act, ic, label, on, dis){ return '<button type="button" data-recfsact="'+act+'"'+(on?' class="on"':'')+(dis?' disabled':'')+'><span class="ic">'+ic+'</span><span>'+label+'</span></button>'; };
+    if(k==="plan"){ bar.innerHTML = btn("edit", "✏️", "書き込む", false, !draws.length); return; }
     bar.innerHTML =
-      btn("edit", "✏️", "編集") +
-      btn("refl", "🏠", refl?"✓おうちノート<br>反映済み":"おうちノート<br>反映", refl, !share) +
-      btn("ask", "🔘", ask?"✓決定の<br>確認中":"決定の<br>確認", ask, !share) +
-      btn("ctask", "📋", "社内<br>タスク") +
-      btn("vgmail", "✉️", "業者依頼<br>(Gmail)");
+      btn("edit", "✏️", draws.length ? "書き込む" : "編集") +
+      btn("refl", "🏠", refl?"✓反映中":"反映", refl, !share) +
+      btn("ask", "🔘", ask?"✓確認中":"決定確認", ask, !share) +
+      btn("ctask", "📋", "タスク") +
+      btn("vgmail", "✉️", "業者依頼");
   }
   function recFsOpen(k, id){
     recFsClose();
+    var doc = recFsDoc(k, id); if(!doc) return;
     var ov = document.createElement("div");
     ov.className = "recfs-ov";
-    ov.innerHTML = '<div class="recfs-head"><b></b><button type="button" class="btn ghost small" data-recfsclose>✕ 閉じる</button></div><div class="recfs-body"></div><div class="recfs-bar"></div>';
+    var files = recPrevFiles(k, doc);
+    ov.innerHTML = '<div class="recfs-head"><b></b>'+
+      (files.length ? '<span class="fvzoom"><button type="button" class="btn ghost small" data-fvz="-1" title="小さく">－</button><button type="button" class="btn ghost small" data-fvz="1" title="大きく">＋</button></span>' : '')+
+      '<button type="button" class="btn ghost small" data-recfsclose>✕ 閉じる</button></div>'+
+      '<div class="recfs-body">'+(k==="n" ? '' : '<div class="fvwrap"><div class="fvin"></div></div>')+
+      (k==="plan" ? '<div class="recfs-det"></div>' : '<details class="recfs-det"'+(k==="n"||!files.length?' open':'')+'><summary>'+(k==="n"?'📝 記録の内容・印・操作':'📝 カードの内容・印・操作')+'</summary><div class="recfs-detin"></div></details>')+
+      (k==="n" && files.length ? '<div class="fvsec">📎 添付をそのまま見る</div><div class="fvwrap"><div class="fvin"></div></div>' : '')+
+      '</div><div class="recfs-bar"></div>';
     document.body.appendChild(ov);
-    recFs = { k:k, id:id, ov:ov };
+    recFs = { k:k, id:id, ov:ov, z:1 };
     recFsRender();
+    // 資料はそのまま（書き込む前に見る）。書き込めるものには「✏️ 書き込む」
+    var draws = recFsDraws(), fin = ov.querySelector(".fvin");
+    if(fin) fin.innerHTML = files.map(function(f){
+      var dk = (draws.find(function(d){ return d.url && d.url===f.url; })||{}).key || "";
+      return fvFileHtml(f, dk);
+    }).join("");
+    if(fin) fin.querySelectorAll(".fvfile").forEach(function(el, i){ fvRender(el.querySelector(".fvpages"), files[i]); });
     ov.addEventListener("click", recFsClick);
   }
   function recFsClose(){ if(recFs && recFs.ov) recFs.ov.remove(); recFs = null; }
@@ -11297,38 +11454,45 @@
   function recFsClick(e){
     if(!recFs) return;
     if(e.target.closest("[data-recfsclose]")){ recFsClose(); return; }
+    var z = e.target.closest("[data-fvz]");
+    if(z){
+      var steps = [1, 1.5, 2, 3], i = steps.indexOf(recFs.z); if(i<0) i = 0;
+      i = Math.max(0, Math.min(steps.length-1, i + Number(z.dataset.fvz)));
+      recFs.z = steps[i]; var fw = recFs.ov.querySelector(".fvwrap"); if(fw) fw.style.setProperty("--fvz", recFs.z);
+      return;
+    }
+    var fd = e.target.closest("[data-fvdraw]");
+    if(fd){ recFsDraw(fd.dataset.fvdraw); return; }
     var b = e.target.closest("[data-recfsact]");
     if(b){
       if(b.disabled) return;
       var act = b.dataset.recfsact, k = recFs.k, id = recFs.id;
       if(act==="edit"){
-        var orig = recFsOrig(k, id), draws = orig ? Array.prototype.slice.call(orig.querySelectorAll("[data-spec-draw]")) : [];
-        var items = draws.map(function(d){ return { value:"d:"+d.dataset.specDraw, label:"✍️ "+(d.textContent||"書き込む").replace(/^✏️\s*/,"")+"（手書き）" }; });
-        items.push({ value:"e", label:"📝 内容を編集" });
+        var draws = recFsDraws();
+        var items = draws.map(function(d){ return { value:"d:"+d.key, label:"✍️ "+(d.name||"資料")+" に書き込む" }; });
+        if(k!=="plan") items.push({ value:"e", label:"📝 内容を編集" });
         var go = function(v){
           if(!v) return;
-          recFsClose();
-          if(v==="e") runUniOp("edit", k, id); else openSpecDraw(v.slice(2));
+          if(v==="e"){ recFsClose(); runUniOp("edit", k, id); } else recFsDraw(v.slice(2));
         };
-        if(items.length===1){ go("e"); return; }
-        opsPopup("編集", "手書きで書き込むか、内容を直すかを選んでください", [["", items]], go);
+        if(items.length===1){ go(items[0].value); return; }
+        opsPopup("書き込む・編集", "書き込む資料を選ぶか、内容を直してください", [["", items]], go);
         return;
       }
       if(act==="ctask" || act==="vgmail"){ recFsAfter(runUniOp(act, k, id)); return; }
       recFsAfter(quickToggle(act, k, id));
       return;
     }
-    // カードの中の写真・PDFなどを押したら、元のカードの同じものを押したことにする（開く・見る）
-    var body = recFs.ov.querySelector(".recfs-body");
-    if(!body.contains(e.target) || e.target.closest("a[href]")) return;
-    var el = e.target, orig = recFsOrig(recFs.k, recFs.id); if(!orig) return;
-    while(el && el!==body){
+    // カードの中のボタン・写真などを押したら、元のカードの同じものを押したことにする
+    var det = recFs.ov.querySelector(".recfs-detin");
+    if(!det || !det.contains(e.target) || e.target.closest("a[href]")) return;
+    var el = e.target, orig = recFsOrig(recFs.k, recFs.id); if(!orig || !recFs.clone) return;
+    while(el && el!==det){
       var attrs = el.attributes ? Array.prototype.some.call(el.attributes, function(a){ return /^data-/.test(a.name); }) : false;
-      if(attrs || /^(BUTTON|IMG)$/.test(el.tagName)){
-        var cl = body.firstElementChild;
-        var all = Array.prototype.slice.call(cl.querySelectorAll("*")), oall = orig.querySelectorAll("*");
-        var i = all.indexOf(el);
-        if(i>=0 && oall[i]){ e.preventDefault(); oall[i].click(); recFsAfter(null); }
+      if(attrs || /^(BUTTON|IMG|SUMMARY)$/.test(el.tagName)){
+        var all = Array.prototype.slice.call(recFs.clone.querySelectorAll("*")), oall = orig.querySelectorAll("*");
+        var i2 = all.indexOf(el);
+        if(i2>=0 && oall[i2]){ e.preventDefault(); oall[i2].click(); recFsAfter(null); }
         return;
       }
       el = el.parentElement;
@@ -11338,8 +11502,9 @@
   document.addEventListener("click", function(e){
     var list = document.getElementById("meetingNoteList");
     if(!list || !list.contains(e.target)) return;
-    var plan = e.target.closest("[data-recplan]");
-    if(plan){ openPlanBoard(plan.dataset.recplan); return; }
+    // 横並びの小さなカード・図面は、どこを押しても全画面で開く
+    var pv = e.target.closest(".recprevw");
+    if(pv && !e.target.closest(".recfull")){ recFsOpen(pv.dataset.fsk, pv.dataset.fsid); return; }
     var w = e.target.closest(".recfsw"); if(!w) return;
     // ボタン・リンク・写真など、押すと何か起きる所は従来どおり
     var el = e.target;
