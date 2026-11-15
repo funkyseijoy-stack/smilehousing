@@ -7,6 +7,9 @@
 <title>おうちノート</title>
 <link rel="icon" href="/note/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="/note/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
 <style>
   :root{
     --page:#efe9e2; --bg:#f7f3ee; --card:#fffdfa; --line:#e9e2da; --line2:#ded5cb;
@@ -17,7 +20,7 @@
   *{ box-sizing:border-box; }
   html,body{ margin:0; padding:0; }
   body{ background:var(--page); color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
     -webkit-font-smoothing:antialiased; }
   button{ font-family:inherit; }
   .app{ max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); position:relative; padding-bottom:calc(84px + env(safe-area-inset-bottom)); }
@@ -343,6 +346,17 @@
   .hstrip{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; padding:2px 2px 8px; align-items:flex-start; }
   .hslot{ flex:0 0 78%; max-width:78%; scroll-snap-align:start; cursor:pointer; }
   .hslot.big{ flex-basis:96%; max-width:96%; }
+  .hslot{ position:relative; }
+  .ovstamp{ position:absolute; right:14px; top:44px; width:72px; height:72px; border:3.5px solid #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.7); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.2rem; line-height:1.05; letter-spacing:.06em; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; opacity:.9; pointer-events:none; z-index:2; box-shadow:inset 0 0 0 2px rgba(210,60,50,.22); }
+  .ovstamp small{ font-size:12px; font-weight:700; border-top:1.5px solid currentColor; margin-top:2px; padding-top:1px; letter-spacing:0; }
+  .ovstamp.big{ top:40px; width:90px; height:90px; font-size:1.45rem; }
+  .hslot.ovst .cdec .stamp{ display:none; }
+  /* プランボード・図面の段は絵を大きく（横いっぱい・全体が見える） */
+  .hslot.big .thumbs, .hslot.big .section-thumbs{ display:block !important; }
+  .hslot.big .th{ width:100%; aspect-ratio:4/3; background:#fff; }
+  .hslot.big .th img{ object-fit:contain; }
+  .hslot.big .pdfpages > .th{ flex-basis:100%; }
+  .hslot.big .ovstamp{ top:100px; right:22px; width:84px; height:84px; font-size:1.35rem; }
   .hslot .fcard{ margin:0; }
   .hdate{ font-size:12px; font-weight:700; color:var(--muted); margin:0 2px 4px; }
   .hplan{ border-left-color:var(--green-ink); }
@@ -1919,13 +1933,20 @@ function homeHtml(){ return homeParts().main; }
         '<div class="hstrip" data-hrow="'+esc(c.id)+'">'+shown.map(function(e){
           var big = isPb(e.x) && !!e.x.file;
           var i = hfsReg.push(e) - 1;
-          return '<div class="hslot'+(big?' big':'')+'" data-hfs="'+i+'"><div class="hdate">'+esc(fmtD(e.at))+'</div>'+feedCardHtml(e, {row:true})+'</div>';
+          var ovs = big ? decStampOver(e.x) : "";
+          return '<div class="hslot'+(big?' big':'')+(ovs?' ovst':'')+'" data-hfs="'+i+'"><div class="hdate">'+esc(fmtD(e.at))+'</div>'+feedCardHtml(e, {row:true})+ovs+'</div>';
         }).join("")+
         (list.length>HROW_LIMIT ? '<div class="hslot" style="flex-basis:40%;"><button class="btn ol" style="width:100%;" data-buildcat="'+esc(c.id)+'">ほか '+(list.length-HROW_LIMIT)+'件 ›</button></div>' : '')+
         '</div></div>');
     });
     if(!rows.length) return "";
     return '<div class="hrows"><div class="sechd"><h3>🏠 家づくりの記録</h3></div><p class="hint">← 横にスクロールすると前の記録が見られます。カードを押すと大きく開きます。</p>'+rows.join("")+'</div>';
+  }
+  // 決定したプランボードには、絵の上に「決定」のはんこを重ねる
+  function decStampOver(x){
+    if(!x || x.cardStatus!=="決定") return "";
+    var dd = x.cardDecidedAt ? new Date(x.cardDecidedAt) : null;
+    return '<span class="ovstamp">決定'+(dd && !isNaN(dd) ? '<small>'+(dd.getMonth()+1)+'/'+dd.getDate()+'</small>' : '')+'</span>';
   }
   var hfsCur = null; // {e, ov}
   function hfsKeyOf(e){ return e.plan ? "plan:"+(e.plan.url||e.plan.name||"") : (e.x.key || (e.c?e.c.id:"")+"|"+e.at+"|"+(e.x.title||"")); }
@@ -1948,6 +1969,8 @@ function homeHtml(){ return homeParts().main; }
     if(box){
       box.innerHTML = files.map(function(f){ return '<div class="hpvf"><div class="hpvh"><b>'+esc(f.name||"資料")+'</b>'+(canDraw && (isPdf(f)||isImg(f)) ? '<button type="button" data-hpvdraw>✏️ 書き込んで送る</button>' : '')+'</div><div class="hpvpages"><div class="muted" style="font-size:13px;">読み込み中…</div></div></div>'; }).join("");
       Array.prototype.forEach.call(box.querySelectorAll(".hpvpages"), function(el, i){ hpvRender(el, files[i]); });
+      var ovs = decStampOver(e.x), f0 = box.querySelector(".hpvf");
+      if(ovs && f0){ f0.style.position = "relative"; f0.insertAdjacentHTML("beforeend", ovs.replace('class="ovstamp"','class="ovstamp big"')); }
     }
   }
   // このカードの資料（図面・プランボード・写真・PDF）

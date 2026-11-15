@@ -309,11 +309,23 @@
   .recprev .rp-b.r{ border-color:#d23c32; color:#b8302a; background:#fdeeed; }
   .recprev .rp-b.o{ border-color:#d08a2c; color:#a5651a; background:#fdf3e5; }
   .recprev .rp-foot{ margin-top:auto; font-size:.85rem; color:var(--muted); }
+  .recprev{ position:relative; }
+  .recprev .rp-ic{ font-size:.95rem; line-height:1; }
+  .recprev.on{ border-color:var(--border); box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  /* 決定（赤）・発注済（緑）のはんこを、絵の右下（絵が無ければカードの右上）に重ねる */
+  .recprev .rp-stamps{ position:absolute; right:8px; bottom:8px; display:flex; gap:4px; pointer-events:none; z-index:2; }
+  .recprev.hasst > .rp-stamps{ top:34px; bottom:auto; }
+  .recprev.hasst .rp-title, .recprev.hasst .rp-text{ padding-inline-end:64px; }
+  .rp-st{ width:58px; height:58px; border:3px solid #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:.95rem; line-height:1.05; letter-spacing:.04em; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; opacity:.88; box-shadow:inset 0 0 0 2px rgba(210,60,50,.2); }
+  .rp-st small{ font-size:.85rem; font-weight:700; border-top:1.5px solid currentColor; margin-top:2px; padding-top:1px; letter-spacing:0; }
+  .rp-st.ord{ border-color:#2e8b57; color:#2e8b57; box-shadow:inset 0 0 0 2px rgba(46,139,87,.2); transform:rotate(8deg); }
+  .recprev .rp-vis.small .rp-st{ width:50px; height:50px; font-size:.85rem; }
   .recplan{ flex:1; min-width:0; }
   .recfsw{ cursor:pointer; }
   @media (max-width:760px){
     .recrow-hint{ display:none; }
     .recstrip{ scroll-snap-type:x mandatory; scroll-padding-inline-start:2px; }
+    .recslot.big{ flex-basis:100%; max-width:100%; }
   }
   /* カードを押すと全画面で開く。下に操作ボタン */
   .recfs-ov{ position:fixed; inset:0; z-index:55; background:var(--bg); display:flex; flex-direction:column; }
@@ -322,6 +334,8 @@
   .recfs-body{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; font-size:1.05rem; }
   .recfs-body > *{ max-width:900px; margin-inline:auto; }
   .recfs-body .qtg{ display:none !important; }
+  /* 全画面では、反映・決定の文字の札は出さない（下のボタンと、はんこで分かる） */
+  .recfs-body .nhead > .pill:not(.spectl-type-note), .recfs-body .nhead > .apstamp, .recfs-body .nhead > .nreflbadge, .recfs-body .spectl-card .pill.reflect{ display:none !important; }
   .recfs-body .noteitem.notemenu-open .notemenu, .recfs-body .spectl-ops[open] .opsmenu{ position:fixed; left:50%; transform:translateX(-50%); right:auto; width:min(420px, calc(100vw - 24px)); top:calc(env(safe-area-inset-top) + 64px); bottom:auto; max-height:calc(100vh - 160px); z-index:120; }
   .recfs-body{ font-weight:400; }
   /* 図面・プランボード・写真をそのまま見る（PDFはページを縦に並べる。拡大は＋／－） */
@@ -335,6 +349,8 @@
   .fvpage .fvpn{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.55); color:#fff; font-size:.85rem; border-radius:999px; padding:1px 8px; }
   .fvzoom{ display:flex; gap:4px; align-items:center; }
   .fvzoom button{ min-width:2.4em; }
+  .fv-stamps{ position:absolute; right:12px; top:44px; display:flex; gap:6px; pointer-events:none; z-index:3; }
+  .fv-stamps .rp-st{ width:76px; height:76px; font-size:1.15rem; }
   .fvsec{ font-size:.9rem; font-weight:700; color:var(--muted); margin:14px 0 6px; }
   .recfs-det > summary{ cursor:pointer; font-size:.9rem; font-weight:700; color:var(--muted); padding:6px 0; }
   .recfs-body img{ max-width:100%; height:auto; }
@@ -9345,29 +9361,32 @@
     } else {
       text = String(doc.customerNote||doc.memo||doc.staffMemo||"").trim();
     }
-    var b = [];
-    if(doc.reflected) b.push('<span class="rp-b g">✓ おうちノート</span>');
-    if(doc.askDecision) b.push('<span class="rp-b o">🔘 決定の確認中</span>');
+    // 印は文字の札にせず、小さな絵だけ（🏠＝おうちノートに出ている／🔘＝お客様に決定の確認中）
+    var icons = (doc.reflected ? '<span class="rp-ic" title="おうちノートに出ています">🏠</span>' : '')+
+      (doc.askDecision ? '<span class="rp-ic" title="お客様に決定の確認中">🔘</span>' : '');
     var ck = k==="n" ? "n:"+doc.id : k==="sp" ? ((doc.source && doc.source.taskId) ? "t:"+doc.source.taskId : "s:"+doc.id) : "a:"+doc.id;
     var dc = (state.noteDecisions||[]).find(function(x){ return x && !x.deletedAt && x.projectId===doc.projectId && x.cardKey===ck && x.status==="決定"; });
-    if(dc) b.push('<span class="rp-b r">🔴 '+(dc.by && dc.by!=="お客様" ? "決定" : "お客様が決定")+'</span>');
-    var od = orderedOf(doc); if(od) b.push('<span class="rp-b r">発注済み</span>');
+    var od = orderedOf(doc);
+    var md = function(iso){ var t = iso ? new Date(iso) : null; return (t && !isNaN(t)) ? '<small>'+(t.getMonth()+1)+'/'+t.getDate()+'</small>' : ''; };
+    // 決定・発注済みは、はんこにして絵（無ければカード）の上に重ねる
+    var stamps = (dc ? '<span class="rp-st">決定'+md(dc.decidedAt||dc.updatedAt)+'</span>' : '')+
+      (od ? '<span class="rp-st ord">発注済'+md(od.ordered && od.ordered.at)+'</span>' : '');
     var part = k==="n" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : k==="sp" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : (doc.specPart||null);
     var pt = (part && part.scope) ? partText(part, doc.projectId) : "";
-    if(pt) b.push('<span class="rp-b">'+escapeHtml(pt)+'</span>');
     var vis = "";
     if(files.length){
       var f = files[0];
-      vis = '<div class="rp-vis'+(big?'':' small')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+'</div>';
+      vis = '<div class="rp-vis'+(big?'':' small')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+
+        (stamps ? '<span class="rp-stamps">'+stamps+'</span>' : '')+'</div>';
     }
     var who = doc.author || doc.createdBy || doc.by || doc.receivedBy || "";
-    return '<div class="recprev'+(doc.reflected?' on':'')+'">'+
-      '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span></div>'+
+    return '<div class="recprev'+(doc.reflected?' on':'')+(stamps && !vis ? ' hasst' : '')+'">'+
+      (stamps && !vis ? '<span class="rp-stamps">'+stamps+'</span>' : '')+
+      '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span>'+icons+'</div>'+
       vis+
       (title ? '<div class="rp-title">'+escapeHtml(title)+'</div>' : '')+
       (text ? '<div class="rp-text">'+escapeHtml(text)+'</div>' : '')+
-      (b.length ? '<div class="rp-badges">'+b.join("")+'</div>' : '')+
-      (who ? '<div class="rp-foot">記入：'+escapeHtml(who)+'</div>' : '')+
+      ((pt || who) ? '<div class="rp-foot">'+escapeHtml([pt, who ? "記入："+who : ""].filter(Boolean).join("　"))+'</div>' : '')+
       '</div>';
   }
   function orderedOf(x){
@@ -11445,6 +11464,12 @@
       return fvFileHtml(f, dk);
     }).join("");
     if(fin) fin.querySelectorAll(".fvfile").forEach(function(el, i){ fvRender(el.querySelector(".fvpages"), files[i]); });
+    // 決定・発注済みのはんこを、いちばん上の資料に重ねる
+    var pv = document.createElement("div"); pv.innerHTML = recPrevHtml(k, doc, "", true);
+    var st = pv.querySelector(".rp-stamps");
+    var first = fin && fin.querySelector(".fvfile");
+    var host = first || ov.querySelector(".recfs-det");
+    if(st && host){ st.className = "fv-stamps"; host.style.position = "relative"; host.appendChild(st); }
     ov.addEventListener("click", recFsClick);
   }
   function recFsClose(){ if(recFs && recFs.ov) recFs.ov.remove(); recFs = null; }
