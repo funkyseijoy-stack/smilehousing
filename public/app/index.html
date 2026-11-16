@@ -325,6 +325,9 @@
   .rp-st.ord{ border-color:#2e8b57; color:#2e8b57; box-shadow:inset 0 0 0 2px rgba(46,139,87,.2); transform:rotate(8deg); }
   .recprev .rp-vis.small .rp-st{ width:50px; height:50px; font-size:.85rem; }
   .recplan{ flex:1; min-width:0; }
+  /* 小さなカードの右上の「⋮」：全画面を開かずに操作のメニュー */
+  .recprev .rp-ops{ flex:none; min-width:34px; height:30px; padding:0 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--ink); font-size:1.05rem; font-weight:900; line-height:1; cursor:pointer; }
+  .recprev .rp-ops:hover{ border-color:var(--accent); color:var(--accent-ink); }
   .recfsw{ cursor:pointer; }
   @media (max-width:760px){
     .recrow-hint{ display:none; }
@@ -9486,7 +9489,8 @@
     var who = doc.author || doc.createdBy || doc.by || doc.receivedBy || "";
     return '<div class="recprev'+(doc.reflected?' on':'')+(stamps && !vis ? ' hasst' : '')+'">'+
       (stamps && !vis ? '<span class="rp-stamps">'+stamps+'</span>' : '')+
-      '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span>'+icons+'</div>'+
+      '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span>'+icons+
+        (k!=="plan" ? '<button type="button" class="rp-ops" data-rpops="1" title="操作">⋮</button>' : '')+'</div>'+
       vis+
       (title ? '<div class="rp-title">'+escapeHtml(title)+'</div>' : '')+
       (text ? '<div class="rp-text">'+escapeHtml(text)+'</div>' : '')+
@@ -11576,6 +11580,43 @@
     if(st && host){ st.className = "fv-stamps"; host.style.position = "relative"; host.appendChild(st); }
     ov.addEventListener("click", recFsClick);
   }
+  // 横並びの小さなカードの「⋮ 操作」：全画面の下のボタンと同じ操作＋そのほか（記録・写真PDF・見積の書類）
+  function rpOpsOpen(k, id){
+    if(k==="plan") return;
+    var doc = recFsDoc(k, id); if(!doc) return;
+    var share = k!=="att" || quoteSharable(doc);
+    var ask = !!doc.askDecision;
+    if(k==="sp" && doc.source && doc.source.taskId){ var tk = state.tasks.find(function(t){ return t.id===doc.source.taskId; }); if(tk) ask = !!tk.askDecision; }
+    var orig = recFsOrig(k, id);
+    var draws = orig ? Array.prototype.slice.call(orig.querySelectorAll("[data-spec-draw]")).map(function(el){
+      var r = specDrawReg[el.dataset.specDraw] || {}; return { key:el.dataset.specDraw, name:r.name||"" };
+    }) : [];
+    var sec = [];
+    if(draws.length) sec.push(["✏️ 書き込む", draws.map(function(d){ return { value:"d:"+d.key, label:"✍️ "+(d.name||"資料")+" に書き込む" }; })]);
+    if(share) sec.push(["🏠 お客様へ", [
+      { value:"q:refl", label:doc.reflected ? "✓ おうちノートに反映中（押すと外す）" : "🏠 おうちノートに反映する", on:!!doc.reflected },
+      { value:"q:home", label:doc.homeShow ? "✓ ホームに出しています（押すと外す）" : "🏡 おうちノートのホームに出す", on:!!doc.homeShow },
+      { value:"q:ask", label:ask ? "✓ 決定ボタンを出しています（押すと出さない）" : "🔘 お客様の決定ボタンを出す", on:ask },
+      { value:"q:cmt", label:"💬 お客様へのひとこと" }
+    ]]);
+    sec.push(["📋 タスク・依頼", [
+      { value:"u:ctask", label:"📋 社内タスクにする" },
+      { value:"u:vgmail", label:"✉️ 業者へ依頼（見積依頼＋Gmail下書き）" },
+      { value:"u:est", label:"＋ 追加見積り（おうちノート）" }
+    ]]);
+    sec.push(["🗂 整理", [
+      { value:"u:gmail", label:"📥 Gmailから取り込む" },
+      { value:"u:part", label:"📍 部位を変える" },
+      { value:"u:edit", label:"✏️ 内容を編集" },
+      { value:"u:del", label:"🗑 削除", danger:true }
+    ]]);
+    opsPopup(recFsTitle(k, doc), "", sec, function(v){
+      if(!v) return;
+      if(v.indexOf("d:")===0){ openSpecDraw(v.slice(2)); return; }
+      if(v.indexOf("q:")===0){ quickToggle(v.slice(2), k, id); return; }
+      runUniOp(v.slice(2), k, id);
+    });
+  }
   function recFsClose(){ if(recFs && recFs.ov) recFs.ov.remove(); recFs = null; }
   function recFsAfter(p){
     Promise.resolve(p).catch(function(){}).then(function(){ setTimeout(recFsRender, 50); setTimeout(recFsRender, 800); });
@@ -11631,6 +11672,9 @@
   document.addEventListener("click", function(e){
     var list = document.getElementById("meetingNoteList");
     if(!list || !list.contains(e.target)) return;
+    // 小さなカードの「⋮」は、全画面を開かずに操作のメニュー
+    var rpo = e.target.closest("[data-rpops]");
+    if(rpo){ var pw = rpo.closest(".recprevw"); if(pw){ e.preventDefault(); e.stopPropagation(); rpOpsOpen(pw.dataset.fsk, pw.dataset.fsid); } return; }
     // 横並びの小さなカード・図面は、どこを押しても全画面で開く
     var pv = e.target.closest(".recprevw");
     if(pv && !e.target.closest(".recfull")){ recFsOpen(pv.dataset.fsk, pv.dataset.fsid); return; }
