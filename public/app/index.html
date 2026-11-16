@@ -325,6 +325,10 @@
   .rp-st.ord{ border-color:#2e8b57; color:#2e8b57; box-shadow:inset 0 0 0 2px rgba(46,139,87,.2); transform:rotate(8deg); }
   .recprev .rp-vis.small .rp-st{ width:50px; height:50px; font-size:.85rem; }
   .recplan{ flex:1; min-width:0; }
+  /* カードの外枠（.recprevw）も枠の幅に収める。以前は中の図面の大きさで広がり、隣のカードに重なっていた */
+  .recslot{ min-width:0; }
+  .recslot > .recprevw{ flex:1 1 auto; min-width:0; max-width:100%; display:flex; }
+  .recslot > .recprevw > .recprev{ flex:1 1 auto; min-width:0; max-width:100%; }
   /* 小さなカードの右上の「⋮」：全画面を開かずに操作のメニュー */
   .recprev .rp-ops{ flex:none; min-width:34px; height:30px; padding:0 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--ink); font-size:1.05rem; font-weight:900; line-height:1; cursor:pointer; }
   .recprev .rp-ops:hover{ border-color:var(--accent); color:var(--accent-ink); }
@@ -11609,6 +11613,30 @@
     ov.addEventListener("click", recFsClick);
   }
   // 横並びの小さなカードの「⋮ 操作」：全画面の下のボタンと同じ操作＋そのほか（記録・写真PDF・見積の書類）
+  // 「⋮ 操作」のメニュー（z-index 120〜200）を開いたまま、反映のひとこと・部位の選択などの確認画面（z-index 95）を出すと、
+  // 確認画面がメニューの裏に隠れて押せず、「反映」などが効かないように見えていた。メニューが開いている間に出た画面は前に出す。
+  (function(){
+    function menuOpen(){ return !!document.querySelector(".opspop-ov, .noteitem.notemenu-open, .spectl-ops[open]"); }
+    var raised = [];
+    var mo = new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        Array.prototype.forEach.call(m.addedNodes, function(n){
+          if(n.nodeType!==1 || n.classList.contains("opspop-ov") || !menuOpen()) return;
+          var cs = getComputedStyle(n);
+          if(cs.position!=="fixed") return;
+          var z = parseInt(cs.zIndex, 10);
+          if(isNaN(z) || z<260){ n.style.zIndex = "260"; raised.push(n); }
+        });
+        Array.prototype.forEach.call(m.removedNodes, function(n){
+          var i = raised.indexOf(n); if(i<0) return;
+          raised.splice(i, 1);
+          document.dispatchEvent(new CustomEvent("opsdialogclosed"));
+        });
+      });
+    });
+    var start = function(){ mo.observe(document.body, { childList:true }); };
+    if(document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+  })();
   function rpOpsOpen(k, id){
     if(k==="plan") return;
     if(!recFsDoc(k, id)) return;
@@ -11640,6 +11668,12 @@
       var sc2 = ov.querySelector(".opspop"); if(sc2) sc2.scrollTop = top;
     };
     paint();
+    // 確認画面（反映のひとこと・部位の選択など）を閉じたら、スイッチの表示を描き直す（保存を待って少しあとにも）
+    var onDlg = function(){
+      if(!ov.isConnected){ document.removeEventListener("opsdialogclosed", onDlg); return; }
+      paint(); setTimeout(function(){ if(ov.isConnected) paint(); }, 900);
+    };
+    document.addEventListener("opsdialogclosed", onDlg);
     var busy = false;
     ov.addEventListener("click", async function(e){
       if(e.target===ov || e.target.closest("[data-opsclose]")){ ov.remove(); return; }
