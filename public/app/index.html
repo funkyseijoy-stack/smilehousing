@@ -11217,6 +11217,7 @@
       b("ord", "🟢 発注済みのはんこ（社内だけ）", ord)+
       b("part", "📍 部位の変更");
     var other =
+      b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
       (noShare ? "" : b("cmt", "💬 お客様へのひとこと"))+
       b("qspec", "🔵 見積仕様のはんこ", qspec)+
       b("estreqst", "🟠 見積依頼中のはんこ（手で）", hasEstReqStamp(u&&u.doc))+

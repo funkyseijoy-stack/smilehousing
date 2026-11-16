@@ -345,6 +345,19 @@
   .hrowh .more{ margin-left:auto; border:0; background:none; color:var(--brown2); font:inherit; font-size:13px; font-weight:700; cursor:pointer; padding:6px 2px; }
   .hstrip{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; padding:2px 2px 8px; align-items:flex-start; }
   .hslot{ flex:0 0 78%; max-width:78%; scroll-snap-align:start; cursor:pointer; }
+  .hest{ background:#fff; border:1px solid var(--line, #e6ddd0); border-radius:14px; padding:12px 13px; display:flex; flex-direction:column; gap:6px; height:100%; box-sizing:border-box; cursor:default; }
+  .hest.wait{ border-color:#d9a441; box-shadow:0 0 0 1px #d9a441 inset; }
+  .hest .et{ font-weight:700; font-size:15px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .hest .en{ font-size:13px; color:var(--muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; }
+  .hest .ea{ font-size:17px; font-weight:700; }
+  .hest .ea small{ font-size:11px; font-weight:400; color:var(--muted); margin-left:4px; }
+  .hest .es{ align-self:flex-start; font-size:12px; font-weight:700; border-radius:999px; padding:2px 10px; background:#f1ebe2; color:#6b5a48; }
+  .hest .es.ok{ background:#e3f1e6; color:#2f7a45; }
+  .hest .es.wt{ background:#fff3d6; color:#9a6b12; }
+  .hest .eb{ display:flex; gap:6px; margin-top:auto; }
+  .hest .eb .btn{ flex:1 1 0; padding:8px 4px; font-size:13px; white-space:nowrap; }
+  .hrowh b{ white-space:nowrap; }
+  .hrow .esum{ font-size:13px; color:var(--muted); margin:-2px 2px 6px; }
   .hslot.big{ flex-basis:96%; max-width:96%; }
   .hslot{ position:relative; }
   .ovstamp{ position:absolute; right:14px; top:44px; width:72px; height:72px; border:3.5px solid #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.7); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:1.2rem; line-height:1.05; letter-spacing:.06em; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; opacity:.9; pointer-events:none; z-index:2; box-shadow:inset 0 0 0 2px rgba(210,60,50,.22); }
@@ -1939,6 +1952,40 @@ function homeHtml(){ return homeParts().main; }
     try{ return fn(); }
     catch(e){ try{ console.error(label, e); }catch(_){} return '<div class="muted" style="font-size:12px;margin:12px 0;padding:8px 10px;border:1px dashed var(--line2);border-radius:8px;">「'+esc(label)+'」を表示できませんでした（'+esc(String(e && e.message || e))+'）</div>'; }
   }
+  // 追加見積りの段（家づくりの記録のいちばん下）。返事待ちを先に、そのあと新しい順
+  function homeEstRowHtml(){
+    var ests = (data.estimates||[]).slice();
+    if(!ests.length) return "";
+    var tAt = function(v){ return Date.parse(v)||0; };
+    var info = function(x){
+      var r = x.customerResponse || "未回答";
+      var pend = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
+      var minus = !pend && estIsMinus(x);
+      return { r:r, pend:pend, minus:minus, wait: !pend && !minus && r==="未回答" && !!x.id };
+    };
+    ests.sort(function(a,b){ var wa=info(a).wait?1:0, wb=info(b).wait?1:0; if(wa!==wb) return wb-wa; return tAt(b.createdAt)-tAt(a.createdAt); });
+    var all=0, ok=0;
+    ests.forEach(function(x){ var i=info(x); if(i.pend || i.r==="見送り" || x.estimateState==="見送り") return; var a=estAmountNum(x.amount); if(a==null) return; all+=a; if(i.r==="承認" || a<0) ok+=a; });
+    var yen = function(v){ return (v<0?"−":"")+Math.abs(v).toLocaleString("ja-JP")+"円"; };
+    var cards = ests.map(function(x){
+      var i = info(x);
+      var st = i.pend ? '<span class="es">金額確認中</span>'
+        : i.minus ? '<span class="es">減額</span>'
+        : i.r==="承認" ? '<span class="es ok">✅ 承認済み</span>'
+        : i.r==="未回答" ? '<span class="es wt">ご確認ください</span>'
+        : '<span class="es">'+esc(i.r)+'</span>';
+      var act = "";
+      if(i.wait) act = '<div class="eb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn dk" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 承認する</button></div>';
+      else if(!i.pend && !i.minus && x.id) act = '<div class="eb"><button class="btn ol" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
+      return '<div class="hslot"><div class="hdate">'+esc(fmtD(x.createdAt))+' '+nwTag(x.createdAt)+'</div>'+
+        '<div class="hest'+(i.wait?' wait':'')+'">'+st+'<div class="et">'+esc(x.title||"追加見積り")+'</div>'+
+        (x.note ? '<div class="en">'+esc(x.note)+'</div>' : '')+
+        '<div class="ea">'+(i.pend ? '金額確認中' : esc(estAmountText(x))+'<small>税抜き</small>')+'</div>'+act+'</div></div>';
+    }).join("");
+    return '<div class="hrow"><div class="hrowh"><b>🧾 追加見積り</b><span class="cnt">'+ests.length+'件</span></div>'+
+      '<div class="esum">合計 '+yen(all)+'　うち承認済み '+yen(ok)+'（税抜き）</div>'+
+      '<div class="hstrip" data-hrow="__est">'+cards+'</div></div>';
+  }
   function homeRowsHtml(){
     hfsReg = [];
     var rows = [];
@@ -1973,6 +2020,7 @@ function homeHtml(){ return homeParts().main; }
         (list.length>HROW_LIMIT ? '<div class="hslot" style="flex-basis:40%;"><button class="btn ol" style="width:100%;" data-buildcat="'+esc(c.id)+'">ほか '+(list.length-HROW_LIMIT)+'件 ›</button></div>' : '')+
         '</div></div>');
     });
+    var er = homeEstRowHtml(); if(er) rows.push(er);
     if(!rows.length) return "";
     return '<div class="hrows"><div class="sechd"><h3>🏠 家づくりの記録</h3></div><p class="hint">← 横にスクロールすると前の記録が見られます。カードを押すと大きく開きます。</p>'+rows.join("")+'</div>';
   }
