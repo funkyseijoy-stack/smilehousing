@@ -498,6 +498,11 @@
   .uoprow > button{ flex:1; min-width:0; }
   .uopchk{ width:20px; height:20px; flex:0 0 auto; margin:0 0 0 4px; }
   .uopchk-sp{ width:20px; flex:0 0 auto; margin-left:4px; }
+  .notemenu button.uopsw{ display:flex !important; align-items:center; justify-content:space-between; gap:10px; }
+  .uopsw .sw{ flex:0 0 auto; width:40px; height:23px; border-radius:12px; background:#cfc9bf; position:relative; transition:background .15s; }
+  .uopsw .sw::after{ content:""; position:absolute; top:3px; left:3px; width:17px; height:17px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:left .15s; }
+  .uopsw.on .sw{ background:var(--accent); }
+  .uopsw.on .sw::after{ left:20px; }
   .notemenu .uoprun{ margin-top:6px; background:#1f6f43 !important; color:#fff !important; border-radius:10px; font-weight:700; text-align:center; }
   .notemenu button{ display:block; width:100%; text-align:start; background:none; border:none; font:inherit; padding:8px 8px; border-radius:7px; cursor:pointer; color:var(--ink); }
   .notemenu button:hover{ background:var(--surface-2); }
@@ -11189,9 +11194,8 @@
     if(ok===false){ u.doc.badges.quote = !u.doc.badges.quote; render(); toast("保存できませんでした"); return; }
     toast(u.doc.badges.quote ? "🔵 見積仕様のはんこを付けました" : "見積仕様のはんこを外しました");
   }
-  // まとめて実行できる操作（チェック欄を出す）。いまオンになっていないものだけチェックできる
-  // まとめて実行できる操作（チェック欄を出す）。いまオンになっていないものだけチェックできる
-  var UNI_BATCH = ["refl","ask","home","stamp","qspec","ctask","vgmail","ord","part"];
+  // タップで切り替える操作（スイッチで表示。押してもメニューは開いたまま）
+  var UNI_TOGGLES = ["refl","ask","stamp","ord","qspec","estreqst","chgst"];
   // 「⋮ 操作」の中身（大きなカード・小さなカードで同じ）。上：よく使う7つ（ともこさんの順）／下：そのほか
   function uniOpsSections(kind, id, drawHtml, f, sent){
     sent = sent || {}; f = f || {};
@@ -11199,27 +11203,25 @@
     var qspec = !!(u && u.doc.badges && u.doc.badges.quote);
     var ord = !!(u && (orderedOf(u.doc) || (sd && sd.ordered)));
     var b = function(act, label, on, cls){
-      var btn = '<button type="button" class="'+(on?"on ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>';
-      if(UNI_BATCH.indexOf(act)<0) return btn;
-      return '<div class="uoprow">'+(on ? '<span class="uopchk-sp"></span>' : '<input type="checkbox" class="uopchk" data-uopchk="'+act+'" aria-label="まとめて実行に入れる">')+btn+'</div>';
+      var sw = UNI_TOGGLES.indexOf(act)>=0;
+      return '<button type="button" class="'+(on?"on ":"")+(sw?"uopsw ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+
+        (sw ? '<span>'+label+'</span><span class="sw" aria-hidden="true"></span>' : label)+'</button>';
     };
     var noShare = !!f.reflectNote;
     var main =
-      (noShare ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", f.reflected?"✓ おうちノートに反映中（押すと外す）":"🏠 おうちノートに反映する", !!f.reflected))+
-      (noShare ? "" : b("ask", f.ask?"✓ お客様の決定ボタンを出しています（押すと出さない）":"🔘 お客様の決定ボタンを出す", !!f.ask))+
-      b("stamp", stamped?"✓ 🔴 決定のはんこ済み（押すと外す）":"🔴 こちらから決定のはんこを押す", stamped)+
+      (noShare ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", "🏠 おうちノートに反映", !!f.reflected))+
+      (noShare ? "" : b("ask", "🔘 お客様の決定ボタン", !!f.ask))+
+      b("stamp", "🔴 こちらから決定のはんこ", stamped)+
       b("ctask", (sent.companytask?"✓ ":"")+"📋 社内タスク", !!sent.companytask)+
       b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へ変更依頼（Gmail下書き・🟠見積依頼中のはんこ）", !!sent.estreq)+
-      b("ord", ord?"✓ 🟢 発注済みのはんこ（押すと外す）":"🟢 発注済みのはんこを押す（社内だけ）", ord)+
+      b("ord", "🟢 発注済みのはんこ（社内だけ）", ord)+
       b("part", "📍 部位の変更");
     var other =
-      (noShare ? "" : b("home", f.home?"✓ おうちノートのホームに出す（押すと外す）":"🏡 おうちノートのホームに出す", !!f.home))+
       (noShare ? "" : b("cmt", "💬 お客様へのひとこと"))+
-      b("qspec", qspec?"✓ 🔵 見積仕様のはんこ（押すと外す）":"🔵 見積仕様のはんこを付ける", qspec)+
-      b("estreqst", hasEstReqStamp(u&&u.doc)?"✓ 🟠 見積依頼中のはんこ（押すと外す）":"🟠 見積依頼中のはんこを手で付ける", hasEstReqStamp(u&&u.doc))+
-      b("chgst", hasChangeStamp(u&&u.doc)?"✓ 🟣 変更依頼中のはんこ（押すと外す）":"🟣 変更依頼中のはんこを手で付ける", hasChangeStamp(u&&u.doc))+
-      b("gmail", "📥 Gmailから取り込む")+
-      '<button type="button" class="uoprun" data-uoprun="1" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">☑ チェックしたものをまとめて実行</button>';
+      b("qspec", "🔵 見積仕様のはんこ", qspec)+
+      b("estreqst", "🟠 見積依頼中のはんこ（手で）", hasEstReqStamp(u&&u.doc))+
+      b("chgst", "🟣 変更依頼中のはんこ（手で）", hasChangeStamp(u&&u.doc))+
+      b("gmail", "📥 Gmailから取り込む");
     var tail = b("edit", "✏️ 内容を編集")+(f.delOk===false ? "" : b("del", "🗑 削除", false, "danger"));
     return [["✏️ 書き込む", drawHtml||""], ["よく使う", main], ["そのほか", other], ["", tail]];
   }
@@ -11292,7 +11294,6 @@
     };
     return '<div class="qtg">'+
       b("refl", "反映", !!f.reflected, f.reflected ? "おうちノートに出しています（押すと外す）" : "おうちノートの家づくりの項目に出す")+
-      b("home", "🏠ホーム", !!f.home, f.home ? "おうちノートのホームに出しています（押すと外す）" : "おうちノートのホームに出す（反映もします）")+
       b("ask", "🔘決定ボタン", !!f.ask, f.ask ? "お客様の決定ボタンを出しています（押すと出さない）" : "お客様に決定ボタンを出す（反映もします）")+
       b("cmt", "💬お客様へ", !!f.cmt, f.cmt ? "お客様へのひとことを入れています（押すと書き直せます）" : "このカードにお客様へのひとことを書く（おうちノートに「スタッフから：」と出ます）")+
       '</div>';
@@ -11357,12 +11358,12 @@
     return runUniOp0(act, kind, id);
   }
   function runUniOp0(act, kind, id){
-    if(act==="ord"){ openNoteMenuId = null; return toggleCardOrdered(kind, id); }
+    if(act==="ord") return toggleCardOrdered(kind, id);
     if(act==="cmt"){ openNoteMenuId = null; return editCardComment(kind, id); }
     // 打合せ記録（記録のカード・変更履歴の記録の写し）は、記録の操作をそのまま使う
     if(kind==="n"){
       var n = state.meetingNotes.find(function(x){ return x.id===id; }); if(!n) return;
-      openNoteMenuId = null;
+      if(UNI_TOGGLES.indexOf(act)<0) openNoteMenuId = null;
       var r0 = null;
       if(act==="stamp") r0 = toggleStaffStamp(kind, id);
       else if(act==="hide") r0 = toggleHomeHide(kind, id);
@@ -11451,7 +11452,7 @@
     var acts = Array.prototype.slice.call(menu.querySelectorAll("input.uopchk:checked")).map(function(c){ return c.dataset.uopchk; });
     if(!acts.length){ toast("まとめて行う操作に、チェックを入れてください"); return; }
     if(uniBatchBusy) return; uniBatchBusy = true;
-    acts.sort(function(a,b){ return UNI_BATCH.indexOf(a)-UNI_BATCH.indexOf(b); });
+    
     openNoteMenuId = null;
     try{
       for(var i=0;i<acts.length;i++){
@@ -11607,39 +11608,48 @@
   // 横並びの小さなカードの「⋮ 操作」：全画面の下のボタンと同じ操作＋そのほか（記録・写真PDF・見積の書類）
   function rpOpsOpen(k, id){
     if(k==="plan") return;
-    var doc = recFsDoc(k, id); if(!doc) return;
-    var f, sent;
-    if(k==="n"){ var ns = noteSentInfo(doc); f = { reflected:doc.reflected, ask:doc.askDecision, home:doc.homeShow }; sent = { estimate:ns.estimate, companytask:ns.companytask, estreq:ns.estreq }; }
-    else if(k==="sp"){
-      var tk = doc.source && doc.source.taskId ? state.tasks.find(function(t){ return t.id===doc.source.taskId; }) : null;
-      f = { reflected:doc.reflected, ask: tk ? tk.askDecision : doc.askDecision, home:doc.homeShow }; sent = specSentInfo(doc);
-    } else {
-      var sh = quoteSharable(doc);
-      f = { reflected:doc.reflected && sh, reflectNote: sh ? "" : "この種類（"+(qtLabel(doc.quoteType)||"")+"）はお客様には出ません", ask:doc.askDecision, home:doc.homeShow }; sent = specSentInfo(doc);
-    }
+    if(!recFsDoc(k, id)) return;
     var orig = recFsOrig(k, id);
     var drawHtml = orig ? Array.prototype.slice.call(orig.querySelectorAll("[data-spec-draw]")).map(function(el){
       var r = specDrawReg[el.dataset.specDraw] || {};
       return '<button type="button" data-rpdraw="'+escapeHtml(el.dataset.specDraw)+'">✍️ '+escapeHtml(r.name||"資料")+' に書き込む</button>';
     }).join("") : "";
-    // 大きなカードの「⋮ 操作」と同じ中身（uniOpsSections）を、画面の真ん中に出す
     var ov = document.createElement("div");
     ov.className = "opspop-ov";
-    ov.innerHTML = '<div class="notemenu opsmenu opspop" role="dialog">'+
-      '<div class="opspop-head"><div><b>'+escapeHtml(recFsTitle(k, doc))+'</b></div>'+
-      '<button type="button" class="notemenu-close" data-opsclose>✕ 閉じる</button></div>'+
-      uniOpsInnerHtml(uniOpsSections(k, id, drawHtml, f, sent))+'</div>';
     document.body.appendChild(ov);
-    ov.addEventListener("click", function(e){
+    // 大きなカードの「⋮ 操作」と同じ中身（uniOpsSections）を画面の真ん中に。スイッチは押しても開いたまま描き直す
+    var paint = function(){
+      var doc = recFsDoc(k, id); if(!doc){ ov.remove(); return; }
+      var f, sent;
+      if(k==="n"){ var ns = noteSentInfo(doc); f = { reflected:doc.reflected, ask:doc.askDecision }; sent = { estimate:ns.estimate, companytask:ns.companytask, estreq:ns.estreq }; }
+      else if(k==="sp"){
+        var tk = doc.source && doc.source.taskId ? state.tasks.find(function(t){ return t.id===doc.source.taskId; }) : null;
+        f = { reflected:doc.reflected, ask: tk ? tk.askDecision : doc.askDecision }; sent = specSentInfo(doc);
+      } else {
+        var sh = quoteSharable(doc);
+        f = { reflected:doc.reflected && sh, reflectNote: sh ? "" : "この種類（"+(qtLabel(doc.quoteType)||"")+"）はお客様には出ません", ask:doc.askDecision }; sent = specSentInfo(doc);
+      }
+      var sc = ov.querySelector(".opspop"), top = sc ? sc.scrollTop : 0;
+      ov.innerHTML = '<div class="notemenu opsmenu opspop" role="dialog">'+
+        '<div class="opspop-head"><div><b>'+escapeHtml(recFsTitle(k, doc))+'</b></div>'+
+        '<button type="button" class="notemenu-close" data-opsclose>✕ 閉じる</button></div>'+
+        uniOpsInnerHtml(uniOpsSections(k, id, drawHtml, f, sent))+'</div>';
+      var sc2 = ov.querySelector(".opspop"); if(sc2) sc2.scrollTop = top;
+    };
+    paint();
+    var busy = false;
+    ov.addEventListener("click", async function(e){
       if(e.target===ov || e.target.closest("[data-opsclose]")){ ov.remove(); return; }
       var d = e.target.closest("[data-rpdraw]");
       if(d){ ov.remove(); openSpecDraw(d.dataset.rpdraw); return; }
-      // data-uop・まとめて実行はページ全体の処理が行う。押したらこの画面は閉じる
-      if(e.target.closest("[data-uop]") || e.target.closest("[data-uoprun]")){
-        var uo = e.target.closest("[data-uoprun]");
-        if(uo && !ov.querySelector("input.uopchk:checked")) return;
-        setTimeout(function(){ ov.remove(); }, 0);
-      }
+      var u = e.target.closest("[data-uop]"); if(!u) return;
+      e.stopPropagation(); e.preventDefault();
+      var act = u.dataset.uop;
+      if(UNI_TOGGLES.indexOf(act)<0){ ov.remove(); runUniOp(act, k, id); return; }
+      if(busy) return; busy = true;
+      try{ await runUniOp(act, k, id); } catch(er){}
+      busy = false;
+      if(ov.isConnected) paint();
     });
   }
   function recFsClose(){ if(recFs && recFs.ov) recFs.ov.remove(); recFs = null; }
