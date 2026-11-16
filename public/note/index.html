@@ -1530,7 +1530,7 @@ function homeHtml(){ return homeParts().main; }
     out += staffCommentHtml();
     out += updatesHtml();
     out += latestNotesHtml();
-    out += reflectedNotesHtml();
+    // 「📝 打合せ記録」の欄（ホームに出すにした記録）は出さない（家づくりの記録の段と二重になるため。2026年11月16日〜）
     out += pendingCardsHtml();
     // 次回のご予約・家づくりの進行状況は上の帯（現在：〇〇／次回 〇/〇）に出ているので、ホームには出さない。
     // スタッフが書いた「打合せの予定」の文章があるときだけ出す
@@ -1577,27 +1577,7 @@ function homeHtml(){ return homeParts().main; }
       }).join("")+'</div>';
     }
 
-    // 追加見積り（住まいるアプリの「おうちノート連携」タブで登録。お客様の承認／見送りもここで受け付ける）
-    if(data.estimates && data.estimates.length){
-      out += '<div class="sechd" id="sec-est"><h3>追加見積り</h3><span class="countpill">税抜き表示です</span></div><div class="catlist">'+data.estimates.map(function(x){
-        var r = x.customerResponse || "未回答";
-        // スタッフが状態を選んでいればそれを優先（金額確認中は、金額が入っていても「金額確認中」と表示）
-        var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
-        var cls = r==="承認" ? "s-決定" : (r==="未回答" ? "s-仮決定" : "");
-        // 金額が決まるまでは「金額確認中」と表示する（スタッフが金額を入力すると自動で切り替わる）
-        var label = pendingAmt ? "金額確認中" : (r==="承認" ? "承認済み" : (r==="未回答" ? "ご確認ください" : r));
-        // 金額が決まったら、お客様がここで「承認」「見送り」を選べる
-        var act = "", minus = !pendingAmt && estIsMinus(x);
-        if(minus) label = "減額";
-        if(!pendingAmt && x.id && !minus){
-          act = r==="未回答"
-            ? '<div style="display:flex; gap:8px; margin-top:10px;"><button class="btn dk" style="flex:1;" data-estresp="承認" data-estid="'+esc(x.id)+'">承認する</button><button class="btn ol" style="flex:1;" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button></div>'
-            : '<div style="margin-top:8px;"><button class="btn ol" style="padding:8px 14px; font-size:.8rem;" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
-        }
-        return '<div class="rv" style="flex-wrap:wrap;"'+(x.id?' id="est-'+esc(x.id)+'"':'')+'><div style="flex:1; min-width:0;"><div class="ty">'+nwTag(x.createdAt)+esc(x.title)+(pendingAmt ? '' : '　'+esc(estAmountText(x)))+'</div>'+
-          (x.note?'<div class="tm">'+esc(x.note)+'</div>':'')+act+'</div><span class="status '+(pendingAmt || minus ? "" : cls)+'">'+esc(label)+'</span></div>';
-      }).join("")+'</div>'+estTotalHtml(data.estimates);
-    }
+    // 追加見積りの一覧は、ホームの「家づくりの記録」のいちばん下の「🧾 追加見積り」の段だけに出す（2026年11月16日〜、二重に出さない）
 
     // 家づくりリスト（打合せ記録からスタッフが反映した検討事項）
     if(data.considerations && data.considerations.length){
@@ -1977,12 +1957,12 @@ function homeHtml(){ return homeParts().main; }
       var act = "";
       if(i.wait) act = '<div class="eb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn dk" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 承認する</button></div>';
       else if(!i.pend && !i.minus && x.id) act = '<div class="eb"><button class="btn ol" data-estresp="未回答" data-estid="'+esc(x.id)+'">回答をやり直す</button></div>';
-      return '<div class="hslot"><div class="hdate">'+esc(fmtD(x.createdAt))+' '+nwTag(x.createdAt)+'</div>'+
+      return '<div class="hslot"'+(x.id?' id="est-'+esc(x.id)+'"':'')+'><div class="hdate">'+esc(fmtD(x.createdAt))+' '+nwTag(x.createdAt)+'</div>'+
         '<div class="hest'+(i.wait?' wait':'')+'">'+st+'<div class="et">'+esc(x.title||"追加見積り")+'</div>'+
         (x.note ? '<div class="en">'+esc(x.note)+'</div>' : '')+
         '<div class="ea">'+(i.pend ? '金額確認中' : esc(estAmountText(x))+'<small>税抜き</small>')+'</div>'+act+'</div></div>';
     }).join("");
-    return '<div class="hrow"><div class="hrowh"><b>🧾 追加見積り</b><span class="cnt">'+ests.length+'件</span></div>'+
+    return '<div class="hrow" id="sec-est"><div class="hrowh"><b>🧾 追加見積り</b><span class="cnt">'+ests.length+'件</span></div>'+
       '<div class="esum">合計 '+yen(all)+'　うち承認済み '+yen(ok)+'（税抜き）</div>'+
       '<div class="hstrip" data-hrow="__est">'+cards+'</div></div>';
   }
@@ -2358,16 +2338,7 @@ function homeHtml(){ return homeParts().main; }
     };
     (data.notes||[]).forEach(function(n){ if(homeLatestIds[n.id] || n.homeShow) markN(n); });
     asks.concat(stamped).forEach(function(e){ if(e.x.type==="note") markN(e.x); });
-    (data.estimates||[]).forEach(function(x){
-      if(x.id && onCard[x.id]) return;
-      var pendingAmt = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
-      if(pendingAmt || !x.id || estIsMinus(x) || (x.customerResponse||"未回答")!=="未回答") return;
-      pendN++;
-      cards.push('<div class="pcard opt"><div class="pch"><span class="ptag">オプション（追加見積り）</span>'+nwTag(x.updated||x.createdAt)+'</div>'+
-        '<div class="pct"><b>'+esc(x.title||"")+'</b>'+(x.note && x.note!==x.title ? '<br>'+esc(x.note).replace(/\n/g,"<br>") : '')+'</div>'+
-        '<div class="pamt">'+esc(estAmountText(x))+'<span class="tx">（税抜き）</span></div>'+
-        '<div class="btns pcb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn ol pdec" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 決定する</button></div></div>');
-    });
+    // 追加見積り（オプション）はここに出さない：ホームの「🧾 追加見積り」の段で承認・見送りする（2026年11月16日〜）
     // 決定のはんこを押したカードは、ホームのいちばん下の「🔴 決定したもの」にまとめる
     if(!cards.length) return "";
     return '<div class="sechd"><h3>✅ ご確認・ご決定ください</h3><span class="countpill">決定待ち '+pendN+'件</span></div>'+
@@ -3529,7 +3500,7 @@ function homeHtml(){ return homeParts().main; }
     // わが家の情報（ホームに出していない欄）
     var info = homeParts().rest;
     var has = function(id){ return info.indexOf('id="'+id+'"')>=0; };
-    var infoTiles = [["sec-plan","📐","平面図"],["sec-est","🧾","追加見積り"],["sec-chk","✅","決めることの一覧"],
+    var infoTiles = [["sec-plan","📐","平面図"],["sec-chk","✅","決めることの一覧"],
       ["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電"],["sec-ntc","📢","お知らせ"],["sec-proc","📘","契約後に知っておきたいこと"],["sec-svc","🏠","3D"]]
       .filter(function(m){ return has(m[0]) || m[0]==="sec-fam"; })
       .map(function(m){ return tile('data-menujump="'+m[0]+'"', emo(m[1]), m[2]); });
@@ -3553,7 +3524,7 @@ function homeHtml(){ return homeParts().main; }
     var info = homeParts().rest;
     function has(id){ return info.indexOf('id="'+id+'"')>=0; }
     [["sec-nextmeet","📝","打合せの予定"],["sec-chk","✅","決めることの一覧"],["sec-plan","📐","わが家の平面図"],
-     ["sec-est","🧾","追加見積り"],["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電・持ち込み品"],["sec-svc","🏠","3D"],
+     ["sec-list","📋","家づくりリスト"],["sec-fam","👪","ご家族・家電・持ち込み品"],["sec-svc","🏠","3D"],
      ["sec-ntc","📢","お知らせ・豆知識"],["sec-proc","📘","契約後に知っておきたいこと"]].forEach(function(m){
       // ご家族（未入力）はホームに出ているので、ホームへ移動する
       if(has(m[0]) || m[0]==="sec-fam") r.push('<button class="mi" data-menujump="'+m[0]+'"><span class="mic">'+m[1]+'</span>'+m[2]+'<span class="ug">›</span></button>');
