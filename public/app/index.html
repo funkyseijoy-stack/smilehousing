@@ -10613,6 +10613,12 @@
       });
     });
   }
+  function createCustomPart(proj, name){
+    var c = { id: uid("cp"), name: name, createdAt: nowIso() };
+    proj.customParts = (proj.customParts||[]).concat([c]);
+    saveCustomParts(proj, "部位「"+name+"」を追加しました");
+    return c;
+  }
   async function addCustomPart(){
     var proj = projectById(state.currentProjectId);
     if(!proj){ toast("案件を選択してください"); return; }
@@ -10620,9 +10626,7 @@
     if(!name) return;
     if(name.length>30){ toast("名前は30文字までです"); return; }
     if(customPartsOf(proj).some(function(c){ return c.name===name; })){ toast("同じ名前の部位がすでにあります"); return; }
-    var c = { id: uid("cp"), name: name, createdAt: nowIso() };
-    proj.customParts = (proj.customParts||[]).concat([c]);
-    saveCustomParts(proj, "部位「"+name+"」を追加しました");
+    var c = createCustomPart(proj, name);
     state.meetingSubTab = "custom_"+c.id;
     state.recFilter = { big: "cp:"+c.id, sub: "" }; // 追加した部位を絞り込みで選んだ状態に（記録がまだ無いと部位ごとの段に出ないため）
     render();
@@ -18995,7 +18999,8 @@
       var b = cur();
       var html = '<h3 style="margin:0 0 4px;">部位を選択</h3><p class="muted" style="margin:0 0 12px; font-size:.85rem;">どの部位の記録・依頼ですか？</p>'+
         '<label class="field">部位<select data-spbig>'+opt("", "選んでください", !st.big)+
-        bigs.map(function(x){ return opt(x.key, x.label, x.key===st.big); }).join("")+'</select></label>';
+        bigs.map(function(x){ return opt(x.key, x.label, x.key===st.big); }).join("")+
+        (proj ? opt("__addpart", "＋ 部位を追加…", false) : "")+'</select></label>';
       if(b && (b.subs.length || b.key==="int")){
         html += '<label class="field">'+(b.key==="int"?"メイン・部屋":"項目")+'<select data-spsub>'+opt("", "選んでください", !st.sub)+
           b.subs.map(function(x){ return opt(x.key, x.label, x.key===st.sub); }).join("")+
@@ -19015,7 +19020,27 @@
     function done(v){ overlay.remove(); callback(v); }
     box.addEventListener("change", function(e){
       var t = e.target;
-      if(t.matches("[data-spbig]")){ st.big = t.value; st.sub = ""; st.item = ""; draw(); return; }
+      if(t.matches("[data-spbig]")){
+        if(t.value==="__addpart"){
+          t.value = st.big;
+          askLine("＋ 部位を追加", "この案件だけの部位を作ります。", "例：玄関ホール、物置、駐車場").then(function(nm){
+            nm = (nm||"").trim();
+            if(!nm || !proj){ draw(); return; }
+            if(nm.length>30){ toast("名前は30文字までです"); draw(); return; }
+            var c = customPartsOf(proj).find(function(x){ return x.name===nm; }) || createCustomPart(proj, nm);
+            var key = "cp:"+c.id;
+            if(!bigs.some(function(x){ return x.key===key; })){
+              var at = bigs.findIndex(function(x){ return x.key==="internal"; });
+              var nb = {key:key, label:"📌 "+c.name, subs:[]};
+              if(at<0) bigs.push(nb); else bigs.splice(at, 0, nb);
+            }
+            st.big = key; st.sub = ""; st.item = ""; draw();
+            toast("部位「"+c.name+"」を追加しました");
+          });
+          return;
+        }
+        st.big = t.value; st.sub = ""; st.item = ""; draw(); return;
+      }
       if(t.matches("[data-spsub]")){
         if(t.value.indexOf("nr:")===0 && proj){
           var nr = ensureProjectRoom(proj, t.value.slice(3));
@@ -19024,7 +19049,9 @@
           st.sub = "r:"+nr.id; st.item = ""; draw(); return;
         }
         if(t.value==="__addroom"){
-          var name = (prompt("追加する部屋の名前（例：LDK、寝室、子ども部屋、和室）")||"").trim();
+          t.value = st.sub;
+          askLine("＋ 新しい部屋を追加", "", "例：LDK、寝室、子ども部屋、和室").then(function(name){
+          name = (name||"").trim();
           if(name && proj){
             var rooms = recRoomsOf(proj);
             var hit = rooms.find(function(r){ return r.name===name; });
@@ -19038,7 +19065,9 @@
             if(ib && !ib.subs.some(function(x){ return x.key==="r:"+hit.id; })) ib.subs.push({key:"r:"+hit.id, label:hit.name});
             st.sub = "r:"+hit.id;
           }
-          draw(); return;
+          draw();
+          });
+          return;
         }
         st.sub = t.value; st.item = ""; draw(); return;
       }
