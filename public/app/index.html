@@ -9687,14 +9687,29 @@
             return '<div class="recslot big"><div class="recplan recfsw recprevw" data-fsk="plan" data-fsid="'+escapeHtml(a.id)+'">'+recPrevHtml("plan", a, d, true)+'</div></div>';
           }).join("")+'</div></div>');
       }
+      // 水まわりは「キッチン・浴室・洗面・トイレ」をそれぞれ1段に（ともこさんの希望）。どの項目にも入らないものは「水まわり（その他）」
+      var rowDefs = [];
       bigs.forEach(function(b){
-        filter = {big:b.key, sub:""};
-        var its = itemsFor(filter);
+        if(b.key==="water" && b.subs && b.subs.length){
+          var seen = {}, idOf = function(it){ return it.t+":"+(it.t==="n"?it.n.id:it.t==="s"?it.p.id:it.a.id); };
+          b.subs.forEach(function(sb){
+            var its0 = itemsFor({big:"water", sub:sb.key});
+            its0.forEach(function(it){ seen[idOf(it)] = 1; });
+            rowDefs.push({ key:"water/"+sb.key, label:"🚿 "+sb.label, open:"water|"+sb.key, its:its0 });
+          });
+          var rest = itemsFor({big:"water", sub:""}).filter(function(it){ return !seen[idOf(it)]; });
+          rowDefs.push({ key:"water", label:"🚿 水まわり（その他）", open:"water", its:rest });
+          return;
+        }
+        rowDefs.push({ key:b.key, label:b.label, open:b.key, its:null });
+      });
+      rowDefs.forEach(function(b){
+        var its = b.its || itemsFor({big:b.key, sub:""});
         if(!its.length) return;
         total += its.length;
         rowsHtml.push('<div class="recrow"><div class="recrow-head"><span class="recrow-name">'+escapeHtml(b.label)+'</span><span class="muted">'+its.length+'件</span>'+
           (its.length>1 ? '<span class="muted recrow-hint">← 横にスクロール</span>' : '')+
-          '<button type="button" class="btn ghost small" data-recrowopen="'+escapeHtml(b.key)+'">この部位だけ見る ›</button></div>'+
+          '<button type="button" class="btn ghost small" data-recrowopen="'+escapeHtml(b.open)+'">この部位だけ見る ›</button></div>'+
           '<div class="recstrip" data-rowkey="'+escapeHtml(b.key)+'">'+its.map(function(it){
             var d = (it.key||"").slice(0,10);
             return '<div class="recslot'+(isBigItem(it)?' big':'')+'">'+prevHtml(it)+'</div>';
@@ -11731,6 +11746,9 @@
     var el = e.target, orig = recFsOrig(recFs.k, recFs.id); if(!orig || !recFs.clone) return;
     while(el && el!==det){
       var attrs = el.attributes ? Array.prototype.some.call(el.attributes, function(a){ return /^data-/.test(a.name); }) : false;
+      // 「⋮ 操作」の中の操作（data-uop）は、ページ全体の処理がこの写しのボタンのまま動かす。元のカードにも送ると
+      // 同じ操作が2回動き、反映が付いてすぐ外れる・部位の選択が2回出る、などになっていた
+      if(el.hasAttribute && (el.hasAttribute("data-uop") || el.hasAttribute("data-uoprun"))){ recFsAfter(null); return; }
       if(attrs || /^(BUTTON|IMG|SUMMARY)$/.test(el.tagName)){
         var all = Array.prototype.slice.call(recFs.clone.querySelectorAll("*")), oall = orig.querySelectorAll("*");
         var i2 = all.indexOf(el);
@@ -21461,7 +21479,7 @@
     var recListEl = document.getElementById("meetingNoteList");
     if(recListEl) recListEl.addEventListener("click", function(e){
       var ro = e.target.closest("[data-recrowopen]");
-      if(ro){ setRecFilter(ro.dataset.recrowopen, ""); var bar = document.getElementById("noteSpecFilterBar"); if(bar) bar.scrollIntoView({block:"start", behavior:"smooth"}); }
+      if(ro){ var rop = String(ro.dataset.recrowopen).split("|"); setRecFilter(rop[0], rop[1]||""); var bar = document.getElementById("noteSpecFilterBar"); if(bar) bar.scrollIntoView({block:"start", behavior:"smooth"}); }
     });
     var noteSpecFilterBarEl = document.getElementById("noteSpecFilterBar");
     if(noteSpecFilterBarEl){
