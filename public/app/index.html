@@ -555,6 +555,10 @@
   .pbtextbar .pbtsz{ min-width:2.2em; text-align:center; font-size:.85rem; color:var(--muted); }
   .pbimg{ position:absolute; pointer-events:none; touch-action:none; }
   .pbimg img{ width:100%; height:100%; display:block; pointer-events:none; user-select:none; -webkit-user-drag:none; }
+  /* iPadでペン・指で書いているときに、画面の文字が選ばれて青く覆われ「コピー・調べる」が出ないように */
+  #pbModal, #pbModal *{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  #pbModal input, #pbModal textarea, #pbModal select, #pbModal [contenteditable="true"]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+  #pbModal canvas{ -webkit-tap-highlight-color:transparent; }
   #pbModal.imgmove #pbBaseCanvas, #pbModal.imgmove #pbOverlayCanvas{ pointer-events:none; }
   #pbModal.imgmove .pbimg{ pointer-events:auto; outline:2px dashed var(--accent); outline-offset:1px; cursor:grab; }
   .pbimg-del, .pbimg-rs{ display:none; }
@@ -21503,6 +21507,21 @@
       document.querySelector(".pbstage").addEventListener(evt, pbSwallowGesture);
     });
     document.querySelectorAll("#pbModal button[data-pbmode]").forEach(function(b){ b.addEventListener("click", function(){ pbSetMode(b.dataset.pbmode); }); });
+    // プランボードを開いている間は、文字の選択（青い範囲と「コピー・調べる」のメニュー）を起こさない
+    (function(){
+      var pm = document.getElementById("pbModal");
+      var editable = function(t){ return t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]'); };
+      document.addEventListener("selectstart", function(e){
+        if(pm && !pm.hidden && !editable(e.target)) e.preventDefault();
+      }, true);
+      if(pm){
+        pm.addEventListener("contextmenu", function(e){ if(!editable(e.target)) e.preventDefault(); });
+        pm.addEventListener("pointerdown", function(e){
+          if(editable(e.target)) return;
+          try{ var sel = window.getSelection && window.getSelection(); if(sel && sel.rangeCount && !sel.isCollapsed) sel.removeAllRanges(); }catch(_){}
+        }, true);
+      }
+    })();
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.addEventListener("click", function(){ pbSetTool(b.dataset.pbtool); }); });
     document.querySelectorAll("#pbModal button[data-pbshape]").forEach(function(b){ b.addEventListener("click", function(){ pbSetShape(b.dataset.pbshape); }); });
     document.getElementById("pbColorGroup").addEventListener("click", function(e){
