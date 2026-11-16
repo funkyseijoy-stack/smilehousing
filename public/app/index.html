@@ -2059,7 +2059,7 @@
             <div class="field mnfield">
               <span>打合せ内容（LINEで来た内容もここに。1行に1つずつ）</span>
               <textarea id="mnBody" rows="5" placeholder="例）キッチンはリシェルSI、色はホワイトに決定&#10;食洗機の有無は次回までにご検討いただく&#10;吊戸棚の高さは現場で確認"></textarea>
-              <div class="mnhint">行を押すと印：<b>✅仮決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」で部位・ファイル・決定のお願い・タスク</div>
+              <div class="mnhint">行を押すと印：<b>✅仮決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」でファイル・決定のお願い・タスク</div>
               <div id="mnLines" class="mnlines"></div>
             </div>
             <input type="checkbox" id="meetingNoteTalkShow" checked hidden><div class="muted" style="font-size:.85rem;">「・」の行（印なし）・✅・💭 は、記録するとおうちノートに打合せ記録として出ます。お客様に見せない行は🔒社内に。</div>
@@ -2244,7 +2244,7 @@
 
     <div class="card">
       <h3>🧪 記録のデモ案件</h3>
-      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">練習用の案件「デモ様邸（練習用）」を作り、打合せ記録の見本（行の印・行ごとの部位・ファイル・お客様への決定のお願い・社内で確認・お客様の決定のはんこ）を入れます。お客様には関係ありません。いらなくなったら案件ごと削除してください。</p>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">練習用の案件「デモ様邸（練習用）」を作り、打合せ記録の見本（行の印・ファイル・お客様への決定のお願い・社内で確認・お客様の決定のはんこ）を入れます。お客様には関係ありません。いらなくなったら案件ごと削除してください。</p>
       <button class="btn secondary small" id="btnDemoProject">デモ案件を作る／開く</button>
     </div>
 
@@ -8798,7 +8798,7 @@
         {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
         {label:"✉️ Gmailから取り込む", value:"gmail"}]).concat(files.map(function(f, i){ return {label:"「"+fnm(f)+"」をこの行から外す", value:"rm:"+i, danger:true}; }))],
       ["🏠 お客様へ", [{label: l.ask ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!l.ask}]],
-      ["🗂 整理", [{label: hasPart ? "✓部位："+partText(l.p)+"（変える）" : "この行の部位を付ける", value:"part", on: hasPart}].concat(hasPart ? [{label:"部位を外す", value:"partrm"}] : [])],
+
       ["📋 タスク・依頼", [
         {label:"📝 タスクを作る（入力画面で担当・業者・期限など）", value:"taskform"},
         {label:(hasAct("task")?"✓ ":"")+"社内タスクにする（担当を選ぶ）", value:"task", on: hasAct("task")},
@@ -9723,11 +9723,13 @@
   var noteGroupOpen = {};
   // 記録の行に付けた部位（noteLines の p）のうち、絞り込みに合う行
   function noteLinePartsMatch(n, f){
+    return []; // 行ごとの部位は使わない（2026年11月16日〜）
     if(!f || !f.big || f.big==="none") return [];
     return (n.noteLines||[]).filter(function(l){ return l && l.p && l.p.scope && recMatch(l.p, f); });
   }
   // 行に付けた部位の一覧（記録全体のカードに小さく出す）
   function noteLinePartsChipsHtml(n){
+    return ""; // 行ごとの部位は使わない（記録は記録でいい。2026年11月16日〜）
     var seen = {}, list = [];
     (n.noteLines||[]).forEach(function(l){
       if(!l || !l.p || !l.p.scope) return;
@@ -17026,7 +17028,6 @@
       var m = mnMarks[t] || "";
       var acts = mnLineActs[t] || [];
       return '<div class="mnlrow"><div class="mnlmain"><button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":m==="c"?"🔒":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>'+
-        '<button type="button" class="mnlpart'+(mnLineParts[t]?" on":"")+'" data-mnlpart="'+i+'" title="この行の部位">'+(mnLineParts[t] ? escapeHtml(partText(mnLineParts[t])) : "📍 部位")+'</button>'+
         '<button type="button" class="mnlact" data-mnlact="'+i+'" title="この行から作る" aria-label="この行から作る">⋯</button></div>'+
         ((mnLineAsk[t] || (mnLineFiles[t]||[]).length) ? '<div class="mnlacts">'+
           (mnLineAsk[t] ? '<span class="mnlchip ask">🔘 お客様に決定してもらう <button type="button" data-mnlaskrm="'+i+'" aria-label="取り消す">×</button></span>' : '')+
@@ -20368,8 +20369,6 @@
             {label:"✍️ 白紙に手書きして付ける", value:"blank"}]],
           ["🏠 お客様へ", [
             {label: mnLineAsk[lt] ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!mnLineAsk[lt]}]],
-          ["🗂 整理", [
-            {label:(mnLineParts[lt] ? "✓部位："+partText(mnLineParts[lt])+"（変える・外す）" : "この行の部位を付ける"), value:"part", on: !!mnLineParts[lt]}]],
           ["📋 タスク・依頼", [
             {label:(hasAct("taskmade")?"✓ ":"")+"📝 タスクを作る（入力画面で担当・業者・期限など）", value:"taskform", on: hasAct("taskmade")},
             {label:(hasAct("task")?"✓ ":"")+"社内タスクにする（担当だけ選ぶ・「記録する」で作る）", value:"task", on: hasAct("task")},

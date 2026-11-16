@@ -831,7 +831,7 @@ export default async (req: Request, context: Context) => {
       .map((l: any) => ({
         t: String(l.t).trim(),
         m: l.m || "",
-        part: l.p && l.p.scope ? partLabel(project, l.p.scope, l.p.category, l.p.roomId) : "",
+        part: "", // 行ごとの部位は使わない（記録は記録の部位にだけ出す。2026年11月16日〜）
         files: (Array.isArray(l.f) ? l.f : []).map(fileOf).filter(notOnCard),
         estId: lineEstId(n, l.t),
         // 「この行をお客様に決定してもらう」の行：記録の中のその行に決定ボタンを出すためのカードの印（各部位の行のカードと同じ key）
@@ -874,7 +874,7 @@ export default async (req: Request, context: Context) => {
     // 部位があればその項目、無ければ記録と同じ項目に出す。カードの key は "l:<記録ID>_<行の文の短い印>"
     for (const l of n.noteLines || []) {
       if (!l || !l.ask || !String(l.t || "").trim() || (l.m || "") === "c") continue;
-      const lp = (l.p && l.p.scope) ? l.p : sp;
+      const lp = sp; // 行ごとの部位は使わず、記録と同じ項目に出す
       const t = String(l.t).trim();
       const m = l.m || "";
       push(noteCatFor(lp.scope, lp.category), {
@@ -901,7 +901,7 @@ export default async (req: Request, context: Context) => {
         estId: lineEstId(n, l.t),
       });
     }
-    for (const l of n.noteLines || []) {
+    for (const l of ([] as any[])) { // 行ごとの部位は使わない（2026年11月16日〜）。以前の「打合せ記録の一部」は出さない
       const lp = l && l.p;
       if (!lp || !lp.scope || !String(l.t || "").trim() || l.ask) continue;
       const cat = noteCatFor(lp.scope, lp.category);
