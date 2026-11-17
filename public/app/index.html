@@ -9955,7 +9955,7 @@
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     // 表示は新しいものを上に（タブの印の数え方は古い順の rows のまま）
     var html = rows.slice().reverse().map(function(m){
-      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : (m.lineQueuedAt ? ' ・ 📱LINEは'+escapeHtml(fmtTs(m.lineQueuedAt))+'ごろ送ります' : ''))+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+'</div>';
+      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : (m.lineQueuedAt ? ' ・ 📱LINEは'+escapeHtml(fmtTs(m.lineQueuedAt))+'ごろ送ります' : ''))+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+msgTaskHtml(m)+'</div>';
     }).join("");
     // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
@@ -9978,6 +9978,82 @@
     }
     refreshMessageLine();
   }
+  // お客様からのメッセージとタスクのつながり：タスクがあれば「📋 タスク：進捗 ›」、無ければ（消えた・作られなかった）「📋 タスクにする」
+  function msgSkipTask(m){
+    var c = String(m.content||"");
+    return !m.fromCustomer || m.chgReply || c.indexOf("【決定】")===0 || c.indexOf("【お返事】")===0;
+  }
+  function msgLinkedTask(m){
+    return state.tasks.find(function(t){
+      if(!t || t.deletedAt || t.mergedInto) return false;
+      if(m.taskId && t.id===m.taskId) return true;
+      var mid = (t.fromCustomerMessage && t.fromCustomerMessage.messageId) || (t.fromCustomerChange && t.fromCustomerChange.messageId) || "";
+      return mid===m.id;
+    }) || null;
+  }
+  function msgTaskHtml(m){
+    if(msgSkipTask(m)) return "";
+    var t = msgLinkedTask(m);
+    if(t) return '<div style="margin-block-start:6px;"><button type="button" class="linkbtn" data-msgtaskopen="'+escapeHtml(t.id)+'">📋 タスク：'+escapeHtml(t.status||"未着手")+(t.assignee?'（'+escapeHtml(t.assignee)+'）':'（担当未定）')+' ›</button></div>';
+    return '<div style="margin-block-start:6px;"><button type="button" class="btn small" data-msgtaskmake="'+escapeHtml(m.id)+'">📋 タスクにする</button> <span class="muted" style="font-size:.85rem;">このメッセージのタスクがありません</span></div>';
+  }
+  function openTaskInProject(taskId){
+    state.taskExpanded = state.taskExpanded || {}; state.taskExpanded[taskId] = true;
+    var b = document.querySelector('.sub-btn[data-sub="tasks"]');
+    if(b) b.click();
+    setTimeout(function(){
+      var card = document.querySelector('#projTaskList .kancard[data-taskid="'+taskId+'"]');
+      if(!card){ goToTaskBoard(taskId); return; }
+      card.scrollIntoView({behavior:"smooth", block:"center"});
+      card.style.transition = "box-shadow .3s"; card.style.boxShadow = "0 0 0 3px var(--orange)";
+      setTimeout(function(){ card.style.boxShadow = ""; }, 2500);
+    }, 150);
+  }
+  async function makeTaskFromMessage(mid){
+    var m = state.messages.find(function(x){ return x.id===mid; });
+    if(!m || msgSkipTask(m)) return;
+    var ex = msgLinkedTask(m);
+    if(ex){ openTaskInProject(ex.id); return; }
+    var c = String(m.content||"");
+    var isChg = c.indexOf("【変更のご依頼】")===0;
+    var body = isChg ? c.replace(/^【変更のご依頼】/, "") : c;
+    var proj = projectById(m.projectId);
+    var part = null;
+    if(isChg){
+      var head = body.split("\n")[0].split("・")[0].replace(/[\s\u{1F300}-\u{1FAFF}]/gu, "");
+      var cp = proj && (proj.customParts||[]).find(function(x){ return x && !x.deletedAt && String(x.name||"").replace(/[\s\u{1F300}-\u{1FAFF}]/gu, "")===head; });
+      if(cp) part = {scope:"custom", category:cp.id};
+      else if(FACILITY_CATS.indexOf(head)>=0) part = {scope:"facility", category:head};
+      else if(head==="お風呂") part = {scope:"facility", category:"お風呂"};
+    }
+    var now = nowIso();
+    var tid = "task_cm_" + m.id + "_" + Date.now().toString(36);
+    var t = {
+      id: tid, projectId: m.projectId,
+      content: (isChg ? "【お客様から変更のご依頼】" : "【お客様からのメッセージ】") + body,
+      assignee: "", instructor: "お客様", creator: "おうちノート",
+      hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+      attachmentAssetIds: [], attachments: (m.files||[]).slice(), vendorSpec: part, private: false,
+      reflected: false, reflectedAt: null, status: "未着手",
+      createdAt: m.createdAt || now, updatedAt: now
+    };
+    if(isChg) t.fromCustomerChange = { messageId: m.id, cardKey: m.chgKey||"", manual: true };
+    else t.fromCustomerMessage = { messageId: m.id };
+    state.tasks.push(t);
+    var ok = await saveDoc("tasks", tid, t);
+    if(ok===false){ state.tasks = state.tasks.filter(function(x){ return x.id!==tid; }); toast("タスクを保存できませんでした"); return; }
+    m.taskId = tid; saveDoc("messages", m.id, m);
+    logActivity("お客様のメッセージからタスクを作りました");
+    toast("タスクにしました（担当未定）");
+    render();
+    openTaskInProject(tid);
+  }
+  document.addEventListener("click", function(e){
+    var o = e.target.closest("[data-msgtaskopen]");
+    if(o){ e.preventDefault(); openTaskInProject(o.dataset.msgtaskopen); return; }
+    var mk = e.target.closest("[data-msgtaskmake]");
+    if(mk){ e.preventDefault(); mk.disabled = true; makeTaskFromMessage(mk.dataset.msgtaskmake); }
+  });
   // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
   // メッセージ送信時に、お客様のLINE（プロライン）へ自動で知らせるかのチェック
   // お客様がおうちノートのボタンから送ったメッセージ（【変更のご依頼】【決めました】【ご相談】）は、先頭を色付きの印にして目立たせる
