@@ -324,6 +324,12 @@
   .rp-st small{ font-size:.85rem; font-weight:700; border-top:1.5px solid currentColor; margin-top:2px; padding-top:1px; letter-spacing:0; }
   .rp-st.ord{ border-color:#2e8b57; color:#2e8b57; box-shadow:inset 0 0 0 2px rgba(46,139,87,.2); transform:rotate(8deg); }
   .recprev .rp-vis.small .rp-st{ width:50px; height:50px; font-size:.85rem; }
+  .rp-st.r{ border-color:#d9731a; color:#d9731a; box-shadow:inset 0 0 0 2px rgba(217,115,26,.2); transform:rotate(-6deg); font-size:.85rem; letter-spacing:-.04em; }
+  .rp-st.c{ border-color:#7b4bb3; color:#7b4bb3; box-shadow:inset 0 0 0 2px rgba(123,75,179,.2); transform:rotate(5deg); font-size:.85rem; letter-spacing:-.04em; }
+  .rp-st.q{ border-color:#2a63b8; color:#2a63b8; box-shadow:inset 0 0 0 2px rgba(42,99,184,.2); transform:rotate(10deg); font-size:.85rem; letter-spacing:-.04em; }
+  .recprev .rp-stamps{ flex-wrap:wrap-reverse; justify-content:flex-end; max-width:calc(100% - 16px); }
+  .recprev .rp-stamps.many .rp-st{ width:48px; height:48px; border-width:2.5px; font-size:.85rem; letter-spacing:-.12em; white-space:nowrap; }
+  .recprev .rp-stamps.many .rp-st small{ letter-spacing:-.04em; }
   .recplan{ flex:1; min-width:0; }
   /* カードの外枠（.recprevw）も枠の幅に収める。以前は中の図面の大きさで広がり、隣のカードに重なっていた */
   .recslot{ min-width:0; }
@@ -371,6 +377,8 @@
   .pmgr-row.off > span small{ text-decoration:none; display:inline-block; }
   .fv-stamps{ position:absolute; right:12px; top:44px; display:flex; gap:6px; pointer-events:none; z-index:3; }
   .fv-stamps .rp-st{ width:76px; height:76px; font-size:1.15rem; }
+  .fv-stamps{ flex-wrap:wrap-reverse; justify-content:flex-end; max-width:calc(100% - 24px); }
+  .fv-stamps .rp-st.r, .fv-stamps .rp-st.c, .fv-stamps .rp-st.q{ font-size:1rem; }
   .fvsec{ font-size:.9rem; font-weight:700; color:var(--muted); margin:14px 0 6px; }
   .recfs-det > summary{ cursor:pointer; font-size:.9rem; font-weight:700; color:var(--muted); padding:6px 0; }
   .recfs-body img{ max-width:100%; height:auto; }
@@ -2620,7 +2628,9 @@
     <h3 style="margin:0 0 6px;">履歴を編集</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <div class="muted" id="spEditInfo" style="font-size:.85rem;"></div>
+      <label class="field" id="spEditNameRow">名前（ファイル名・お客様画面にも出ます）<input type="text" id="spEditName" maxlength="120"></label>
       <label class="field" id="spEditDateRow">日付<input type="date" id="spEditDate"></label>
+      <label class="field" id="spEditCustRow">💬 お客様へのひとこと（おうちノートのカードに「スタッフから：」で出ます）<textarea id="spEditCust" rows="3" maxlength="500"></textarea></label>
       <label class="field">メモ（スタッフ用・お客様には表示されません）<textarea id="spEditMemo" rows="4"></textarea></label>
       <div id="spEditSwBox" hidden style="border:1px solid var(--border); border-radius:12px; padding:10px; margin-block-start:4px;">
         <label style="display:flex; gap:8px; align-items:center; font-weight:700;"><input type="checkbox" id="spEditSwOn"> 🎨 お客様画面で「色見本カード」にする</label>
@@ -9485,8 +9495,13 @@
     var od = orderedOf(doc);
     var md = function(iso){ var t = iso ? new Date(iso) : null; return (t && !isNaN(t)) ? '<small>'+(t.getMonth()+1)+'/'+t.getDate()+'</small>' : ''; };
     // 決定・発注済みは、はんこにして絵（無ければカード）の上に重ねる
+    // 見積仕様（青）・見積依頼中（オレンジ）・変更依頼中（紫）も、大きなカード（stampsHtml）と同じ判定で重ねる
     var stamps = (dc ? '<span class="rp-st">決定'+md(dc.decidedAt||dc.updatedAt)+'</span>' : '')+
-      (od ? '<span class="rp-st ord">発注済'+md(od.ordered && od.ordered.at)+'</span>' : '');
+      (od ? '<span class="rp-st ord">発注済'+md(od.ordered && od.ordered.at)+'</span>' : '')+
+      (k!=="plan" && hasEstReqStamp(doc) ? '<span class="rp-st r">見積<br>依頼中</span>' : '')+
+      (k!=="plan" && hasChangeStamp(doc) ? '<span class="rp-st c">変更<br>依頼中</span>' : '')+
+      (k!=="plan" && doc.badges && doc.badges.quote ? '<span class="rp-st q">見積<br>仕様</span>' : '');
+    var stN = (stamps.match(/class="rp-st/g)||[]).length;
     var part = k==="n" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : k==="sp" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : (doc.specPart||null);
     var pt = (part && part.scope) ? partText(part, doc.projectId) : "";
     var vis = "";
@@ -9494,11 +9509,11 @@
       var f = files[0];
       var isPdfVis = fileKindOf(f.url, f.contentType, f.name)==="pdf";
       vis = '<div class="rp-vis'+(big?'':' small')+(isPdfVis?' pdf':'')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+
-        (stamps ? '<span class="rp-stamps">'+stamps+'</span>' : '')+'</div>';
+        (stamps ? '<span class="rp-stamps'+(stN>2?' many':'')+'">'+stamps+'</span>' : '')+'</div>';
     }
     var who = doc.author || doc.createdBy || doc.by || doc.receivedBy || "";
     return '<div class="recprev'+((doc.reflected && (k!=="att" || quoteSharable(doc)))?' on':'')+(stamps && !vis ? ' hasst' : '')+'">'+
-      (stamps && !vis ? '<span class="rp-stamps">'+stamps+'</span>' : '')+
+      (stamps && !vis ? '<span class="rp-stamps'+(stN>2?' many':'')+'">'+stamps+'</span>' : '')+
       '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span>'+icons+
         (k!=="plan" ? '<button type="button" class="rp-ops" data-rpops="1" title="操作">⋮</button>' : '')+'</div>'+
       vis+
@@ -14538,6 +14553,10 @@
     document.getElementById("spEditInfo").textContent = (isNote?"打ち合わせ記録":(p.fileName||"写真・PDF"))+"（"+(p.category||"")+"）";
     document.getElementById("spEditDate").value = (p.createdAt||"").slice(0,10);
     document.getElementById("spEditDateRow").hidden = isNote;
+    document.getElementById("spEditNameRow").hidden = isNote;
+    document.getElementById("spEditName").value = p.fileName || p.name || "";
+    document.getElementById("spEditCustRow").hidden = isNote;
+    document.getElementById("spEditCust").value = p.customerNote || "";
     document.getElementById("spEditMemo").value = p.memo||"";
     document.getElementById("spEditNote").hidden = !(isNote && p.source && p.source.noteId);
     // 色見本カード（画像の写真・プランボードだけ）
@@ -14625,6 +14644,11 @@
     var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
     if(!p) return;
     var updated = Object.assign({}, p, {memo: document.getElementById("spEditMemo").value.trim()});
+    if(p.kind!=="note"){
+      var nm = document.getElementById("spEditName").value.trim();
+      if(nm){ updated.fileName = nm; if(p.name) updated.name = nm; }
+      updated.customerNote = document.getElementById("spEditCust").value.trim();
+    }
     if(!document.getElementById("spEditSwBox").hidden){
       var swOn = document.getElementById("spEditSwOn").checked;
       updated.swatch = { on: swOn, name: document.getElementById("spEditSwName").value.trim(), color: document.getElementById("spEditSwColor").value };
