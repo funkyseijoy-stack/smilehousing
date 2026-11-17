@@ -1,11 +1,13 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import webpush from "web-push";
-import { getVapid, subIdOf, listSubs, listAllSubs, publicSub, saveSub, isActive, PUSH_MAX_PER_PROJECT } from "../lib/push.mts";
+import { getVapid, subIdOf, listSubs, listAllSubs, publicSub, saveSub, isActive, isListed, kindOf, maskEmail, sendEmailToProject, PUSH_MAX_PER_PROJECT } from "../lib/push.mts";
 
 // お客様のスマホへのプッシュ通知の登録（/api/push、2026年11月〜）。送るのは netlify/lib/line-queue.mts（LINEのお知らせと同じ時）。
 // お客様（おうちノート /note/・お打合せの記録ページ /kiroku/、案件ID p と noteToken か earlyToken t で確認）：
 //   GET ?p&t → {publicKey}／POST {action:"subscribe", sub, name, page, url}／{action:"unsubscribe", endpoint}／{action:"status", endpoint}
+//   お知らせの受け取り方（2026年11月〜）：{action:"list", endpoint?} → {entries:[{id,kind,name,email(伏せ字),mine}]}
+//   ／{action:"addEmail", name, email, page}／{action:"addLine", name, page}／{action:"remove", id}
 // スタッフ（X-Staff-Token に合言葉）：GET → {subs:[…]}（全案件、鍵は返さない）
 //   POST {action:"rename"|"remove"|"test", projectId, id, name}
 const CORS_HEADERS = {
@@ -42,6 +44,13 @@ export default async (req: Request, context: Context) => {
     if (!doc) return json({ error: "not_found" }, 404);
     if (body.action === "rename") { doc.name = cleanName(body.name); await saveSub(doc); return json({ ok: true, sub: publicSub(doc) }); }
     if (body.action === "remove") { doc.disabledAt = new Date().toISOString(); doc.disabledWhy = "staff"; await saveSub(doc); return json({ ok: true, sub: publicSub(doc) }); }
+    if (body.action === "test" && doc.kind === "email") {
+      if (doc.disabledAt) return json({ ok: false, error: "inactive" }, 400);
+      const project: any = await getStore("staffData").get(`projects/${pid}`, { type: "json" });
+      const r = await sendEmailToProject(pid, project, () => ({ title: "お知らせメールのテスト", body: "お知らせメールのテストです。届いていれば設定は完了です。" }), String(doc.id)
+      ).catch(() => null);
+      return r && r.okIds.has(String(doc.id)) ? json({ ok: true }) : json({ ok: false, error: "send_failed" }, 502);
+    }
     if (body.action === "test") {
       if (!isActive(doc)) return json({ ok: false, error: "inactive" }, 400);
       const v = await getVapid();
@@ -71,6 +80,48 @@ export default async (req: Request, context: Context) => {
     const v = await getVapid();
     return json({ ok: true, publicKey: v.publicKey });
   }
+  const pageOf = body.page === "kiroku" ? "kiroku" : "note";
+  const s0 = getStore("pushSubs");
+  const nowIso = new Date().toISOString();
+  if (body.action === "list") {
+    const ep = String(body.endpoint || "");
+    const mineId = /^https:\/\//.test(ep) ? subIdOf(ep) : "";
+    const entries = (await listSubs(projectId)).filter(isListed)
+      .sort((a: any, b: any) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")))
+      .map((x: any) => ({ id: x.id, kind: kindOf(x), name: x.name || "", email: x.kind === "email" ? maskEmail(x.email) : "", mine: x.id === mineId }));
+    return json({ ok: true, entries });
+  }
+  if (body.action === "addEmail" || body.action === "addLine") {
+    const name = cleanName(body.name);
+    if (!name) return json({ error: "no_name" }, 400);
+    let id = "", extra: any = {};
+    if (body.action === "addEmail") {
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(email) || email.length > 200) return json({ error: "bad_email" }, 400);
+      id = "em" + subIdOf(email).slice(2); extra = { kind: "email", email };
+    } else {
+      id = "ln" + subIdOf(name).slice(2); extra = { kind: "line" };
+    }
+    const k = `${projectId}/${id}`;
+    const cur: any = await s0.get(k, { type: "json", consistency: "strong" } as any);
+    if (!cur || cur.disabledAt) {
+      const live = (await listSubs(projectId)).filter(isListed);
+      if (live.length >= PUSH_MAX_PER_PROJECT) return json({ error: "limit_reached" }, 429);
+    }
+    const doc: any = { ...(cur || {}), id, projectId, page: pageOf, name, ...extra,
+      url: `/${pageOf}/?p=${encodeURIComponent(projectId)}&t=${encodeURIComponent(token)}`,
+      createdAt: (cur && !cur.disabledAt && cur.createdAt) || nowIso, updatedAt: nowIso, failCount: 0 };
+    delete doc.disabledAt; delete doc.disabledWhy; delete doc.sub;
+    await saveSub(doc);
+    return json({ ok: true, id });
+  }
+  if (body.action === "remove") {
+    const id = String(body.id || "");
+    if (!id || id.includes("/")) return json({ error: "missing_fields" }, 400);
+    const cur: any = await s0.get(`${projectId}/${id}`, { type: "json", consistency: "strong" } as any);
+    if (cur && !cur.disabledAt) { cur.disabledAt = nowIso; cur.disabledWhy = "customer"; await saveSub(cur); }
+    return json({ ok: true });
+  }
   const endpoint = String((body.sub && body.sub.endpoint) || body.endpoint || "");
   if (!/^https:\/\//.test(endpoint) || endpoint.length > 1000) return json({ error: "bad_endpoint" }, 400);
   const id = subIdOf(endpoint);
@@ -89,7 +140,7 @@ export default async (req: Request, context: Context) => {
   if (!keys || typeof keys.p256dh !== "string" || typeof keys.auth !== "string" || keys.p256dh.length > 200 || keys.auth.length > 100) return json({ error: "bad_keys" }, 400);
   const page = body.page === "kiroku" ? "kiroku" : "note";
   if (!cur || !isActive(cur)) {
-    const active = (await listSubs(projectId)).filter(isActive);
+    const active = (await listSubs(projectId)).filter(isListed);
     if (active.length >= PUSH_MAX_PER_PROJECT) return json({ error: "limit_reached" }, 429);
   }
   const now = new Date().toISOString();

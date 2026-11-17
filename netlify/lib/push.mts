@@ -1,5 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import webpush from "web-push";
+import { sendMailTo, CUSTOMER_MAIL_FROM_NAME, CUSTOMER_MAIL_SIGNATURE } from "./google.mts";
 
 // お客様のスマホへのプッシュ通知（おうちノート・お打合せの記録ページ、2026年11月〜）。
 // - 登録した端末は "pushSubs" ストアの <案件ID>/<端末ID> に {id,projectId,page,name,url,sub,createdAt,lastOkAt,failCount,disabledAt}。
@@ -47,10 +48,23 @@ export async function listAllSubs() {
   return all.filter(Boolean) as any[];
 }
 export function isActive(x: any) { return !!(x && !x.disabledAt && x.sub && x.sub.endpoint); }
+// お客様が選んだ受け取り方（2026年11月〜）：kind 無し＝アプリの通知（端末）／"email"＝メール／"line"＝LINE（スタッフが登録したLINEで届く。記録だけ）
+export function kindOf(x: any) { return x && (x.kind === "email" || x.kind === "line") ? x.kind : "push"; }
+export function isEmailActive(x: any) { return !!(x && x.kind === "email" && !x.disabledAt && x.email); }
+// 届け先として生きているもの（アプリの通知の端末・メール）
+export function isLive(x: any) { return isActive(x) || isEmailActive(x); }
+// お客様の画面で一覧に出すもの（止めたものは出さない）
+export function isListed(x: any) { return !!(x && !x.disabledAt && (kindOf(x) !== "push" || isActive(x))); }
+export function maskEmail(e: string) {
+  const [a, d] = String(e || "").split("@");
+  if (!d) return "";
+  return (a.length <= 2 ? a.slice(0, 1) : a.slice(0, 2)) + "***@" + d;
+}
 // スタッフの画面に見せる形（鍵・endpoint は出さない）
 export function publicSub(x: any) {
   return { id: x.id, projectId: x.projectId, page: x.page || "note", name: x.name || "", createdAt: x.createdAt || "",
-    lastOkAt: x.lastOkAt || "", disabledAt: x.disabledAt || "", disabledWhy: x.disabledWhy || "", ua: x.ua || "" };
+    lastOkAt: x.lastOkAt || "", disabledAt: x.disabledAt || "", disabledWhy: x.disabledWhy || "", ua: x.ua || "",
+    kind: kindOf(x), email: x.kind === "email" ? (x.email || "") : "" };
 }
 export async function saveSub(doc: any) {
   await getStore("pushSubs").setJSON(`${doc.projectId}/${doc.id}`, doc);
@@ -87,4 +101,38 @@ export async function sendPushToProject(projectId: string, payload: { title: str
     }
   }));
   return { sent, failed, total: subs.length, okIds };
+}
+
+// お客様が「メールで受け取る」にしたアドレスへ送る（アプリの通知と同じ時・同じ内容）
+const SITE = "https://sprightly-pegasus-9b65a7.netlify.app";
+export async function sendEmailToProject(projectId: string, project: any, makeText: (page: string) => { title: string; body: string }, onlyId?: string) {
+  const list = (await listSubs(projectId)).filter(isEmailActive).filter((x: any) => !onlyId || String(x.id) === onlyId);
+  const okIds = new Set<string>();
+  if (!list.length) return { sent: 0, total: 0, okIds };
+  const now = new Date().toISOString();
+  let sent = 0;
+  for (const x of list) {
+    const page = x.page === "kiroku" ? "kiroku" : "note";
+    const app = page === "kiroku" ? "お打合せの記録" : "おうちノート";
+    const pl = makeText(page);
+    const link = SITE + (x.url || "/");
+    const name = String(x.name || "").trim();
+    const cust = String((project && project.customer) || "").replace(/様$/, "").trim();
+    const r = await sendMailTo({
+      to: x.email,
+      subject: "【住まいるハウジング】" + (pl.title || app + "が更新されました"),
+      body: (name ? name + "様\n\n" : cust ? cust + "様\n\n" : "") +
+        "いつもありがとうございます。住まいるハウジングです。\n" +
+        app + "が更新されました。\n\n" + (pl.body ? pl.body + "\n\n" : "") +
+        "下のリンクから、" + app + "をご確認ください。\n" + link + "\n\n" +
+        "※このメールは、" + app + "で「メールで受け取る」にご登録いただいたアドレスへお送りしています。\n" +
+        "※受け取りをやめるときは、" + app + "の「🔔 お知らせの受け取り方」から削除できます。\n" +
+        CUSTOMER_MAIL_SIGNATURE,
+      fromName: CUSTOMER_MAIL_FROM_NAME,
+    }).catch(() => ({ ok: false } as any));
+    if (r && r.ok) { sent++; okIds.add(String(x.id)); x.lastOkAt = now; x.failCount = 0; }
+    else { x.failCount = (x.failCount || 0) + 1; }
+    await saveSub(x);
+  }
+  return { sent, total: list.length, okIds };
 }

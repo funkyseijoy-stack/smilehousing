@@ -1,5 +1,5 @@
 import { getStore } from "@netlify/blobs";
-import { listSubs, isActive, sendPushToProject } from "./push.mts";
+import { listSubs, isActive, isLive, sendPushToProject, sendEmailToProject } from "./push.mts";
 import { isDemoProject } from "./boaxel.mts";
 
 // お客様へのLINEのお知らせ（プロライン経由）を、時間帯でまとめて送る。
@@ -58,10 +58,10 @@ export function remapPushRows(project: any, subs: any[]) {
   const rows = project.prolineUids.map((r: any) => {
     if (!r || !r.pushSub) return r;
     const cur = byId[String(r.pushSub)];
-    if (cur && isActive(cur)) return r;
+    if (cur && isLive(cur)) return r;
     const nm = String((cur && cur.name) || "").trim();
     if (!nm) return r;
-    const alt = subs.filter((x: any) => isActive(x) && String(x.name || "").trim() === nm)
+    const alt = subs.filter((x: any) => isLive(x) && String(x.name || "").trim() === nm)
       .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
     return alt ? { ...r, pushSub: String(alt.id) } : r;
   });
@@ -72,7 +72,7 @@ export async function projectForSend(project: any) {
   return remapPushRows(project, await listSubs(project.id));
 }
 export async function activePushIds(projectId: string) {
-  return new Set((await listSubs(projectId)).filter(isActive).map((x: any) => String(x.id)));
+  return new Set((await listSubs(projectId)).filter(isLive).map((x: any) => String(x.id)));
 }
 // 何が更新されたか（スマホの通知の文に使う。LINEはプロラインの決まった文面なので使わない）
 // item = {kind:"message"|"photo"|"comment"|"manual", text?, count?, at}
@@ -123,10 +123,16 @@ export async function deliverNow(projectId: string, beacon: string | null, items
   const act = await activePushIds(projectId);
   let p = { sent: 0, total: 0 };
   let okIds = new Set<string>();
-  if (act.size) {
+  if (act.size) { // アプリの通知の端末・メールのどちらかがあるとき
     try { const pr = await sendPushToProject(projectId, (page: string) => pushPayload(items, page)); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
     catch (e) { console.error("push failed", e); }
   }
+  // お客様が「メールで受け取る」にしたアドレスへも送る（届いたメールの行の人にはLINEを送らない）
+  let mailSent = 0;
+  try {
+    const er = await sendEmailToProject(projectId, project, (page: string) => pushPayload(items, page));
+    mailSent = er.sent; er.okIds.forEach((id) => okIds.add(id));
+  } catch (e) { console.error("email failed", e); }
   const subsAfter = await listSubs(projectId);
   const remapped = remapPushRows(project, subsAfter);
   const uids = recipientsOf(remapped, okIds);
@@ -135,9 +141,10 @@ export async function deliverNow(projectId: string, beacon: string | null, items
   const rows: any[] = Array.isArray(remapped && remapped.prolineUids) ? remapped.prolineUids : [];
   const nameOfUid = (u: string) => { const row = rows.find((x: any) => x && String(x.uid) === u); return (row && row.name) || u; };
   const lineTo = beacon ? uids.map(nameOfUid) : [];
-  const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id))).map((x: any) => x.name || "名前なし");
+  const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && x.kind !== "email").map((x: any) => x.name || "名前なし");
+  const mailTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && x.kind === "email").map((x: any) => x.name || "名前なし");
   console.log("deliverNow", projectId, JSON.stringify({ rows: rows.map((x: any) => ({ uid: x && x.uid, pushSub: x && x.pushSub })), okIds: Array.from(okIds), lineTo: uids }));
-  return { sent: r.sent, failed: r.failed, pushSent: p.sent, pushTotal: p.total, lineTo, pushTo };
+  return { sent: r.sent, failed: r.failed, pushSent: p.sent + mailSent, pushTotal: p.total, mailSent, lineTo, pushTo, mailTo };
 }
 export function checkBeacon(settings: any): string | null {
   const beacon = String((settings && settings.prolineBeaconUrl) || "").trim();

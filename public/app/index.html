@@ -4498,12 +4498,13 @@
     return pushSubsLoading;
   }
   function pushSubsOf(p){ return (p && pushSubsCache[p.id]) || []; }
-  function activePushOf(p){ return pushSubsOf(p).filter(function(x){ return !x.disabledAt; }); }
+  // 届け先として生きているもの（アプリの通知の端末・メール。お客様が「LINE」を選んだ記録は含めない）
+  function activePushOf(p){ return pushSubsOf(p).filter(function(x){ return !x.disabledAt && x.kind!=="line"; }); }
   // LINEを送る人（プッシュ通知で届く端末を選んだ人は除く。その端末が届かなくなっていればLINEを送る）
   // 行の端末が止まっていても、同じ名前の届く端末があればそちらとみなす（サーバーの remapPushRows と同じ考え方）
   function effPushSub(p, r){
     if(!r || !r.pushSub) return "";
-    var subs = pushSubsOf(p), cur = subs.filter(function(x){ return x.id===r.pushSub; })[0];
+    var subs = pushSubsOf(p).filter(function(x){ return x.kind!=="line"; }), cur = subs.filter(function(x){ return x.id===r.pushSub; })[0];
     if(cur && !cur.disabledAt) return cur.id;
     var nm = String((cur && cur.name) || "").trim(); if(!nm) return r.pushSub;
     var alt = subs.filter(function(x){ return !x.disabledAt && String(x.name||"").trim()===nm; })
@@ -4525,17 +4526,19 @@
     var parts = [];
     var ln = hasBeacon ? lineTargetsOf(p).map(function(r){ return r.name || r.uid; }) : [];
     if(ln.length) parts.push("LINE："+ln.join("、"));
-    var ps = activePushOf(p).map(function(x){ return x.name || "名前なし"; });
+    var ps = activePushOf(p).filter(function(x){ return x.kind!=="email"; }).map(function(x){ return x.name || "名前なし"; });
     if(ps.length) parts.push("🔔通知："+ps.join("、"));
+    var ms = activePushOf(p).filter(function(x){ return x.kind==="email"; }).map(function(x){ return x.name || "名前なし"; });
+    if(ms.length) parts.push("✉️メール："+ms.join("、"));
     return parts.join("／");
   }
   var prolineRowsDraft = null; // 編集中の行（保存までは画面だけ）
   var prolineDraftPid = null;  // 編集中の行がどの案件のものか
   function prolineRowHtml(r, i){
-    var subs = pushSubsOf(projectById(state.currentProjectId));
+    var subs = pushSubsOf(projectById(state.currentProjectId)).filter(function(x){ return x.kind!=="line"; });
     var opts = '<option value="">📱 LINEで送る</option>'+subs.filter(function(x){ return !x.disabledAt || r.pushSub===x.id; }).map(function(x){
       var when = (x.page==="kiroku"?"記録ページ":"おうちノート")+"・"+String(x.createdAt||"").slice(5,16).replace("-","/").replace("T"," ")+"登録";
-      return '<option value="'+escapeHtml(x.id)+'"'+(r.pushSub===x.id?' selected':'')+'>🔔 通知で届く：'+escapeHtml(x.name||"名前なし")+'（'+when+'）'+(x.disabledAt?'（止まっている）':'')+'・LINEは送らない</option>';
+      return '<option value="'+escapeHtml(x.id)+'"'+(r.pushSub===x.id?' selected':'')+'>'+(x.kind==="email"?'✉️ メールで届く：':'🔔 通知で届く：')+escapeHtml(x.name||"名前なし")+'（'+when+'）'+(x.disabledAt?'（止まっている）':'')+'・LINEは送らない</option>';
     }).join("");
     if(r.pushSub && !subs.some(function(x){ return x.id===r.pushSub; })) opts += '<option value="'+escapeHtml(r.pushSub)+'" selected>🔔 通知（見つからない端末→LINEで送る）</option>';
     return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">'+
@@ -4544,7 +4547,8 @@
       (subs.length ? '<select data-plpush="'+i+'" style="flex:1 1 220px; min-width:180px;" title="この人への送り方">'+opts+'</select>' : '')+
       '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>'+
       (r.uid ? (function(){ var pp = projectById(state.currentProjectId), e = effPushSub(pp, r), ok = e && activePushOf(pp).some(function(x){ return x.id===e; });
-        return '<div class="muted" style="font-size:.85rem; margin:-2px 0 6px;">→ いま：'+(ok ? '🔔 通知で届くので、LINEは送りません' : (r.pushSub ? '📱 選んだ端末が止まっているので、LINEで送ります' : '📱 LINEで送ります'))+'</div>'; })() : '');
+        var isMail = ok && pushSubsOf(pp).some(function(x){ return x.id===e && x.kind==="email"; });
+        return '<div class="muted" style="font-size:.85rem; margin:-2px 0 6px;">→ いま：'+(ok ? (isMail ? '✉️ メールで届くので、LINEは送りません' : '🔔 通知で届くので、LINEは送りません') : (r.pushSub ? '📱 選んだ端末が止まっているので、LINEで送ります' : '📱 LINEで送ります'))+'</div>'; })() : '');
   }
   function readProlineRows(){
     var rows = [];
@@ -4593,15 +4597,18 @@
     var box = document.getElementById("pushDevBox");
     if(!box) return;
     var subs = pushSubsOf(proj).slice().sort(function(a,b){ return String(b.createdAt).localeCompare(String(a.createdAt)); });
-    if(!subs.length){ box.innerHTML = '<div class="muted" style="font-size:.85rem;">🔔 通知を受け取っている端末：まだありません（お客様がおうちノート・お打合せの記録ページで「受け取る」を押すと、ここに出ます）'+
+    if(!subs.length){ box.innerHTML = '<div class="muted" style="font-size:.85rem;">🔔 お客様が選んだ受け取り方：まだありません（お客様がおうちノート・お打合せの記録ページの「🔔 お知らせの受け取り方」で、アプリ／LINE／メールを選ぶと、ここに出ます）'+
       ' <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'; return; }
-    box.innerHTML = '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">🔔 通知を受け取っている端末 <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'+
+    var hasMail = subs.some(function(x){ return x.kind==="email" && !x.disabledAt; });
+    box.innerHTML = '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">🔔 お客様が選んだ受け取り方 <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">📱アプリ・✉️メールを選んだ方は、上の送る人の行で「〜で届く」を選ぶと、その方にはLINEを送りません。💬LINEを選んだ方は、これまでどおりLINEで届きます。'+(hasMail?' ✉️メールは共有Gmailから送ります。':'')+'</div>'+
       subs.map(function(x){
-        var st = x.disabledAt ? '<span class="pill" style="background:#f3d6d0;">止まっている（'+(x.disabledWhy==="customer"?"お客様がやめた":x.disabledWhy==="staff"?"外した":"届かない")+'）</span>' : '<span class="pill" style="background:var(--accent); color:#fff;">届く</span>';
+        var how = x.kind==="email" ? '✉️ メール（'+escapeHtml(x.email||"")+'）' : x.kind==="line" ? '💬 LINE' : '📱 アプリ';
+        var st = x.disabledAt ? '<span class="pill" style="background:#f3d6d0;">止まっている（'+(x.disabledWhy==="customer"?"お客様がやめた":x.disabledWhy==="staff"?"外した":"届かない")+'）</span>' : (x.kind==="line" ? '' : '<span class="pill" style="background:var(--accent); color:#fff;">届く</span>');
         return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center; padding:4px 0; border-top:1px solid var(--border);">'+
-          '<b>'+escapeHtml(x.name||"名前なし")+'</b>'+st+
+          '<b>'+escapeHtml(x.name||"名前なし")+'</b><span>'+how+'</span>'+st+
           '<span class="muted" style="font-size:.85rem;">'+(x.page==="kiroku"?"お打合せの記録ページ":"おうちノート")+'・'+String(x.createdAt||"").slice(5,10).replace("-","/")+'登録'+(x.lastOkAt?'・最後に届いた '+String(x.lastOkAt).slice(5,10).replace("-","/"):'')+'</span>'+
-          (x.disabledAt ? '' : '<button class="btn secondary small" data-pushtest="'+escapeHtml(x.id)+'">テスト送信</button>'+
+          (x.disabledAt ? '' : (x.kind==="line" ? '' : '<button class="btn secondary small" data-pushtest="'+escapeHtml(x.id)+'">テスト送信</button>')+
             '<button class="btn secondary small" data-pushrename="'+escapeHtml(x.id)+'">名前を直す</button>'+
             '<button class="btn secondary small" data-pushremove="'+escapeHtml(x.id)+'">外す</button>')+
         '</div>';
@@ -4665,7 +4672,7 @@
   // LINEのお知らせの結果の言い方（夜20時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回まで。サーバーの netlify/lib/line-queue.mts）
   function lineResultText(d){
     if(d && d.queued) return "📣 お知らせ（LINE・通知）は "+(d.sendAtLabel||"あとで")+" にまとめて送ります（同じお客様へは1回にまとめます）";
-    var who = (d && d.pushTo && d.pushTo.length ? "🔔通知："+d.pushTo.join("、") : "") + (d && d.lineTo && d.lineTo.length ? (d.pushTo && d.pushTo.length ? "／" : "")+"📱LINE："+d.lineTo.join("、") : "");
+    var who = [d && d.pushTo && d.pushTo.length ? "🔔通知："+d.pushTo.join("、") : "", d && d.mailTo && d.mailTo.length ? "✉️メール："+d.mailTo.join("、") : "", d && d.lineTo && d.lineTo.length ? "📱LINE："+d.lineTo.join("、") : ""].filter(Boolean).join("／");
     if(d && d.pushSent && !d.sent) return "🔔 通知でお知らせしました" + (who ? "（"+who+"）" : "");
     if(d && d.pushSent) return "📣 LINEと通知でお知らせしました" + (who ? "（"+who+"）" : "");
     return "📱 LINEでお知らせしました" + (who ? "（"+who+"）" : "");
@@ -14217,6 +14224,26 @@
     if(okCount>0) logActivity((kind==="reference"?"参考写真":"おうちアルバム")+"を追加しました（"+okCount+"件）");
     if(files.length>1 && okCount<files.length) toast(files.length+"枚のうち"+okCount+"枚を追加しました。"+(files.length-okCount)+"枚は追加できていません", 9000);
     else if(okCount>0) toast("✅ "+okCount+"枚を追加しました");
+    if(okCount>0 && kind==="album") askNotifyAlbum(pid0, okCount);
+  }
+  // おうちアルバムに写真を足したあと、お客様に知らせるかを聞く（「お客様に写真を送る」と同じお知らせ。夜・30分のまとめも同じ）
+  async function askNotifyAlbum(pid, count){
+    var proj = projectById(pid); if(!proj) return;
+    try{ await loadPushSubs(); }catch(e){}
+    if(!canNotifyProj(proj)) return;
+    askChoice("お客様に知らせますか？", (proj.customer||proj.name||"お客様")+"に「"+count+"枚の写真が届きました」と知らせます。\n（"+notifyWhoText(proj)+"）",
+      [{label:"📣 知らせる", value:"yes"}], async function(v){
+        if(v!=="yes") return;
+        try{
+          var lres = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: pid, kind:"photo", count: count, text:"", by: state.currentUser||"" }) });
+          var lj = await lres.json().catch(function(){ return {}; });
+          if(lres.ok && lj.ok){
+            if(!lj.queued){ proj.lineNotifiedAt = nowIso(); proj.lineNotifiedBy = state.currentUser || ""; saveDoc("projects", proj.id, proj); }
+            toast(lineResultText(lj), 7000);
+            logActivity((proj.customer||proj.name||"")+"にアルバムの写真（"+count+"枚）をお知らせしました");
+          } else toast("⚠ お知らせを送れませんでした");
+        }catch(e){ toast("⚠ お知らせを送れませんでした"); }
+      }, {cancelLabel:"知らせない"});
   }
   function deleteAlbumPhoto(id){
     var p = state.albumPhotos.find(function(x){ return x.id===id; });

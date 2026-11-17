@@ -65,7 +65,7 @@ export default async (req: Request, context: Context) => {
   const r: any = await requestLineNotify({ projectId, kind: String(body.kind || "manual"), by: String(body.by || ""), beacon, item: makeItem(body) });
   if (r.queued) return json({ ok: true, queued: true, sendAt: r.sendAt, sendAtLabel: jstLabel(Date.parse(r.sendAt)), push: act.size, line: uids.length });
   if (!r.sent && !r.pushSent) return json({ ok: false, error: act.size ? "push_failed" : "proline_failed", failed: r.failed }, 502);
-  return json({ ok: true, sent: r.sent, failed: r.failed, pushSent: r.pushSent, pushTotal: r.pushTotal, lineTo: r.lineTo || [], pushTo: r.pushTo || [] });
+  return json({ ok: true, sent: r.sent, failed: r.failed, pushSent: r.pushSent, pushTotal: r.pushTotal, lineTo: r.lineTo || [], pushTo: r.pushTo || [], mailTo: r.mailTo || [], mailSent: r.mailSent || 0 });
 };
 
 export const config: Config = {
