@@ -1855,7 +1855,7 @@
               <button class="btn secondary small" id="btnProlineUidAdd">＋ 送る人を追加</button>
               <button class="btn secondary small" id="btnProlineUidSave">保存</button>
             </div>
-            <p class="muted help" style="margin:6px 0 4px; font-size:.85rem;">お客様がおうちノート・お打合せの記録ページで「🔔 受け取る」を押した端末には、LINEと同じ時にスマホの通知が届きます。通知で届く人は、送る人の行で「🔔 通知で届く：〇〇」を選ぶと、LINEを送らなくなります（その端末に届かなくなったら、自動でLINEに戻ります）。</p>
+            <p class="muted help" style="margin:6px 0 4px; font-size:.85rem;">お知らせは、お客様がおうちノート・お打合せの記録ページの「🔔 お知らせの受け取り方」で選んだ方法（📱アプリ／💬LINE／✉️メール）だけで送ります。ここに登録するプロラインIDは、LINEを選んだ方（と、まだ何も選んでいないお客様）に使います。</p>
             <div id="pushDevBox" style="margin-block:8px 4px;"></div>
             <button class="btn small" id="btnLineNotify" style="margin-block-start:8px;" disabled>📣 お客様に「おうちノートが更新されました」を知らせる</button>
             <div id="lineNotifyStatus" class="muted" style="font-size:.85rem; margin-block-start:4px;"></div>
@@ -4511,9 +4511,13 @@
       .sort(function(a,b){ return String(b.createdAt||"").localeCompare(String(a.createdAt||"")); })[0];
     return alt ? alt.id : r.pushSub;
   }
+  // お客様が選んだ受け取り方（止めたものは除く）。サーバーの netlify/lib/line-queue.mts の sendPlan と同じ考え方：
+  // 選んでいる案件は選んだ方法だけ（LINEを選んだ方がいればスタッフが登録したLINEへ）、何も選んでいない案件はこれまでどおりLINE
+  function chosenWaysOf(p){ return pushSubsOf(p).filter(function(x){ return !x.disabledAt; }); }
   function lineTargetsOf(p){
-    var act = {}; activePushOf(p).forEach(function(x){ act[x.id] = 1; });
-    return prolineRecipients(p).filter(function(r){ var e = effPushSub(p, r); return !(e && act[e]); });
+    var ch = chosenWaysOf(p);
+    if(ch.length && !ch.some(function(x){ return x.kind==="line"; })) return [];
+    return prolineRecipients(p);
   }
   function canNotifyProj(p){
     if(!p) return false;
@@ -4524,7 +4528,8 @@
   function notifyWhoText(p){
     var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
     var parts = [];
-    var ln = hasBeacon ? lineTargetsOf(p).map(function(r){ return r.name || r.uid; }) : [];
+    var chl = chosenWaysOf(p).filter(function(x){ return x.kind==="line"; });
+    var ln = hasBeacon && lineTargetsOf(p).length ? (chl.length ? chl.map(function(x){ return x.name || "名前なし"; }) : lineTargetsOf(p).map(function(r){ return r.name || r.uid; })) : [];
     if(ln.length) parts.push("LINE："+ln.join("、"));
     var ps = activePushOf(p).filter(function(x){ return x.kind!=="email"; }).map(function(x){ return x.name || "名前なし"; });
     if(ps.length) parts.push("🔔通知："+ps.join("、"));
@@ -4535,31 +4540,17 @@
   var prolineRowsDraft = null; // 編集中の行（保存までは画面だけ）
   var prolineDraftPid = null;  // 編集中の行がどの案件のものか
   function prolineRowHtml(r, i){
-    var subs = pushSubsOf(projectById(state.currentProjectId)).filter(function(x){ return x.kind!=="line"; });
-    var opts = '<option value="">📱 LINEで送る</option>'+subs.filter(function(x){ return !x.disabledAt || r.pushSub===x.id; }).map(function(x){
-      var when = (x.page==="kiroku"?"記録ページ":"おうちノート")+"・"+String(x.createdAt||"").slice(5,16).replace("-","/").replace("T"," ")+"登録";
-      return '<option value="'+escapeHtml(x.id)+'"'+(r.pushSub===x.id?' selected':'')+'>'+(x.kind==="email"?'✉️ メールで届く：':'🔔 通知で届く：')+escapeHtml(x.name||"名前なし")+'（'+when+'）'+(x.disabledAt?'（止まっている）':'')+'・LINEは送らない</option>';
-    }).join("");
-    if(r.pushSub && !subs.some(function(x){ return x.id===r.pushSub; })) opts += '<option value="'+escapeHtml(r.pushSub)+'" selected>🔔 通知（見つからない端末→LINEで送る）</option>';
     return '<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">'+
       '<input type="text" autocomplete="off" data-plname="'+i+'" value="'+escapeHtml(r.name||"")+'" placeholder="名前（例：ご主人）" style="flex:1; min-width:110px;">'+
       '<input type="text" autocomplete="off" data-pluid="'+i+'" value="'+escapeHtml(r.uid||"")+'" placeholder="プロラインID（例：abc1234）" style="flex:1; min-width:150px;">'+
-      (subs.length ? '<select data-plpush="'+i+'" style="flex:1 1 220px; min-width:180px;" title="この人への送り方">'+opts+'</select>' : '')+
-      '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>'+
-      (r.uid ? (function(){ var pp = projectById(state.currentProjectId), e = effPushSub(pp, r), ok = e && activePushOf(pp).some(function(x){ return x.id===e; });
-        var isMail = ok && pushSubsOf(pp).some(function(x){ return x.id===e && x.kind==="email"; });
-        return '<div class="muted" style="font-size:.85rem; margin:-2px 0 6px;">→ いま：'+(ok ? (isMail ? '✉️ メールで届くので、LINEは送りません' : '🔔 通知で届くので、LINEは送りません') : (r.pushSub ? '📱 選んだ端末が止まっているので、LINEで送ります' : '📱 LINEで送ります'))+'</div>'; })() : '');
+      '<button class="btn secondary small" data-pldel="'+i+'" title="この人を外す">×</button></div>';
   }
   function readProlineRows(){
     var rows = [];
     document.querySelectorAll("#prolineUidRows [data-pluid]").forEach(function(inp){
       var i = inp.dataset.pluid;
       var nm = document.querySelector('#prolineUidRows [data-plname="'+i+'"]');
-      var ps = document.querySelector('#prolineUidRows [data-plpush="'+i+'"]');
       var row = { uid: (inp.value||"").trim(), name: (nm && nm.value || "").trim() };
-      var keep = prolineRecipients(projectById(state.currentProjectId)).filter(function(x){ return x.uid===row.uid; })[0];
-      if(ps){ if(ps.value) row.pushSub = ps.value; }
-      else if(keep && keep.pushSub) row.pushSub = keep.pushSub;
       rows.push(row);
     });
     return rows;
@@ -4601,7 +4592,7 @@
       ' <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'; return; }
     var hasMail = subs.some(function(x){ return x.kind==="email" && !x.disabledAt; });
     box.innerHTML = '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">🔔 お客様が選んだ受け取り方 <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'+
-      '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">📱アプリ・✉️メールを選んだ方は、上の送る人の行で「〜で届く」を選ぶと、その方にはLINEを送りません。💬LINEを選んだ方は、これまでどおりLINEで届きます。'+(hasMail?' ✉️メールは共有Gmailから送ります。':'')+'</div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">お知らせは、お客様が選んだ方法だけで送ります（📱アプリ＝通知／✉️メール＝共有Gmailから／💬LINE＝上に登録したプロラインIDへ）。お客様がまだ何も選んでいないときだけ、上に登録したLINEへ送ります。</div>'+
       subs.map(function(x){
         var how = x.kind==="email" ? '✉️ メール（'+escapeHtml(x.email||"")+'）' : x.kind==="line" ? '💬 LINE' : '📱 アプリ';
         var st = x.disabledAt ? '<span class="pill" style="background:#f3d6d0;">止まっている（'+(x.disabledWhy==="customer"?"お客様がやめた":x.disabledWhy==="staff"?"外した":"届かない")+'）</span>' : (x.kind==="line" ? '' : '<span class="pill" style="background:var(--accent); color:#fff;">届く</span>');
@@ -21179,7 +21170,7 @@
     document.getElementById("prolineUidRows").addEventListener("input", function(){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null; });
     document.getElementById("prolineUidRows").addEventListener("change", function(e){ prolineRowsDraft = readProlineRows(); prolineDraftPid = this.dataset.pid || null;
       // 送り方（📱LINE／🔔通知）は選んだらすぐ保存する（保存ボタンの押し忘れで、LINEも届いてしまうのを防ぐ）
-      if(e.target && e.target.matches("[data-plpush]")) saveProlineUid(); });
+});
     document.getElementById("btnLineNotify").addEventListener("click", sendLineNotify);
     document.getElementById("pushDevBox").addEventListener("click", async function(e){
       var proj = projectById(state.currentProjectId); if(!proj) return;
@@ -21190,7 +21181,7 @@
       var rn = e.target.closest("[data-pushrename]");
       if(rn){ var cur = (pushSubsOf(proj).filter(function(x){ return x.id===rn.dataset.pushrename; })[0]||{}).name || ""; var nm = prompt("端末の名前（例：奥様のスマホ）", cur); if(nm==null) return; var r2 = await pushStaffAct("rename", rn.dataset.pushrename, {name:nm}); toast(r2 && r2.ok ? "名前を直しました" : "⚠ 直せませんでした"); await redraw(); return; }
       var rm = e.target.closest("[data-pushremove]");
-      if(rm){ if(!confirm("この端末への通知をやめますか？（この端末で「通知で届く」にしていた人には、LINEを送るようになります）")) return; var r3 = await pushStaffAct("remove", rm.dataset.pushremove); toast(r3 && r3.ok ? "外しました" : "⚠ 外せませんでした"); await redraw(); return; }
+      if(rm){ if(!confirm("この受け取り方を外しますか？（外した方には、お知らせが届かなくなります）")) return; var r3 = await pushStaffAct("remove", rm.dataset.pushremove); toast(r3 && r3.ok ? "外しました" : "⚠ 外せませんでした"); await redraw(); return; }
     });
     document.getElementById("btnSaveProlineBeacon").addEventListener("click", saveProlineBeacon);
     document.getElementById("btnNewNoteOpen").addEventListener("click", function(){

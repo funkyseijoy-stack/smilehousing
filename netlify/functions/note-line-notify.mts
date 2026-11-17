@@ -1,6 +1,7 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { requestLineNotify, recipientsOf, jstLabel, activePushIds, projectForSend, makeItem } from "../lib/line-queue.mts";
+import { requestLineNotify, recipientsOf, jstLabel, sendPlan, makeItem } from "../lib/line-queue.mts";
+import { listSubs } from "../lib/push.mts";
 
 // スタッフが「LINEでお知らせ」を押したとき、プロライン経由でお客様のLINEに
 // 「おうちノートが更新されました。」を送る。
@@ -47,17 +48,18 @@ export default async (req: Request, context: Context) => {
   const store = getStore("staffData");
   const project: any = await store.get(`projects/${projectId}`, { type: "json" });
   if (!project || project.deletedAt) return json({ error: "not_found" }, 404);
-  // 送る人：prolineUids=[{uid,name,pushSub}]（以前の1人だけの prolineUid も読む）。プッシュ通知で届く人は除く
-  const act = await activePushIds(projectId);
+  // 送り方：お客様が選んだ方法（アプリ・メール・LINE）だけ。まだ選んでいない案件は、スタッフが登録したLINE（netlify/lib/line-queue.mts の sendPlan）
   const allUids = recipientsOf(project);
   if (allUids.some((u) => !/^[A-Za-z0-9_-]{1,64}$/.test(u))) return json({ ok: false, error: "bad_uid" }, 400);
-  const uids = recipientsOf(await projectForSend({ ...project, id: projectId }), act);
+  const plan = sendPlan(project, await listSubs(projectId));
+  const uids = plan.uids;
   const settings: any = await store.get("settings/main", { type: "json" });
   const beaconRaw = String((settings && settings.prolineBeaconUrl) || "").trim();
   const beaconOk = !!beaconRaw && beaconRaw.startsWith(BEACON_PREFIX) && beaconRaw.includes("[[uid]]");
   const beacon = beaconOk ? beaconRaw : null;
+  const act = { size: plan.push.length + plan.email.length };
   if (!act.size) {
-    if (!uids.length) return json({ ok: false, error: "no_uid" }, 400);
+    if (!uids.length) return json({ ok: false, error: plan.chosen ? "no_uid_for_line" : "no_uid" }, 400);
     if (!beaconRaw) return json({ ok: false, error: "no_beacon" }, 400);
     if (!beaconOk) return json({ ok: false, error: "bad_beacon" }, 400);
   }

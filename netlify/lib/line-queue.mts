@@ -1,5 +1,5 @@
 import { getStore } from "@netlify/blobs";
-import { listSubs, isActive, isLive, sendPushToProject, sendEmailToProject } from "./push.mts";
+import { listSubs, isActive, isLive, isListed, kindOf, sendPushToProject, sendEmailToProject } from "./push.mts";
 import { isDemoProject } from "./boaxel.mts";
 
 // お客様へのLINEのお知らせ（プロライン経由）を、時間帯でまとめて送る。
@@ -114,36 +114,48 @@ export function pushPayload(items: NotifyItem[], page: string) {
   return { title: app + "が更新されました", body: parts.map((x) => x.line).join("\n") };
 }
 
-// いま送る：LINE（プッシュ通知で届く人を除く）とプッシュ通知の両方
+// 送り方の決め方（2026年11月17日〜）：お客様が「🔔 お知らせの受け取り方」で選んだ方法だけで送る。
+// - アプリ（kind なし）＝その端末へ通知、メール（kind:"email"）＝そのアドレスへ、LINE（kind:"line"）＝スタッフが登録したプロラインIDへLINE。
+// - お客様がまだ何も選んでいない案件だけ、これまでどおりスタッフが登録したLINEに送る（いきなり届かなくならないように）。
+export function sendPlan(project: any, subs: any[]) {
+  const listed = (subs || []).filter(isListed);
+  const chosen = listed.length > 0;
+  const lineChosen = listed.some((x: any) => kindOf(x) === "line");
+  const uids = (chosen && !lineChosen) ? [] : recipientsOf(project);
+  return {
+    chosen,
+    push: listed.filter((x: any) => kindOf(x) === "push"),
+    email: listed.filter((x: any) => kindOf(x) === "email"),
+    line: listed.filter((x: any) => kindOf(x) === "line"),
+    uids,
+  };
+}
 export async function deliverNow(projectId: string, beacon: string | null, items: NotifyItem[] = []) {
   const store = getStore("staffData");
   const project: any = await store.get(`projects/${projectId}`, { type: "json", consistency: "strong" } as any);
   if (!project || project.deletedAt) return { sent: 0, failed: [] as string[], pushSent: 0, pushTotal: 0 };
-  // 先に通知を送り、届いた端末を選んでいる人にだけLINEを送らない（届かなかった人にはこの回もLINEを送る）
-  const act = await activePushIds(projectId);
+  const plan = sendPlan(project, await listSubs(projectId));
   let p = { sent: 0, total: 0 };
-  let okIds = new Set<string>();
-  if (act.size) { // アプリの通知の端末・メールのどちらかがあるとき
-    try { const pr = await sendPushToProject(projectId, (page: string) => pushPayload(items, page)); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
+  const okIds = new Set<string>();
+  if (plan.push.length) {
+    try { const pr = await sendPushToProject(projectId, (page: string) => pushPayload(items, page)); p = { sent: pr.sent, total: pr.total }; pr.okIds.forEach((id) => okIds.add(id)); }
     catch (e) { console.error("push failed", e); }
   }
-  // お客様が「メールで受け取る」にしたアドレスへも送る（届いたメールの行の人にはLINEを送らない）
   let mailSent = 0;
-  try {
-    const er = await sendEmailToProject(projectId, project, (page: string) => pushPayload(items, page));
-    mailSent = er.sent; er.okIds.forEach((id) => okIds.add(id));
-  } catch (e) { console.error("email failed", e); }
-  const subsAfter = await listSubs(projectId);
-  const remapped = remapPushRows(project, subsAfter);
-  const uids = recipientsOf(remapped, okIds);
+  if (plan.email.length) {
+    try { const er = await sendEmailToProject(projectId, project, (page: string) => pushPayload(items, page)); mailSent = er.sent; er.okIds.forEach((id) => okIds.add(id)); }
+    catch (e) { console.error("email failed", e); }
+  }
+  const uids = plan.uids;
   const r = beacon && uids.length ? await sendBeacon(beacon, uids) : { sent: 0, failed: [] as string[] };
-  // 誰に何で届けたか（画面に出す・ログに残す）
-  const rows: any[] = Array.isArray(remapped && remapped.prolineUids) ? remapped.prolineUids : [];
-  const nameOfUid = (u: string) => { const row = rows.find((x: any) => x && String(x.uid) === u); return (row && row.name) || u; };
-  const lineTo = beacon ? uids.map(nameOfUid) : [];
-  const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && x.kind !== "email").map((x: any) => x.name || "名前なし");
-  const mailTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && x.kind === "email").map((x: any) => x.name || "名前なし");
-  console.log("deliverNow", projectId, JSON.stringify({ rows: rows.map((x: any) => ({ uid: x && x.uid, pushSub: x && x.pushSub })), okIds: Array.from(okIds), lineTo: uids }));
+  const subsAfter = await listSubs(projectId);
+  const lineTo = beacon && uids.length ? (plan.chosen ? plan.line.map((x: any) => x.name || "名前なし") : (() => {
+    const rows: any[] = Array.isArray(project.prolineUids) ? project.prolineUids : [];
+    return uids.map((u) => { const row = rows.find((x: any) => x && String(x.uid) === u); return (row && row.name) || u; });
+  })()) : [];
+  const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && kindOf(x) === "push").map((x: any) => x.name || "名前なし");
+  const mailTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && kindOf(x) === "email").map((x: any) => x.name || "名前なし");
+  console.log("deliverNow", projectId, JSON.stringify({ chosen: plan.chosen, push: plan.push.length, email: plan.email.length, line: uids }));
   return { sent: r.sent, failed: r.failed, pushSent: p.sent + mailSent, pushTotal: p.total, mailSent, lineTo, pushTo, mailTo };
 }
 export function checkBeacon(settings: any): string | null {
