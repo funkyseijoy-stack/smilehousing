@@ -1855,7 +1855,7 @@
               <button class="btn secondary small" id="btnProlineUidAdd">＋ 送る人を追加</button>
               <button class="btn secondary small" id="btnProlineUidSave">保存</button>
             </div>
-            <p class="muted help" style="margin:6px 0 4px; font-size:.85rem;">お知らせは、お客様がおうちノート・お打合せの記録ページの「🔔 お知らせの受け取り方」で選んだ方法（📱アプリ／💬LINE／✉️メール）だけで送ります。ここに登録するプロラインIDは、LINEを選んだ方（と、まだ何も選んでいないお客様）に使います。</p>
+            <p class="muted help" style="margin:6px 0 4px; font-size:.85rem;">お知らせは、お客様がおうちノート・お打合せの記録ページの「🔔 お知らせの受け取り方」で選んだ方法（📱アプリ／💬LINE／✉️メール）だけで送ります。ここに登録するプロラインIDは、LINEを選んだ方がいるときだけ使います。お客様がまだ何も選んでいないときは、お知らせは届きません。</p>
             <div id="pushDevBox" style="margin-block:8px 4px;"></div>
             <button class="btn small" id="btnLineNotify" style="margin-block-start:8px;" disabled>📣 お客様に「おうちノートが更新されました」を知らせる</button>
             <div id="lineNotifyStatus" class="muted" style="font-size:.85rem; margin-block-start:4px;"></div>
@@ -4515,9 +4515,7 @@
   // 選んでいる案件は選んだ方法だけ（LINEを選んだ方がいればスタッフが登録したLINEへ）、何も選んでいない案件はこれまでどおりLINE
   function chosenWaysOf(p){ return pushSubsOf(p).filter(function(x){ return !x.disabledAt; }); }
   function lineTargetsOf(p){
-    var ch = chosenWaysOf(p);
-    if(ch.length && !ch.some(function(x){ return x.kind==="line"; })) return [];
-    return prolineRecipients(p);
+    return chosenWaysOf(p).some(function(x){ return x.kind==="line"; }) ? prolineRecipients(p) : [];
   }
   function canNotifyProj(p){
     if(!p) return false;
@@ -4578,7 +4576,7 @@
     btn.textContent = "📣 お客様に「おうちノートが更新されました」を知らせる";
     var last = proj && proj.lineNotifiedAt;
     var who = notifyWhoText(proj);
-    st.textContent = !can ? (!hasBeacon && saved.length ? "「業者・設定」タブで、プロラインの発動用URLを先に保存してください。" : "送る人のプロラインIDを入れて保存するか、お客様がおうちノートで通知を「受け取る」にすると送れます。")
+    st.textContent = !can ? (!hasBeacon && saved.length ? "「業者・設定」タブで、プロラインの発動用URLを先に保存してください。" : (chosenWaysOf(proj).length ? "LINEを選んだ方がいます。プロラインIDを登録すると送れます。" : "お客様がおうちノートの「🔔 お知らせの受け取り方」で選ぶと送れます（まだ選んでいません）。"))
       : "届く人：" + who + "　" + (last ? "前回の送信：" + String(last).slice(0,16).replace("T"," ") + (proj.lineNotifiedBy ? "（"+proj.lineNotifiedBy+"）" : "") + "　" : "") + "※夜8時〜朝10時は朝10時に1回、昼は同じお客様へ30分に1回にまとめて送ります";
     renderPushDevBox(proj);
     if(proj && !pushSubsLoadedAt){ loadPushSubs().then(function(){ if(state.currentProjectId===pid){ prolineRowsDraft = prolineRowsDraft || null; var w2 = document.getElementById("prolineUidRows"); if(w2) w2.dataset.pid = ""; renderLineNotifyBox(projectById(pid)); } }); }
@@ -4592,7 +4590,7 @@
       ' <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'; return; }
     var hasMail = subs.some(function(x){ return x.kind==="email" && !x.disabledAt; });
     box.innerHTML = '<div style="font-size:.85rem; font-weight:700; margin-block-end:4px;">🔔 お客様が選んだ受け取り方 <button class="btn secondary small" data-pushreload>↻ 取り直す</button></div>'+
-      '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">お知らせは、お客様が選んだ方法だけで送ります（📱アプリ＝通知／✉️メール＝共有Gmailから／💬LINE＝上に登録したプロラインIDへ）。お客様がまだ何も選んでいないときだけ、上に登録したLINEへ送ります。</div>'+
+      '<div class="muted" style="font-size:.85rem; margin-block-end:4px;">お知らせは、お客様が選んだ方法だけで送ります（📱アプリ＝通知／✉️メール＝共有Gmailから／💬LINE＝上に登録したプロラインIDへ）。お客様が何も選んでいないときは、何も送りません。</div>'+
       subs.map(function(x){
         var how = x.kind==="email" ? '✉️ メール（'+escapeHtml(x.email||"")+'）' : x.kind==="line" ? '💬 LINE' : '📱 アプリ';
         var st = x.disabledAt ? '<span class="pill" style="background:#f3d6d0;">止まっている（'+(x.disabledWhy==="customer"?"お客様がやめた":x.disabledWhy==="staff"?"外した":"届かない")+'）</span>' : (x.kind==="line" ? '' : '<span class="pill" style="background:var(--accent); color:#fff;">届く</span>');
@@ -4693,7 +4691,7 @@
         logActivity("LINEで「おうちノートが更新されました」を送りました（"+(proj.customer||proj.name||"")+"）");
         if(!(data.failed && data.failed.length)) toast("✅ お知らせを送りました（"+[data.sent?"LINE "+data.sent+"人":"", data.pushSent?"🔔通知 "+data.pushSent+"台":""].filter(Boolean).join("・")+"）");
       } else {
-        var why = { no_uid:"プロラインIDが入っていません", bad_uid:"プロラインIDの形が正しくありません", no_beacon:"「業者・設定」でプロラインの発動用URLが保存されていません", bad_beacon:"プロラインの発動用URLの形が正しくありません（[[uid]] が必要です）", proline_failed:"プロラインが受け付けませんでした", proline_unreachable:"プロラインにつながりませんでした", push_failed:"通知を届けられませんでした（お客様の端末で通知が止まっている可能性があります）", unauthorized:"ログインし直してください" }[data.error] || "送れませんでした";
+        var why = { not_chosen:"お客様がまだお知らせの受け取り方を選んでいません", no_uid_for_line:"LINEを選んだ方がいますが、プロラインIDが登録されていません", no_uid:"プロラインIDが入っていません", bad_uid:"プロラインIDの形が正しくありません", no_beacon:"「業者・設定」でプロラインの発動用URLが保存されていません", bad_beacon:"プロラインの発動用URLの形が正しくありません（[[uid]] が必要です）", proline_failed:"プロラインが受け付けませんでした", proline_unreachable:"プロラインにつながりませんでした", push_failed:"通知を届けられませんでした（お客様の端末で通知が止まっている可能性があります）", unauthorized:"ログインし直してください" }[data.error] || "送れませんでした";
         toast("⚠ " + why);
       }
     }catch(e){ toast("⚠ 通信できませんでした"); }
@@ -10102,6 +10100,8 @@
     refreshMessageLine();
     var wrap = document.getElementById("messageNotifyWrap"), lab = document.getElementById("messageNotifyLabel"), cb = document.getElementById("messageNotify");
     if(!wrap || !lab || !state.currentProjectId) return;
+    // 2026年11月17日〜：お知らせはお客様が選んだ方法（「🔔 お知らせの受け取り方」）だけ。以前のお知らせメールの欄は使わない
+    wrap.hidden = true; cb.checked = false; cb.disabled = true; return;
     var pid = state.currentProjectId, email = "";
     try{
       var c = await okaiFetchCustomerData(pid);

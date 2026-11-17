@@ -59,7 +59,8 @@ export default async (req: Request, context: Context) => {
   const beacon = beaconOk ? beaconRaw : null;
   const act = { size: plan.push.length + plan.email.length };
   if (!act.size) {
-    if (!uids.length) return json({ ok: false, error: plan.chosen ? "no_uid_for_line" : "no_uid" }, 400);
+    if (!plan.chosen) return json({ ok: false, error: "not_chosen" }, 400);
+    if (!uids.length) return json({ ok: false, error: "no_uid_for_line" }, 400);
     if (!beaconRaw) return json({ ok: false, error: "no_beacon" }, 400);
     if (!beaconOk) return json({ ok: false, error: "bad_beacon" }, 400);
   }

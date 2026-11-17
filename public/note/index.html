@@ -1725,7 +1725,8 @@ function homeHtml(){ return homeParts().main; }
 
   // ---------- メッセージ ----------
   function hintClosed(){ try{ return localStorage.getItem("okaiHintClosed")==="1"; }catch(e){ return false; } }
-  function nmHtml(){
+  function nmHtml(){ return ""; /* 2026年11月17日〜：お知らせメールは「🔔 お知らせの受け取り方」で選ぶ */ }
+  function nmHtmlOld(){
     var em = data.notifyEmail || "";
     var out = '<div class="nmbox"><h3>📧 メッセージのお知らせメール</h3>'+
       '住まいるハウジングからメッセージを送ったときに、メールでお知らせします（メッセージの内容は書かず、このノートを開くリンクだけをお送りします）。これまで通り、LINEでメッセージをいただいても大丈夫です。';

@@ -116,12 +116,12 @@ export function pushPayload(items: NotifyItem[], page: string) {
 
 // 送り方の決め方（2026年11月17日〜）：お客様が「🔔 お知らせの受け取り方」で選んだ方法だけで送る。
 // - アプリ（kind なし）＝その端末へ通知、メール（kind:"email"）＝そのアドレスへ、LINE（kind:"line"）＝スタッフが登録したプロラインIDへLINE。
-// - お客様がまだ何も選んでいない案件だけ、これまでどおりスタッフが登録したLINEに送る（いきなり届かなくならないように）。
+// - お客様が何も選んでいない案件には、何も送らない。
 export function sendPlan(project: any, subs: any[]) {
   const listed = (subs || []).filter(isListed);
   const chosen = listed.length > 0;
   const lineChosen = listed.some((x: any) => kindOf(x) === "line");
-  const uids = (chosen && !lineChosen) ? [] : recipientsOf(project);
+  const uids = lineChosen ? recipientsOf(project) : [];
   return {
     chosen,
     push: listed.filter((x: any) => kindOf(x) === "push"),
@@ -149,10 +149,7 @@ export async function deliverNow(projectId: string, beacon: string | null, items
   const uids = plan.uids;
   const r = beacon && uids.length ? await sendBeacon(beacon, uids) : { sent: 0, failed: [] as string[] };
   const subsAfter = await listSubs(projectId);
-  const lineTo = beacon && uids.length ? (plan.chosen ? plan.line.map((x: any) => x.name || "名前なし") : (() => {
-    const rows: any[] = Array.isArray(project.prolineUids) ? project.prolineUids : [];
-    return uids.map((u) => { const row = rows.find((x: any) => x && String(x.uid) === u); return (row && row.name) || u; });
-  })()) : [];
+  const lineTo = beacon && uids.length ? plan.line.map((x: any) => x.name || "名前なし") : [];
   const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && kindOf(x) === "push").map((x: any) => x.name || "名前なし");
   const mailTo = subsAfter.filter((x: any) => okIds.has(String(x.id)) && kindOf(x) === "email").map((x: any) => x.name || "名前なし");
   console.log("deliverNow", projectId, JSON.stringify({ chosen: plan.chosen, push: plan.push.length, email: plan.email.length, line: uids }));
