@@ -456,6 +456,7 @@
   #pbImageCanvas{ background:var(--canvas-bg); }
   #pbBaseCanvas{ position:absolute; inset:0; max-width:100%; height:auto; border-radius:8px; background:transparent; }
   #pbOverlayCanvas{ position:absolute; inset:0; touch-action:none; background:transparent; }
+  .pbitem.text span{ white-space:pre; text-align:center; line-height:1.3; }
   .textEditor{ position:absolute; z-index:5; min-width:60px; min-height:1.4em; background:transparent; border:1px dashed var(--accent); border-radius:4px; padding:2px 4px; font-family:"Noto Sans JP",sans-serif; outline:none; line-height:1.3; white-space:pre; }
   .pbsourcelist{ display:flex; flex-wrap:wrap; gap:8px; margin-block-end:10px; }
   .pbsourcechip{ border:1px solid var(--border); border-radius:10px; padding:6px 10px; font-size:.85rem; cursor:pointer; background:var(--surface); }
@@ -18771,8 +18772,17 @@
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.classList.remove("active"); });
     document.querySelectorAll("#pbModal button[data-pbshape]").forEach(function(b){ b.classList.toggle("active", b.dataset.pbshape===shape); });
   }
+  // 元に戻す用の控え。toDataURL は大きな図面だと書き終わるたびに画面が止まっていたので、
+  // toBlob（裏で作る）にして、控えは「作り終わったら URL になる Promise」で持つ
+  function pbSnapshot(){
+    var cv = pb.baseCanvas;
+    return new Promise(function(res){
+      try{ cv.toBlob(function(b){ res(b ? URL.createObjectURL(b) : cv.toDataURL("image/png")); }, "image/png"); }
+      catch(e){ res(cv.toDataURL("image/png")); }
+    });
+  }
   function pbPushHistory(){
-    var dataUrl = pb.baseCanvas.toDataURL("image/png");
+    var dataUrl = pbSnapshot();
     pb.history = pb.history.slice(0, pb.historyIndex+1);
     pb.history.push(dataUrl);
     if(pb.history.length > pb.HISTORY_LIMIT) pb.history.shift();
@@ -18787,7 +18797,7 @@
     if(index<0 || index>=pb.history.length) return;
     var img = new Image();
     img.onload = function(){ pb.baseCtx.clearRect(0,0,pb.baseCanvas.width, pb.baseCanvas.height); pb.baseCtx.drawImage(img,0,0); };
-    img.src = pb.history[index];
+    Promise.resolve(pb.history[index]).then(function(u){ img.src = u; });
   }
   function pbSetupCanvas(naturalW, naturalH, img){
     var MAX_DIM = 2000;
@@ -19310,6 +19320,21 @@
     if(pb.tool==="marker") return {color:pb.color, width:size*2.2, alpha:.35, cap:"round"};
     return {color:pb.color, width:size, alpha:1, cap:"round"};
   }
+  // ペンの線をなめらかに：取りこぼした点（getCoalescedEvents）も全部使い、点と点の間は曲線でつなぐ
+  function pbPosIn(e, r){ return { x:(e.clientX-r.left)*r.sx, y:(e.clientY-r.top)*r.sy }; }
+  function pbDrawCurve(ctx, pts, style){
+    if(!pts.length) return;
+    ctx.save();
+    if(style.erase) ctx.globalCompositeOperation = "destination-out";
+    ctx.globalAlpha=style.alpha; ctx.strokeStyle=style.color; ctx.lineWidth=style.width; ctx.lineCap="round"; ctx.lineJoin="round";
+    ctx.beginPath(); ctx.moveTo(pb.prevMid.x, pb.prevMid.y);
+    pts.forEach(function(p){
+      var l = pb.lastPt, mid = { x:(l.x+p.x)/2, y:(l.y+p.y)/2 };
+      ctx.quadraticCurveTo(l.x, l.y, mid.x, mid.y);
+      pb.prevMid = mid; pb.lastPt = p;
+    });
+    ctx.stroke(); ctx.restore();
+  }
   function pbDrawSegment(ctx, from, to, style){
     ctx.save();
     if(style.erase) ctx.globalCompositeOperation = "destination-out";
@@ -19347,10 +19372,14 @@
     editor.focus();
     setTimeout(function(){ if(pb.activeTextEditor && pb.activeTextEditor.el===editor && document.activeElement!==editor) editor.focus(); }, 30);
     pb.activeTextEditor = {el:editor, x:x, y:y, scaleX:scaleX, at:Date.now()};
+    // Enter は改行（日本語の変換中の Enter はそのまま変換の確定）。確定は外側を押すか Ctrl／⌘＋Enter
     editor.addEventListener("keydown", function(ev){
-      if(ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); pbCommitTextEditor(); }
+      if(ev.isComposing || ev.keyCode===229) return;
+      if(ev.key==="Enter" && (ev.ctrlKey || ev.metaKey)){ ev.preventDefault(); pbCommitTextEditor(); return; }
+      if(ev.key==="Enter"){ ev.preventDefault(); try{ document.execCommand("insertLineBreak"); }catch(e2){ document.execCommand("insertText", false, "\n"); } return; }
       if(ev.key==="Escape"){ ev.preventDefault(); pbCancelTextEditor(); }
     });
+    if(!pb.textHintShown){ pb.textHintShown = true; toast("文字を入力（Enterで改行）。入れ終わったら図面の別の場所を押すと確定します", 6000); }
     editor.addEventListener("blur", function(){
       // 出した直後のピント外れ（マウスの押し離し）では閉じない
       if(pb.activeTextEditor && pb.activeTextEditor.el===editor && Date.now()-pb.activeTextEditor.at < 300){ setTimeout(function(){ editor.focus(); }, 0); return; }
@@ -19360,10 +19389,15 @@
   function pbCommitTextEditor(){
     if(!pb.activeTextEditor) return;
     var info = pb.activeTextEditor; pb.activeTextEditor = null;
-    var text = info.el.textContent; info.el.remove();
+    // 改行を残す（innerText は <br>・<div> を改行にする）。前後の空行だけ取る
+    var text = String(info.el.innerText!=null ? info.el.innerText : info.el.textContent).replace(/\u00a0/g, " ").replace(/\r/g, "").replace(/^\n+|\n+$/g, "");
+    // 入力欄の真ん中を文字の中心にする（複数行でも、書いた場所に置かれるように）
+    var ex = parseFloat(info.el.style.left)||info.x, ey = parseFloat(info.el.style.top)||info.y;
+    var cx = ex + info.el.offsetWidth/2, cy = ey + info.el.offsetHeight/2;
+    info.el.remove();
     if(!text || !text.trim()) return;
     var rect = pb.overlayCanvas.getBoundingClientRect();
-    var canvasX = info.x*info.scaleX, canvasY = info.y*(pb.overlayCanvas.height/rect.height);
+    var canvasX = cx*info.scaleX, canvasY = cy*(pb.overlayCanvas.height/rect.height);
     var size = parseInt(document.getElementById("pbSizeSelect").value,10);
     var fontPx = Math.max(12, size*3);
     // Placed as a movable/deletable item (like symbols and stamps) rather
@@ -21126,7 +21160,9 @@
       // パソコンのマウスでは、押した直後に画面のピントが外れて入力欄がすぐ閉じていたので、既定の動きを止める
       if(pb.tool==="text"){ e.preventDefault(); pbStartTextEditor(e); return; }
       try{ pb.overlayCanvas.setPointerCapture(e.pointerId); }catch(err){ /* ignore: drawing still proceeds without capture */ }
-      pb.drawing = true; pb.drawPointerType = e.pointerType; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt;
+      var dr = pb.overlayCanvas.getBoundingClientRect();
+      pb.drawRect = { left:dr.left, top:dr.top, sx: pb.overlayCanvas.width/dr.width, sy: pb.overlayCanvas.height/dr.height };
+      pb.drawing = true; pb.drawPointerId = e.pointerId; pb.drawPointerType = e.pointerType; pb.startPt = pbGetPos(e); pb.lastPt = pb.startPt; pb.prevMid = pb.startPt;
       if(pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser"){
         var style = pbStrokeStyleFor();
         pbDrawSegment(pb.baseCtx, pb.startPt, {x:pb.startPt.x+0.01, y:pb.startPt.y+0.01}, style);
@@ -21159,7 +21195,14 @@
       }
       if(!pb.drawing) return;
       var pos = pbGetPos(e);
-      if(pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser"){ pbDrawSegment(pb.baseCtx, pb.lastPt, pos, pbStrokeStyleFor()); pb.lastPt = pos; }
+      if(pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser"){
+        if(pb.drawPointerId!=null && e.pointerId!==pb.drawPointerId) return;
+        var evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+        if(!evs.length) evs = [e];
+        var r = pb.drawRect || { left:0, top:0, sx:1, sy:1 };
+        pbDrawCurve(pb.baseCtx, evs.map(function(ev){ return pbPosIn(ev, r); }), pbStrokeStyleFor());
+        return;
+      }
       else if(pb.tool==="shape" && pb.shape){ pb.overlayCtx.clearRect(0,0,pb.overlayCanvas.width, pb.overlayCanvas.height); pbDrawShape(pb.overlayCtx, pb.shape, pb.startPt, pos, pbStrokeStyleFor()); }
     });
     function pbEndStroke(e){
@@ -21174,6 +21217,11 @@
       }
       if(!pb.drawing) return;
       pb.drawing = false;
+      if((pb.tool==="pen" || pb.tool==="marker" || pb.tool==="eraser") && pb.lastPt && pb.prevMid){
+        var st0 = pbStrokeStyleFor();
+        pbDrawSegment(pb.baseCtx, pb.prevMid, pb.lastPt, st0);
+      }
+      pb.drawPointerId = null;
       if(pb.tool==="shape" && pb.shape){
         var pos = pbGetPos(e);
         pb.overlayCtx.clearRect(0,0,pb.overlayCanvas.width, pb.overlayCanvas.height);
