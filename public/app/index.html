@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>住まいるアプリ</title>
 <meta name="description" content="住まいるハウジング・案件統合管理アプリ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
 <link rel="manifest" href="/app/manifest.json">
 <meta name="theme-color" content="#3f7d5c">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +28,6 @@
   })();
 </script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
   :root{
     --bg:#faf7f2; --surface:#ffffff; --surface-2:#f2ede3; --ink:#2b2420; --muted:#8a7f72;
@@ -69,7 +71,7 @@
   .fspick button:first-of-type{ border-radius:8px 0 0 8px; } .fspick button:last-of-type{ border-radius:0 8px 8px 0; }
   .fspick button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
   body{ background:var(--bg); color:var(--ink); font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; padding-inline:clamp(12px,1.6vw,32px); padding-block:0; }
-  h1,h2,h3,.display{ font-family:"Zen Maru Gothic","Noto Sans JP",sans-serif; text-wrap:balance; }
+  h1,h2,h3,.display{ font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; text-wrap:balance; }
   .tabular{ font-variant-numeric: tabular-nums; }
   .wrap{ max-width:none; margin:0 auto; padding-block-end:40px; }
 
@@ -129,7 +131,7 @@
   }
 
   nav.tabs{ display:flex; gap:2px; margin-block:12px 14px; border-bottom:1px solid var(--border); overflow-x:auto; }
-  nav.tabs button{ appearance:none; border:none; background:none; font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; color:var(--muted); padding:8px 11px 10px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+  nav.tabs button{ appearance:none; border:none; background:none; font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; font-size:.85rem; font-weight:700; color:var(--muted); padding:8px 11px 10px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
   nav.tabs button.active{ color:var(--accent-ink); border-bottom-color:var(--accent); }
 
   section.panel{ display:none; }
@@ -155,13 +157,13 @@
   textarea{ resize:vertical; width:100%; }
   label.field{ display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:var(--muted); flex:1; min-width:120px; }
 
-  button.btn{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:.85rem; padding:8px 14px; border-radius:999px; border:1px solid transparent; cursor:pointer; background:var(--accent); color:#fff; white-space:nowrap; }
+  button.btn{ font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; font-weight:700; font-size:.85rem; padding:8px 14px; border-radius:999px; border:1px solid transparent; cursor:pointer; background:var(--accent); color:#fff; white-space:nowrap; }
   button.btn:disabled{ opacity:.5; cursor:not-allowed; }
   button.btn.secondary{ background:var(--surface-2); color:var(--ink); border-color:var(--border); }
   button.btn.ghost{ background:transparent; color:var(--accent-ink); border-color:var(--accent); padding:6px 11px; font-size:.85rem; }
   button.btn.small{ padding:5px 10px; font-size:.85rem; border-radius:8px; white-space:normal; max-width:100%; }
   button.btn.danger-ghost{ background:transparent; color:var(--danger); border-color:var(--danger); padding:5px 10px; font-size:.85rem; border-radius:8px; }
-  button.tbtn{ appearance:none; border:1px solid transparent; background:none; cursor:pointer; border-radius:9px; padding:7px 10px; font-size:.85rem; font-weight:700; color:var(--ink); font-family:"Zen Maru Gothic",sans-serif; display:flex; align-items:center; gap:5px; white-space:nowrap; }
+  button.tbtn{ appearance:none; border:1px solid transparent; background:none; cursor:pointer; border-radius:9px; padding:7px 10px; font-size:.85rem; font-weight:700; color:var(--ink); font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; display:flex; align-items:center; gap:5px; white-space:nowrap; }
   button.tbtn:hover{ background:var(--surface-2); }
   button.tbtn.active{ background:var(--accent); color:#fff; }
   button.tbtn:disabled{ opacity:.4; cursor:not-allowed; }
@@ -270,7 +272,7 @@
   .backbtn{ background:none; border:none; color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:.85rem; padding:4px 2px; }
 
   .subtabs{ display:flex; gap:4px; margin-block-end:12px; flex-wrap:wrap; }
-  .subtabs button{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; }
+  .subtabs button{ font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; }
   .subtabs button.active{ background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent); }
   .meetingsubtabs{ display:flex; gap:4px; margin-block-end:12px; flex-wrap:wrap; }
   .meetingsubtabs[hidden]{ display:none !important; }
@@ -285,11 +287,106 @@
   .recrow-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-block-end:6px; }
   .recrow-name{ font-weight:700; font-size:1.05rem; }
   .recrow-head .btn{ margin-inline-start:auto; }
-  .recstrip{ display:flex; gap:12px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; padding:2px 2px 10px; align-items:flex-start; -webkit-overflow-scrolling:touch; }
-  .recslot{ flex:0 0 360px; max-width:360px; scroll-snap-align:start; }
-  .recslot-date{ font-size:.85rem; font-weight:700; color:var(--muted); margin-block-end:4px; }
-  .recslot .noteitem, .recslot .rectl{ margin:0; }
-  @media (max-width:760px){ .recslot{ flex-basis:84vw; max-width:84vw; } .recrow-hint{ display:none; } }
+  .recstrip{ display:flex; gap:10px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; padding:2px 2px 10px; align-items:stretch; -webkit-overflow-scrolling:touch; }
+  /* 横に並ぶのは「見出しだけの小さなカード」。押すと全画面で中身・操作（デモと同じ形） */
+  .recslot{ flex:0 0 min(300px, 80%); max-width:min(300px, 80%); scroll-snap-align:start; display:flex; }
+  .recslot.big{ flex-basis:min(520px, 94%); max-width:min(520px, 94%); }
+  .recslot-date{ display:none; }
+  .recprev{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; cursor:pointer; font-weight:400; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .recprev.on{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .recprev .rp-top{ display:flex; align-items:center; gap:6px; }
+  .recprev .rp-date{ font-size:.85rem; font-weight:700; color:var(--accent-ink); white-space:nowrap; }
+  .recprev .rp-kind{ margin-inline-start:auto; font-size:.85rem; font-weight:500; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .recprev .rp-vis{ position:relative; width:100%; aspect-ratio:4/3; border-radius:8px; overflow:hidden; background:#f4f2ec; display:flex; align-items:center; justify-content:center; }
+  .recprev .rp-vis img, .recprev .rp-vis video{ width:100%; height:100%; object-fit:contain; }
+  .recprev .rp-vis.small{ aspect-ratio:16/9; }
+  /* PDFも写真と同じ見せ方（ページ全体を大きく・黒い「PDF」の帯なし・白地） */
+  .recprev .rp-vis.pdf{ aspect-ratio:4/3; background:#fff; border:1px solid var(--border); }
+  .recprev .rp-vis.pdf .pdfbadge{ display:none; }
+  .recprev .rp-vis.pdf img{ width:100%; height:100%; object-fit:contain; }
+  .recprev .rp-vis .rp-more{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.6); color:#fff; font-size:.85rem; font-weight:700; border-radius:999px; padding:1px 8px; }
+  .recprev .rp-title{ font-size:.95rem; font-weight:700; line-height:1.4; word-break:break-all; }
+  .recprev .rp-text{ font-size:.88rem; line-height:1.6; color:var(--ink); white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+  .recprev .rp-badges{ display:flex; flex-wrap:wrap; gap:4px; }
+  .recprev .rp-b{ font-size:.85rem; font-weight:500; line-height:1.3; padding:1px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); background:var(--surface); white-space:nowrap; }
+  .recprev .rp-b.g{ border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); }
+  .recprev .rp-b.r{ border-color:#d23c32; color:#b8302a; background:#fdeeed; }
+  .recprev .rp-b.o{ border-color:#d08a2c; color:#a5651a; background:#fdf3e5; }
+  .recprev .rp-foot{ margin-top:auto; font-size:.85rem; color:var(--muted); }
+  .recprev{ position:relative; }
+  .recprev .rp-ic{ font-size:.95rem; line-height:1; }
+  .recprev.on{ background:var(--accent-soft); border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  /* 決定（赤）・発注済（緑）のはんこを、絵の右下（絵が無ければカードの右上）に重ねる */
+  .recprev .rp-stamps{ position:absolute; right:8px; bottom:8px; display:flex; gap:4px; pointer-events:none; z-index:2; }
+  .recprev.hasst > .rp-stamps{ top:34px; bottom:auto; }
+  .recprev.hasst .rp-title, .recprev.hasst .rp-text{ padding-inline-end:64px; }
+  .rp-st{ width:58px; height:58px; border:3px solid #d23c32; border-radius:50%; color:#d23c32; background:rgba(255,255,255,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; transform:rotate(-14deg); font-weight:900; font-size:.95rem; line-height:1.05; letter-spacing:.04em; font-family:"Hiragino Mincho ProN","Yu Mincho",serif; opacity:.88; box-shadow:inset 0 0 0 2px rgba(210,60,50,.2); }
+  .rp-st small{ font-size:.85rem; font-weight:700; border-top:1.5px solid currentColor; margin-top:2px; padding-top:1px; letter-spacing:0; }
+  .rp-st.ord{ border-color:#2e8b57; color:#2e8b57; box-shadow:inset 0 0 0 2px rgba(46,139,87,.2); transform:rotate(8deg); }
+  .recprev .rp-vis.small .rp-st{ width:50px; height:50px; font-size:.85rem; }
+  .rp-st.r{ border-color:#d9731a; color:#d9731a; box-shadow:inset 0 0 0 2px rgba(217,115,26,.2); transform:rotate(-6deg); font-size:.85rem; letter-spacing:-.04em; }
+  .rp-st.c{ border-color:#7b4bb3; color:#7b4bb3; box-shadow:inset 0 0 0 2px rgba(123,75,179,.2); transform:rotate(5deg); font-size:.85rem; letter-spacing:-.04em; }
+  .rp-st.q{ border-color:#2a63b8; color:#2a63b8; box-shadow:inset 0 0 0 2px rgba(42,99,184,.2); transform:rotate(10deg); font-size:.85rem; letter-spacing:-.04em; }
+  .recprev .rp-stamps{ flex-wrap:wrap-reverse; justify-content:flex-end; max-width:calc(100% - 16px); }
+  .recprev .rp-stamps.many .rp-st{ width:48px; height:48px; border-width:2.5px; font-size:.85rem; letter-spacing:-.12em; white-space:nowrap; }
+  .recprev .rp-stamps.many .rp-st small{ letter-spacing:-.04em; }
+  .recplan{ flex:1; min-width:0; }
+  /* カードの外枠（.recprevw）も枠の幅に収める。以前は中の図面の大きさで広がり、隣のカードに重なっていた */
+  .recslot{ min-width:0; }
+  .recslot > .recprevw{ flex:1 1 auto; min-width:0; max-width:100%; display:flex; }
+  .recslot > .recprevw > .recprev{ flex:1 1 auto; min-width:0; max-width:100%; }
+  /* 小さなカードの右上の「⋮」：全画面を開かずに操作のメニュー */
+  .recprev .rp-ops{ flex:none; min-width:34px; height:30px; padding:0 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--ink); font-size:1.05rem; font-weight:900; line-height:1; cursor:pointer; }
+  .recprev .rp-ops:hover{ border-color:var(--accent); color:var(--accent-ink); }
+  .recfsw{ cursor:pointer; }
+  @media (max-width:760px){
+    .recrow-hint{ display:none; }
+    .recstrip{ scroll-snap-type:x mandatory; scroll-padding-inline-start:2px; }
+    .recslot.big{ flex-basis:100%; max-width:100%; }
+  }
+  /* カードを押すと全画面で開く。下に操作ボタン */
+  .recfs-ov{ position:fixed; inset:0; z-index:55; background:var(--bg); display:flex; flex-direction:column; }
+  .recfs-head{ display:flex; align-items:center; gap:8px; padding:calc(env(safe-area-inset-top) + 10px) 14px 10px; border-bottom:1px solid var(--border); background:var(--surface); }
+  .recfs-head b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .recfs-body{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; font-size:1.05rem; }
+  .recfs-body > *{ max-width:900px; margin-inline:auto; }
+  .recfs-body .qtg{ display:none !important; }
+  /* 全画面では、反映・決定の文字の札は出さない（下のボタンと、はんこで分かる） */
+  .recfs-body .nhead > .pill:not(.spectl-type-note), .recfs-body .nhead > .apstamp, .recfs-body .nhead > .nreflbadge, .recfs-body .spectl-card .pill.reflect{ display:none !important; }
+  .recfs-body .noteitem.notemenu-open .notemenu, .recfs-body .spectl-ops[open] .opsmenu{ position:fixed; left:50%; transform:translateX(-50%); right:auto; width:min(420px, calc(100vw - 24px)); top:calc(env(safe-area-inset-top) + 64px); bottom:auto; max-height:calc(100vh - 160px); z-index:120; }
+  .recfs-body{ font-weight:400; }
+  /* 図面・プランボード・写真をそのまま見る（PDFはページを縦に並べる。拡大は＋／－） */
+  .fvwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-block-end:12px; }
+  .fvwrap .fvin{ width:calc(100% * var(--fvz, 1)); margin-inline:auto; }
+  .fvfile{ margin-block-end:14px; }
+  .fvfile-h{ display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--muted); margin-block-end:6px; position:sticky; left:0; }
+  .fvfile-h b{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-weight:500; }
+  .fvpage{ position:relative; background:#fff; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-block-end:8px; }
+  .fvpage canvas, .fvpage img, .fvpage video{ display:block; width:100%; height:auto; }
+  .fvpage .fvpn{ position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.55); color:#fff; font-size:.85rem; border-radius:999px; padding:1px 8px; }
+  .fvzoom{ display:flex; gap:4px; align-items:center; }
+  .fvzoom button{ min-width:2.4em; }
+  .pmgr-ov{ position:fixed; inset:0; z-index:130; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .pmgr{ background:var(--surface); border-radius:14px; width:min(520px,100%); max-height:calc(100vh - 32px); display:flex; flex-direction:column; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .pmgr-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .pmgr-list{ overflow:auto; }
+  .pmgr-h{ font-weight:700; margin:12px 0 4px; font-size:.9rem; }
+  .pmgr-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); font-size:.92rem; }
+  .pmgr-row.sub{ padding-inline-start:18px; font-size:.88rem; color:var(--muted); }
+  .pmgr-row.off > span{ color:var(--muted); text-decoration:line-through; }
+  .pmgr-row.off > span small{ text-decoration:none; display:inline-block; }
+  .fv-stamps{ position:absolute; right:12px; top:44px; display:flex; gap:6px; pointer-events:none; z-index:3; }
+  .fv-stamps .rp-st{ width:76px; height:76px; font-size:1.15rem; }
+  .fv-stamps{ flex-wrap:wrap-reverse; justify-content:flex-end; max-width:calc(100% - 24px); }
+  .fv-stamps .rp-st.r, .fv-stamps .rp-st.c, .fv-stamps .rp-st.q{ font-size:1rem; }
+  .fvsec{ font-size:.9rem; font-weight:700; color:var(--muted); margin:14px 0 6px; }
+  .recfs-det > summary{ cursor:pointer; font-size:.9rem; font-weight:700; color:var(--muted); padding:6px 0; }
+  .recfs-body img{ max-width:100%; height:auto; }
+  .recfs-bar{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:6px; padding:10px 10px calc(env(safe-area-inset-bottom) + 12px); border-top:1px solid var(--border); background:var(--surface); }
+  .recfs-bar button{ min-height:56px; white-space:nowrap; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:10px; font-family:inherit; font-size:.85rem; font-weight:700; line-height:1.3; cursor:pointer; padding:6px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
+  .recfs-bar button .ic{ font-size:1.2rem; }
+  .recfs-bar button.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .recfs-bar button:disabled{ opacity:.4; cursor:default; }
   /* 横スクロールの中では操作メニューが切れるので、画面の真ん中に出す */
   .recstrip .noteitem.notemenu-open .notemenu, .recstrip .spectl-ops[open] .opsmenu{ position:fixed; left:50%; transform:translateX(-50%); right:auto; width:min(420px, calc(100vw - 24px)); top:calc(env(safe-area-inset-top) + 64px); bottom:auto; max-height:calc(100vh - 160px); z-index:120; }
   .recday .rectl{ margin-block-end:8px; }
@@ -299,7 +396,7 @@
   .ri-thumb img{ width:100%; height:100%; object-fit:cover; }
   .ri-name{ flex:1 1 10rem; min-width:0; font-size:.9rem; overflow-wrap:anywhere; }
   .ri-row select{ min-height:40px; max-width:100%; }
-  .meetingsub-btn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; }
+  .meetingsub-btn{ font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; font-size:.85rem; font-weight:700; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--muted); cursor:pointer; }
   .meetingsub-btn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
   .meetingsubpane{ display:none; }
   .meetingsubpane.active{ display:block; }
@@ -413,6 +510,11 @@
   .uoprow > button{ flex:1; min-width:0; }
   .uopchk{ width:20px; height:20px; flex:0 0 auto; margin:0 0 0 4px; }
   .uopchk-sp{ width:20px; flex:0 0 auto; margin-left:4px; }
+  .notemenu button.uopsw{ display:flex !important; align-items:center; justify-content:space-between; gap:10px; }
+  .uopsw .sw{ flex:0 0 auto; width:40px; height:23px; border-radius:12px; background:#cfc9bf; position:relative; transition:background .15s; }
+  .uopsw .sw::after{ content:""; position:absolute; top:3px; left:3px; width:17px; height:17px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:left .15s; }
+  .uopsw.on .sw{ background:var(--accent); }
+  .uopsw.on .sw::after{ left:20px; }
   .notemenu .uoprun{ margin-top:6px; background:#1f6f43 !important; color:#fff !important; border-radius:10px; font-weight:700; text-align:center; }
   .notemenu button{ display:block; width:100%; text-align:start; background:none; border:none; font:inherit; padding:8px 8px; border-radius:7px; cursor:pointer; color:var(--ink); }
   .notemenu button:hover{ background:var(--surface-2); }
@@ -474,6 +576,10 @@
   .pbtextbar .pbtsz{ min-width:2.2em; text-align:center; font-size:.85rem; color:var(--muted); }
   .pbimg{ position:absolute; pointer-events:none; touch-action:none; }
   .pbimg img{ width:100%; height:100%; display:block; pointer-events:none; user-select:none; -webkit-user-drag:none; }
+  /* iPadでペン・指で書いているときに、画面の文字が選ばれて青く覆われ「コピー・調べる」が出ないように */
+  #pbModal, #pbModal *{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  #pbModal input, #pbModal textarea, #pbModal select, #pbModal [contenteditable="true"]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+  #pbModal canvas{ -webkit-tap-highlight-color:transparent; }
   #pbModal.imgmove #pbBaseCanvas, #pbModal.imgmove #pbOverlayCanvas{ pointer-events:none; }
   #pbModal.imgmove .pbimg{ pointer-events:auto; outline:2px dashed var(--accent); outline-offset:1px; cursor:grab; }
   .pbimg-del, .pbimg-rs{ display:none; }
@@ -619,7 +725,7 @@
   .submsgbadge[hidden]{ display:none; }
   .sub-extra{ display:none; }
   .subtabs.showextra .sub-extra, .sub-extra.active{ display:inline-block; }
-  .sub-morebtn{ font-family:"Zen Maru Gothic",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px dashed var(--border); background:none; color:var(--muted); cursor:pointer; flex-shrink:0; white-space:nowrap; }
+  .sub-morebtn{ font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; font-size:.85rem; font-weight:700; padding:6px 12px; border-radius:999px; border:1px dashed var(--border); background:none; color:var(--muted); cursor:pointer; flex-shrink:0; white-space:nowrap; }
   .sub-morebtn.on{ border-style:solid; color:var(--accent-ink); }
   .subtabs:not(.showextra) .sub-extra.active{ order:0; }
   /* 見積り依頼：案件ごとのまとまり */
@@ -678,7 +784,7 @@
   .kboard{ display:flex; gap:12px; overflow-x:auto; align-items:flex-start; padding-block-end:10px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
   .kcol{ flex:0 0 310px; min-width:0; background:var(--surface-2); border-radius:14px; border-top:5px solid var(--sc); padding:10px 8px 8px; scroll-snap-align:start; }
   @media (max-width:760px){ .kcol{ flex-basis:86%; } }
-  .khead{ display:flex; align-items:center; gap:8px; margin:0 4px 8px; font-weight:700; font-family:"Zen Maru Gothic",sans-serif; }
+  .khead{ display:flex; align-items:center; gap:8px; margin:0 4px 8px; font-weight:700; font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; }
   .khead .kandot{ width:11px; height:11px; border-radius:50%; flex-shrink:0; }
   .khead .kn{ margin-inline-start:auto; color:var(--muted); font-weight:400; }
   .kgrp{ display:flex; align-items:center; gap:6px; font-size:.85rem; font-weight:700; color:var(--muted); margin:12px 4px 4px; }
@@ -1966,7 +2072,7 @@
             <div class="field mnfield">
               <span>打合せ内容（LINEで来た内容もここに。1行に1つずつ）</span>
               <textarea id="mnBody" rows="5" placeholder="例）キッチンはリシェルSI、色はホワイトに決定&#10;食洗機の有無は次回までにご検討いただく&#10;吊戸棚の高さは現場で確認"></textarea>
-              <div class="mnhint">行を押すと印：<b>✅仮決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」で部位・ファイル・決定のお願い・タスク</div>
+              <div class="mnhint">行を押すと印：<b>✅仮決定</b> → <b>💭検討</b> → <b>🔒社内</b> → なし　／　行の「⋯」でファイル・決定のお願い・タスク</div>
               <div id="mnLines" class="mnlines"></div>
             </div>
             <input type="checkbox" id="meetingNoteTalkShow" checked hidden><div class="muted" style="font-size:.85rem;">「・」の行（印なし）・✅・💭 は、記録するとおうちノートに打合せ記録として出ます。お客様に見せない行は🔒社内に。</div>
@@ -2151,7 +2257,7 @@
 
     <div class="card">
       <h3>🧪 記録のデモ案件</h3>
-      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">練習用の案件「デモ様邸（練習用）」を作り、打合せ記録の見本（行の印・行ごとの部位・ファイル・お客様への決定のお願い・社内で確認・お客様の決定のはんこ）を入れます。お客様には関係ありません。いらなくなったら案件ごと削除してください。</p>
+      <p class="muted" style="margin:0 0 8px; font-size:.85rem;">練習用の案件「デモ様邸（練習用）」を作り、打合せ記録の見本（行の印・ファイル・お客様への決定のお願い・社内で確認・お客様の決定のはんこ）を入れます。お客様には関係ありません。いらなくなったら案件ごと削除してください。</p>
       <button class="btn secondary small" id="btnDemoProject">デモ案件を作る／開く</button>
     </div>
 
@@ -2523,7 +2629,9 @@
     <h3 style="margin:0 0 6px;">履歴を編集</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <div class="muted" id="spEditInfo" style="font-size:.85rem;"></div>
+      <label class="field" id="spEditNameRow">名前（ファイル名・お客様画面にも出ます）<input type="text" id="spEditName" maxlength="120"></label>
       <label class="field" id="spEditDateRow">日付<input type="date" id="spEditDate"></label>
+      <label class="field" id="spEditCustRow">💬 お客様へのひとこと（おうちノートのカードに「スタッフから：」で出ます）<textarea id="spEditCust" rows="3" maxlength="500"></textarea></label>
       <label class="field">メモ（スタッフ用・お客様には表示されません）<textarea id="spEditMemo" rows="4"></textarea></label>
       <div id="spEditSwBox" hidden style="border:1px solid var(--border); border-radius:12px; padding:10px; margin-block-start:4px;">
         <label style="display:flex; gap:8px; align-items:center; font-weight:700;"><input type="checkbox" id="spEditSwOn"> 🎨 お客様画面で「色見本カード」にする</label>
@@ -2747,6 +2855,8 @@
     {label:"外部散水栓・インターホンなど", value:"siteCheck"},
     {label:"インテリア：メイン（家全体の基本色）", value:"interiorColor"},
     {label:"インテリア：部屋別", value:"room"},
+    {label:"内装", value:"naiso"},
+    {label:"建具（内部ドア）", value:"tategu"},
     {label:"収納", value:"storage"},
     {label:"社内だけ（基礎・足場など。お客様に出さない）", value:"internal"}
   ];
@@ -2754,7 +2864,7 @@
   // 文字は中の項目名だけ（例：「🚿 キッチン」「🔥 暖房設備」）。保存している scope／category は変えない。
   var PART_BIG = {
     exterior:{name:"外部", icon:"🏠"}, facility:{name:"水まわり", icon:"🚿"},
-    interiorColor:{name:"各部屋（家全体）", icon:"🎨"}, room:{name:"各部屋", icon:"🎨"}, storage:{name:"収納", icon:"🗄"},
+    interiorColor:{name:"各部屋（家全体）", icon:"🎨"}, room:{name:"各部屋", icon:"🎨"}, storage:{name:"収納", icon:"🗄"}, naiso:{name:"内装", icon:"🖌"}, tategu:{name:"建具（内部ドア）", icon:"🚪"},
     siteCheck:{name:"その他の確認", icon:"🔧"}, internal:{name:"社内だけ", icon:"🔒"},
     general:{name:"総合", icon:"📋"}, custom:{name:"追加した部位", icon:"📌"}
   };
@@ -4257,15 +4367,18 @@
     if(scope==="exterior") return "exterior";
     if(scope==="facility") return ({"キッチン":"kitchen","お風呂":"bath","洗面":"wash","脱衣室":"rooms","ランドリーバー":"rooms","トイレ":"toilet","1階トイレ":"toilet","2階トイレ":"toilet"})[category] || null;
     if(scope==="equipment") return ({"暖房設備":"climate","換気設備":"climate","電気配線":"electric","あかりプラン":"electric"})[category] || null;
-    if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : "interior");
+    // 各部屋（家全体）の「ドア」は、お客様画面では「建具（内部ドア）」の項目に出す（note-data.mts の noteCatFor と同じ）
+    if(scope==="interiorColor") return category==="浴室枠" ? "bath" : (category==="玄関枠" ? "exterior" : (category==="ドア" ? "tategu" : "interior"));
     if(scope==="room") return "rooms";
     if(scope==="storage") return "storage";
+    if(scope==="naiso") return "naiso";
+    if(scope==="tategu") return "tategu";
     if(scope==="siteCheck") return "other"; // 外部散水栓・インターホン親機・給湯リモコン・床下点検口
     if(scope==="custom") return category ? "cp_"+category : null; // 追加した部位は1つずつ別の項目（note-data.mts の noteCatFor と同じ）
     return null;
   }
   var NOTE_CAT_NAMES = { general:"総合", exterior:"外部", kitchen:"キッチン", bath:"お風呂", wash:"洗面", dressing:"脱衣室", toilet:"トイレ",
-    climate:"暖房・換気", electric:"電気・あかり", interior:"各部屋（家全体）", rooms:"各部屋", storage:"収納", other:"その他の確認", planboard:"プランボード" };
+    climate:"暖房・換気", electric:"電気・あかり", interior:"各部屋（家全体）", rooms:"各部屋", storage:"収納", naiso:"内装", tategu:"建具（内部ドア）", other:"その他の確認", planboard:"プランボード" };
   // 統合前の項目IDで保存済みのお客様の選択は、新しい項目IDとして読み替える（note-data.mts の LEGACY_CAT_MAP と同じ内容）
   var NOTE_LEGACY_CAT = { toilet1:"toilet", toilet2:"toilet", heating:"climate", ventilation:"climate", wiring:"electric", lighting:"electric" };
   function noteDecisionFor(catId, roomId){
@@ -8496,11 +8609,86 @@
       liveNotes().some(function(n){ return n.projectId===pid && n.specPart && n.specPart.scope==="room" && !n.specPart.roomId; });
     if(noRoom) intSubs.push({key:"r:", label:"部屋未設定"});
     list.push({ key:"int", label:"🎨 各部屋", subs: intSubs });
+    list.push({ key:"naiso", label:"🖌 内装", subs:[] });
+    list.push({ key:"tategu", label:"🚪 建具（内部ドア）", subs:[] });
     list.push({ key:"storage", label:"🗄 収納", subs:[] });
     list.push({ key:"other", label:"🔧 その他の確認", subs: SITECHECK_CATS.map(function(c){ return {key:c, label:c}; }) });
     customPartsOf(proj).forEach(function(c){ list.push({ key:"cp:"+c.id, label:"📌 "+c.name, subs:[] }); });
     list.push({ key:"internal", label:"🔒 社内だけ", subs: INTERNAL_CATS.map(function(c){ return {key:c, label:c}; }) });
     return list;
+  }
+  // ===== 部位の整理（使わない部位を、部位を選ぶ一覧から外す。全案件共通＝settings/main.hiddenParts）=====
+  // キーは recBigs の key（例 "storage"／"eq:暖房設備"）か "key/項目"（例 "ext/ポスト"）。外しても記録・資料のデータは消さない
+  function hiddenPartKeys(){ return (state.settings && Array.isArray(state.settings.hiddenParts)) ? state.settings.hiddenParts : []; }
+  function partHidden(big, sub){
+    var h = hiddenPartKeys();
+    return h.indexOf(big)>=0 || (sub!=null && sub!=="" && h.indexOf(big+"/"+sub)>=0);
+  }
+  // 部位を選ぶ一覧用（外した部位・項目を除く。keep に入れたものは外していても残す＝いま選んでいる値）
+  function recBigsPick(proj, keepBig, keepSub){
+    return recBigs(proj).filter(function(b){ return !partHidden(b.key) || b.key===keepBig; }).map(function(b){
+      if(!b.subs.length || b.key==="int") return b;
+      return {key:b.key, label:b.label, subs:b.subs.filter(function(x){ return !partHidden(b.key, x.key) || (b.key===keepBig && x.key===keepSub); })};
+    });
+  }
+  function inboxKeyHidden(key){
+    if(!key) return false;
+    var k = key.split("|"), sc = k[0], cat = k.slice(1).join("|");
+    var map = { general:"general", exterior:"ext", facility:"water", naiso:"naiso", tategu:"tategu", storage:"storage", siteCheck:"other", internal:"internal", interiorColor:"int", room:"int" };
+    if(sc==="equipment") return partHidden("eq:"+cat);
+    var big = map[sc]; if(!big) return false;
+    if(big==="int") return partHidden("int");
+    return partHidden(big, cat||(sc==="exterior"?"_none":""));
+  }
+  async function setPartHidden(key, hide){
+    var h = hiddenPartKeys().filter(function(x){ return x!==key; });
+    if(hide) h.push(key);
+    state.settings.hiddenParts = h;
+    var ok = await saveDoc("settings","main", state.settings);
+    if(!ok) toast("保存できませんでした");
+    return ok;
+  }
+  function openPartManager(){
+    var proj = projectById(state.currentProjectId);
+    var ov = document.createElement("div");
+    ov.className = "pmgr-ov";
+    var draw = function(){
+      var row = function(key, label, sub){
+        var hid = hiddenPartKeys().indexOf(key)>=0;
+        return '<div class="pmgr-row'+(sub?' sub':'')+(hid?' off':'')+'"><span>'+escapeHtml(label)+(hid?' <small>（一覧から外しています）</small>':'')+'</span>'+
+          '<button type="button" class="btn '+(hid?'secondary':'ghost')+' small" data-pmkey="'+escapeHtml(key)+'" data-pmhide="'+(hid?'0':'1')+'">'+(hid?'↩ 戻す':'🗑 削除')+'</button></div>';
+      };
+      var html = '';
+      recBigs(proj).forEach(function(b){
+        if(b.key.indexOf("cp:")===0) return;
+        html += row(b.key, b.label, false);
+        if(b.key!=="int" && hiddenPartKeys().indexOf(b.key)<0) b.subs.forEach(function(x){ html += row(b.key+"/"+x.key, x.label, true); });
+      });
+      var cps = proj ? customPartsOf(proj) : [];
+      if(cps.length){
+        html += '<div class="pmgr-h">📌 この案件で追加した部位</div>'+cps.map(function(c){
+          return '<div class="pmgr-row"><span>'+escapeHtml(c.name)+'</span><button type="button" class="btn ghost small" data-pmcp="'+escapeHtml(c.id)+'">🗑 削除</button></div>';
+        }).join("");
+      }
+      ov.innerHTML = '<div class="pmgr"><div class="pmgr-head"><b>部位の整理</b><button type="button" class="btn ghost small" data-pmclose>✕ 閉じる</button></div>'+
+        '<p class="muted" style="margin:0 0 8px;font-size:.85rem;">「削除」した部位・項目は、部位を選ぶ一覧から外れます（全部の案件で共通）。すでにその部位で残した記録・資料は消えず、そのまま見られます。「戻す」でいつでも元に戻せます。部屋は絞り込みの「各部屋」から削除できます。</p>'+
+        '<div class="pmgr-list">'+html+'</div></div>';
+    };
+    draw();
+    ov.addEventListener("click", async function(e){
+      if(e.target===ov || e.target.closest("[data-pmclose]")){ ov.remove(); renderMeetingNotes(); return; }
+      var b = e.target.closest("[data-pmkey]");
+      if(b){
+        var hide = b.dataset.pmhide==="1";
+        if(hide && !confirm("「"+b.closest(".pmgr-row").querySelector("span").textContent+"」を部位の一覧から削除しますか？\n（記録・資料のデータは消えません。あとで戻せます）")) return;
+        b.disabled = true;
+        await setPartHidden(b.dataset.pmkey, hide);
+        draw(); return;
+      }
+      var c = e.target.closest("[data-pmcp]");
+      if(c){ deleteCustomPart(c.dataset.pmcp); draw(); return; }
+    });
+    document.body.appendChild(ov);
   }
   function recMatch(part, f){
     if(!f || !f.big) return true;
@@ -8520,6 +8708,8 @@
     if(f.big.indexOf("cp:")===0) return sc==="custom" && cat===f.big.slice(3);
     if(f.big==="general") return sc==="general";
     if(f.big==="storage") return sc==="storage";
+    if(f.big==="naiso") return sc==="naiso";
+    if(f.big==="tategu") return sc==="tategu";
     if(f.big==="internal") return sc==="internal" && (!sub || cat===sub);
     return false;
   }
@@ -8531,6 +8721,8 @@
     if(big.indexOf("cp:")===0) return P("custom", big.slice(3));
     if(big==="general") return P("general", null);
     if(big==="storage") return P("storage", null);
+    if(big==="naiso") return P("naiso", null);
+    if(big==="tategu") return P("tategu", null);
     if(!sub) return null;
     if(big==="ext") return P("exterior", sub==="_none" ? null : sub);
     if(big==="water") return P("facility", sub);
@@ -8621,7 +8813,7 @@
         {label:"登録済みのファイルから選ぶ（図面・書類・記録の写真）", value:"pick"},
         {label:"✉️ Gmailから取り込む", value:"gmail"}]).concat(files.map(function(f, i){ return {label:"「"+fnm(f)+"」をこの行から外す", value:"rm:"+i, danger:true}; }))],
       ["🏠 お客様へ", [{label: l.ask ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!l.ask}]],
-      ["🗂 整理", [{label: hasPart ? "✓部位："+partText(l.p)+"（変える）" : "この行の部位を付ける", value:"part", on: hasPart}].concat(hasPart ? [{label:"部位を外す", value:"partrm"}] : [])],
+
       ["📋 タスク・依頼", [
         {label:"📝 タスクを作る（入力画面で担当・業者・期限など）", value:"taskform"},
         {label:(hasAct("task")?"✓ ":"")+"社内タスクにする（担当を選ぶ）", value:"task", on: hasAct("task")},
@@ -8776,13 +8968,15 @@
     if(!bar) return;
     var proj = projectById(state.currentProjectId);
     var f = state.recFilter || {big:"", sub:""};
-    var bigs = recBigs(proj);
+    var bigs = recBigsPick(proj, f.big, f.sub);
     var cur = bigs.filter(function(b){ return b.key===f.big; })[0];
     var opt = function(v, label, on){ return '<option value="'+escapeHtml(v)+'"'+(on?" selected":"")+'>'+escapeHtml(label)+'</option>'; };
     var html = '<label class="field recsel">部位<select data-recbig>'+opt("", "すべて", !f.big)+
       bigs.map(function(b){ return opt(b.key, b.label, b.key===f.big); }).join("")+
       opt("none", "部位なしの記録", f.big==="none")+
-      opt("__addpart", "＋ 部位を追加…", false)+'</select></label>';
+      opt("__addpart", "＋ 部位を追加…", false)+'</select></label>'+
+      '<button type="button" class="btn ghost small" data-recaddpart title="この案件だけの部位を作る">＋ 部位を追加</button>'+
+      '<button type="button" class="btn ghost small" data-recparts title="使わない部位を一覧から外す">⚙ 部位を整理</button>';
     if(cur && (cur.subs.length || cur.key==="int")){
       html += '<label class="field recsel">'+(cur.key==="int"?"部屋":"項目")+'<select data-recsub>'+opt("", cur.label.replace(/^\S+\s/, "")+"すべて", !f.sub)+
         cur.subs.map(function(x){ return opt(x.key, x.label, x.key===f.sub); }).join("")+
@@ -8859,7 +9053,8 @@
   function recPartOptionsHtml(proj, val){
     var opt = function(v, label){ return '<option value="'+escapeHtml(v)+'"'+(v===val?" selected":"")+'>'+escapeHtml(label)+'</option>'; };
     var html = opt("", "部位なし（総合）");
-    recBigs(proj).forEach(function(b){
+    var vk = String(val||"").split("||");
+    recBigsPick(proj, vk[0], vk[1]).forEach(function(b){
       if(b.key==="general") return;
       if(!b.subs.length){ html += opt(b.key+"||", b.label); return; }
       html += '<optgroup label="'+escapeHtml(b.label)+'">'+b.subs.map(function(x){ return opt(b.key+"||"+x.key, b.label.replace(/^\S+\s/, "")+"・"+x.label); }).join("")+'</optgroup>';
@@ -9270,6 +9465,64 @@
     toast(d.ordered ? "🟢 発注済みのはんこを押しました（社内だけ・お客様には出ません）" : "発注済みのはんこを外しました");
   }
   // カード（記録・写真PDF・見積の書類・タスクの写し）に対応する「発注済み」の決定
+  // 記録タブの「部位ごと」の横並びに出す小さなカード（日付・種類・図面の絵・題名・数行・印・記入者）
+  function recPrevFiles(k, doc){
+    if(!doc) return [];
+    if(k==="n") return noteAllFiles(doc);
+    if(doc.url) return [{ url:doc.url, name:doc.name||doc.fileName||doc.title||"", contentType:doc.contentType||"" }];
+    return [];
+  }
+  function recPrevHtml(k, doc, day, big){
+    var files = recPrevFiles(k, doc), d = String(day||doc.date||doc.receivedAt||doc.createdAt||"").slice(0,10);
+    var kind = k==="n" ? "📝 打合せ記録" : k==="plan" ? "📐 図面" : k==="sp" ? (doc.kind==="planboard" ? "📐 プランボード" : "📷 写真・PDF") : "📄 "+qtLabel(quoteTypeNorm(doc.quoteType));
+    var title = k==="n" ? (doc.title||"") : (doc.title||doc.name||doc.fileName||"");
+    var text = "";
+    if(k==="n"){
+      var parts = [];
+      var dec = doc.decided || doc.content || "";
+      if(dec) parts.push("✅ "+String(dec).trim());
+      if(doc.open) parts.push("💭 "+String(doc.open).trim());
+      if(doc.talk) parts.push(String(doc.talk).trim());
+      if(doc.message) parts.push("💬 "+String(doc.message).trim());
+      text = parts.join("\n");
+    } else {
+      text = String(doc.customerNote||doc.memo||doc.staffMemo||"").trim();
+    }
+    // 印は文字の札にせず、小さな絵だけ（🏠＝おうちノートに出ている／🔘＝お客様に決定の確認中）
+    var icons = (doc.reflected ? '<span class="rp-ic" title="おうちノートに出ています">🏠</span>' : '')+
+      (doc.askDecision ? '<span class="rp-ic" title="お客様に決定の確認中">🔘</span>' : '');
+    var ck = k==="n" ? "n:"+doc.id : k==="sp" ? ((doc.source && doc.source.taskId) ? "t:"+doc.source.taskId : "s:"+doc.id) : "a:"+doc.id;
+    var dc = (state.noteDecisions||[]).find(function(x){ return x && !x.deletedAt && x.projectId===doc.projectId && x.cardKey===ck && x.status==="決定"; });
+    var od = orderedOf(doc);
+    var md = function(iso){ var t = iso ? new Date(iso) : null; return (t && !isNaN(t)) ? '<small>'+(t.getMonth()+1)+'/'+t.getDate()+'</small>' : ''; };
+    // 決定・発注済みは、はんこにして絵（無ければカード）の上に重ねる
+    // 見積仕様（青）・見積依頼中（オレンジ）・変更依頼中（紫）も、大きなカード（stampsHtml）と同じ判定で重ねる
+    var stamps = (dc ? '<span class="rp-st">決定'+md(dc.decidedAt||dc.updatedAt)+'</span>' : '')+
+      (od ? '<span class="rp-st ord">発注済'+md(od.ordered && od.ordered.at)+'</span>' : '')+
+      (k!=="plan" && hasEstReqStamp(doc) ? '<span class="rp-st r">見積<br>依頼中</span>' : '')+
+      (k!=="plan" && hasChangeStamp(doc) ? '<span class="rp-st c">変更<br>依頼中</span>' : '')+
+      (k!=="plan" && doc.badges && doc.badges.quote ? '<span class="rp-st q">見積<br>仕様</span>' : '');
+    var stN = (stamps.match(/class="rp-st/g)||[]).length;
+    var part = k==="n" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : k==="sp" ? {scope:doc.scope, category:doc.category, roomId:doc.roomId, side:doc.side} : (doc.specPart||null);
+    var pt = (part && part.scope) ? partText(part, doc.projectId) : "";
+    var vis = "";
+    if(files.length){
+      var f = files[0];
+      var isPdfVis = fileKindOf(f.url, f.contentType, f.name)==="pdf";
+      vis = '<div class="rp-vis'+(big?'':' small')+(isPdfVis?' pdf':'')+'">'+fileThumbInner(f.url, f.contentType, f.name)+(files.length>1?'<span class="rp-more">ほか'+(files.length-1)+'</span>':'')+
+        (stamps ? '<span class="rp-stamps'+(stN>2?' many':'')+'">'+stamps+'</span>' : '')+'</div>';
+    }
+    var who = doc.author || doc.createdBy || doc.by || doc.receivedBy || "";
+    return '<div class="recprev'+((doc.reflected && (k!=="att" || quoteSharable(doc)))?' on':'')+(stamps && !vis ? ' hasst' : '')+'">'+
+      (stamps && !vis ? '<span class="rp-stamps'+(stN>2?' many':'')+'">'+stamps+'</span>' : '')+
+      '<div class="rp-top"><span class="rp-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</span><span class="rp-kind">'+escapeHtml(kind)+'</span>'+icons+
+        (k!=="plan" ? '<button type="button" class="rp-ops" data-rpops="1" title="操作">⋮</button>' : '')+'</div>'+
+      vis+
+      (title ? '<div class="rp-title">'+escapeHtml(title)+'</div>' : '')+
+      (text ? '<div class="rp-text">'+escapeHtml(text)+'</div>' : '')+
+      ((pt || who) ? '<div class="rp-foot">'+escapeHtml([pt, who ? "記入："+who : ""].filter(Boolean).join("　"))+'</div>' : '')+
+      '</div>';
+  }
   function orderedOf(x){
     if(!x || !x.id) return null;
     var keys = ["n:"+x.id, "s:"+String(x.id).slice(0,78), "a:"+String(x.id).slice(0,78)];
@@ -9416,7 +9669,19 @@
       items.sort(function(x, y){ return (y.key||"").localeCompare(x.key||""); });
       return items;
     };
-    var itemHtml = function(it){
+    var itemHtml = function(it){ return '<div class="recfsw" data-fsk="'+(it.t==="n"?"n":it.t==="s"?"sp":"att")+'" data-fsid="'+escapeHtml(it.t==="n"?it.n.id:it.t==="s"?it.p.id:it.a.id)+'">'+itemHtml0(it)+'</div>'; };
+    // 部位ごとの横並びでは、見出しだけの小さなカード（押すと全画面で中身・図面・操作）。元のカードは隠して持っておく（操作に使う）
+    var prevHtml = function(it){
+      var fsk = it.t==="n"?"n":it.t==="s"?"sp":"att", doc = it.t==="n"?it.n:it.t==="s"?it.p:it.a;
+      return '<div class="recfsw recprevw" data-fsk="'+fsk+'" data-fsid="'+escapeHtml(doc.id)+'">'+recPrevHtml(fsk, doc, (it.key||"").slice(0,10), isBigItem(it))+
+        '<div class="recfull" hidden>'+itemHtml0(it)+'</div></div>';
+    };
+    var isBigItem = function(it){
+      if(it.t==="a") return quoteTypeNorm(it.a.quoteType)==="プランボード";
+      if(it.t==="s") return it.p.kind==="planboard";
+      return false;
+    };
+    var itemHtml0 = function(it){
       if(it.t==="n") return cardOf(it.n);
       if(it.t==="s"){ var p = it.p; return '<div class="spectl rectl">'+specTimelineCardHtml(p, p.scope, p.category||null, p.roomId||null, p.side||null, {scope:p.scope, category:p.category||null, roomId:p.roomId||null, side:p.side||null}, true)+'</div>'; }
       var a = it.a, sp = a.specPart; return '<div class="spectl rectl">'+quoteTimelineCardHtml(a, "att:"+a.id, {scope:sp.scope, category:sp.category||null, roomId:sp.roomId||null, side:sp.side||null, showPart:true})+'</div>';
@@ -9427,17 +9692,44 @@
       var proj = projectById(pid);
       var bigs = recBigs(proj).concat([{key:"none", label:"❔ 部位なし"}]);
       var total = 0, rowsHtml = [];
+      // いちばん上に「図面」の段（見積タブの図面＝attachments の kind:"plan"）。押すと全画面で開いて書き込める
+      var plans = liveAttachments().filter(function(a){ return a.projectId===pid && a.kind==="plan"; })
+        .sort(function(x, y){ return String(y.createdAt||y.uploadedAt||"").localeCompare(String(x.createdAt||x.uploadedAt||"")); });
+      if(plans.length){
+        total += plans.length;
+        rowsHtml.push('<div class="recrow"><div class="recrow-head"><span class="recrow-name">📐 図面</span><span class="muted">'+plans.length+'件</span>'+
+          (plans.length>1 ? '<span class="muted recrow-hint">← 横にスクロール</span>' : '')+'</div>'+
+          '<div class="recstrip" data-rowkey="__plans">'+plans.map(function(a){
+            var d = String(a.createdAt||a.uploadedAt||"").slice(0,10);
+            return '<div class="recslot big"><div class="recplan recfsw recprevw" data-fsk="plan" data-fsid="'+escapeHtml(a.id)+'">'+recPrevHtml("plan", a, d, true)+'</div></div>';
+          }).join("")+'</div></div>');
+      }
+      // 水まわりは「キッチン・浴室・洗面・トイレ」をそれぞれ1段に（ともこさんの希望）。どの項目にも入らないものは「水まわり（その他）」
+      var rowDefs = [];
       bigs.forEach(function(b){
-        filter = {big:b.key, sub:""};
-        var its = itemsFor(filter);
+        if(b.key==="water" && b.subs && b.subs.length){
+          var seen = {}, idOf = function(it){ return it.t+":"+(it.t==="n"?it.n.id:it.t==="s"?it.p.id:it.a.id); };
+          b.subs.forEach(function(sb){
+            var its0 = itemsFor({big:"water", sub:sb.key});
+            its0.forEach(function(it){ seen[idOf(it)] = 1; });
+            rowDefs.push({ key:"water/"+sb.key, label:"🚿 "+sb.label, open:"water|"+sb.key, its:its0 });
+          });
+          var rest = itemsFor({big:"water", sub:""}).filter(function(it){ return !seen[idOf(it)]; });
+          rowDefs.push({ key:"water", label:"🚿 水まわり（その他）", open:"water", its:rest });
+          return;
+        }
+        rowDefs.push({ key:b.key, label:b.label, open:b.key, its:null });
+      });
+      rowDefs.forEach(function(b){
+        var its = b.its || itemsFor({big:b.key, sub:""});
         if(!its.length) return;
         total += its.length;
         rowsHtml.push('<div class="recrow"><div class="recrow-head"><span class="recrow-name">'+escapeHtml(b.label)+'</span><span class="muted">'+its.length+'件</span>'+
           (its.length>1 ? '<span class="muted recrow-hint">← 横にスクロール</span>' : '')+
-          '<button type="button" class="btn ghost small" data-recrowopen="'+escapeHtml(b.key)+'">この部位だけ見る ›</button></div>'+
+          '<button type="button" class="btn ghost small" data-recrowopen="'+escapeHtml(b.open)+'">この部位だけ見る ›</button></div>'+
           '<div class="recstrip" data-rowkey="'+escapeHtml(b.key)+'">'+its.map(function(it){
             var d = (it.key||"").slice(0,10);
-            return '<div class="recslot"><div class="recslot-date">'+escapeHtml(d ? d.replace(/-/g,".") : "日付不明")+'</div>'+itemHtml(it)+'</div>';
+            return '<div class="recslot'+(isBigItem(it)?' big':'')+'">'+prevHtml(it)+'</div>';
           }).join("")+'</div></div>');
       });
       filter = {big:"", sub:""};
@@ -9467,11 +9759,13 @@
   var noteGroupOpen = {};
   // 記録の行に付けた部位（noteLines の p）のうち、絞り込みに合う行
   function noteLinePartsMatch(n, f){
+    return []; // 行ごとの部位は使わない（2026年11月16日〜）
     if(!f || !f.big || f.big==="none") return [];
     return (n.noteLines||[]).filter(function(l){ return l && l.p && l.p.scope && recMatch(l.p, f); });
   }
   // 行に付けた部位の一覧（記録全体のカードに小さく出す）
   function noteLinePartsChipsHtml(n){
+    return ""; // 行ごとの部位は使わない（記録は記録でいい。2026年11月16日〜）
     var seen = {}, list = [];
     (n.noteLines||[]).forEach(function(l){
       if(!l || !l.p || !l.p.scope) return;
@@ -9569,7 +9863,7 @@
   function upsertNoteSpecEntry(note){
     var existing = state.specPhotos.find(function(p){ return !p.deletedAt && p.kind==="note" && p.source && p.source.noteId===note.id; });
     var part = note.specPart;
-    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || part.scope==="storage" || part.scope==="room");
+    var usable = part && (part.category || part.scope==="exterior" || part.scope==="general" || part.scope==="storage" || part.scope==="naiso" || part.scope==="tategu" || part.scope==="room");
     if(!usable){
       if(existing) softDelete("specPhotos","specPhotos", existing.id, "打合せ記録の仕様タイムライン項目");
       return;
@@ -9677,7 +9971,7 @@
     var rows = liveMessages().filter(function(m){ return m.projectId===state.currentProjectId; }).slice().sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||""); });
     // 表示は新しいものを上に（タブの印の数え方は古い順の rows のまま）
     var html = rows.slice().reverse().map(function(m){
-      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : (m.lineQueuedAt ? ' ・ 📱LINEは'+escapeHtml(fmtTs(m.lineQueuedAt))+'ごろ送ります' : ''))+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+'</div>';
+      return '<div class="noteitem"'+(m.fromCustomer?' style="border-inline-start:4px solid #e8b04a;"':'')+'><div class="ndate">'+fmtTs(m.createdAt)+' ・ '+escapeHtml(m.sender||"")+(m.fromCustomer?' ・ お客様から':'')+(m.lineNotifiedAt ? ' ・ 📱LINEでお知らせ済み' : (m.lineQueuedAt ? ' ・ 📱LINEは'+escapeHtml(fmtTs(m.lineQueuedAt))+'ごろ送ります' : ''))+'</div><div class="ntext">'+msgTagged(m)+'</div>'+((m.files&&m.files.length) ? fileThumbRowHtml(m.files) : '')+msgTaskHtml(m)+'</div>';
     }).join("");
     // 案件の「メッセージ」タブと「ヒアリング」タブの両方に同じやりとりを出す
     [["messageList","messageEmpty"],["hearMsgList","hearMsgEmpty"]].forEach(function(ids){
@@ -9700,6 +9994,82 @@
     }
     refreshMessageLine();
   }
+  // お客様からのメッセージとタスクのつながり：タスクがあれば「📋 タスク：進捗 ›」、無ければ（消えた・作られなかった）「📋 タスクにする」
+  function msgSkipTask(m){
+    var c = String(m.content||"");
+    return !m.fromCustomer || m.chgReply || c.indexOf("【決定】")===0 || c.indexOf("【お返事】")===0;
+  }
+  function msgLinkedTask(m){
+    return state.tasks.find(function(t){
+      if(!t || t.deletedAt || t.mergedInto) return false;
+      if(m.taskId && t.id===m.taskId) return true;
+      var mid = (t.fromCustomerMessage && t.fromCustomerMessage.messageId) || (t.fromCustomerChange && t.fromCustomerChange.messageId) || "";
+      return mid===m.id;
+    }) || null;
+  }
+  function msgTaskHtml(m){
+    if(msgSkipTask(m)) return "";
+    var t = msgLinkedTask(m);
+    if(t) return '<div style="margin-block-start:6px;"><button type="button" class="linkbtn" data-msgtaskopen="'+escapeHtml(t.id)+'">📋 タスク：'+escapeHtml(t.status||"未着手")+(t.assignee?'（'+escapeHtml(t.assignee)+'）':'（担当未定）')+' ›</button></div>';
+    return '<div style="margin-block-start:6px;"><button type="button" class="btn small" data-msgtaskmake="'+escapeHtml(m.id)+'">📋 タスクにする</button> <span class="muted" style="font-size:.85rem;">このメッセージのタスクがありません</span></div>';
+  }
+  function openTaskInProject(taskId){
+    state.taskExpanded = state.taskExpanded || {}; state.taskExpanded[taskId] = true;
+    var b = document.querySelector('.sub-btn[data-sub="tasks"]');
+    if(b) b.click();
+    setTimeout(function(){
+      var card = document.querySelector('#projTaskList .kancard[data-taskid="'+taskId+'"]');
+      if(!card){ goToTaskBoard(taskId); return; }
+      card.scrollIntoView({behavior:"smooth", block:"center"});
+      card.style.transition = "box-shadow .3s"; card.style.boxShadow = "0 0 0 3px var(--orange)";
+      setTimeout(function(){ card.style.boxShadow = ""; }, 2500);
+    }, 150);
+  }
+  async function makeTaskFromMessage(mid){
+    var m = state.messages.find(function(x){ return x.id===mid; });
+    if(!m || msgSkipTask(m)) return;
+    var ex = msgLinkedTask(m);
+    if(ex){ openTaskInProject(ex.id); return; }
+    var c = String(m.content||"");
+    var isChg = c.indexOf("【変更のご依頼】")===0;
+    var body = isChg ? c.replace(/^【変更のご依頼】/, "") : c;
+    var proj = projectById(m.projectId);
+    var part = null;
+    if(isChg){
+      var head = body.split("\n")[0].split("・")[0].replace(/[\s\u{1F300}-\u{1FAFF}]/gu, "");
+      var cp = proj && (proj.customParts||[]).find(function(x){ return x && !x.deletedAt && String(x.name||"").replace(/[\s\u{1F300}-\u{1FAFF}]/gu, "")===head; });
+      if(cp) part = {scope:"custom", category:cp.id};
+      else if(FACILITY_CATS.indexOf(head)>=0) part = {scope:"facility", category:head};
+      else if(head==="お風呂") part = {scope:"facility", category:"お風呂"};
+    }
+    var now = nowIso();
+    var tid = "task_cm_" + m.id + "_" + Date.now().toString(36);
+    var t = {
+      id: tid, projectId: m.projectId,
+      content: (isChg ? "【お客様から変更のご依頼】" : "【お客様からのメッセージ】") + body,
+      assignee: "", instructor: "お客様", creator: "おうちノート",
+      hasDeadline: false, deadline: "", requestTo: "", requestMethod: "",
+      attachmentAssetIds: [], attachments: (m.files||[]).slice(), vendorSpec: part, private: false,
+      reflected: false, reflectedAt: null, status: "未着手",
+      createdAt: m.createdAt || now, updatedAt: now
+    };
+    if(isChg) t.fromCustomerChange = { messageId: m.id, cardKey: m.chgKey||"", manual: true };
+    else t.fromCustomerMessage = { messageId: m.id };
+    state.tasks.push(t);
+    var ok = await saveDoc("tasks", tid, t);
+    if(ok===false){ state.tasks = state.tasks.filter(function(x){ return x.id!==tid; }); toast("タスクを保存できませんでした"); return; }
+    m.taskId = tid; saveDoc("messages", m.id, m);
+    logActivity("お客様のメッセージからタスクを作りました");
+    toast("タスクにしました（担当未定）");
+    render();
+    openTaskInProject(tid);
+  }
+  document.addEventListener("click", function(e){
+    var o = e.target.closest("[data-msgtaskopen]");
+    if(o){ e.preventDefault(); openTaskInProject(o.dataset.msgtaskopen); return; }
+    var mk = e.target.closest("[data-msgtaskmake]");
+    if(mk){ e.preventDefault(); mk.disabled = true; makeTaskFromMessage(mk.dataset.msgtaskmake); }
+  });
   // お客様がおうちノートで登録した「お知らせメール」の宛先を確かめ、あれば送信時に知らせるチェックを出す
   // メッセージ送信時に、お客様のLINE（プロライン）へ自動で知らせるかのチェック
   // お客様がおうちノートのボタンから送ったメッセージ（【変更のご依頼】【決めました】【ご相談】）は、先頭を色付きの印にして目立たせる
@@ -10316,17 +10686,41 @@
     if(logMsg) logActivity(logMsg);
     return ok;
   }
-  function addCustomPart(){
-    var proj = projectById(state.currentProjectId);
-    if(!proj){ toast("案件を選択してください"); return; }
-    var name = (prompt("追加する部位の名前を入れてください（例：玄関ホール、物置、駐車場）")||"").trim();
-    if(!name) return;
-    if(name.length>30){ toast("名前は30文字までです"); return; }
-    if(customPartsOf(proj).some(function(c){ return c.name===name; })){ toast("同じ名前の部位がすでにあります"); return; }
+  // 1行の名前を入れる小さな画面（window.prompt はホーム画面のアプリ・LINEの中などで出ないことがあるため）
+  function askLine(title, hint, placeholder){
+    return new Promise(function(resolve){
+      var ov = document.createElement("div");
+      ov.className = "taskform-modal"; ov.style.zIndex = "260"; ov.style.alignItems = "center";
+      ov.innerHTML = '<div class="taskform-card" style="max-width:460px; width:100%;"><h3 style="margin:0 0 6px;">'+escapeHtml(title)+'</h3>'+
+        (hint ? '<div class="muted" style="font-size:.85rem; margin-block-end:6px;">'+escapeHtml(hint)+'</div>' : '')+
+        '<input type="text" maxlength="30" style="width:100%; box-sizing:border-box;" placeholder="'+escapeHtml(placeholder||"")+'">'+
+        '<div class="row" style="gap:8px; margin-block-start:10px;"><button type="button" class="btn" data-ok>追加する</button><button type="button" class="btn secondary" data-cancel>やめる</button></div></div>';
+      document.body.appendChild(ov);
+      var inp = ov.querySelector("input"); setTimeout(function(){ inp.focus(); }, 50);
+      var done = function(v){ ov.remove(); resolve(v); };
+      inp.addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); done(inp.value.trim()); } });
+      ov.addEventListener("click", function(e){
+        if(e.target.closest("[data-cancel]") || e.target===ov){ done(null); return; }
+        if(e.target.closest("[data-ok]")) done(inp.value.trim());
+      });
+    });
+  }
+  function createCustomPart(proj, name){
     var c = { id: uid("cp"), name: name, createdAt: nowIso() };
     proj.customParts = (proj.customParts||[]).concat([c]);
     saveCustomParts(proj, "部位「"+name+"」を追加しました");
+    return c;
+  }
+  async function addCustomPart(){
+    var proj = projectById(state.currentProjectId);
+    if(!proj){ toast("案件を選択してください"); return; }
+    var name = (await askLine("＋ 部位を追加", "この案件だけの部位を作ります。", "例：玄関ホール、物置、駐車場")) || "";
+    if(!name) return;
+    if(name.length>30){ toast("名前は30文字までです"); return; }
+    if(customPartsOf(proj).some(function(c){ return c.name===name; })){ toast("同じ名前の部位がすでにあります"); return; }
+    var c = createCustomPart(proj, name);
     state.meetingSubTab = "custom_"+c.id;
+    state.recFilter = { big: "cp:"+c.id, sub: "" }; // 追加した部位を絞り込みで選んだ状態に（記録がまだ無いと部位ごとの段に出ないため）
     render();
     toast("部位「"+name+"」を追加しました");
   }
@@ -10938,39 +11332,59 @@
     if(ok===false){ u.doc.badges.quote = !u.doc.badges.quote; render(); toast("保存できませんでした"); return; }
     toast(u.doc.badges.quote ? "🔵 見積仕様のはんこを付けました" : "見積仕様のはんこを外しました");
   }
-  // まとめて実行できる操作（チェック欄を出す）。いまオンになっていないものだけチェックできる
-  var UNI_BATCH = ["refl","ask","home","stamp","qspec","est","ctask","vgmail","part"];
+  // タップで切り替える操作（スイッチで表示。押してもメニューは開いたまま）
+  var UNI_TOGGLES = ["refl","ask","stamp","ord","qspec","estreqst","chgst"];
+  // 「⋮ 操作」の中身（大きなカード・小さなカードで同じ）。上：よく使う7つ（ともこさんの順）／下：そのほか
   function uniOpsSections(kind, id, drawHtml, f, sent){
     sent = sent || {}; f = f || {};
     var u = uniDocOf(kind, id), sd = staffStampOf(u), stamped = !!(sd && sd.status==="決定");
     var qspec = !!(u && u.doc.badges && u.doc.badges.quote);
+    var ord = !!(u && (orderedOf(u.doc) || (sd && sd.ordered)));
     var b = function(act, label, on, cls){
-      var btn = '<button type="button" class="'+(on?"on ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+label+'</button>';
-      if(UNI_BATCH.indexOf(act)<0) return btn;
-      return '<div class="uoprow">'+(on ? '<span class="uopchk-sp"></span>' : '<input type="checkbox" class="uopchk" data-uopchk="'+act+'" aria-label="まとめて実行に入れる">')+btn+'</div>';
+      var sw = UNI_TOGGLES.indexOf(act)>=0;
+      return '<button type="button" class="'+(on?"on ":"")+(sw?"uopsw ":"")+(cls||"")+'" data-uop="'+act+'" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">'+
+        (sw ? '<span>'+label+'</span><span class="sw" aria-hidden="true"></span>' : label)+'</button>';
     };
+    var noShare = !!f.reflectNote;
     var main =
-      (f.reflectNote ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", f.reflected?"✓反映済み":"反映する", !!f.reflected))+
-      b("ask", f.ask?"✓ お客様の決定ボタンを出しています（押すと出さない）":"🔘 お客様の決定ボタンを出す", !!f.ask)+
-      b("home", f.home?"✓ おうちノートのホームに出す（押すと外す）":"🏠 おうちノートのホームに出す", !!f.home)+
-      b("hide", (u&&u.doc.homeHide)?"✓ 🚫 ホームのどの欄にも出さない（押すと解除）":"🚫 ホームのどの欄にも出さない", !!(u&&u.doc.homeHide))+
-      b("stamp", stamped?"✓ 🔴 決定のはんこ済み（押すと外す）":"🔴 決定のはんこを押す", stamped)+
-      b("qspec", qspec?"✓ 🔵 見積仕様のはんこ（押すと外す）":"🔵 見積仕様のはんこを付ける", qspec)+
-      b("estreqst", hasEstReqStamp(u&&u.doc)?"✓ 🟠 見積依頼中のはんこ（押すと外す）":"🟠 見積依頼中のはんこを付ける", hasEstReqStamp(u&&u.doc))+
-      b("chgst", hasChangeStamp(u&&u.doc)?"✓ 🟣 変更依頼中のはんこ（押すと外す）":"🟣 変更依頼中のはんこを付ける", hasChangeStamp(u&&u.doc))+
-      b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
+      (noShare ? '<div class="muted" style="font-size:.85rem; padding:4px 8px;">反映：'+escapeHtml(f.reflectNote)+'</div>' : b("refl", "🏠 おうちノートに反映", !!f.reflected))+
+      (noShare ? "" : b("ask", "🔘 お客様の決定ボタン", !!f.ask))+
+      b("stamp", "🔴 こちらから決定のはんこ", stamped)+
       b("ctask", (sent.companytask?"✓ ":"")+"📋 社内タスク", !!sent.companytask)+
-      b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へGmail（見積依頼＋下書き）", !!sent.estreq)+
-      b("gmail", "📥 Gmailから取り込み")+
-      b("part", "📍 部位の変更")+
-      '<button type="button" class="uoprun" data-uoprun="1" data-uk="'+kind+'" data-uid="'+escapeHtml(id)+'">☑ チェックしたものをまとめて実行</button>';
-    var tail = b("edit", "✏️ 編集")+(f.delOk===false ? "" : b("del", "削除", false, "danger"));
-    return [["", drawHtml||""], ["", main], ["", tail]];
+      b("vgmail", (sent.estreq?"✓ ":"")+"✉️ 業者へ変更依頼（Gmail下書き・🟠見積依頼中のはんこ）", !!sent.estreq)+
+      b("ord", "🟢 発注済みのはんこ（社内だけ）", ord)+
+      b("part", "📍 部位の変更");
+    var other =
+      b("est", (sent.estimate?"✓ 追加見積り済み（見る ›）":"＋ 追加見積り（おうちノート）"), !!sent.estimate)+
+      (noShare ? "" : b("cmt", "💬 お客様へのひとこと"))+
+      b("qspec", "🔵 見積仕様のはんこ", qspec)+
+      b("estreqst", "🟠 見積依頼中のはんこ（手で）", hasEstReqStamp(u&&u.doc))+
+      b("chgst", "🟣 変更依頼中のはんこ（手で）", hasChangeStamp(u&&u.doc))+
+      b("gmail", "📥 Gmailから取り込む");
+    var tail = b("edit", "✏️ 内容を編集")+(f.delOk===false ? "" : b("del", "🗑 削除", false, "danger"));
+    return [["✏️ 書き込む", drawHtml||""], ["よく使う", main], ["そのほか", other], ["", tail]];
   }
   function uniOpsInnerHtml(sections){
     return sections.filter(function(x){ return x && x[1]; }).map(function(x, i){
-      return (i?'<div class="notemenu-divider"></div>':'')+'<div class="opsgrp">'+x[1]+'</div>';
+      return (i?'<div class="notemenu-divider"></div>':'')+(x[0]?'<div class="notemenu-h">'+escapeHtml(x[0])+'</div>':'')+'<div class="opsgrp">'+x[1]+'</div>';
     }).join("");
+  }
+  // 「🟢 発注済み」のはんこ（社内だけ）。カードの決定（noteDecisions）に付ける。決定がまだ無いカードは、発注済みだけを持つ決定を作る
+  async function toggleCardOrdered(kind, id){
+    var u = uniDocOf(kind, id); if(!u) return;
+    var d = staffStampOf(u) || orderedOf(u.doc);
+    if(d){ return toggleOrdered(d.id); }
+    var did = u.pid+"__card__"+u.key.replace(":","_");
+    var cat = u.part && u.part.scope ? noteCatIdFor(u.part.scope, u.part.category) : null;
+    if(cat==="rooms" && !(u.part && u.part.roomId)) cat = "interior";
+    var doc = { id:did, projectId:u.pid, cardKey:u.key, status:"検討中", label:String(u.doc.title || u.doc.fileName || u.doc.name || "").slice(0,60),
+      by: state.currentUser || "スタッフ", ordered:{ by: state.currentUser || "スタッフ", at: nowIso() }, createdAt: nowIso(), updatedAt: nowIso() };
+    if(cat) doc.category = cat;
+    if(cat==="rooms") doc.roomId = u.part.roomId;
+    state.noteDecisions = (state.noteDecisions||[]).concat([doc]);
+    render();
+    if(await saveDoc("noteDecisions", did, doc)===false){ state.noteDecisions = state.noteDecisions.filter(function(x){ return x.id!==did; }); render(); toast("保存できませんでした"); return; }
+    toast("🟢 発注済みのはんこを押しました（社内だけ・お客様には出ません）");
   }
   // 写真・PDF・見積の書類の「部位・内容・ファイル」（タスク・見積依頼・追加見積りに使う）
   function uniOpsCtx(kind, id){
@@ -11019,7 +11433,6 @@
     };
     return '<div class="qtg">'+
       b("refl", "反映", !!f.reflected, f.reflected ? "おうちノートに出しています（押すと外す）" : "おうちノートの家づくりの項目に出す")+
-      b("home", "🏠ホーム", !!f.home, f.home ? "おうちノートのホームに出しています（押すと外す）" : "おうちノートのホームに出す（反映もします）")+
       b("ask", "🔘決定ボタン", !!f.ask, f.ask ? "お客様の決定ボタンを出しています（押すと出さない）" : "お客様に決定ボタンを出す（反映もします）")+
       b("cmt", "💬お客様へ", !!f.cmt, f.cmt ? "お客様へのひとことを入れています（押すと書き直せます）" : "このカードにお客様へのひとことを書く（おうちノートに「スタッフから：」と出ます）")+
       '</div>';
@@ -11084,10 +11497,12 @@
     return runUniOp0(act, kind, id);
   }
   function runUniOp0(act, kind, id){
+    if(act==="ord") return toggleCardOrdered(kind, id);
+    if(act==="cmt"){ openNoteMenuId = null; return editCardComment(kind, id); }
     // 打合せ記録（記録のカード・変更履歴の記録の写し）は、記録の操作をそのまま使う
     if(kind==="n"){
       var n = state.meetingNotes.find(function(x){ return x.id===id; }); if(!n) return;
-      openNoteMenuId = null;
+      if(UNI_TOGGLES.indexOf(act)<0) openNoteMenuId = null;
       var r0 = null;
       if(act==="stamp") r0 = toggleStaffStamp(kind, id);
       else if(act==="hide") r0 = toggleHomeHide(kind, id);
@@ -11176,7 +11591,7 @@
     var acts = Array.prototype.slice.call(menu.querySelectorAll("input.uopchk:checked")).map(function(c){ return c.dataset.uopchk; });
     if(!acts.length){ toast("まとめて行う操作に、チェックを入れてください"); return; }
     if(uniBatchBusy) return; uniBatchBusy = true;
-    acts.sort(function(a,b){ return UNI_BATCH.indexOf(a)-UNI_BATCH.indexOf(b); });
+    
     openNoteMenuId = null;
     try{
       for(var i=0;i<acts.length;i++){
@@ -11192,6 +11607,294 @@
     if(!u) return;
     e.preventDefault();
     runUniOp(u.dataset.uop, u.dataset.uk, u.dataset.uid);
+  });
+  // ===== 記録タブ：カードを押すと全画面で開く（下に 編集／おうちノート反映／決定の確認／社内タスク／業者依頼） =====
+  var recFs = null; // {k, id, ov}
+  function recFsDoc(k, id){
+    if(k==="n") return state.meetingNotes.find(function(x){ return x.id===id; });
+    if(k==="sp") return (state.specPhotos||[]).find(function(x){ return x.id===id; });
+    return state.attachments.find(function(x){ return x.id===id; });
+  }
+  // 全画面で写す元のカード（横並びでは隠してある .recfull の中身）
+  function recFsOrig(k, id){
+    if(k==="plan") return null;
+    var list = document.querySelectorAll('#meetingNoteList .recfsw[data-fsk="'+k+'"]');
+    for(var i=0;i<list.length;i++){ if(list[i].dataset.fsid===id){ return list[i].querySelector(".recfull") || list[i]; } }
+    return null;
+  }
+  function recFsTitle(k, doc){
+    if(!doc) return "";
+    if(k==="n") return "📝 打合せ記録 "+(doc.date||String(doc.createdAt||"").slice(0,10))+(doc.title?"　"+doc.title:"");
+    if(k==="plan") return "📐 図面　"+(doc.name||"");
+    if(k==="sp") return (doc.kind==="planboard"?"📐 プランボード ":"📷 写真・PDF ")+(doc.title||doc.name||"");
+    return "📄 "+qtLabel(quoteTypeNorm(doc.quoteType))+"　"+(doc.name||"");
+  }
+  // 書き込める資料（図面は図面のプランボード、ほかはカードの「✏️ 書き込む」と同じ）
+  function recFsDraws(){
+    if(!recFs) return [];
+    if(recFs.k==="plan"){ var d = recFsDoc("plan", recFs.id); return d ? [{ key:"plan", url:d.url, name:d.name||"図面" }] : []; }
+    var orig = recFsOrig(recFs.k, recFs.id); if(!orig) return [];
+    return Array.prototype.slice.call(orig.querySelectorAll("[data-spec-draw]")).map(function(el){
+      var r = specDrawReg[el.dataset.specDraw] || {};
+      return { key:el.dataset.specDraw, url:r.url||"", name:r.name||"" };
+    });
+  }
+  function recFsDraw(key){
+    if(!recFs) return;
+    var k = recFs.k, id = recFs.id;
+    recFsClose();
+    if(k==="plan") openPlanBoard(id); else openSpecDraw(key);
+  }
+  // 図面・写真・PDFを、そのままの形で見る（PDFはページを縦に並べる）
+  var fvSeq = 0;
+  function fvFileHtml(f, drawKey){
+    var n = ++fvSeq;
+    return '<div class="fvfile" data-fvn="'+n+'"><div class="fvfile-h"><b>'+escapeHtml(f.name||"資料")+'</b>'+
+      (drawKey ? '<button type="button" class="btn small" data-fvdraw="'+escapeHtml(drawKey)+'">✏️ 書き込む</button>' : '')+
+      '<a class="btn ghost small" href="'+escapeHtml(f.url||"#")+'" target="_blank" rel="noopener">開く</a></div><div class="fvpages"><div class="muted">読み込み中…</div></div></div>';
+  }
+  async function fvRender(box, f){
+    var k = fileKindOf(f.url, f.contentType, f.name);
+    if(k==="image"){ box.innerHTML = '<div class="fvpage"><img src="'+escapeHtml(f.url)+'" alt=""></div>'; return; }
+    if(k==="video"){ box.innerHTML = '<div class="fvpage"><video src="'+escapeHtml(f.url)+'" controls playsinline></video></div>'; return; }
+    if(k!=="pdf"){ box.innerHTML = '<div class="muted">この形式は画面で表示できません。「開く」から見てください。</div>'; return; }
+    try{
+      if(typeof pdfjsLib==="undefined") throw new Error("nopdfjs");
+      var doc = await pdfjsLib.getDocument({url:f.url}).promise;
+      box.innerHTML = "";
+      var max = Math.min(doc.numPages, 30);
+      var w = Math.max(box.clientWidth || 360, 320);
+      var target = Math.min(2200, Math.round(w * Math.min(3, window.devicePixelRatio||1) * 1.6));
+      for(var i=1;i<=max;i++){
+        if(!box.isConnected) return;
+        var page = await doc.getPage(i), v1 = page.getViewport({scale:1});
+        var vp = page.getViewport({scale: target / v1.width});
+        var c = document.createElement("canvas"); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        var wrap = document.createElement("div"); wrap.className = "fvpage";
+        wrap.appendChild(c);
+        if(doc.numPages>1){ var pn = document.createElement("span"); pn.className = "fvpn"; pn.textContent = i+"/"+doc.numPages; wrap.appendChild(pn); }
+        box.appendChild(wrap);
+        await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+      }
+      if(doc.numPages>max){ var more = document.createElement("div"); more.className = "muted"; more.textContent = "ほか "+(doc.numPages-max)+" ページは「開く」から見てください"; box.appendChild(more); }
+    }catch(e){
+      box.innerHTML = '<div class="muted">PDFを表示できませんでした。「開く」から見てください。</div>';
+    }
+  }
+  function recFsRender(){
+    if(!recFs) return;
+    var k = recFs.k, doc = recFsDoc(k, recFs.id);
+    var orig = recFsOrig(k, recFs.id);
+    if(!doc || (k!=="plan" && !orig)){ recFsClose(); return; }
+    var body = recFs.ov.querySelector(".recfs-body");
+    var top = body.scrollTop;
+    var det = recFs.ov.querySelector(".recfs-det");
+    if(orig){
+      var cl = orig.cloneNode(true);
+      cl.removeAttribute("hidden"); cl.removeAttribute("data-fsk"); cl.classList.remove("recfsw");
+      cl.querySelectorAll("[id]").forEach(function(el){ el.removeAttribute("id"); });
+      var holder = det.querySelector(".recfs-detin");
+      holder.innerHTML = ""; holder.appendChild(cl);
+      recFs.clone = cl;
+    }
+    body.scrollTop = top;
+    recFs.ov.querySelector(".recfs-head b").textContent = recFsTitle(k, doc);
+    var share = !!(orig && orig.querySelector(".qtg"));
+    var bar = recFs.ov.querySelector(".recfs-bar");
+    var refl = !!doc.reflected, ask = !!doc.askDecision;
+    if(k==="sp" && doc.source && doc.source.taskId){ var tk = state.tasks.find(function(t){ return t.id===doc.source.taskId; }); if(tk) ask = !!tk.askDecision; }
+    var draws = recFsDraws();
+    var btn = function(act, ic, label, on, dis){ return '<button type="button" data-recfsact="'+act+'"'+(on?' class="on"':'')+(dis?' disabled':'')+'><span class="ic">'+ic+'</span><span>'+label+'</span></button>'; };
+    if(k==="plan"){ bar.innerHTML = btn("edit", "✏️", "書き込む", false, !draws.length); return; }
+    bar.innerHTML =
+      btn("edit", "✏️", draws.length ? "書き込む" : "編集") +
+      btn("refl", "🏠", refl?"✓反映中":"反映", refl, !share) +
+      btn("ask", "🔘", ask?"✓確認中":"決定確認", ask, !share) +
+      btn("ctask", "📋", "タスク") +
+      btn("vgmail", "✉️", "業者依頼");
+  }
+  function recFsOpen(k, id){
+    recFsClose();
+    var doc = recFsDoc(k, id); if(!doc) return;
+    var ov = document.createElement("div");
+    ov.className = "recfs-ov";
+    var files = recPrevFiles(k, doc);
+    ov.innerHTML = '<div class="recfs-head"><b></b>'+
+      (files.length ? '<span class="fvzoom"><button type="button" class="btn ghost small" data-fvz="-1" title="小さく">－</button><button type="button" class="btn ghost small" data-fvz="1" title="大きく">＋</button></span>' : '')+
+      '<button type="button" class="btn ghost small" data-recfsclose>✕ 閉じる</button></div>'+
+      '<div class="recfs-body">'+(k==="n" ? '' : '<div class="fvwrap"><div class="fvin"></div></div>')+
+      (k==="plan" ? '<div class="recfs-det"></div>' : '<details class="recfs-det"'+(k==="n"||!files.length?' open':'')+'><summary>'+(k==="n"?'📝 記録の内容・印・操作':'📝 カードの内容・印・操作')+'</summary><div class="recfs-detin"></div></details>')+
+      (k==="n" && files.length ? '<div class="fvsec">📎 添付をそのまま見る</div><div class="fvwrap"><div class="fvin"></div></div>' : '')+
+      '</div><div class="recfs-bar"></div>';
+    document.body.appendChild(ov);
+    recFs = { k:k, id:id, ov:ov, z:1 };
+    recFsRender();
+    // 資料はそのまま（書き込む前に見る）。書き込めるものには「✏️ 書き込む」
+    var draws = recFsDraws(), fin = ov.querySelector(".fvin");
+    if(fin) fin.innerHTML = files.map(function(f){
+      var dk = (draws.find(function(d){ return d.url && d.url===f.url; })||{}).key || "";
+      return fvFileHtml(f, dk);
+    }).join("");
+    if(fin) fin.querySelectorAll(".fvfile").forEach(function(el, i){ fvRender(el.querySelector(".fvpages"), files[i]); });
+    // 決定・発注済みのはんこを、いちばん上の資料に重ねる
+    var pv = document.createElement("div"); pv.innerHTML = recPrevHtml(k, doc, "", true);
+    var st = pv.querySelector(".rp-stamps");
+    var first = fin && fin.querySelector(".fvfile");
+    var host = first || ov.querySelector(".recfs-det");
+    if(st && host){ st.className = "fv-stamps"; host.style.position = "relative"; host.appendChild(st); }
+    ov.addEventListener("click", recFsClick);
+  }
+  // 横並びの小さなカードの「⋮ 操作」：全画面の下のボタンと同じ操作＋そのほか（記録・写真PDF・見積の書類）
+  // 「⋮ 操作」のメニュー（z-index 120〜200）を開いたまま、反映のひとこと・部位の選択などの確認画面（z-index 95）を出すと、
+  // 確認画面がメニューの裏に隠れて押せず、「反映」などが効かないように見えていた。メニューが開いている間に出た画面は前に出す。
+  (function(){
+    function menuOpen(){ return !!document.querySelector(".opspop-ov, .noteitem.notemenu-open, .spectl-ops[open]"); }
+    var raised = [];
+    var mo = new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        Array.prototype.forEach.call(m.addedNodes, function(n){
+          if(n.nodeType!==1 || n.classList.contains("opspop-ov") || !menuOpen()) return;
+          var cs = getComputedStyle(n);
+          if(cs.position!=="fixed") return;
+          var z = parseInt(cs.zIndex, 10);
+          if(isNaN(z) || z<260){ n.style.zIndex = "260"; raised.push(n); }
+        });
+        Array.prototype.forEach.call(m.removedNodes, function(n){
+          var i = raised.indexOf(n); if(i<0) return;
+          raised.splice(i, 1);
+          document.dispatchEvent(new CustomEvent("opsdialogclosed"));
+        });
+      });
+    });
+    var start = function(){ mo.observe(document.body, { childList:true }); };
+    if(document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+  })();
+  function rpOpsOpen(k, id){
+    if(k==="plan") return;
+    if(!recFsDoc(k, id)) return;
+    var orig = recFsOrig(k, id);
+    var drawHtml = orig ? Array.prototype.slice.call(orig.querySelectorAll("[data-spec-draw]")).map(function(el){
+      var r = specDrawReg[el.dataset.specDraw] || {};
+      return '<button type="button" data-rpdraw="'+escapeHtml(el.dataset.specDraw)+'">✍️ '+escapeHtml(r.name||"資料")+' に書き込む</button>';
+    }).join("") : "";
+    var ov = document.createElement("div");
+    ov.className = "opspop-ov";
+    document.body.appendChild(ov);
+    // 大きなカードの「⋮ 操作」と同じ中身（uniOpsSections）を画面の真ん中に。スイッチは押しても開いたまま描き直す
+    var paint = function(){
+      var doc = recFsDoc(k, id); if(!doc){ ov.remove(); return; }
+      var f, sent;
+      if(k==="n"){ var ns = noteSentInfo(doc); f = { reflected:doc.reflected, ask:doc.askDecision }; sent = { estimate:ns.estimate, companytask:ns.companytask, estreq:ns.estreq }; }
+      else if(k==="sp"){
+        var tk = doc.source && doc.source.taskId ? state.tasks.find(function(t){ return t.id===doc.source.taskId; }) : null;
+        f = { reflected:doc.reflected, ask: tk ? tk.askDecision : doc.askDecision }; sent = specSentInfo(doc);
+      } else {
+        var sh = quoteSharable(doc);
+        f = { reflected:doc.reflected && sh, reflectNote: sh ? "" : "この種類（"+(qtLabel(doc.quoteType)||"")+"）はお客様には出ません", ask:doc.askDecision }; sent = specSentInfo(doc);
+      }
+      var sc = ov.querySelector(".opspop"), top = sc ? sc.scrollTop : 0;
+      ov.innerHTML = '<div class="notemenu opsmenu opspop" role="dialog">'+
+        '<div class="opspop-head"><div><b>'+escapeHtml(recFsTitle(k, doc))+'</b></div>'+
+        '<button type="button" class="notemenu-close" data-opsclose>✕ 閉じる</button></div>'+
+        uniOpsInnerHtml(uniOpsSections(k, id, drawHtml, f, sent))+'</div>';
+      var sc2 = ov.querySelector(".opspop"); if(sc2) sc2.scrollTop = top;
+    };
+    paint();
+    // 確認画面（反映のひとこと・部位の選択など）を閉じたら、スイッチの表示を描き直す（保存を待って少しあとにも）
+    var onDlg = function(){
+      if(!ov.isConnected){ document.removeEventListener("opsdialogclosed", onDlg); return; }
+      paint(); setTimeout(function(){ if(ov.isConnected) paint(); }, 900);
+    };
+    document.addEventListener("opsdialogclosed", onDlg);
+    var busy = false;
+    ov.addEventListener("click", async function(e){
+      if(e.target===ov || e.target.closest("[data-opsclose]")){ ov.remove(); return; }
+      var d = e.target.closest("[data-rpdraw]");
+      if(d){ ov.remove(); openSpecDraw(d.dataset.rpdraw); return; }
+      var u = e.target.closest("[data-uop]"); if(!u) return;
+      e.stopPropagation(); e.preventDefault();
+      var act = u.dataset.uop;
+      if(UNI_TOGGLES.indexOf(act)<0){ ov.remove(); runUniOp(act, k, id); return; }
+      if(busy) return; busy = true;
+      try{ await runUniOp(act, k, id); } catch(er){}
+      busy = false;
+      if(ov.isConnected) paint();
+    });
+  }
+  function recFsClose(){ if(recFs && recFs.ov) recFs.ov.remove(); recFs = null; }
+  function recFsAfter(p){
+    Promise.resolve(p).catch(function(){}).then(function(){ setTimeout(recFsRender, 50); setTimeout(recFsRender, 800); });
+  }
+  function recFsClick(e){
+    if(!recFs) return;
+    if(e.target.closest("[data-recfsclose]")){ recFsClose(); return; }
+    var z = e.target.closest("[data-fvz]");
+    if(z){
+      var steps = [1, 1.5, 2, 3], i = steps.indexOf(recFs.z); if(i<0) i = 0;
+      i = Math.max(0, Math.min(steps.length-1, i + Number(z.dataset.fvz)));
+      recFs.z = steps[i]; var fw = recFs.ov.querySelector(".fvwrap"); if(fw) fw.style.setProperty("--fvz", recFs.z);
+      return;
+    }
+    var fd = e.target.closest("[data-fvdraw]");
+    if(fd){ recFsDraw(fd.dataset.fvdraw); return; }
+    var b = e.target.closest("[data-recfsact]");
+    if(b){
+      if(b.disabled) return;
+      var act = b.dataset.recfsact, k = recFs.k, id = recFs.id;
+      if(act==="edit"){
+        var draws = recFsDraws();
+        var items = draws.map(function(d){ return { value:"d:"+d.key, label:"✍️ "+(d.name||"資料")+" に書き込む" }; });
+        if(k!=="plan") items.push({ value:"e", label:"📝 内容を編集" });
+        var go = function(v){
+          if(!v) return;
+          if(v==="e"){ recFsClose(); runUniOp("edit", k, id); } else recFsDraw(v.slice(2));
+        };
+        if(items.length===1){ go(items[0].value); return; }
+        opsPopup("書き込む・編集", "書き込む資料を選ぶか、内容を直してください", [["", items]], go);
+        return;
+      }
+      if(act==="ctask" || act==="vgmail"){ recFsAfter(runUniOp(act, k, id)); return; }
+      recFsAfter(quickToggle(act, k, id));
+      return;
+    }
+    // カードの中のボタン・写真などを押したら、元のカードの同じものを押したことにする
+    var det = recFs.ov.querySelector(".recfs-detin");
+    if(!det || !det.contains(e.target) || e.target.closest("a[href]")) return;
+    var el = e.target, orig = recFsOrig(recFs.k, recFs.id); if(!orig || !recFs.clone) return;
+    while(el && el!==det){
+      var attrs = el.attributes ? Array.prototype.some.call(el.attributes, function(a){ return /^data-/.test(a.name); }) : false;
+      // 「⋮ 操作」の中の操作（data-uop）は、ページ全体の処理がこの写しのボタンのまま動かす。元のカードにも送ると
+      // 同じ操作が2回動き、反映が付いてすぐ外れる・部位の選択が2回出る、などになっていた
+      if(el.hasAttribute && (el.hasAttribute("data-uop") || el.hasAttribute("data-uoprun"))){ recFsAfter(null); return; }
+      if(attrs || /^(BUTTON|IMG|SUMMARY)$/.test(el.tagName)){
+        var all = Array.prototype.slice.call(recFs.clone.querySelectorAll("*")), oall = orig.querySelectorAll("*");
+        var i2 = all.indexOf(el);
+        if(i2>=0 && oall[i2]){ e.preventDefault(); oall[i2].click(); recFsAfter(null); }
+        return;
+      }
+      el = el.parentElement;
+    }
+  }
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape" && recFs) recFsClose(); });
+  document.addEventListener("click", function(e){
+    var list = document.getElementById("meetingNoteList");
+    if(!list || !list.contains(e.target)) return;
+    // 小さなカードの「⋮」は、全画面を開かずに操作のメニュー
+    var rpo = e.target.closest("[data-rpops]");
+    if(rpo){ var pw = rpo.closest(".recprevw"); if(pw){ e.preventDefault(); e.stopPropagation(); rpOpsOpen(pw.dataset.fsk, pw.dataset.fsid); } return; }
+    // 横並びの小さなカード・図面は、どこを押しても全画面で開く
+    var pv = e.target.closest(".recprevw");
+    if(pv && !e.target.closest(".recfull")){ recFsOpen(pv.dataset.fsk, pv.dataset.fsid); return; }
+    var w = e.target.closest(".recfsw"); if(!w) return;
+    // ボタン・リンク・写真など、押すと何か起きる所は従来どおり
+    var el = e.target;
+    while(el && el!==w){
+      if(/^(A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY|LABEL|VIDEO|IMG|DETAILS)$/.test(el.tagName)) return;
+      if(el.attributes && Array.prototype.some.call(el.attributes, function(a){ return /^data-/.test(a.name); })) return;
+      el = el.parentElement;
+    }
+    if(window.getSelection && String(window.getSelection())) return;
+    recFsOpen(w.dataset.fsk, w.dataset.fsid);
   });
   function samePartLoose(sp, scope, category, roomId){
     if(!sp || sp.scope!==scope) return false;
@@ -12591,10 +13294,10 @@
     var doc = null;
     try{
       if(typeof pdfjsLib === "undefined") throw new Error("pdfjsLib not loaded");
-      doc = await pdfjsLib.getDocument(url).promise;
+      doc = await pdfjsLib.getDocument({url:url}).promise;
       var page = await doc.getPage(1);
       var baseViewport = page.getViewport({scale:1});
-      var scale = 200 / Math.max(baseViewport.width, baseViewport.height);
+      var scale = 560 / Math.max(baseViewport.width, baseViewport.height);
       if(!(scale>0)) scale = 1;
       var viewport = page.getViewport({scale:scale});
       var canvas = document.createElement("canvas");
@@ -13851,6 +14554,10 @@
     document.getElementById("spEditInfo").textContent = (isNote?"打ち合わせ記録":(p.fileName||"写真・PDF"))+"（"+(p.category||"")+"）";
     document.getElementById("spEditDate").value = (p.createdAt||"").slice(0,10);
     document.getElementById("spEditDateRow").hidden = isNote;
+    document.getElementById("spEditNameRow").hidden = isNote;
+    document.getElementById("spEditName").value = p.fileName || p.name || "";
+    document.getElementById("spEditCustRow").hidden = isNote;
+    document.getElementById("spEditCust").value = p.customerNote || "";
     document.getElementById("spEditMemo").value = p.memo||"";
     document.getElementById("spEditNote").hidden = !(isNote && p.source && p.source.noteId);
     // 色見本カード（画像の写真・プランボードだけ）
@@ -13938,6 +14645,11 @@
     var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
     if(!p) return;
     var updated = Object.assign({}, p, {memo: document.getElementById("spEditMemo").value.trim()});
+    if(p.kind!=="note"){
+      var nm = document.getElementById("spEditName").value.trim();
+      if(nm){ updated.fileName = nm; if(p.name) updated.name = nm; }
+      updated.customerNote = document.getElementById("spEditCust").value.trim();
+    }
     if(!document.getElementById("spEditSwBox").hidden){
       var swOn = document.getElementById("spEditSwOn").checked;
       updated.swatch = { on: swOn, name: document.getElementById("spEditSwName").value.trim(), color: document.getElementById("spEditSwColor").value };
@@ -15037,7 +15749,7 @@
     [/暖房|ヒーター|床暖/,"equipment","暖房設備"], [/換気|換気扇|ダクト/,"equipment","換気設備"],
     [/照明|あかり|ライティング/,"equipment","あかりプラン"], [/電気|配線|コンセント|スイッチ/,"equipment","電気配線"],
     [/玄関ドア/,"exterior","玄関ドア"], [/外壁|サイディング/,"exterior","外壁"], [/屋根|板金/,"exterior","屋根"],
-    [/クロス|壁紙/,"interiorColor","メインクロス"], [/建具|ドア/,"interiorColor","ドア"], [/フローリング|床材/,"interiorColor","床"],
+    [/内部ドア|室内ドア|建具/,"tategu",""], [/内装/,"naiso",""], [/クロス|壁紙/,"interiorColor","メインクロス"], [/ドア/,"interiorColor","ドア"], [/フローリング|床材/,"interiorColor","床"],
     [/カーテン|ブラインド|窓まわり/,"interiorColor","窓まわり"], [/脱衣|ランドリー/,"room","nr:脱衣室"], [/収納|クローゼット|パントリー/,"storage",""],
     [/基礎/,"internal","基礎"], [/足場/,"internal","足場"]
   ];
@@ -15083,8 +15795,8 @@
   }
   function inboxPartSel(i, key, proj){
     if(key==="facility|脱衣室" || key==="facility|ランドリーバー") key = "room|nr:脱衣室";
-    var opt = function(v, label){ return '<option value="'+escapeHtml(v)+'"'+(v===key?' selected':'')+'>'+escapeHtml(label)+'</option>'; };
-    var grp = function(label, inner){ return '<optgroup label="'+escapeHtml(label)+'">'+inner+'</optgroup>'; };
+    var opt = function(v, label){ return (v!==key && inboxKeyHidden(v)) ? '' : '<option value="'+escapeHtml(v)+'"'+(v===key?' selected':'')+'>'+escapeHtml(label)+'</option>'; };
+    var grp = function(label, inner){ return inner ? '<optgroup label="'+escapeHtml(label)+'">'+inner+'</optgroup>' : ''; };
     var rooms = DEFAULT_ROOMS.slice();
     recRoomsOf(proj).forEach(function(r){ if(r && r.name && rooms.indexOf(r.name)<0) rooms.push(r.name); });
     var html = '<select class="rcvpart" data-inpart="'+i+'" aria-label="部位"><option value="">部位（なし）</option>'+
@@ -15094,6 +15806,7 @@
       grp("🚿 水まわり", FACILITY_CATS.map(function(c){ return opt("facility|"+c, PART_ITEM_ALIAS[c]||c); }).join(""))+
       grp("🎨 各部屋", opt("interiorColor|", "家全体（基本色）")+INTERIOR_COLOR_CATS.map(function(c){ return opt("interiorColor|"+c, "　家全体・"+c); }).join("")+
         rooms.map(function(nm){ return opt("room|nr:"+nm, nm); }).join(""))+
+      opt("naiso|", "🖌 内装")+opt("tategu|", "🚪 建具（内部ドア）")+
       opt("storage|", "🗄 収納")+
       grp("🔧 その他の確認", SITECHECK_CATS.map(function(c){ return opt("siteCheck|"+c, c); }).join(""))+
       (proj && customPartsOf(proj).length ? grp("📌 追加した部位", customPartsOf(proj).map(function(c){ return opt("custom|"+c.id, c.name); }).join("")) : "")+
@@ -16493,7 +17206,6 @@
       var m = mnMarks[t] || "";
       var acts = mnLineActs[t] || [];
       return '<div class="mnlrow"><div class="mnlmain"><button type="button" class="mnline'+(m?" m-"+m:"")+'" data-mnline="'+i+'"><span class="mnmark">'+(m==="d"?"✅":m==="o"?"💭":m==="c"?"🔒":"・")+'</span><span class="mntext">'+escapeHtml(t)+'</span></button>'+
-        '<button type="button" class="mnlpart'+(mnLineParts[t]?" on":"")+'" data-mnlpart="'+i+'" title="この行の部位">'+(mnLineParts[t] ? escapeHtml(partText(mnLineParts[t])) : "📍 部位")+'</button>'+
         '<button type="button" class="mnlact" data-mnlact="'+i+'" title="この行から作る" aria-label="この行から作る">⋯</button></div>'+
         ((mnLineAsk[t] || (mnLineFiles[t]||[]).length) ? '<div class="mnlacts">'+
           (mnLineAsk[t] ? '<span class="mnlchip ask">🔘 お客様に決定してもらう <button type="button" data-mnlaskrm="'+i+'" aria-label="取り消す">×</button></span>' : '')+
@@ -18054,7 +18766,7 @@
     if(!vs || !vs.scope) return false;
     if(vs.scope==="internal") return false; // 社内だけの部位はお客様に出さない
     if(vs.category) return true;
-    if(vs.scope==="general" || vs.scope==="storage" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
+    if(vs.scope==="general" || vs.scope==="storage" || vs.scope==="naiso" || vs.scope==="tategu" || vs.scope==="exterior" || vs.scope==="interiorColor") return true; // interiorColor で category なし＝インテリア全体
     if(vs.scope==="room" && vs.roomId) return true;
     return false;
   }
@@ -18358,7 +19070,7 @@
   // 部位を選ぶ画面：記録の一覧の絞り込みと同じ「プルダウン2段（部位→項目・部屋）」。インテリアのメインは項目（表・裏）まで選べる
   function askSpecPart(callback, projectId){
     var proj = projectById(projectId || state.currentProjectId);
-    var bigs = recBigs(proj).map(function(b){
+    var bigs = recBigsPick(proj).map(function(b){
       if(b.key!=="int") return b;
       var subs = b.subs.filter(function(x){ return x.key!=="r:"; });
       // リビング・玄関・脱衣室は、案件にまだ無くても最初から選べる（選んだときに作る）
@@ -18388,7 +19100,8 @@
       var b = cur();
       var html = '<h3 style="margin:0 0 4px;">部位を選択</h3><p class="muted" style="margin:0 0 12px; font-size:.85rem;">どの部位の記録・依頼ですか？</p>'+
         '<label class="field">部位<select data-spbig>'+opt("", "選んでください", !st.big)+
-        bigs.map(function(x){ return opt(x.key, x.label, x.key===st.big); }).join("")+'</select></label>';
+        bigs.map(function(x){ return opt(x.key, x.label, x.key===st.big); }).join("")+
+        (proj ? opt("__addpart", "＋ 部位を追加…", false) : "")+'</select></label>';
       if(b && (b.subs.length || b.key==="int")){
         html += '<label class="field">'+(b.key==="int"?"メイン・部屋":"項目")+'<select data-spsub>'+opt("", "選んでください", !st.sub)+
           b.subs.map(function(x){ return opt(x.key, x.label, x.key===st.sub); }).join("")+
@@ -18408,7 +19121,27 @@
     function done(v){ overlay.remove(); callback(v); }
     box.addEventListener("change", function(e){
       var t = e.target;
-      if(t.matches("[data-spbig]")){ st.big = t.value; st.sub = ""; st.item = ""; draw(); return; }
+      if(t.matches("[data-spbig]")){
+        if(t.value==="__addpart"){
+          t.value = st.big;
+          askLine("＋ 部位を追加", "この案件だけの部位を作ります。", "例：玄関ホール、物置、駐車場").then(function(nm){
+            nm = (nm||"").trim();
+            if(!nm || !proj){ draw(); return; }
+            if(nm.length>30){ toast("名前は30文字までです"); draw(); return; }
+            var c = customPartsOf(proj).find(function(x){ return x.name===nm; }) || createCustomPart(proj, nm);
+            var key = "cp:"+c.id;
+            if(!bigs.some(function(x){ return x.key===key; })){
+              var at = bigs.findIndex(function(x){ return x.key==="internal"; });
+              var nb = {key:key, label:"📌 "+c.name, subs:[]};
+              if(at<0) bigs.push(nb); else bigs.splice(at, 0, nb);
+            }
+            st.big = key; st.sub = ""; st.item = ""; draw();
+            toast("部位「"+c.name+"」を追加しました");
+          });
+          return;
+        }
+        st.big = t.value; st.sub = ""; st.item = ""; draw(); return;
+      }
       if(t.matches("[data-spsub]")){
         if(t.value.indexOf("nr:")===0 && proj){
           var nr = ensureProjectRoom(proj, t.value.slice(3));
@@ -18417,7 +19150,9 @@
           st.sub = "r:"+nr.id; st.item = ""; draw(); return;
         }
         if(t.value==="__addroom"){
-          var name = (prompt("追加する部屋の名前（例：LDK、寝室、子ども部屋、和室）")||"").trim();
+          t.value = st.sub;
+          askLine("＋ 新しい部屋を追加", "", "例：LDK、寝室、子ども部屋、和室").then(function(name){
+          name = (name||"").trim();
           if(name && proj){
             var rooms = recRoomsOf(proj);
             var hit = rooms.find(function(r){ return r.name===name; });
@@ -18431,7 +19166,9 @@
             if(ib && !ib.subs.some(function(x){ return x.key==="r:"+hit.id; })) ib.subs.push({key:"r:"+hit.id, label:hit.name});
             st.sub = "r:"+hit.id;
           }
-          draw(); return;
+          draw();
+          });
+          return;
         }
         st.sub = t.value; st.item = ""; draw(); return;
       }
@@ -19868,8 +20605,6 @@
             {label:"✍️ 白紙に手書きして付ける", value:"blank"}]],
           ["🏠 お客様へ", [
             {label: mnLineAsk[lt] ? "✓お客様に決定してもらう（押すと取り消す）" : "この行をお客様に決定してもらう", value:"ask", on: !!mnLineAsk[lt]}]],
-          ["🗂 整理", [
-            {label:(mnLineParts[lt] ? "✓部位："+partText(mnLineParts[lt])+"（変える・外す）" : "この行の部位を付ける"), value:"part", on: !!mnLineParts[lt]}]],
           ["📋 タスク・依頼", [
             {label:(hasAct("taskmade")?"✓ ":"")+"📝 タスクを作る（入力画面で担当・業者・期限など）", value:"taskform", on: hasAct("taskmade")},
             {label:(hasAct("task")?"✓ ":"")+"社内タスクにする（担当だけ選ぶ・「記録する」で作る）", value:"task", on: hasAct("task")},
@@ -20928,7 +21663,7 @@
     var recListEl = document.getElementById("meetingNoteList");
     if(recListEl) recListEl.addEventListener("click", function(e){
       var ro = e.target.closest("[data-recrowopen]");
-      if(ro){ setRecFilter(ro.dataset.recrowopen, ""); var bar = document.getElementById("noteSpecFilterBar"); if(bar) bar.scrollIntoView({block:"start", behavior:"smooth"}); }
+      if(ro){ var rop = String(ro.dataset.recrowopen).split("|"); setRecFilter(rop[0], rop[1]||""); var bar = document.getElementById("noteSpecFilterBar"); if(bar) bar.scrollIntoView({block:"start", behavior:"smooth"}); }
     });
     var noteSpecFilterBarEl = document.getElementById("noteSpecFilterBar");
     if(noteSpecFilterBarEl){
@@ -20952,6 +21687,8 @@
         if(e.target.closest("[data-recclear]")){ state.recMark = ""; setRecFilter("", ""); return; }
         var rr = e.target.closest("[data-recroomrename]"); if(rr){ recRenameRoom(rr.dataset.recroomrename); return; }
         var rd = e.target.closest("[data-recroomdel]"); if(rd){ recDeleteRoom(rd.dataset.recroomdel); return; }
+        if(e.target.closest("[data-recaddpart]")){ addCustomPart(); return; }
+        if(e.target.closest("[data-recparts]")){ openPartManager(); return; }
         var cr = e.target.closest("[data-customrename]"); if(cr){ renameCustomPart(cr.dataset.customrename); return; }
         var cd = e.target.closest("[data-customdel]"); if(cd){ deleteCustomPart(cd.dataset.customdel); return; }
       });
@@ -21086,6 +21823,21 @@
       document.querySelector(".pbstage").addEventListener(evt, pbSwallowGesture);
     });
     document.querySelectorAll("#pbModal button[data-pbmode]").forEach(function(b){ b.addEventListener("click", function(){ pbSetMode(b.dataset.pbmode); }); });
+    // プランボードを開いている間は、文字の選択（青い範囲と「コピー・調べる」のメニュー）を起こさない
+    (function(){
+      var pm = document.getElementById("pbModal");
+      var editable = function(t){ return t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]'); };
+      document.addEventListener("selectstart", function(e){
+        if(pm && !pm.hidden && !editable(e.target)) e.preventDefault();
+      }, true);
+      if(pm){
+        pm.addEventListener("contextmenu", function(e){ if(!editable(e.target)) e.preventDefault(); });
+        pm.addEventListener("pointerdown", function(e){
+          if(editable(e.target)) return;
+          try{ var sel = window.getSelection && window.getSelection(); if(sel && sel.rangeCount && !sel.isCollapsed) sel.removeAllRanges(); }catch(_){}
+        }, true);
+      }
+    })();
     document.querySelectorAll("#pbModal button[data-pbtool]").forEach(function(b){ b.addEventListener("click", function(){ pbSetTool(b.dataset.pbtool); }); });
     document.querySelectorAll("#pbModal button[data-pbshape]").forEach(function(b){ b.addEventListener("click", function(){ pbSetShape(b.dataset.pbshape); }); });
     document.getElementById("pbColorGroup").addEventListener("click", function(e){

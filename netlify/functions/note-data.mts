@@ -40,11 +40,13 @@ const NOTE_CATS = [
   { id: "toilet", name: "トイレ", sub: "1階・2階", icon: "toilet" },
   { id: "climate", name: "暖房・換気", sub: "暖房機器・換気方式", icon: "heating" },
   { id: "electric", name: "電気・あかり", sub: "配線・照明計画", icon: "plug" },
-  { id: "interior", name: "インテリア（メイン）", sub: "床・建具・クロス・配色", icon: "sofa" },
+  { id: "interior", name: "インテリア（メイン）", sub: "床・クロス・配色", icon: "sofa" },
   // 部屋別インテリア。部屋ごとに分けて表示し、「仮決定／決定」も部屋単位で受け付ける
   { id: "rooms", name: "インテリア（部屋別）", sub: "天井・壁・アクセント", icon: "room" },
   // 収納（パントリー・クローゼットなど。部位「収納」）
   { id: "storage", name: "収納", sub: "パントリー・クローゼット・棚など", icon: "storage" },
+  { id: "naiso", name: "内装", sub: "内装プラン・仕上げなど", icon: "sofa" },
+  { id: "tategu", name: "建具（内部ドア）", sub: "室内ドア・引き戸など", icon: "room" },
   // 外部散水栓・インターホン親機・給湯リモコン・床下点検口（打合せで確認する項目）
   { id: "other", name: "その他の確認", sub: "散水栓・インターホン・給湯リモコン・床下点検口", icon: "house" },
 ];
@@ -92,6 +94,8 @@ function partLabel(project: any, scope?: string, category?: string | null, roomI
   }
   if (scope === "interiorColor" && !category) return "インテリア全体";
   if (scope === "storage") return "収納";
+  if (scope === "naiso") return "内装";
+  if (scope === "tategu") return "建具（内部ドア）";
   return category || "";
 }
 
@@ -142,11 +146,14 @@ function noteCatFor(scope?: string, category?: string | null): string | null {
   if (scope === "interiorColor") {
     if (category === "浴室枠") return "bath";
     if (category === "玄関枠") return "exterior";
+    if (category === "ドア") return "tategu"; // 内部ドアは「建具（内部ドア）」の項目に出す（住まいるアプリの noteCatIdFor と同じ）
     return "interior";
   }
   if (scope === "room") return "rooms";
   if (scope === "siteCheck") return "other";
   if (scope === "storage") return "storage";
+  if (scope === "naiso") return "naiso";
+  if (scope === "tategu") return "tategu";
   // 案件ごとに追加した部位は、1つずつ別の項目（id は cp_<部位ID>）として出す
   if (scope === "custom") return category ? "cp_" + category : null;
   return null;
@@ -755,7 +762,7 @@ export default async (req: Request, context: Context) => {
     const vs = t.vendorSpec || {};
     // 外部仕様（項目を選ばず「外部仕様」だけ）・インテリア全体（項目を選ばない）・部屋そのもの（項目を限定しない）は category が空でも出す
     if (!vs.scope) continue;
-    if (!vs.category && vs.scope !== "general" && vs.scope !== "storage" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
+    if (!vs.category && vs.scope !== "general" && vs.scope !== "storage" && vs.scope !== "naiso" && vs.scope !== "tategu" && vs.scope !== "exterior" && vs.scope !== "interiorColor" && !(vs.scope === "room" && vs.roomId)) continue;
     for (const att of t.attachments || []) {
       if (!att || !att.url || shownUrls.has(att.url)) continue;
       shownUrls.add(att.url);
@@ -785,7 +792,7 @@ export default async (req: Request, context: Context) => {
     if (a.kind !== "quote" || (qt !== "プランボード" && qt !== "定価") || !a.reflected || !a.url) continue;
     const sp = a.specPart || {};
     if (!sp.scope) continue;
-    if (!sp.category && sp.scope !== "general" && sp.scope !== "storage" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
+    if (!sp.category && sp.scope !== "general" && sp.scope !== "storage" && sp.scope !== "naiso" && sp.scope !== "tategu" && sp.scope !== "exterior" && sp.scope !== "interiorColor" && !(sp.scope === "room" && sp.roomId)) continue;
     push(noteCatFor(sp.scope, sp.category), {
       type: "photo",
       isQuote: true,
@@ -824,7 +831,7 @@ export default async (req: Request, context: Context) => {
       .map((l: any) => ({
         t: String(l.t).trim(),
         m: l.m || "",
-        part: l.p && l.p.scope ? partLabel(project, l.p.scope, l.p.category, l.p.roomId) : "",
+        part: "", // 行ごとの部位は使わない（記録は記録の部位にだけ出す。2026年11月16日〜）
         files: (Array.isArray(l.f) ? l.f : []).map(fileOf).filter(notOnCard),
         estId: lineEstId(n, l.t),
         // 「この行をお客様に決定してもらう」の行：記録の中のその行に決定ボタンを出すためのカードの印（各部位の行のカードと同じ key）
@@ -867,7 +874,7 @@ export default async (req: Request, context: Context) => {
     // 部位があればその項目、無ければ記録と同じ項目に出す。カードの key は "l:<記録ID>_<行の文の短い印>"
     for (const l of n.noteLines || []) {
       if (!l || !l.ask || !String(l.t || "").trim() || (l.m || "") === "c") continue;
-      const lp = (l.p && l.p.scope) ? l.p : sp;
+      const lp = sp; // 行ごとの部位は使わず、記録と同じ項目に出す
       const t = String(l.t).trim();
       const m = l.m || "";
       push(noteCatFor(lp.scope, lp.category), {
@@ -894,7 +901,7 @@ export default async (req: Request, context: Context) => {
         estId: lineEstId(n, l.t),
       });
     }
-    for (const l of n.noteLines || []) {
+    for (const l of ([] as any[])) { // 行ごとの部位は使わない（2026年11月16日〜）。以前の「打合せ記録の一部」は出さない
       const lp = l && l.p;
       if (!lp || !lp.scope || !String(l.t || "").trim() || l.ask) continue;
       const cat = noteCatFor(lp.scope, lp.category);
@@ -934,7 +941,7 @@ export default async (req: Request, context: Context) => {
   const plans = attachments
     .filter((a) => a.kind === "plan")
     .sort((a, b) => String(a.uploadedAt || "").localeCompare(String(b.uploadedAt || "")))
-    .map((a) => ({ ...fileOf(a), date: a.uploadedAt || "", upd: updAt(a.uploadedAt, a.createdAt) }));
+    .map((a) => ({ ...fileOf(a), id: a.id, date: a.uploadedAt || "", upd: updAt(a.uploadedAt, a.createdAt) }));
 
   // カード1枚ごとの仮決定／決定（key が付いた記録・図面）。まだ選んでいないカードは「検討中」。
   const cardDecByKey: Record<string, any> = {};
