@@ -6,7 +6,7 @@
 :root{--bg:#f7f3ee;--card:#fffdfa;--line:#e9e2da;--line2:#ded5cb;--ink:#2f2925;--ink2:#5c534d;--brown:#5d5049;--brown2:#7a6a60;--green:#4f7a5f;--red:#d6403a}
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans JP",sans-serif;color:var(--ink)}
-.fl{width:390px;height:693px;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.fl{width:390px;height:844px;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
 .hero{background:var(--brown);color:#fff;padding:18px 18px 14px}
 .hero .co{font-size:11px;letter-spacing:.12em;opacity:.85}
 .hero h1{margin:4px 0 0;font-size:24px;font-weight:900;line-height:1.3}
@@ -27,6 +27,15 @@ body{margin:0;font-family:"Noto Sans JP",sans-serif;color:var(--ink)}
 .box.warn{border-color:#e8c4c4;background:#fdf3f2}
 .box.warn .n{background:var(--red)}
 .box.warn em{font-style:normal;color:#b3412f;font-weight:700}
+.ntf{margin-top:7px;background:#2b2724;border-radius:14px;padding:8px 9px;color:#fff;display:flex;gap:8px;align-items:flex-start;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.ntf .ap{flex:0 0 26px;height:26px;border-radius:7px;background:var(--brown);display:flex;align-items:center;justify-content:center;font-size:14px}
+.ntf .t{font-size:11.5px;font-weight:700;display:flex;justify-content:space-between;gap:6px}
+.ntf .t span{font-weight:400;opacity:.6;font-size:10.5px}
+.ntf .b{font-size:11.5px;opacity:.92;line-height:1.45;margin-top:1px}
+.vs{display:flex;gap:6px;margin-top:6px}
+.vs div{flex:1;border:1.5px dashed var(--line2);background:#fff;border-radius:10px;padding:5px 7px;font-size:11px;color:var(--ink2);line-height:1.4}
+.vs b{display:block;font-size:11px;color:var(--ink)}
+.rec{display:inline-block;background:var(--brown);color:#fff;border-radius:999px;font-size:10.5px;font-weight:700;padding:1px 7px;margin-left:4px;vertical-align:2px}
 .foot{text-align:center;font-size:11.5px;color:var(--ink2);padding:9px 10px 11px;line-height:1.55}
 .foot b{color:var(--brown);letter-spacing:.06em}
 </style></head><body><div class="fl">
@@ -37,18 +46,22 @@ body{margin:0;font-family:"Noto Sans JP",sans-serif;color:var(--ink)}
 <div class="body">
   <div class="box"><div class="n">1</div><div>
     <h2>ホームに「家づくりの記録」</h2>
-    <p>図面・キッチン・各部屋など<b>項目ごとに並び、横にスクロール</b>して見られます。押すと大きく開きます。</p>
+    <p>図面・キッチンなど<b>項目ごとに横にスクロール</b>。押すと大きく開きます。</p>
     <div class="strip"><i></i><i></i><i></i><i></i><span>← 横へ</span></div>
   </div></div>
   <div class="box"><div class="n">2</div><div>
     <h2>決定・変更はカードから</h2>
-    <p><b>「決定」で最終決定</b>のはんこ。変えたいときは「変更」「書き込む」で図面に書いて送れます。</p>
+    <p><b>「決定」で最終決定</b>のはんこ。「書き込む」で図面に書いて送れます。</p>
     <div class="chips"><span class="chip">✏️ 変更</span><span class="chip">🖊 書き込む</span><span class="chip g">✅ 決定</span></div>
   </div></div>
   <div class="box warn"><div class="n">3</div><div>
-    <h2>お知らせの受け取り方を登録</h2>
-    <p>ホームの「🔔 お知らせの受け取り方」で、お名前と方法を選んでください。<em>ご登録がないと、更新のお知らせが届きません。</em></p>
-    <div class="chips"><span class="chip d">📱 アプリ</span><span class="chip">💬 LINE</span><span class="chip">✉️ メール</span></div>
+    <h2>お知らせは「アプリ」がおすすめ</h2>
+    <p>アプリなら、<b>何が届いたかまで</b>スマホに表示されます。</p>
+    <div class="ntf"><div class="ap">🏠</div><div style="flex:1">
+      <div class="t">住まいるハウジングからメッセージ<span>いま</span></div>
+      <div class="b">キッチンの新しいプランボードをお送りしました。ご確認ください。</div></div></div>
+    <div class="vs"><div><b>💬 LINE</b>「おうちノートが更新されました」だけ</div><div><b>✉️ メール</b>「おうちノートが更新されました」だけ</div></div>
+    <p style="margin-top:6px">ホームの「🔔 お知らせの受け取り方」で登録してください。<em>ご登録がないと届きません。</em></p>
   </div></div>
   <div class="box"><div class="n">4</div><div>
     <h2>ホーム画面に追加</h2>

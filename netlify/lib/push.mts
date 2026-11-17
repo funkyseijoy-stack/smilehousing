@@ -120,10 +120,11 @@ export async function sendEmailToProject(projectId: string, project: any, makeTe
     const cust = String((project && project.customer) || "").replace(/様$/, "").trim();
     const r = await sendMailTo({
       to: x.email,
-      subject: "【住まいるハウジング】" + (pl.title || app + "が更新されました"),
+      // メールは「更新されました」だけ（内容はおうちノートで見ていただく。内容まで届くのはアプリの通知だけ）
+      subject: "【住まいるハウジング】" + app + "が更新されました",
       body: (name ? name + "様\n\n" : cust ? cust + "様\n\n" : "") +
         "いつもありがとうございます。住まいるハウジングです。\n" +
-        app + "が更新されました。\n\n" + (pl.body ? pl.body + "\n\n" : "") +
+        app + "が更新されました。\n\n" +
         "下のリンクから、" + app + "をご確認ください。\n" + link + "\n\n" +
         "※このメールは、" + app + "で「メールで受け取る」にご登録いただいたアドレスへお送りしています。\n" +
         "※受け取りをやめるときは、" + app + "の「🔔 お知らせの受け取り方」から削除できます。\n" +
