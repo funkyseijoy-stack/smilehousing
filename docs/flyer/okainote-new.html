@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>おうちノートのお知らせ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--page:#efe9e2;--bg:#f7f3ee;--card:#fffdfa;--line:#e9e2da;--line2:#ded5cb;--ink:#2f2925;--ink2:#5c534d;--muted:#9a9089;--brown:#5d5049;--brown2:#7a6a60;--chip:#efe9e3;--green:#e3efe7;--green-ink:#4f7a5f;--rose:#b45b6a;--tape:#e8cfc8;--kari:#f6ead6;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);font-family:"Noto Sans JP",sans-serif;color:var(--ink);}
+.fl{width:390px;margin:0 auto;padding:0 0 18px;background:var(--bg);}
+.hero{background:var(--brown);color:#fff;padding:26px 22px 22px;position:relative;overflow:hidden}
+.hero .co{font-size:12px;letter-spacing:.12em;opacity:.85}
+.hero h1{margin:8px 0 6px;font-size:27px;font-weight:900;line-height:1.35}
+.hero p{margin:0;font-size:13.5px;line-height:1.7;opacity:.95}
+.hero .new{display:inline-block;background:#fff;color:var(--rose);font-weight:900;font-size:12px;border-radius:999px;padding:3px 10px;margin-bottom:4px}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.07)}
+.sec{margin:14px 14px 0;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px 16px 14px}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.num{flex:0 0 30px;height:30px;border-radius:50%;background:var(--brown);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:15px}
+.sh h2{margin:0;font-size:18px;font-weight:900;line-height:1.35}
+.tx{font-size:13.5px;line-height:1.75;color:var(--ink2);margin:4px 0 10px}
+.tx b{color:var(--ink)}
+/* mock: rows */
+.mock{background:var(--bg);border:1px solid var(--line2);border-radius:14px;padding:10px 0 10px 10px;overflow:hidden}
+.mrow{margin-bottom:9px}.mrow:last-child{margin-bottom:0}
+.mrh{font-size:12px;font-weight:700;color:var(--ink2);margin:0 0 5px 2px;display:flex;justify-content:space-between;padding-right:10px}
+.mrh span{color:var(--brown2);font-weight:400}
+.mstrip{display:flex;gap:8px;position:relative}
+.mc{flex:0 0 120px;height:72px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;font-size:10.5px;color:var(--ink2);position:relative}
+.mc.big{flex-basis:200px;height:92px}
+.mc .pl{height:44px;border-radius:6px;background:repeating-linear-gradient(0deg,#f3eee8 0 9px,#e7dfd6 9px 10px),repeating-linear-gradient(90deg,transparent 0 9px,#e7dfd6 9px 10px);background-blend-mode:multiply;margin-bottom:4px}
+.mc.big .pl{height:64px}
+.mc .ln{height:5px;border-radius:3px;background:var(--line2);margin:4px 0}
+.mc .nw{position:absolute;top:-6px;left:6px;background:#d6403a;color:#fff;font-size:9px;font-weight:900;border-radius:999px;padding:1px 6px}
+.swipe{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(93,80,73,.92);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:5px 10px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.fade{position:absolute;right:0;top:0;bottom:0;width:60px;background:linear-gradient(90deg,rgba(247,243,238,0),var(--bg))}
+.pts{margin:10px 0 0;padding:0;list-style:none;font-size:13px;line-height:1.7;color:var(--ink2)}
+.pts li{padding-left:18px;position:relative;margin:3px 0}
+.pts li::before{content:"●";position:absolute;left:2px;color:var(--brown2);font-size:9px;top:4px}
+/* decide */
+.dcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;position:relative}
+.dcard .pl{height:70px;border-radius:8px;background:repeating-linear-gradient(0deg,#f3eee8 0 9px,#e7dfd6 9px 10px),repeating-linear-gradient(90deg,transparent 0 9px,#e7dfd6 9px 10px)}
+.dcard .tt{font-size:12.5px;font-weight:700;margin:7px 0 8px}
+.btns{display:flex;gap:6px}
+.btn{flex:1;border:1.5px solid var(--line2);border-radius:999px;background:#fff;font-size:12px;font-weight:700;text-align:center;padding:7px 2px;color:var(--ink)}
+.btn.dec{border-color:#4f7a5f;color:#4f7a5f}
+.stamp{position:absolute;right:14px;top:16px;width:66px;height:66px;border:3px solid #d6403a;border-radius:50%;color:#d6403a;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-12deg);font-weight:900;font-size:17px;line-height:1.1;background:rgba(255,255,255,.75)}
+.stamp small{font-size:9px;font-weight:700}
+.how{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;margin-top:12px;font-size:13px;line-height:1.6;align-items:start}
+.how .k{font-weight:700;white-space:nowrap;border-radius:999px;padding:2px 10px;font-size:12px;background:var(--chip);text-align:center}
+.how .k.g{background:var(--green);color:var(--green-ink)}
+.how div{color:var(--ink2)}
+/* notify */
+.nbox{background:#fffdfa;border:1.5px solid var(--line2);border-radius:14px;padding:12px}
+.nbox .h{font-weight:900;font-size:14px;margin-bottom:8px}
+.nin{border:1.5px solid var(--line2);border-radius:10px;padding:8px 10px;font-size:12.5px;color:var(--muted);background:#fff;margin-bottom:8px}
+.nch{display:flex;gap:6px}
+.nch div{flex:1;border:1.5px solid var(--line2);border-radius:10px;background:#fff;text-align:center;padding:9px 2px;font-size:12.5px;font-weight:700}
+.nch div.on{background:var(--brown);color:#fff;border-color:var(--brown)}
+.ways{margin-top:10px;display:grid;gap:6px}
+.way{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.6;color:var(--ink2)}
+.way b{flex:0 0 74px;color:var(--ink);font-size:13px}
+.warn{margin-top:12px;background:#fbeeee;border:1.5px solid #e8c4c4;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.7;color:#8c3a3a}
+.warn b{color:#b3412f}
+/* steps */
+.os{margin-top:6px}
+.os h3{font-size:14px;margin:12px 0 6px;font-weight:900;display:flex;align-items:center;gap:6px}
+.os h3:first-child{margin-top:0}
+.step{display:flex;gap:10px;align-items:center;margin:6px 0;font-size:13px;line-height:1.55;color:var(--ink2)}
+.step .n{flex:0 0 22px;height:22px;border-radius:50%;border:1.5px solid var(--brown2);color:var(--brown2);font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center}
+.ic{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1.5px solid var(--ink2);border-radius:6px;font-size:13px;vertical-align:middle;margin:0 2px;background:#fff}
+.note{font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px}
+.foot{margin:16px 14px 0;text-align:center;font-size:13px;line-height:1.8;color:var(--ink2)}
+.foot .nm{margin-top:10px;font-weight:900;color:var(--brown);font-size:15px;letter-spacing:.06em}
+</style></head><body><div class="fl">
+
+<div class="hero">
+  <div class="co">住まいるハウジング</div>
+  <h1><span class="new">NEW</span><br>おうちノートが<br>見やすくなりました</h1>
+  <p>家づくりの記録を、もっと見つけやすく。<br>決定やご相談も、カードからすぐできます。</p>
+</div>
+
+<div class="sec">
+  <div class="sh"><div class="num">1</div><h2>ホームに「家づくりの記録」</h2></div>
+  <p class="tx">ホームを下へ進むと、<b>図面・キッチン・浴室…と項目ごと</b>に記録が並んでいます。それぞれ<b>横にスクロール</b>すると、新しいものから順に見られます。</p>
+  <div class="mock">
+    <div class="mrow"><div class="mrh">📐 図面<span>一覧 ›</span></div>
+      <div class="mstrip"><div class="mc big"><span class="nw">NEW</span><div class="pl"></div>1階平面図</div><div class="mc big"><div class="pl"></div></div><div class="fade"></div><div class="swipe">← 横へ</div></div></div>
+    <div class="mrow"><div class="mrh">🚿 キッチン<span>この項目を見る ›</span></div>
+      <div class="mstrip"><div class="mc"><div class="pl"></div>プランボード</div><div class="mc"><div class="ln" style="width:80%"></div><div class="ln"></div><div class="ln" style="width:60%"></div>打合せ記録</div><div class="mc"></div><div class="fade"></div></div></div>
+    <div class="mrow"><div class="mrh">🎨 各部屋<span>この項目を見る ›</span></div>
+      <div class="mstrip"><div class="mc"><div class="pl"></div>クロス</div><div class="mc"><div class="pl"></div></div><div class="mc"></div><div class="fade"></div></div></div>
+  </div>
+  <ul class="pts">
+    <li>カードを押すと、<b>図面やPDFを大きく</b>見られます（指で拡大できます）</li>
+    <li>新しく届いたものには赤い <b style="color:#d6403a">NEW</b> の印が付きます</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <div class="sh"><div class="num">2</div><h2>決定・変更はカードから</h2></div>
+  <p class="tx">プランボードや打合せ記録のカードの下にあるボタンで、お気持ちをそのままお伝えいただけます。</p>
+  <div class="dcard">
+    <div class="pl"></div>
+    <div class="tt">キッチン　プランボード</div>
+    <div class="btns"><div class="btn">✏️ 変更</div><div class="btn">🖊 書き込む</div><div class="btn dec">✅ 決定</div></div>
+    <div class="stamp">決定<small>11/20</small></div>
+  </div>
+  <div class="how">
+    <span class="k g">✅ 決定</span><div>「決定」のはんこが押され、担当者に届きます。これで<b>最終決定</b>となります。</div>
+    <span class="k">✏️ 変更</span><div>変えたいところを文章でお送りください。写真やPDFも付けられます。</div>
+    <span class="k">🖊 書き込む</span><div>図面に直接、ペンや文字で書き込んで送れます。</div>
+  </div>
+  <p class="note">※ はんこは「はんこを外す」でいつでも検討中に戻せます。</p>
+</div>
+
+<div class="sec">
+  <div class="sh"><div class="num">3</div><h2>お知らせの受け取り方を<br>お選びください</h2></div>
+  <p class="tx">おうちノートが更新されたときのお知らせを、<b>ご家族それぞれ</b>、好きな方法で受け取れます。</p>
+  <div class="nbox">
+    <div class="h">🔔 お知らせの受け取り方</div>
+    <div class="nin">お名前（例：奥様・ご主人）</div>
+    <div class="nch"><div class="on">📱 アプリ</div><div>💬 LINE</div><div>✉️ メール</div></div>
+  </div>
+  <div class="ways">
+    <div class="way"><b>📱 アプリ</b><span>スマホに通知が届きます（下の「ホーム画面への追加」をしてから設定してください）</span></div>
+    <div class="way"><b>💬 LINE</b><span>いつもの公式LINEに届きます</span></div>
+    <div class="way"><b>✉️ メール</b><span>メールアドレスに届きます</span></div>
+  </div>
+  <p class="note">場所：おうちノートのホームのいちばん上、または「≡ メニュー」の中にあります。</p>
+  <div class="warn"><b>⚠ ご登録のお願い</b><br>これからは、<b>選んでいただいた方法でだけ</b>お知らせをお送りします。ご登録がないと、更新のお知らせが届かなくなりますので、お手数ですが一度ご設定をお願いいたします。</div>
+</div>
+
+<div class="sec">
+  <div class="sh"><div class="num">4</div><h2>ホーム画面に追加すると<br>アプリのように使えます</h2></div>
+  <div class="os">
+    <h3>📱 iPhone（Safari）</h3>
+    <div class="step"><span class="n">1</span><span>画面下の共有ボタン <span class="ic">⬆︎</span> をタップ</span></div>
+    <div class="step"><span class="n">2</span><span>「ホーム画面に追加」をタップ</span></div>
+    <div class="step"><span class="n">3</span><span>右上の「追加」をタップ</span></div>
+    <h3>🤖 Android（Chrome）</h3>
+    <div class="step"><span class="n">1</span><span>右上の <span class="ic">⋮</span> をタップ</span></div>
+    <div class="step"><span class="n">2</span><span>「ホーム画面に追加」または「アプリをインストール」</span></div>
+    <div class="step"><span class="n">3</span><span>「追加」をタップ</span></div>
+  </div>
+  <p class="note">※ LINEの中で開いているときは、右上の「⋯」から「ブラウザで開く」を選んでから追加してください。</p>
+</div>
+
+<div class="foot">
+  わからないことがあれば、<br>おうちノートの「メッセージ」やLINEで<br>お気軽にお尋ねください。
+  <div class="nm">住まいるハウジング</div>
+</div>
+
+</div></body></html>
