@@ -1558,11 +1558,12 @@ function homeHtml(){ return homeParts().main; }
     // 「📝 打合せ記録」の欄（ホームに出すにした記録）は出さない（家づくりの記録の段と二重になるため。2026年11月16日〜）
     // 「✅ ご確認・ご決定ください」も出さない（2026年11月21日〜。決定は家づくりの記録の各カードで）。
     // ホームの並び：最新の打合せ記録 → 家づくりの記録（部位ごと・いちばん下に追加見積り）→ 決定事項。ほかはそのあと
+    // 最新の打合せ記録のすぐ下に「ご検討いただく事」、その下に「打合せの予定」
+    out += decideListHtml();
     var mainTop = out; out = "";
     // 次回のご予約・家づくりの進行状況は上の帯（現在：〇〇／次回 〇/〇）に出ているので、ホームには出さない。
     // スタッフが書いた「打合せの予定」の文章があるときだけ出す
-    if(nmText) out += '<div class="sechd"><h3>📝 打合せの予定</h3></div><div class="qbox"><div class="qdetail nmtext">'+esc(nmText)+'</div></div>';
-    out += decideListHtml();
+    if(nmText) mainTop += '<div class="sechd"><h3>📝 打合せの予定</h3></div><div class="qbox"><div class="qdetail nmtext">'+esc(nmText)+'</div></div>';
     // ここから下は「そのほかの情報」にまとめる
     var mainOut = out; out = "";
     var mainTopHtml = mainTop;
@@ -1638,7 +1639,7 @@ function homeHtml(){ return homeParts().main; }
     var procs = data.notices.filter(function(n){ return n.kind==="process"; });
     if(procs.length) out += '<div class="sechd" id="sec-proc"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
     // 決定のはんこを押したものは、ホームのいちばん下にまとめる
-    return { main: mainTopHtml + safeHtml("家づくりの記録", homeRowsHtml) + safeHtml("決定したもの", function(){ return pendingCardsHtml("stamped"); }) + mainOut, rest: out };
+    return { main: mainTopHtml + safeHtml("家づくりの記録", homeRowsHtml) + mainOut + safeHtml("決定したもの", function(){ return pendingCardsHtml("stamped"); }), rest: out };
   }
   function noticeHtml(n){
     return '<div class="ntc-wrap">'+(n.tag?'<span class="ntag'+(n.kind==="process"?" proc":"")+'">'+esc(n.tag)+'</span>':'')+
