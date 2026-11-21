@@ -1413,7 +1413,8 @@ function consItems(){
       var g = kinds[k];
       if(g.cats.length) rows.push({ ic:g.ic, t:g.t+namesText(g.cats.map(function(c){ return c.name; })), a:'data-updcat="'+(g.cats.length===1 ? esc(g.cats[0].id) : "")+'"' });
     });
-    var album = (data.album||[]).filter(function(a){ return isNewSeen(a.createdAt); });
+    var spUrls = sentPhotoUrls();
+    var album = (data.album||[]).filter(function(a){ return isNewSeen(a.createdAt) && !spUrls[a.url]; });
     if(album.length) rows.push({ ic:"📷", t:"アルバムに写真の追加があります", a:'data-go="album"' });
     var notes = (data.notes||[]).filter(function(n){ return isNewSeen(n.upd); });
     if(notes.length) rows.push({ ic:"🗒", t:"打合せ記録の追加があります"+namesText(notes.map(function(n){ return n.partName || n.title; })), a:'data-opennotes="1"' });
@@ -1436,6 +1437,8 @@ function consItems(){
     // あとから写真だけ（ひとことなし）を送っていたら、前のひとことは出さない（以前に送った分も含めて）
     var sp = data.sentPhotos;
     if(sp && sp.at && !sp.text && sc.at && Date.parse(sp.at) > Date.parse(sc.at) + 30*60*1000) return "";
+    // 写真と一緒に送ったひとことは、上の写真の下に出す（同じお知らせを2か所に出さない）
+    if(commentWithPhotos()) return "";
     var d = sc.at ? new Date(sc.at) : null;
     // 一緒に送った写真は上の「🆕 新しい写真」に出すので、ここは文章だけ
     return '<div class="scom"><div class="sh">💬 スタッフから'+(d && !isNaN(d) ? '<span class="sd">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>' : '')+nwTag(sc.at)+'</div>'+
@@ -1450,6 +1453,21 @@ function consItems(){
     if(data.sentPhotos && (data.sentPhotos.photos||[]).length) return data.sentPhotos;
     return data.staffComment;
   }
+  // ひとことが「最後に送った写真」と一緒に送られたものか（同じ文・または送った時刻が30分以内）
+  function commentWithPhotos(){
+    var sc = data.staffComment, sp = sentPhotosOf();
+    if(!sc || !sc.text || !sp || !(sp.photos||[]).filter(isImg).length) return false;
+    if(sp===sc) return true;
+    if(sp.text && String(sp.text).trim()===String(sc.text).trim()) return true;
+    var a = Date.parse(sp.at||""), b = Date.parse(sc.at||"");
+    return !!(a && b && Math.abs(a-b) <= 30*60*1000);
+  }
+  // 最後に送った写真のURL（NEWのお知らせで「アルバムに写真の追加」を重ねて出さないため）
+  function sentPhotoUrls(){
+    var m = {}, sp = sentPhotosOf();
+    ((sp && sp.photos)||[]).forEach(function(a){ if(a && a.url) m[a.url] = 1; });
+    return m;
+  }
   function newPhotosHtml(){
     var sc = sentPhotosOf();
     var ph = sc ? (sc.photos||[]).filter(isImg) : [];
@@ -1462,6 +1480,13 @@ function consItems(){
       return '<button class="pola" data-img="'+esc(a.url)+'"><div class="im"><img loading="lazy" src="'+esc(a.url)+'" alt=""></div><div class="pc">'+fmtD(a.createdAt || when)+(sent ? '' : '<br>アルバムの写真')+'</div></button>';
     }).join("")+'</div>';
     if(sent && ph.length>3) out += '<div style="text-align:right;margin:6px 0 14px;"><button class="linkbtn" data-scphotos="1">📷 すべて見る（'+ph.length+'枚） ›</button></div>';
+    // 写真と一緒に送ったスタッフのひとことは、ここ（写真の下）にまとめて出す
+    if(sent && commentWithPhotos()){
+      var scm = data.staffComment, scd = scm.at ? new Date(scm.at) : null;
+      out += '<div class="scom"><div class="sh">💬 スタッフから'+(scd && !isNaN(scd) ? '<span class="sd">'+(scd.getMonth()+1)+'/'+scd.getDate()+'</span>' : '')+'</div>'+
+        '<div class="st">'+esc(scm.text)+'</div>'+
+        '<div class="srep"><button class="linkbtn" data-go="msg">返信する ›</button></div></div>';
+    }
     return out;
   }
 
@@ -1531,13 +1556,16 @@ function homeHtml(){ return homeParts().main; }
     out += updatesHtml();
     out += latestNotesHtml();
     // 「📝 打合せ記録」の欄（ホームに出すにした記録）は出さない（家づくりの記録の段と二重になるため。2026年11月16日〜）
-    out += pendingCardsHtml();
+    // 「✅ ご確認・ご決定ください」も出さない（2026年11月21日〜。決定は家づくりの記録の各カードで）。
+    // ホームの並び：最新の打合せ記録 → 家づくりの記録（部位ごと・いちばん下に追加見積り）→ 決定事項。ほかはそのあと
+    var mainTop = out; out = "";
     // 次回のご予約・家づくりの進行状況は上の帯（現在：〇〇／次回 〇/〇）に出ているので、ホームには出さない。
     // スタッフが書いた「打合せの予定」の文章があるときだけ出す
     if(nmText) out += '<div class="sechd"><h3>📝 打合せの予定</h3></div><div class="qbox"><div class="qdetail nmtext">'+esc(nmText)+'</div></div>';
     out += decideListHtml();
     // ここから下は「そのほかの情報」にまとめる
     var mainOut = out; out = "";
+    var mainTopHtml = mainTop;
     // 最新のプランボードは「わが家の情報」から外した（家づくりの各項目で見る）
 
     // 次回の打合せの予定（スタッフが入力した文章）は、ホームの「次の打合せ」に出す
@@ -1610,7 +1638,7 @@ function homeHtml(){ return homeParts().main; }
     var procs = data.notices.filter(function(n){ return n.kind==="process"; });
     if(procs.length) out += '<div class="sechd" id="sec-proc"><h3>契約後に知っておきたいこと</h3></div><div class="ntc-grid two">'+procs.map(noticeHtml).join("")+'</div>';
     // 決定のはんこを押したものは、ホームのいちばん下にまとめる
-    return { main: mainOut + safeHtml("決定したもの", function(){ return pendingCardsHtml("stamped"); }) + safeHtml("家づくりの記録", homeRowsHtml), rest: out };
+    return { main: mainTopHtml + safeHtml("家づくりの記録", homeRowsHtml) + safeHtml("決定したもの", function(){ return pendingCardsHtml("stamped"); }) + mainOut, rest: out };
   }
   function noticeHtml(n){
     return '<div class="ntc-wrap">'+(n.tag?'<span class="ntag'+(n.kind==="process"?" proc":"")+'">'+esc(n.tag)+'</span>':'')+
@@ -1984,8 +2012,9 @@ function homeHtml(){ return homeParts().main; }
     (data.categories||[]).forEach(function(c){
       if(c.id==="plan") return;
       var list = [];
-      (c.items||[]).concat(c.roomMisc||[]).forEach(function(x){ list.push({c:c, x:x, room:"", at:String(x.at||x.date||x.createdAt||"")}); });
-      (c.rooms||[]).forEach(function(r){ (r.items||[]).forEach(function(x){ list.push({c:c, x:x, room:r.id||x.roomId||"", at:String(x.at||x.date||x.createdAt||"")}); }); });
+      var inLatest = function(x){ var k = String(x.key||""); return k.indexOf("n:")===0 && !x.partial && homeLatestIds[k.slice(2)]; };
+      (c.items||[]).concat(c.roomMisc||[]).forEach(function(x){ if(inLatest(x)) return; list.push({c:c, x:x, room:"", at:String(x.at||x.date||x.createdAt||"")}); });
+      (c.rooms||[]).forEach(function(r){ (r.items||[]).forEach(function(x){ if(inLatest(x)) return; list.push({c:c, x:x, room:r.id||x.roomId||"", at:String(x.at||x.date||x.createdAt||"")}); }); });
       if(!list.length) return;
       list.sort(function(a,b){ return tAt(b.at) - tAt(a.at); });
       var shown = list.slice(0, HROW_LIMIT), nNew = catNewCount(c);
@@ -2409,11 +2438,10 @@ function homeHtml(){ return homeParts().main; }
     var notes = gen.filter(function(n){
       var f = noteDecItem(n); if(!f) return true;
       var st = f.x.cardStatus || "検討中";
-      if(st==="決定") return false;
-      if(f.x.showDecide && st==="検討中" && !chgDone(f.c, f.x)) return false;
-      return true;
+      return st!=="決定";
     });
     var hd = '<div class="sechd"><h3>🗒 最新の打合せ記録</h3>';
+    homeLatestIds = {};
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
     var list = notes.filter(function(n){ return String(n.date||"")===last; });
@@ -2423,7 +2451,7 @@ function homeHtml(){ return homeParts().main; }
         var f = noteDecItem(n);
         var isGen = n.scope==="general" || !n.scope;
         var link = (!isGen && f) ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
-        return '<div class="tli flat">'+noteBody(n, true, true)+link+'</div>';
+        return '<div class="tli flat">'+noteBody(n, true, true)+(f ? homeDecHtml(n, f) : '')+link+'</div>';
       }).join("")+'</div>'+
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
   }
