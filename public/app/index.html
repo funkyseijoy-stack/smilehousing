@@ -842,6 +842,9 @@
   .vfdoc{ flex:0 0 120px; width:120px; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface); cursor:pointer; }
   .vfgrid .vfdoc{ width:auto; }
   .vfdoc{ position:relative; }
+  .vfedit{ display:block; width:100%; border:0; border-top:1px solid var(--border); background:var(--surface-2,#f4f1ea); color:var(--text); font-size:.85rem; padding:6px 4px; cursor:pointer; font-family:inherit; }
+  .vfedit:hover{ background:var(--accent-soft,#e6f2ea); }
+  .vfnopart{ color:#c2410c; font-weight:700; }
   .vcev{ position:relative; }
   .vcev .vcoh{ position:absolute; top:4px; right:4px; background:#2f7a4a; color:#fff; border-radius:999px; padding:0 7px; font-size:.85rem; font-weight:700; line-height:1.5; z-index:1; }
   .vfdoc.reg .vfth{ opacity:.55; }
@@ -8363,10 +8366,15 @@
       return '<div class="vfdoc lock lockbox reg" title="NETは暗証番号でロック中（押すと暗証番号）"><span class="vfstamp">登録<br>済</span>🔒<span>NET '+escapeHtml(md)+'<br>'+escapeHtml(p ? p.name : "（案件未定）")+fromLab+'</span></div>';
     var pname = p ? p.name : "（案件未定）";
     var lab = (i===0 ? '<b class="nw">最新</b> ' : '')+(d.kind==="pend" ? '<b class="mi">未整理</b> ' : '')+escapeHtml(md)+'<br>'+escapeHtml(pname)+(d.kind==="att" && d.type ? ' '+escapeHtml(d.type) : '')+(via ? fromLab : '');
+    // 見積の書類（NET以外）：部位を出す。部位が無いと記録に出ないので目立たせる
+    if(d.kind==="att" && d.att.kind==="quote" && !quoteLocked(d.att.quoteType)){
+      lab += '<br>'+(d.att.specPart && d.att.specPart.scope ? '<span class="muted">'+escapeHtml(partText(d.att.specPart)||"")+'</span>' : '<span class="vfnopart">📍部位なし（記録に出ません）</span>');
+    }
     var homeOn = d.kind==="att" && vfAttShown(d.att);
     var stamp = d.kind==="att" ? (homeOn ? '<span class="vfstamp home" title="おうちノートに出ています">おうち</span>' : '<span class="vfstamp" title="登録済み（タスクの業者ごとの変更履歴に入っています）">登録<br>済</span>') : '';
     return '<div class="vfdoc'+(i===0?' new':'')+(d.kind==="pend"?' mi':' reg')+'" '+(d.kind==="pend" ? 'data-vfpend="'+escapeHtml(d.task.id)+'" title="押すと、案件・種類を選んで整理できます"' : 'data-openatt="'+escapeHtml(d.att.id)+'" title="'+escapeHtml(d.name)+'"')+'>'+
-      '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div>'+stamp+'<div class="vflb">'+lab+'</div></div>';
+      '<div class="vfth">'+fileThumbInner(d.url, d.ct, d.name)+'</div>'+stamp+'<div class="vflb">'+lab+'</div>'+
+      (d.kind==="att" ? '<button type="button" class="vfedit" data-vfedit="'+escapeHtml(d.att.id)+'">✏️ 案件・部位を直す</button>' : '')+'</div>';
   }
   function renderVendorFolders(){
     var body = document.getElementById("vfBody"); if(!body) return;
@@ -8414,6 +8422,8 @@
       var o = e.target.closest("[data-vfopen]");
       if(o){ vfState.open = o.dataset.vfopen; renderVendorFolders(); window.scrollTo({top:0, behavior:"smooth"}); return; }
       if(e.target.closest("[data-vfback]")){ vfState.open = ""; renderVendorFolders(); return; }
+      var ve = e.target.closest("[data-vfedit]");
+      if(ve){ e.stopPropagation(); openAttEditPopup(ve.dataset.vfedit); return; }
       var pd = e.target.closest("[data-vfpend]");
       if(pd){ taskToQuoteSheet(pd.dataset.vfpend); return; }
       var oa = e.target.closest("[data-openatt]");
@@ -11476,21 +11486,63 @@
     var a = state.attachments.find(function(x){ return x.id===id; }); if(!a) return;
     var ov = document.createElement("div");
     ov.className = "taskform-modal"; ov.style.zIndex = "95"; ov.style.alignItems = "center";
-    ov.innerHTML = '<div class="card" style="max-width:640px; width:calc(100% - 24px); max-height:86vh; overflow:auto;">'+
-      '<div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">✏️ 書類を直す・コメント</h3><button type="button" class="btn small ghost" data-ae-close>✕ 閉じる</button></div>'+
-      '<div class="muted" style="margin:4px 0 8px;">'+escapeHtml(a.name||"")+'</div>'+docEditHtml(a, projectById(a.projectId))+'</div>';
+    var paint = function(){
+      var proj = projectById(a.projectId);
+      var popts = '<option value="">（案件未定）</option>'+liveProjects().slice().sort(function(x,y){ return String(x.name||"").localeCompare(String(y.name||""),"ja"); })
+        .map(function(p){ return '<option value="'+escapeHtml(p.id)+'"'+(p.id===a.projectId?' selected':'')+'>'+escapeHtml(p.name||"")+(p.customer?'（'+escapeHtml(p.customer)+'）':'')+'</option>'; }).join("");
+      var recNote = (a.kind==="quote" && !quoteLocked(a.quoteType)) ?
+        (!a.projectId ? '<div class="vfnopart" style="margin:6px 0;">⚠️ 案件を選んでください（案件が無いと記録に出ません）</div>' :
+         !(a.specPart && a.specPart.scope) ? '<div class="vfnopart" style="margin:6px 0;">⚠️ 部位を選ぶと、この案件の打合せ記録に出ます</div>' :
+         (docInRecord(a) ? '<div class="muted" style="margin:6px 0;">✓ この案件の打合せ記録に出ています（部位：'+escapeHtml(partText(a.specPart)||"")+'）</div>' : '')) : '';
+      ov.innerHTML = '<div class="card" style="max-width:640px; width:calc(100% - 24px); max-height:86vh; overflow:auto;">'+
+        '<div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">✏️ 書類を直す・コメント</h3><button type="button" class="btn small ghost" data-ae-close>✕ 閉じる</button></div>'+
+        '<div class="muted" style="margin:4px 0 8px;">'+escapeHtml(a.name||"")+'</div>'+
+        '<label style="display:block; margin-bottom:6px;">案件<select data-aeproj style="width:100%;">'+popts+'</select></label>'+
+        recNote+
+        (proj ? docEditHtml(a, proj) : '<div class="muted">部位・種類などは、案件を選ぶと直せます。</div>')+'</div>';
+    };
+    paint();
     document.body.appendChild(ov);
     var close = function(){ ov.remove(); };
     ov.addEventListener("click", function(e){
       if(e.target===ov || e.target.closest("[data-ae-close]")){ close(); return; }
-      if(docHandleClick(e)) return;
+      if(docHandleClick(e)){ setTimeout(paint, 50); return; }
       var btn = e.target.closest("button[data-act]"); if(!btn) return;
       var bid = btn.dataset.id;
-      if(btn.dataset.act==="setquotepart"){ close(); setQuotePart(bid); }
+      if(btn.dataset.act==="setquotepart"){
+        // 部位を選んだら、この画面に戻る（閉じない）
+        ov.style.display = "none";
+        askSpecPart(async function(part){
+          ov.style.display = "";
+          if(!part){ paint(); return; }
+          a.specPart = part; delete a.specPartAuto;
+          await docSave(a, "部位を「"+(partText(part)||"")+"」にしました"+(docInRecord(a)?"（打合せ記録に出ます）":""));
+          paint();
+        }, a.projectId);
+      }
       else if(btn.dataset.act==="quotetohearing"){ close(); quoteToHearing(bid); }
       else if(btn.dataset.act==="delattachment"){ close(); deleteAttachment(bid); }
     });
-    ov.addEventListener("change", function(e){ docHandleChange(e); });
+    ov.addEventListener("change", async function(e){
+      var ps = e.target.closest("[data-aeproj]");
+      if(ps){
+        var to = ps.value || "", from = a.projectId || "";
+        if(to===from) return;
+        var np = projectById(to), op = projectById(from);
+        if(from && !confirm("この書類の案件を「"+(op?op.name:"")+"」から「"+(np?np.name:"（案件未定）")+"」に変えますか？")){ ps.value = from; return; }
+        a.projectId = to;
+        a.folderId = "";
+        // 部屋・追加した部位は案件ごとなので、案件を変えたら外す
+        if(a.specPart && (a.specPart.scope==="room" || a.specPart.scope==="custom")){ a.specPart = null; delete a.specPartAuto; }
+        // つながっていた見積依頼が別の案件なら外す
+        if(a.requestId){ var rq = (state.requests||[]).find(function(r){ return r.id===a.requestId; }); if(!rq || rq.projectId!==to) delete a.requestId; }
+        await docSave(a, "案件を「"+(np?np.name:"（案件未定）")+"」にしました");
+        paint();
+        return;
+      }
+      docHandleChange(e);
+      setTimeout(paint, 50);
+    });
   }
   async function runUniOp(act, kind, id){
     if(act==="refl" && !(await reflectWithComment(kind, id))) return;
