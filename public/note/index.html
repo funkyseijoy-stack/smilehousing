@@ -2010,6 +2010,8 @@ function homeHtml(){ return homeParts().main; }
             (pk ? '<div class="chgrow"><button class="chgbtn" data-drawchg="'+esc(pk)+'" data-drawlabel="'+esc("図面（"+(f.name||"")+"）")+'">✏️ 書き込んで送る</button></div>' : '')+'</div></div>';
         }).join("")+'</div></div>');
     }
+    // 部位の段は、いちばん新しく届いたもの（反映した日時）の新しい順に並べる（図面はいちばん上、追加見積りはいちばん下に固定）
+    var catRows = [];
     (data.categories||[]).forEach(function(c){
       if(c.id==="plan") return;
       var list = [];
@@ -2019,7 +2021,9 @@ function homeHtml(){ return homeParts().main; }
       if(!list.length) return;
       list.sort(function(a,b){ return tAt(b.at) - tAt(a.at); });
       var shown = list.slice(0, HROW_LIMIT), nNew = catNewCount(c);
-      rows.push('<div class="hrow"><div class="hrowh"><b>'+esc(c.name)+'</b><span class="cnt">'+list.length+'件</span>'+(nNew?'<span class="tag nw">NEW</span>':'')+
+      var latest = 0;
+      list.forEach(function(e){ latest = Math.max(latest, tAt(e.x.upd), tAt(e.x.homeShowAt), tAt(e.at)); });
+      catRows.push({ latest:latest, html:'<div class="hrow"><div class="hrowh"><b>'+esc(c.name)+'</b><span class="cnt">'+list.length+'件</span>'+(nNew?'<span class="tag nw">NEW</span>':'')+
         '<button class="more" data-buildcat="'+esc(c.id)+'">この項目を見る ›</button></div>'+
         '<div class="hstrip" data-hrow="'+esc(c.id)+'">'+shown.map(function(e){
           var big = isPb(e.x) && !!e.x.file;
@@ -2028,8 +2032,9 @@ function homeHtml(){ return homeParts().main; }
           return '<div class="hslot'+(big?' big':'')+(ovs?' ovst':'')+'" data-hfs="'+i+'"><div class="hdate">'+esc(fmtD(e.at))+'</div>'+feedCardHtml(e, {row:true})+ovs+'</div>';
         }).join("")+
         (list.length>HROW_LIMIT ? '<div class="hslot" style="flex-basis:40%;"><button class="btn ol" style="width:100%;" data-buildcat="'+esc(c.id)+'">ほか '+(list.length-HROW_LIMIT)+'件 ›</button></div>' : '')+
-        '</div></div>');
+        '</div></div>' });
     });
+    catRows.sort(function(a, b){ return b.latest - a.latest; }).forEach(function(r){ rows.push(r.html); });
     var er = homeEstRowHtml(); if(er) rows.push(er);
     if(!rows.length) return "";
     return '<div class="hrows"><div class="sechd"><h3>🏠 家づくりの記録</h3></div><p class="hint">← 横にスクロールすると前の記録が見られます。カードを押すと大きく開きます。</p>'+rows.join("")+'</div>';
