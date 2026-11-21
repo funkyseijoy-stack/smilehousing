@@ -494,7 +494,16 @@
   .decsum .dsi{ border-top:1px solid var(--border); padding:6px 0; font-size:.85rem; white-space:pre-wrap; }
   .decsum .dsi:first-of-type{ border-top:none; }
   .decsum .dsd{ font-size:.85rem; color:var(--muted); }
-  .noteitem .nbox.open{ background:var(--orange-soft); }
+  .noteitem .nbox.open{ background:#fff6cf; border:2px solid #e3b400; }
+  .rp-cons{ background:#fff6cf; border:2px solid #e3b400; border-radius:8px; padding:5px 8px; margin-block:6px; font-size:.85rem; white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+  .rp-cons b{ display:block; color:#8a6a00; }
+  .conscard{ border:2px solid #e3b400; background:#fffbea; }
+  .consrow{ display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px dashed #e7d48a; }
+  .consrow:first-of-type{ border-top:0; }
+  .consrow .ct{ flex:1; min-width:0; white-space:pre-wrap; }
+  .consrow .cm{ font-size:.85rem; color:var(--muted); }
+  .consrow .cs{ font-size:.85rem; font-weight:700; }
+  .consrow .cs.ok{ color:#1f7a3a; } .consrow .cs.off{ color:#b45309; }
   .noteitem .nbox.open .nboxlabel{ color:var(--orange); }
   .noteitem .nbox.markhl{ box-shadow:0 0 0 2px var(--orange) inset; }
   .noteitem .nbox.decided.markhl{ box-shadow:0 0 0 2px var(--accent) inset; }
@@ -2042,6 +2051,11 @@
             <input type="file" id="recFileInput" multiple accept=".pdf,image/*" hidden>
           </div>
           <div class="recview" id="recViewBar"></div>
+          <div class="card conscard" id="consCard" hidden>
+            <h3>💭 ご検討いただく事（おうちノートのホームに出ているもの）</h3>
+            <p class="muted" style="margin:0 0 6px; font-size:.85rem;">お客様のホームの「🙋 ご検討いただく事」と同じ内容です。直すときは「✏️ 直す」で記録を開き、行の💭の印を外す・文を書き換えてください（印を外すとお客様のホームからも消えます）。</p>
+            <div id="consList"></div>
+          </div>
           <div class="card" id="recCheckCard" hidden>
             <h3>🔒 社内で確認</h3>
             <p class="muted help" style="margin:0 0 8px; font-size:.85rem;">記録の「🔒 社内で確認」の行を、全部の記録から集めています（お客様には出ません）。</p>
@@ -9491,7 +9505,6 @@
       var parts = [];
       var dec = doc.decided || doc.content || "";
       if(dec) parts.push("✅ "+String(dec).trim());
-      if(doc.open) parts.push("💭 "+String(doc.open).trim());
       if(doc.talk) parts.push(String(doc.talk).trim());
       if(doc.message) parts.push("💬 "+String(doc.message).trim());
       text = parts.join("\n");
@@ -9529,6 +9542,7 @@
         (k!=="plan" ? '<button type="button" class="rp-ops" data-rpops="1" title="操作">⋮</button>' : '')+'</div>'+
       vis+
       (title ? '<div class="rp-title">'+escapeHtml(title)+'</div>' : '')+
+      (k==="n" && String(doc.open||"").trim() ? '<div class="rp-cons"><b>💭 ご検討いただく事</b>'+escapeHtml(String(doc.open).trim())+'</div>' : '')+
       (text ? '<div class="rp-text">'+escapeHtml(text)+'</div>' : '')+
       ((pt || who) ? '<div class="rp-foot">'+escapeHtml([pt, who ? "記入："+who : ""].filter(Boolean).join("　"))+'</div>' : '')+
       '</div>';
@@ -9538,6 +9552,38 @@
     var keys = ["n:"+x.id, "s:"+String(x.id).slice(0,78), "a:"+String(x.id).slice(0,78)];
     if(x.source && x.source.taskId) keys.push("t:"+x.source.taskId);
     return (state.noteDecisions||[]).find(function(d){ return d.ordered && !d.deletedAt && d.projectId===x.projectId && keys.indexOf(d.cardKey)>=0; }) || null;
+  }
+  // 「💭 ご検討いただく事」：お客様のおうちノートのホーム（consItems）と同じ考え方で、反映済みの記録の💭の行を集める
+  function consLinesOf(n){
+    var ls = Array.isArray(n.noteLines) && n.noteLines.length ? n.noteLines.filter(function(l){ return l && l.m==="o"; }).map(function(l){ return String(l.t||"").trim(); })
+      : String(n.open||"").split("\n").map(function(x){ return x.trim(); });
+    return ls.filter(Boolean);
+  }
+  function renderConsCard(notes){
+    var card = document.getElementById("consCard"), box = document.getElementById("consList");
+    if(!card || !box) return;
+    if(!notes){ card.hidden = true; return; }
+    var msgs = (state.messages||[]).filter(function(m){ return !m.deletedAt && m.fromCustomer && m.projectId===state.currentProjectId; });
+    var sent = function(t, n){ var head = "【決めました】「"+t+"」", at = Date.parse(n.createdAt||"")||0;
+      return msgs.some(function(m){ return String(m.content||m.text||"").indexOf(head)===0 && (Date.parse(m.createdAt||"")||0) >= at; }); };
+    var rows = [], seen = {};
+    notes.slice().sort(function(a,b){ return String(b.date||b.createdAt||"").localeCompare(String(a.date||a.createdAt||"")); }).forEach(function(n){
+      consLinesOf(n).forEach(function(t){
+        if(seen[t]) return; seen[t] = 1;
+        var st, cls;
+        if(!n.reflected){ st = "まだおうちノートに出ていません"; cls = "off"; }
+        else if(n.homeHide){ st = "ホームには出していません（家づくりの記録には出ます）"; cls = "off"; }
+        else if(sent(t, n)){ st = "お客様が「決めたこと」を返信済み（ホームからは外れています）"; cls = "ok"; }
+        else { st = "🏠 お客様のホームに出ています"; cls = ""; }
+        var pt = n.specPart && n.specPart.scope ? partText(n.specPart, n.projectId) : "";
+        rows.push('<div class="consrow"><div class="ct"><div class="cm">'+escapeHtml((n.date||String(n.createdAt||"").slice(0,10)).replace(/-/g,"."))+(pt?'　'+escapeHtml(pt):'')+(n.title?'　'+escapeHtml(n.title):'')+'</div>'+
+          '<div>💭 '+escapeHtml(t)+'</div><div class="cs '+cls+'">'+escapeHtml(st)+'</div></div>'+
+          '<button type="button" class="btn secondary small" data-consedit="'+escapeHtml(n.id)+'">✏️ 直す</button></div>');
+      });
+    });
+    card.hidden = !rows.length;
+    box.innerHTML = rows.join("");
+    if(!box._wired){ box._wired = true; box.addEventListener("click", function(e){ var b = e.target.closest("[data-consedit]"); if(b) editMeetingNote(b.dataset.consedit); }); }
   }
   // 記録タブの切り替え：📝 記録／✅ 決定／🔒 社内確認
   function renderRecView(){
@@ -9549,6 +9595,7 @@
       return '<button type="button" data-recview="'+x[0]+'" class="'+(v===x[0]?"on":"")+'">'+escapeHtml(x[1])+'</button>'; }).join("");
     var show = function(id, on){ var el = document.getElementById(id); if(el) el.style.display = on ? "" : "none"; };
     show("recListCard", v==="rec");
+    renderConsCard(v==="rec" ? notes : null);
     show("custDecidedCard", v==="dec");
     show("decidedSummaryCard", v==="dec");
     var cc = document.getElementById("recCheckCard"), cl = document.getElementById("recCheckList");
