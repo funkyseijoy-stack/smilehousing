@@ -2646,6 +2646,10 @@
     <h3 style="margin:0 0 6px;">履歴を編集</h3>
     <div class="addform" style="flex-direction:column; align-items:stretch;">
       <div class="muted" id="spEditInfo" style="font-size:.85rem;"></div>
+      <div id="spEditToNoteBox" hidden style="border:1px solid var(--border); border-radius:12px; padding:10px; background:var(--surface-2, #faf7f2);">
+        <button type="button" class="btn" id="spEditToNote" style="width:100%;">📝 記録に変えて内容を編集（写真の追加・文章）</button>
+        <div class="muted" style="font-size:.85rem; margin-block-start:6px;">このカードを打合せ記録にして、記録の入力画面で写真を足したり、文章を書いたりできます。いまの写真は記録の添付になります。</div>
+      </div>
       <label class="field" id="spEditNameRow">名前（ファイル名・お客様画面にも出ます）<input type="text" id="spEditName" maxlength="120"></label>
       <label class="field" id="spEditDateRow">日付<input type="date" id="spEditDate"></label>
       <label class="field" id="spEditCustRow">💬 お客様へのひとこと（おうちノートのカードに「スタッフから：」で出ます）<textarea id="spEditCust" rows="3" maxlength="500"></textarea></label>
@@ -14659,6 +14663,7 @@
     document.getElementById("spEditCust").value = p.customerNote || "";
     document.getElementById("spEditMemo").value = p.memo||"";
     document.getElementById("spEditNote").hidden = !(isNote && p.source && p.source.noteId);
+    document.getElementById("spEditToNoteBox").hidden = !specCanBecomeNote(p);
     // 色見本カード（画像の写真・プランボードだけ）
     var canSw = !isNote && !!p.url && String(p.contentType||"").indexOf("image/")===0;
     var sw = p.swatch || {};
@@ -14740,6 +14745,77 @@
     document.getElementById("spEditSwChip").style.background = col;
   }
   function closeSpecEdit(){ document.getElementById("spEditModal").hidden = true; spEditId = null; }
+  // 写真・PDFのカードを打合せ記録に変えられるか（記録の写し・業者タスクの写し・ファイルの無いものは不可）
+  function specCanBecomeNote(p){
+    return !!(p && !p.deletedAt && p.kind!=="note" && p.url && !(p.source && (p.source.taskId || p.source.noteId)));
+  }
+  // 写真・PDFのカード（specPhotos）を打合せ記録（meetingNotes）に変えて、記録の入力画面で開く。
+  // 写真は記録の添付（同じファイルを参照）、お客様へのひとこと→お客様へのメッセージ、反映・決定ボタン・ホーム・はんこ類は引き継ぐ。
+  // 元のカードはごみ箱へ（convertedToNote に記録のIDを残す）。お客様の決定（noteDecisions）も記録のカードへ写す。
+  var specToNoteBusy = false;
+  function convertSpecToNote(spId){
+    var p = state.specPhotos.find(function(x){ return x.id===spId; });
+    if(!specCanBecomeNote(p) || specToNoteBusy) return;
+    var memo = String(p.memo||"").trim();
+    var go = function(memoAsCheck){
+      closeSpecEdit();
+      doConvertSpecToNote(p, memoAsCheck);
+    };
+    var msg = "このカードを打合せ記録に変えます。\n・いまの写真（ファイル）は記録の添付になります\n・おうちノートへの反映・決定ボタン・はんこはそのまま引き継ぎます\n・変えたあと、記録の入力画面が開きます";
+    if(p.swatch && p.swatch.on) msg += "\n※色見本カードの設定は外れます";
+    if(memo){
+      askChoice("記録に変えて編集", msg+"\n\n社内メモ「"+memo.slice(0,40)+(memo.length>40?"…":"")+"」はどうしますか？",
+        [{label:"🔒 社内で確認の行に入れる", value:"check"}, {label:"メモは入れずに変える", value:"drop"}],
+        function(v){ if(v) go(v==="check"); });
+    } else {
+      askChoice("記録に変えて編集", msg, [{label:"📝 記録に変えて開く", value:"go"}], function(v){ if(v) go(false); });
+    }
+  }
+  async function doConvertSpecToNote(p, memoAsCheck){
+    specToNoteBusy = true;
+    try{
+      var now = nowIso();
+      var part = { scope: p.scope, category: p.category||null, roomId: p.roomId||null, side: p.side||null };
+      part.label = partText(part, p.projectId) || "";
+      var file = { id: p.assetId||p.id, url: p.url, contentType: p.contentType||"", name: p.fileName||p.name||"" };
+      var memo = String(p.memo||"").trim();
+      var lines = [];
+      if(memoAsCheck && memo){ memo.split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(t){ lines.push({t:t, m:"c"}); }); }
+      var note = { id: uid("note"), projectId: p.projectId, title: "", date: (p.createdAt||now).slice(0,10), channel: "打合せ",
+        author: state.currentUser||"", talk: "", talkPublic: true, decided: "", open: "",
+        internal: lines.map(function(l){ return l.t; }).join("\n"), noteLines: lines,
+        message: String(p.customerNote||"").trim(), content: "", files: [file], specPart: part,
+        createdAt: p.createdAt||now, updatedAt: now, badges: Object.assign({}, p.badges||{}), autoCreated: {},
+        convertedFromSpec: p.id };
+      ["reflected","reflectedAt","askDecision","homeShow","homeShowAt","homeHide","stampOv","sent","ordered"].forEach(function(k){ if(p[k]!=null) note[k] = p[k]; });
+      state.meetingNotes.push(note);
+      var ok = await saveDoc("meetingNotes", note.id, note);
+      if(ok===false){
+        state.meetingNotes = state.meetingNotes.filter(function(x){ return x.id!==note.id; });
+        render(); toast("保存できませんでした（カードはそのままです）"); return;
+      }
+      upsertNoteSpecEntry(note);
+      // お客様・スタッフの決定（s:<カード>）を記録のカード（n:<記録>）へ写す
+      var oldKey = "s:"+p.id, newKey = "n:"+note.id;
+      var decs = (state.noteDecisions||[]).filter(function(d){ return d && !d.deletedAt && d.cardKey===oldKey; });
+      for(var i=0;i<decs.length;i++){
+        var nd = Object.assign({}, decs[i], { id: p.projectId+"__card__"+newKey.replace(":","_"), cardKey: newKey, updatedAt: now });
+        if(await saveDoc("noteDecisions", nd.id, nd)!==false){
+          state.noteDecisions = (state.noteDecisions||[]).filter(function(x){ return x.id!==nd.id; }).concat([nd]);
+        }
+      }
+      p.convertedToNote = note.id;
+      await softDelete("specPhotos", "specPhotos", p.id, "写真・PDFのカード（記録に変えたため）");
+      logActivity("写真・PDFのカードを打合せ記録に変えました");
+      switchMeetingSubTab("record");
+      editMeetingNote(note.id);
+      toast("記録に変えました。写真の追加や文章を書いて「更新」を押してください", 6000);
+    }catch(e){
+      toast("記録に変えられませんでした");
+    }finally{
+      specToNoteBusy = false;
+    }
+  }
   async function saveSpecEdit(){
     var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
     if(!p) return;
@@ -21520,6 +21596,7 @@
     });
     document.getElementById("spEditSwImg").addEventListener("click", swPickColor);
     document.getElementById("spEditClose").addEventListener("click", closeSpecEdit);
+    document.getElementById("spEditToNote").addEventListener("click", function(){ if(spEditId) convertSpecToNote(spEditId); });
     document.getElementById("spEditNote").addEventListener("click", function(){
       var p = state.specPhotos.find(function(x){ return x.id===spEditId; });
       var nid = p && p.source && p.source.noteId;
