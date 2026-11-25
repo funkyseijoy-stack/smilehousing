@@ -959,6 +959,17 @@
   .kancard .kc-proj{ font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .kancard .kc-content{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-block-end:4px; }
   .kancard .kc-part{ font-size:.85rem; padding:1px 8px; margin-block-end:4px; }
+  .tatts{ display:flex; flex-wrap:wrap; gap:8px; width:100%; }
+  .tatt{ width:150px; max-width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:6px; display:flex; flex-direction:column; gap:4px; }
+  .tatt-th{ position:relative; display:block; width:100%; height:96px; padding:0; border:none; border-radius:6px; overflow:hidden; background:#fff; cursor:pointer; }
+  .tatt-th img, .tatt-th video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .tatt-th .specphoto-file, .tatt-th .ftext{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:1.4rem; }
+  .tatt-nm{ font-size:.85rem; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-all; }
+  .tatt-tags{ display:flex; flex-wrap:wrap; gap:4px; }
+  .tatt-tags span{ font-size:.85rem; color:#2f6b3a; background:#e7f3e8; border-radius:4px; padding:0 4px; }
+  .tatt-btns{ display:flex; gap:4px; }
+  .tatt-btns button{ flex:1 1 auto; font:inherit; font-size:.85rem; padding:3px 4px; border:1px solid var(--border); background:var(--surface); border-radius:6px; cursor:pointer; white-space:nowrap; color:var(--text); }
+  .tatt-btns button:last-child{ flex:0 0 auto; }
   .kancard .kc-full{ display:none; }
   .kancard .kc-qclosed{ margin-block-start:6px; }
   #bxPartsBody input[type=number]{ padding:6px 8px; border:1px solid var(--border); border-radius:10px; font:inherit; background:var(--surface,#fff); color:inherit; }
@@ -13347,13 +13358,162 @@
       return '<a href="'+a.url+'" target="_blank" rel="noopener" class="pill method">📎 '+escapeHtml(a.name||"添付")+'</a>';
     }).join(" ");
   }
+  // タスクの添付：絵＋名前＋「見る／保存／⋯」。✕で消える事故を防ぐため、外すのは「⋯」の中（確認つき）。
+  // 「記録に残す」でタスクを消しても残る（記録タブの写真・PDFカードにする）、「図面に登録」で見積タブの図面にも入れられる。
   function taskAttachmentsHtml(taskId, atts){
-    return (atts||[]).map(function(a){
-      return '<div style="display:inline-flex; align-items:center; gap:4px; background:var(--surface-2); padding:2px 8px; border-radius:4px; font-size:.85rem;">'+
-        '<a href="'+a.url+'" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">📎 '+escapeHtml(a.name||"添付")+'</a>'+
-        '<button data-delattach="'+taskId+'" data-attid="'+escapeHtml(a.id)+'" style="background:none; border:none; color:var(--muted); cursor:pointer; padding:0; font-size:.85rem; line-height:1;">✕</button>'+
-      '</div>';
-    }).join(" ");
+    var t = state.tasks.find(function(x){ return x.id===taskId; });
+    return '<div class="tatts">'+(atts||[]).map(function(a){
+      var kept = t && taskAttKeptSpec(t, a), plan = t && taskAttPlan(t, a);
+      var k = ' data-tatt="'+escapeHtml(taskId)+'" data-attid="'+escapeHtml(a.id)+'"';
+      return '<div class="tatt">'+
+        '<button type="button" class="tatt-th" data-tattact="open"'+k+' title="開いて見る">'+fileThumbInner(a.url, a.contentType, a.name)+'</button>'+
+        '<div class="tatt-nm" title="'+escapeHtml(a.name||"")+'">'+escapeHtml(a.name||"添付")+'</div>'+
+        ((kept||plan)?'<div class="tatt-tags">'+(kept?'<span>📝 記録済み</span>':'')+(plan?'<span>📐 図面登録済み</span>':'')+'</div>':'')+
+        '<div class="tatt-btns">'+
+          '<button type="button" data-tattact="open"'+k+'>👁 見る</button>'+
+          '<button type="button" data-tattact="dl"'+k+'>⬇ 保存</button>'+
+          '<button type="button" data-tattact="ops"'+k+' title="記録に残す・図面に登録・外す">⋯</button>'+
+        '</div></div>';
+    }).join("")+'</div>';
+  }
+  function taskAttKeptSpec(t, a){
+    var id = a.keptSpecId || ("sp_k_"+t.id+"_"+a.id);
+    return liveSpecPhotos().find(function(sp){ return sp.id===id; }) || null;
+  }
+  function taskAttPlan(t, a){
+    var id = a.planAttId || ("att_t_"+t.id+"_"+a.id);
+    return liveAttachments().find(function(x){ return x.id===id; }) || null;
+  }
+  function taskAttFind(taskId, attId){
+    var t = state.tasks.find(function(x){ return x.id===taskId; });
+    var a = t && (t.attachments||[]).find(function(x){ return x.id===attId; });
+    return t && a ? {t:t, a:a} : null;
+  }
+  function taskAttOpen(a){
+    if(!a.url){ toast("ファイルの場所が見つかりません"); return; }
+    try{ window.open(a.url, "_blank", "noopener"); }catch(e){ location.href = a.url; }
+  }
+  // 名前つきでパソコン・スマホに保存する（そのままのリンクだと名前が「get-photo」になるため）
+  async function taskAttDownload(a){
+    if(!a.url){ toast("ファイルの場所が見つかりません"); return; }
+    try{
+      var blob = blobCache[a.id];
+      if(!blob){
+        var res = await fetch(a.url);
+        if(!res.ok) throw new Error("http "+res.status);
+        blob = await res.blob();
+      }
+      var u = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = u; link.download = a.name || "添付ファイル";
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(function(){ URL.revokeObjectURL(u); }, 60000);
+      toast("⬇ 保存しました（ダウンロード）");
+    }catch(e){
+      toast("保存できませんでした。開いた画面から保存してください");
+      taskAttOpen(a);
+    }
+  }
+  function taskAttGoRecord(pid){
+    if(!pid || !projectById(pid)) return;
+    switchTab("projects"); openProjectDetail(pid);
+    setTimeout(function(){ var mb = document.querySelector('.sub-btn[data-sub="meeting"]'); if(mb) mb.click(); }, 30);
+  }
+  function taskAttOps(taskId, attId){
+    var f = taskAttFind(taskId, attId); if(!f) return;
+    var t = f.t, a = f.a;
+    var kept = taskAttKeptSpec(t, a), plan = taskAttPlan(t, a);
+    var keepItems = [];
+    if(kept) keepItems.push({label:"📝 記録に残してあります（記録タブで見る）", value:"gokept", on:true});
+    else keepItems.push({label:"📝 記録に残す（部位を選んで記録タブへ）", value:"keep"});
+    if(plan) keepItems.push({label:"📐 図面に登録してあります", value:"noop", on:true});
+    else keepItems.push({label:"📐 案件の図面に登録する（見積タブ・図面から選べる）", value:"plan"});
+    opsPopup(a.name||"添付ファイル", t.projectId ? (projectById(t.projectId)||{}).name||"" : "案件が未設定のタスク", [
+      ["見る・取り出す", [{label:"👁 開いて見る", value:"open"}, {label:"⬇ 名前をつけて保存（ダウンロード）", value:"dl"}]],
+      ["残す", keepItems],
+      ["", [{label:"✕ このタスクから外す", value:"del", danger:true}]]
+    ], function(v){
+      if(v==="open") taskAttOpen(a);
+      else if(v==="dl") taskAttDownload(a);
+      else if(v==="keep") taskAttKeep(taskId, attId);
+      else if(v==="gokept") taskAttGoRecord(kept.projectId);
+      else if(v==="plan") taskAttToPlan(taskId, attId);
+      else if(v==="del"){
+        var msg = "「"+(a.name||"添付")+"」をこのタスクから外しますか？"+((kept||plan)?"\n（記録・図面に残した分は消えません）":"\n（記録に残していないと、あとで探しにくくなります）");
+        if(confirm(msg)) deleteTaskAttachment(taskId, attId);
+      }
+    });
+  }
+  function taskAttNeedProject(t){
+    if(t.projectId && projectById(t.projectId)) return true;
+    toast("先にタスクの「編集」で案件を選んでください（残す先の案件が決まっていません）");
+    return false;
+  }
+  async function taskAttKeep(taskId, attId){
+    var f = taskAttFind(taskId, attId); if(!f) return;
+    var t = f.t;
+    if(!taskAttNeedProject(t)) return;
+    var vs = t.vendorSpec && t.vendorSpec.scope ? t.vendorSpec : null;
+    var go = function(part){
+      if(!part) return;
+      taskAttKeepDo(taskId, attId, part);
+    };
+    if(vs){
+      opsPopup("どの部位の記録に残しますか？", "", [["部位", [
+        {label:"📍 "+(partText(vs, t.projectId)||vs.label||"タスクの部位")+" に残す", value:"same"},
+        {label:"別の部位を選ぶ", value:"other"}
+      ]]], function(v){
+        if(v==="same") go(vs);
+        else if(v==="other") askSpecPart(go, t.projectId);
+      });
+    }else askSpecPart(go, t.projectId);
+  }
+  async function taskAttKeepDo(taskId, attId, part){
+    var f = taskAttFind(taskId, attId); if(!f) return;
+    var t = f.t, a = f.a;
+    var id = "sp_k_"+t.id+"_"+a.id;
+    var doc = state.specPhotos.find(function(sp){ return sp.id===id; });
+    var fresh = !doc;
+    if(!doc){ doc = { id:id }; }
+    Object.assign(doc, {
+      projectId: t.projectId, scope: part.scope, category: part.category==null ? null : part.category,
+      roomId: part.roomId || null, side: part.side || null,
+      assetId: a.id, url: a.url, kind: "photo",
+      contentType: a.contentType || (/\.pdf$/i.test(a.name||"") ? "application/pdf" : ""), fileName: a.name,
+      createdAt: doc.createdAt || nowIso(), updatedAt: nowIso(), deletedAt: null,
+      source: { keptFromTaskId: t.id },
+      memo: doc.memo || ("タスク「"+(t.content||"").split("\n")[0].slice(0,30)+"」の添付から")
+    });
+    if(fresh) state.specPhotos.push(doc);
+    var ok = await saveDoc("specPhotos", doc.id, doc);
+    if(ok===false){ toast("記録に残せませんでした。もう一度お試しください"); return; }
+    a.keptSpecId = doc.id;
+    t.updatedAt = nowIso();
+    await saveDoc("tasks", t.id, t);
+    logActivity("タスク「"+(t.content||"").slice(0,20)+"」の添付「"+(a.name||"")+"」を記録に残しました");
+    render();
+    askChoice("📝 記録に残しました", "「"+(partText(part, t.projectId)||"")+"」の記録タブに入りました。タスクを消しても残ります。\nお客様にはまだ出ていません（出すときは記録のカードの「⋮ 操作」→反映）。",
+      [{label:"記録タブで見る", value:"go"}], function(v){ if(v==="go") taskAttGoRecord(t.projectId); }, {cancelLabel:"閉じる"});
+  }
+  async function taskAttToPlan(taskId, attId){
+    var f = taskAttFind(taskId, attId); if(!f) return;
+    var t = f.t, a = f.a;
+    if(!taskAttNeedProject(t)) return;
+    var id = "att_t_"+t.id+"_"+a.id;
+    var att = state.attachments.find(function(x){ return x.id===id; });
+    var fresh = !att;
+    if(!att) att = { id:id };
+    Object.assign(att, { projectId: t.projectId, assetId: a.id, name: a.name || "図面", url: a.url,
+      contentType: a.contentType || "", uploadedAt: att.uploadedAt || todayStr(), kind: "plan", fromTaskId: t.id, deletedAt: null });
+    if(fresh) state.attachments.push(att);
+    var ok = await saveDoc("attachments", att.id, att);
+    if(ok===false){ toast("図面に登録できませんでした"); return; }
+    a.planAttId = att.id;
+    t.updatedAt = nowIso();
+    await saveDoc("tasks", t.id, t);
+    logActivity("タスク「"+(t.content||"").slice(0,20)+"」の添付「"+(a.name||"")+"」を図面に登録しました");
+    render();
+    toast("📐 案件の図面に登録しました（タスクを消しても残ります）");
   }
   // PDF・図面のサムネイルを「本物の1ページ目プレビュー画像」として見せるための
   // 共通ヘルパー。初回呼び出し時はファイルアイコンを即座に返しつつ裏でpdf.jsに
@@ -21639,6 +21799,16 @@
     var kanbanClick = function(e){
       var opj = e.target.closest("[data-openproj]");
       if(opj){ var opid = opj.dataset.openproj; switchTab("projects"); openProjectDetail(opid); var tb = document.querySelector('.sub-btn[data-sub="tasks"]'); if(tb) tb.click(); return; }
+      var tab = e.target.closest("[data-tattact]");
+      if(tab){
+        var tf = taskAttFind(tab.dataset.tatt, tab.dataset.attid);
+        if(!tf){ toast("ファイルが見つかりません"); return; }
+        var ta = tab.dataset.tattact;
+        if(ta==="open") taskAttOpen(tf.a);
+        else if(ta==="dl") taskAttDownload(tf.a);
+        else if(ta==="ops") taskAttOps(tab.dataset.tatt, tab.dataset.attid);
+        return;
+      }
       var delAttachBtn = e.target.closest("button[data-delattach]");
       if(delAttachBtn){ deleteTaskAttachment(delAttachBtn.dataset.delattach, delAttachBtn.dataset.attid); return; }
       var kcol = e.target.closest("[data-kccollapse]");
@@ -21686,7 +21856,7 @@
       if(!btn){
         // カード本体を押したら、詳細を開く／閉じる（ボタン・リンク・入力は除く）
         var cardEl = e.target.closest(".kancard");
-        if(cardEl && !e.target.closest("button, a, label, input, select, textarea, [data-openatt], [data-vendorcycle], [data-vendorlist], [data-delattach]")){
+        if(cardEl && !e.target.closest("button, a, label, input, select, textarea, [data-openatt], [data-vendorcycle], [data-vendorlist], [data-delattach], [data-tattact]")){
           var tid = cardEl.dataset.taskid;
           state.taskExpanded = state.taskExpanded || {};
           state.taskExpanded[tid] = !state.taskExpanded[tid];
