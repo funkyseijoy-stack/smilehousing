@@ -3452,7 +3452,7 @@ function homeHtml(){ return homeParts().main; }
     g.globalCompositeOperation = "source-over";
   }
   // 拡大：表示の大きさ＝元の大きさ×（画面に合わせた倍率 fit）×zoom。cx,cy（画面上の点）を中心に拡大する
-  var DRAW_MAX_ZOOM = 5;
+  var DRAW_MAX_ZOOM = 10;
   function drawSetZoom(z, cx, cy){
     var wrap = dr.wrap, stage = document.getElementById("drawStage"); if(!wrap || !stage) return;
     z = Math.max(1, Math.min(DRAW_MAX_ZOOM, z));
