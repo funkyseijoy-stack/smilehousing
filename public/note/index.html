@@ -917,7 +917,8 @@
     <button class="col on" data-dcol="#e0321e" style="background:#e0321e;" aria-label="赤"></button>
     <button class="col" data-dcol="#1f5fd1" style="background:#1f5fd1;" aria-label="青"></button>
     <button class="col" data-dcol="#111111" style="background:#111111;" aria-label="黒"></button>
-    <button data-dtool="pen" class="on">✏️ ペン</button>
+    <button data-dtool="move" class="on">✋ 動かす</button>
+    <button data-dtool="pen">✏️ ペン</button>
     <button data-dtool="text">🔤 文字</button>
     <button data-dtool="eraser">🧽 消しゴム</button>
     <button id="drawUndo">↶ 元に戻す</button>
@@ -3370,11 +3371,13 @@ function homeHtml(){ return homeParts().main; }
       b.parentNode.insertBefore(d, b.nextSibling);
     });
   }
-  var dr = { files:[], fi:0, page:1, pages:1, pdf:null, w:0, h:0, color:"#e0321e", tool:"pen", strokes:[], key:"", label:"" };
+  var dr = { files:[], fi:0, page:1, pages:1, pdf:null, w:0, h:0, color:"#e0321e", tool:"move", strokes:[], key:"", label:"" };
   var drBg = null, drInk = null;
   function drawOpen(key, label){
     dr.files = drawFilesOfKey(key); if(!dr.files.length){ toast("書き込める図面がありません"); return; }
     dr.key = key; dr.label = label; dr.fi = 0; dr.page = 1; dr.strokes = [];
+    // 開いたときは「動かす」：指で動かす・2本指で拡大。書くときは「ペン」を押す
+    dr.tool = "move"; Array.prototype.forEach.call(document.querySelectorAll("#drawModal [data-dtool]"), function(x){ x.classList.toggle("on", x.getAttribute("data-dtool")==="move"); });
     var sel = document.getElementById("drawFileSel");
     sel.innerHTML = dr.files.map(function(f, i){ return '<option value="'+i+'">'+esc(f.name || ((isPdf(f)?"PDF ":"写真 ")+(i+1)))+'</option>'; }).join("");
     sel.hidden = dr.files.length < 2;
@@ -3422,12 +3425,13 @@ function homeHtml(){ return homeParts().main; }
   }
   function drawRedraw(){
     var g = drInk.getContext("2d"); g.clearRect(0,0,dr.w,dr.h);
-    var lw = Math.max(3, Math.round(Math.max(dr.w, dr.h)/300));
+    var tl = Math.max(3, Math.round(Math.max(dr.w, dr.h)/300));   // 文字・消しゴムの大きさの基準（以前の線の太さ）
+    var lw = Math.max(2, Math.round(Math.max(dr.w, dr.h)/900));   // ペンの線（細め）
     dr.strokes.forEach(function(s){
-      if(s.text){ g.globalCompositeOperation = "source-over"; g.fillStyle = s.color; g.font = "bold "+(lw*8)+"px sans-serif"; g.textBaseline = "top";
-        String(s.text).split("\n").forEach(function(line, i){ g.fillText(line, s.x, s.y + i*lw*9); }); return; }
+      if(s.text){ g.globalCompositeOperation = "source-over"; g.fillStyle = s.color; g.font = "bold "+(tl*8)+"px sans-serif"; g.textBaseline = "top";
+        String(s.text).split("\n").forEach(function(line, i){ g.fillText(line, s.x, s.y + i*tl*9); }); return; }
       g.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
-      g.strokeStyle = s.color; g.lineWidth = s.erase ? lw*6 : lw; g.lineCap = "round"; g.lineJoin = "round";
+      g.strokeStyle = s.color; g.lineWidth = s.erase ? tl*6 : lw; g.lineCap = "round"; g.lineJoin = "round";
       g.beginPath(); s.pts.forEach(function(p, i){ if(i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); });
       if(s.pts.length===1) g.lineTo(s.pts[0][0]+0.1, s.pts[0][1]);
       g.stroke();
@@ -3451,7 +3455,7 @@ function homeHtml(){ return homeParts().main; }
     var lb = document.getElementById("drawZoomLbl"); if(lb) lb.textContent = Math.round(z*100)+"%";
   }
   function drawWireInk(){
-    var cur = null, touches = {}, pinch = null;
+    var cur = null, touches = {}, pinch = null, pan = null;
     var pt = function(e){ var r = drInk.getBoundingClientRect(); return [ (e.clientX - r.left) * dr.w / r.width, (e.clientY - r.top) * dr.h / r.height ]; };
     var tList = function(){ return Object.keys(touches).map(function(k){ return touches[k]; }); };
     var pinchInfo = function(){ var t = tList(), a = t[0], b = t[1];
@@ -3464,11 +3468,17 @@ function homeHtml(){ return homeParts().main; }
         if(tList().length >= 2){
           // 2本目の指：書きかけの線は取り消して、拡大・移動にする
           if(cur){ var i = dr.strokes.indexOf(cur); if(i >= 0) dr.strokes.splice(i, 1); cur = null; drawRedraw(); }
+          pan = null;
           var pi = pinchInfo(); pinch = { d0:pi.d, z0:dr.zoom, x:pi.x, y:pi.y };
           return;
         }
       }
       if(pinch) return;
+      if(dr.tool==="move"){
+        // 「動かす」：1本指（マウス）で画面を動かす
+        try{ drInk.setPointerCapture(e.pointerId); }catch(er){}
+        pan = { id:e.pointerId, x:e.clientX, y:e.clientY }; return;
+      }
       var p = pt(e);
       if(dr.tool==="text"){
         // LINEの中のブラウザでは window.prompt が出ないことがあるので、画面の中に入力欄を出す
@@ -3492,9 +3502,16 @@ function homeHtml(){ return homeParts().main; }
         drawSetZoom(pinch.z0 * pi.d / pinch.d0, pi.x, pi.y);
         return;
       }
+      if(pan && pan.id === e.pointerId){
+        e.preventDefault();
+        var st = document.getElementById("drawStage");
+        st.scrollLeft -= e.clientX - pan.x; st.scrollTop -= e.clientY - pan.y;
+        pan.x = e.clientX; pan.y = e.clientY; return;
+      }
       if(!cur) return; e.preventDefault(); cur.pts.push(pt(e)); drawRedraw(); });
     var end = function(e){
       if(e && touches[e.pointerId]) delete touches[e.pointerId];
+      if(pan && (!e || pan.id === e.pointerId)) pan = null;
       if(pinch){ if(!tList().length) pinch = null; cur = null; return; }
       cur = null; };
     drInk.addEventListener("pointerup", end); drInk.addEventListener("pointercancel", end);
@@ -3530,7 +3547,7 @@ function homeHtml(){ return homeParts().main; }
   Array.prototype.forEach.call(document.querySelectorAll("#drawModal [data-dcol]"), function(b){ b.addEventListener("click", function(){
     dr.color = b.getAttribute("data-dcol");
     Array.prototype.forEach.call(document.querySelectorAll("#drawModal [data-dcol]"), function(x){ x.classList.toggle("on", x===b); });
-    if(dr.tool==="eraser"){ dr.tool = "pen"; Array.prototype.forEach.call(document.querySelectorAll("#drawModal [data-dtool]"), function(x){ x.classList.toggle("on", x.getAttribute("data-dtool")==="pen"); }); }
+    if(dr.tool==="eraser" || dr.tool==="move"){ dr.tool = "pen"; Array.prototype.forEach.call(document.querySelectorAll("#drawModal [data-dtool]"), function(x){ x.classList.toggle("on", x.getAttribute("data-dtool")==="pen"); }); }
   }); });
   Array.prototype.forEach.call(document.querySelectorAll("#drawModal [data-dtool]"), function(b){ b.addEventListener("click", function(){
     dr.tool = b.getAttribute("data-dtool");
