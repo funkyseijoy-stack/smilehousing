@@ -375,6 +375,14 @@
   .hslot .section-item-desc{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .hslot .section-item-title{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .hdate{ font-size:12px; font-weight:700; color:var(--muted); margin:0 2px 4px; }
+  /* ホームの「お願いしたいこと」の横スクロール */
+  .rqrow .hdate{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .rqk{ font-size:11px; font-weight:700; border-radius:999px; padding:1px 8px; }
+  .rqk.dec{ background:#fde7e4; color:#b33a2c; }
+  .rqk.cons{ background:#fff3d6; color:#9a6b12; }
+  .rqk.est{ background:#e8eef9; color:#2f4f8a; }
+  .rqcons{ border-color:#e6c46a; background:#fffbef; }
+  .rqcons .rqt{ font-size:15px; line-height:1.6; margin:4px 0 6px; white-space:pre-line; }
   .hplan{ border-left-color:var(--green-ink); }
   .hplan .pnm{ font-weight:700; margin-top:6px; word-break:break-all; }
   .hint{ font-size:12px; color:var(--muted); margin:-2px 2px 10px; }
@@ -1567,12 +1575,13 @@ function homeHtml(){ return homeParts().main; }
     out += newPhotosHtml();
     out += staffCommentHtml();
     out += updatesHtml();
-    out += latestNotesHtml();
+    // 「🙋 お願いしたいこと」：決定待ち・ご検討いただく事・返事待ちの追加見積りを横スクロールのカードで。
+    // 何も無いときだけ、従来どおり最新の打合せ記録を出す（2026年11月28日〜）
+    out += safeHtml("お願いしたいこと", requestRowHtml);
     // 「📝 打合せ記録」の欄（ホームに出すにした記録）は出さない（家づくりの記録の段と二重になるため。2026年11月16日〜）
     // 「✅ ご確認・ご決定ください」も出さない（2026年11月21日〜。決定は家づくりの記録の各カードで）。
     // ホームの並び：最新の打合せ記録 → 家づくりの記録（部位ごと・いちばん下に追加見積り）→ 決定事項。ほかはそのあと
     // 最新の打合せ記録のすぐ下に「ご検討いただく事」、その下に「打合せの予定」
-    out += decideListHtml();
     var mainTop = out; out = "";
     // 次回のご予約・家づくりの進行状況は上の帯（現在：〇〇／次回 〇/〇）に出ているので、ホームには出さない。
     // スタッフが書いた「打合せの予定」の文章があるときだけ出す
@@ -2474,6 +2483,41 @@ function homeHtml(){ return homeParts().main; }
         return '<div class="tli flat">'+noteBody(n, true, true)+(f ? homeDecHtml(n, f) : '')+link+'</div>';
       }).join("")+'</div>'+
       '<div class="homelink"><button class="linkbtn" data-opennotes="1">これまでの打合せ記録を見る ›</button></div>';
+  }
+  // ホームの「🙋 お願いしたいこと」：決定待ちのカード → ご検討いただく事（💭）→ 返事待ちの追加見積り を横スクロールで。
+  // 何も無いときは最新の打合せ記録（latestNotesHtml）を出す
+  function requestRowHtml(){
+    homeLatestIds = {};
+    var slots = [];
+    var tagH = function(t){ return t ? '<span class="ptag">'+esc(t)+'</span>' : ''; };
+    askItems().forEach(function(e){
+      var c = e.c, x = e.x, room = "", roomName = "";
+      (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
+      var big = isPb(x) && !!x.file;
+      slots.push('<div class="hslot'+(big?' big':'')+'"><div class="hdate">'+tagH(roomName || partOf(c, x) || x.label || c.name)+' <span class="rqk dec">決定してください</span></div>'+
+        feedCardHtml({c:c, x:x, room:room, at:e.at}, {row:true})+
+        '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
+    });
+    consItems().forEach(function(c){
+      slots.push('<div class="hslot"><div class="hdate">'+tagH(c.part||c.title||"打合せ")+' <span class="rqk cons">ご検討ください</span></div>'+
+        '<div class="fcard rqcons"><div class="fhd"><span class="fd">'+fmtD(c.date)+'</span></div>'+
+        '<div class="rqt">'+esc(c.t)+'</div>'+
+        (c.id ? '<button class="linkbtn" data-opennote="'+esc(c.id)+'">打合せ記録を見る ›</button>' : '')+
+        consBtnsHtml(c.t, fmtD(c.date)+(c.part?'・'+c.part:(c.title?'・'+c.title:'')))+'</div></div>');
+    });
+    (data.estimates||[]).forEach(function(x){
+      var pend = x.estimateState ? x.estimateState==="金額確認中" : !String(x.amount||"").trim();
+      if(pend || !x.id || estIsMinus(x) || (x.customerResponse||"未回答")!=="未回答") return;
+      slots.push('<div class="hslot"><div class="hdate">'+tagH("追加見積り")+' <span class="rqk est">ご確認ください</span></div>'+
+        '<div class="hest wait"><div class="et">'+esc(x.title||"追加見積り")+'</div>'+
+        (x.note ? '<div class="en">'+esc(x.note)+'</div>' : '')+
+        '<div class="ea">'+esc(estAmountText(x))+'<small>税抜き</small></div>'+
+        '<div class="eb"><button class="btn ol" data-estresp="見送り" data-estid="'+esc(x.id)+'">見送る</button><button class="btn dk" data-estresp="承認" data-estid="'+esc(x.id)+'">✅ 承認する</button></div></div></div>');
+    });
+    if(!slots.length) return latestNotesHtml();
+    return '<div class="sechd"><h3>🙋 お願いしたいこと</h3><span class="countpill">'+slots.length+'件</span></div>'+
+      (slots.length>1 ? '<p class="hint">← 横にスクロールすると、ほかのお願いが見られます。</p>' : '')+
+      '<div class="hrow rqrow"><div class="hstrip" data-hrow="__req">'+slots.join("")+'</div></div>';
   }
   // 打合せ記録が入っている項目と、その項目の中のカード（決定ボタンの状態）を探す
   function noteDecItem(n){ return decItemByKey("n:"+n.id); }
