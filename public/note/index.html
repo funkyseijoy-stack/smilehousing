@@ -626,8 +626,10 @@
   #drawModal .dtb button, #drawModal .dtop button{ background:#fff; border:2px solid transparent; border-radius:999px; padding:6px 11px; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; color:#3a332d; }
   #drawModal .dtb button.on{ border-color:#f2b84b; box-shadow:0 0 0 2px #f2b84b; }
   #drawModal .dtb .col{ width:32px; height:32px; padding:0; }
-  #drawModal .dstage{ flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:8px; }
-  #drawModal .dwrap{ position:relative; background:#fff; }
+  #drawModal .dstage{ flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:flex-start; padding:8px; -webkit-overflow-scrolling:touch; }
+  #drawModal .dwrap{ position:relative; background:#fff; margin:0 auto; flex:none; }
+  #drawModal .dtb .dzm{ min-width:36px; }
+  #drawModal .dtb .dzl{ color:#fff; font-size:.8rem; min-width:3em; text-align:center; }
   #drawModal .dwrap canvas{ position:absolute; left:0; top:0; width:100%; height:100%; touch-action:none; }
   #drawModal .dbot{ background:#f7f1e8; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px; }
   #drawModal .dbot textarea{ width:100%; min-height:56px; border:1px solid var(--line2); border-radius:10px; padding:8px; font:inherit; font-size:.92rem; box-sizing:border-box; }
@@ -919,6 +921,7 @@
     <button data-dtool="text">🔤 文字</button>
     <button data-dtool="eraser">🧽 消しゴム</button>
     <button id="drawUndo">↶ 元に戻す</button>
+    <button class="dzm" id="drawZoomOut" aria-label="縮小">－</button><span class="dzl" id="drawZoomLbl">100%</span><button class="dzm" id="drawZoomIn" aria-label="拡大">＋</button>
   </div>
   <div class="dstage" id="drawStage"><div class="dmsg">読み込み中…</div></div>
   <div class="dbot">
@@ -3409,9 +3412,10 @@ function homeHtml(){ return homeParts().main; }
     var wrap = document.createElement("div"); wrap.className = "dwrap";
     var maxW = stage.clientWidth - 16, maxH = stage.clientHeight - 16, fit = Math.min(maxW / dr.w, maxH / dr.h);
     if(!(fit > 0)) fit = maxW / dr.w;
-    wrap.style.width = Math.round(dr.w*fit)+"px"; wrap.style.height = Math.round(dr.h*fit)+"px";
+    dr.fit = fit; dr.zoom = 1; dr.wrap = wrap;
     wrap.appendChild(drBg); wrap.appendChild(drInk);
     stage.innerHTML = ""; stage.appendChild(wrap);
+    drawSetZoom(1);
     document.getElementById("drawPage").textContent = dr.pages > 1 ? dr.page+" / "+dr.pages : "";
     document.getElementById("drawPrev").hidden = !(dr.pages > 1); document.getElementById("drawNext").hidden = !(dr.pages > 1);
     drawWireInk();
@@ -3430,11 +3434,41 @@ function homeHtml(){ return homeParts().main; }
     });
     g.globalCompositeOperation = "source-over";
   }
+  // 拡大：表示の大きさ＝元の大きさ×（画面に合わせた倍率 fit）×zoom。cx,cy（画面上の点）を中心に拡大する
+  var DRAW_MAX_ZOOM = 5;
+  function drawSetZoom(z, cx, cy){
+    var wrap = dr.wrap, stage = document.getElementById("drawStage"); if(!wrap || !stage) return;
+    z = Math.max(1, Math.min(DRAW_MAX_ZOOM, z));
+    var r0 = wrap.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    if(cx == null){ cx = sr.left + sr.width/2; cy = sr.top + sr.height/2; }
+    var fx = r0.width ? (cx - r0.left) / r0.width : .5, fy = r0.height ? (cy - r0.top) / r0.height : .5;
+    dr.zoom = z;
+    var w = Math.round(dr.w*dr.fit*z), h = Math.round(dr.h*dr.fit*z);
+    wrap.style.width = w+"px"; wrap.style.height = h+"px";
+    var r1 = wrap.getBoundingClientRect();
+    stage.scrollLeft += r1.left - (cx - fx*w);
+    stage.scrollTop += r1.top - (cy - fy*h);
+    var lb = document.getElementById("drawZoomLbl"); if(lb) lb.textContent = Math.round(z*100)+"%";
+  }
   function drawWireInk(){
-    var cur = null;
+    var cur = null, touches = {}, pinch = null;
     var pt = function(e){ var r = drInk.getBoundingClientRect(); return [ (e.clientX - r.left) * dr.w / r.width, (e.clientY - r.top) * dr.h / r.height ]; };
+    var tList = function(){ return Object.keys(touches).map(function(k){ return touches[k]; }); };
+    var pinchInfo = function(){ var t = tList(), a = t[0], b = t[1];
+      return { d: Math.max(1, Math.hypot(a.x-b.x, a.y-b.y)), x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; };
     drInk.addEventListener("pointerdown", function(e){
       e.preventDefault();
+      if(e.pointerType === "touch"){
+        touches[e.pointerId] = { x:e.clientX, y:e.clientY };
+        try{ drInk.setPointerCapture(e.pointerId); }catch(er){}
+        if(tList().length >= 2){
+          // 2本目の指：書きかけの線は取り消して、拡大・移動にする
+          if(cur){ var i = dr.strokes.indexOf(cur); if(i >= 0) dr.strokes.splice(i, 1); cur = null; drawRedraw(); }
+          var pi = pinchInfo(); pinch = { d0:pi.d, z0:dr.zoom, x:pi.x, y:pi.y };
+          return;
+        }
+      }
+      if(pinch) return;
       var p = pt(e);
       if(dr.tool==="text"){
         // LINEの中のブラウザでは window.prompt が出ないことがあるので、画面の中に入力欄を出す
@@ -3446,8 +3480,23 @@ function homeHtml(){ return homeParts().main; }
       try{ drInk.setPointerCapture(e.pointerId); }catch(er){}
       cur = { pts:[p], color:dr.color, erase: dr.tool==="eraser" }; dr.strokes.push(cur); drawRedraw();
     });
-    drInk.addEventListener("pointermove", function(e){ if(!cur) return; e.preventDefault(); cur.pts.push(pt(e)); drawRedraw(); });
-    var end = function(){ cur = null; };
+    drInk.addEventListener("pointermove", function(e){
+      if(e.pointerType === "touch" && touches[e.pointerId]){ touches[e.pointerId] = { x:e.clientX, y:e.clientY }; }
+      if(pinch){
+        e.preventDefault();
+        if(tList().length < 2) return;
+        var pi = pinchInfo(), stage = document.getElementById("drawStage");
+        // 2本指を動かした分だけ画面を動かし、指の間の点を中心に拡大・縮小
+        stage.scrollLeft -= pi.x - pinch.x; stage.scrollTop -= pi.y - pinch.y;
+        pinch.x = pi.x; pinch.y = pi.y;
+        drawSetZoom(pinch.z0 * pi.d / pinch.d0, pi.x, pi.y);
+        return;
+      }
+      if(!cur) return; e.preventDefault(); cur.pts.push(pt(e)); drawRedraw(); });
+    var end = function(e){
+      if(e && touches[e.pointerId]) delete touches[e.pointerId];
+      if(pinch){ if(!tList().length) pinch = null; cur = null; return; }
+      cur = null; };
     drInk.addEventListener("pointerup", end); drInk.addEventListener("pointercancel", end);
   }
   document.getElementById("drawClose").addEventListener("click", function(){
@@ -3455,6 +3504,8 @@ function homeHtml(){ return homeParts().main; }
     drawClose();
   });
   document.getElementById("drawUndo").addEventListener("click", function(){ dr.strokes.pop(); drawRedraw(); });
+  document.getElementById("drawZoomIn").addEventListener("click", function(){ drawSetZoom((dr.zoom||1) * 1.5); });
+  document.getElementById("drawZoomOut").addEventListener("click", function(){ drawSetZoom((dr.zoom||1) / 1.5); });
   var drawTxtClose = function(){ document.getElementById("drawTxtBox").hidden = true; dr.txtAt = null; };
   var drawTxtPut = function(){
     var t = (document.getElementById("drawTxtIn").value||"").trim();
