@@ -4702,16 +4702,39 @@
     if(d && d.pushSent) return "📣 LINEと通知でお知らせしました" + (who ? "（"+who+"）" : "");
     return "📱 LINEでお知らせしました" + (who ? "（"+who+"）" : "");
   }
+  // 「おうちノートが更新されました」を誰に送るか選ぶ。戻り値：[]＝全員／[uid]＝その人だけ／null＝やめる
+  function notifyRowHow(p, r){
+    var e = effPushSub(p, r);
+    var pushOk = e && activePushOf(p).some(function(x){ return x.id===e; });
+    var hasBeacon = !!(state.settings && state.settings.prolineBeaconUrl);
+    return pushOk ? "🔔 通知" : (hasBeacon ? "📱 LINE" : "");
+  }
+  function askNotifyTargets(p, who){
+    return new Promise(function(resolve){
+      var title = (p.customer||p.name||"お客様")+"に知らせますか？";
+      var rows = prolineRecipients(p).filter(function(r){ return notifyRowHow(p, r); });
+      if(rows.length < 2){
+        resolve(confirm(title+"\n「おうちノートが更新されました。」\n（"+who+"）") ? [] : null);
+        return;
+      }
+      var choices = [{ label: "全員に送る（"+who+"）", value: [] }].concat(rows.map(function(r){
+        return { label: (r.name||r.uid)+"だけに送る（"+notifyRowHow(p, r)+"）", value: [r.uid] };
+      }));
+      askChoice(title, "「おうちノートが更新されました。」を送る相手を選んでください。", choices, function(v){ resolve(v===null ? null : v); });
+    });
+  }
   async function sendLineNotify(){
     var proj = projectById(state.currentProjectId);
     var recips = prolineRecipients(proj);
     if(!proj || !canNotifyProj(proj) || lineNotifying) return;
     var who = notifyWhoText(proj);
-    if(!confirm((proj.customer||proj.name||"お客様")+"に「おうちノートが更新されました。」を知らせますか？\n（"+who+"）")) return;
+    // 送る相手を選ぶ（全員／〇〇さんだけ）。送る人が1人以下なら従来どおりの確認だけ
+    var only = await askNotifyTargets(proj, who);
+    if(only===null) return;
     lineNotifying = true;
     var btn = document.getElementById("btnLineNotify"); if(btn) btn.disabled = true;
     try{
-      var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: proj.id, by: state.currentUser||"" }) });
+      var res = await fetch('/api/note-line-notify', { method:'POST', headers:{'Content-Type':'application/json','X-Staff-Token': getStaffToken()}, body: JSON.stringify({ projectId: proj.id, by: state.currentUser||"", only: only }) });
       var data = {}; try{ data = await res.json(); }catch(e){}
       if(res.ok && data.ok && data.failed && data.failed.length){
         var fn = data.failed.map(function(u){ var r = recips.find(function(x){ return x.uid===u; }); return (r && r.name) || u; }).join("、");

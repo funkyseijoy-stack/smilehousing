@@ -115,16 +115,27 @@ export function pushPayload(items: NotifyItem[], page: string) {
 }
 
 // いま送る：LINE（プッシュ通知で届く人を除く）とプッシュ通知の両方
-export async function deliverNow(projectId: string, beacon: string | null, items: NotifyItem[] = []) {
+// only＝送る人の行のプロラインID（「ご主人だけ」「奥様だけ」）。無い／空なら全員（行に無い端末にも通知を送る）
+export async function deliverNow(projectId: string, beacon: string | null, items: NotifyItem[] = [], only?: string[] | null) {
   const store = getStore("staffData");
-  const project: any = await store.get(`projects/${projectId}`, { type: "json", consistency: "strong" } as any);
+  let project: any = await store.get(`projects/${projectId}`, { type: "json", consistency: "strong" } as any);
   if (!project || project.deletedAt) return { sent: 0, failed: [] as string[], pushSent: 0, pushTotal: 0 };
+  let onlySubs: Set<string> | undefined;
+  if (only && only.length) {
+    const want = new Set(only.map(String));
+    const rows0: any[] = Array.isArray(project.prolineUids) ? project.prolineUids : (project.prolineUid ? [{ uid: project.prolineUid }] : []);
+    const picked = rows0.filter((r: any) => r && want.has(String(r.uid)));
+    project = { ...project, prolineUids: picked };
+    delete project.prolineUid;
+    const remap0 = remapPushRows(project, await listSubs(projectId));
+    onlySubs = new Set((remap0.prolineUids || []).map((r: any) => String((r && r.pushSub) || "")).filter(Boolean));
+  }
   // 先に通知を送り、届いた端末を選んでいる人にだけLINEを送らない（届かなかった人にはこの回もLINEを送る）
   const act = await activePushIds(projectId);
   let p = { sent: 0, total: 0 };
   let okIds = new Set<string>();
-  if (act.size) {
-    try { const pr = await sendPushToProject(projectId, (page: string) => pushPayload(items, page)); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
+  if (act.size && !(onlySubs && !onlySubs.size)) {
+    try { const pr = await sendPushToProject(projectId, (page: string) => pushPayload(items, page), onlySubs); p = { sent: pr.sent, total: pr.total }; okIds = pr.okIds; }
     catch (e) { console.error("push failed", e); }
   }
   const subsAfter = await listSubs(projectId);
@@ -136,7 +147,7 @@ export async function deliverNow(projectId: string, beacon: string | null, items
   const nameOfUid = (u: string) => { const row = rows.find((x: any) => x && String(x.uid) === u); return (row && row.name) || u; };
   const lineTo = beacon ? uids.map(nameOfUid) : [];
   const pushTo = subsAfter.filter((x: any) => okIds.has(String(x.id))).map((x: any) => x.name || "名前なし");
-  console.log("deliverNow", projectId, JSON.stringify({ rows: rows.map((x: any) => ({ uid: x && x.uid, pushSub: x && x.pushSub })), okIds: Array.from(okIds), lineTo: uids }));
+  console.log("deliverNow", projectId, JSON.stringify({ rows: rows.map((x: any) => ({ uid: x && x.uid, pushSub: x && x.pushSub })), okIds: Array.from(okIds), lineTo: uids, only: only || null }));
   return { sent: r.sent, failed: r.failed, pushSent: p.sent, pushTotal: p.total, lineTo, pushTo };
 }
 export function checkBeacon(settings: any): string | null {
@@ -156,11 +167,16 @@ export async function sendBeacon(beacon: string, uids: string[]) {
 }
 
 // 頼まれたときに呼ぶ。すぐ送るか、まとめて送る予定に入れるかを決める。
-export async function requestLineNotify(opts: { projectId: string; kind: string; by: string; beacon: string | null; uids?: string[]; item?: NotifyItem }) {
+export async function requestLineNotify(opts: { projectId: string; kind: string; by: string; beacon: string | null; uids?: string[]; item?: NotifyItem; only?: string[] | null }) {
   const q = getStore("lineQueue");
   const now = Date.now();
   const cur: any = (await q.get(opts.projectId, { type: "json", consistency: "strong" } as any)) || { projectId: opts.projectId };
-  const merge = (p: any) => {
+  const only = opts.only && opts.only.length ? opts.only.map(String) : null;
+  const merge = (p: any, fresh = false) => {
+    // 送る相手：新しく予定に入れるときはこの回の相手。すでに予定があれば合わせる（どちらかが全員なら全員）
+    if (fresh) { if (only) p.only = only; else delete p.only; }
+    else if (!p.only || !only) delete p.only;
+    else p.only = Array.from(new Set([...p.only, ...only]));
     p.kinds = Array.from(new Set([...(p.kinds || []), opts.kind || "manual"]));
     p.by = Array.from(new Set([...(p.by || []), opts.by || ""].filter(Boolean)));
     if (opts.item) p.items = [...(p.items || []), opts.item].slice(-20);
@@ -169,7 +185,8 @@ export async function requestLineNotify(opts: { projectId: string; kind: string;
   // デモの案件（練習用）は試しやすいよう、夜・30分の間隔に関係なくいつもすぐ送る（たまっていた予定も消す）
   const proj: any = await getStore("staffData").get(`projects/${opts.projectId}`, { type: "json", consistency: "strong" } as any);
   if (isDemoProject(proj)) {
-    const r = await deliverNow(opts.projectId, opts.beacon, [...((cur.pending && cur.pending.items) || []), ...(opts.item ? [opts.item] : [])]);
+    const pendOnly = cur.pending ? (cur.pending.only && only ? Array.from(new Set([...cur.pending.only, ...only])) : null) : only;
+    const r = await deliverNow(opts.projectId, opts.beacon, [...((cur.pending && cur.pending.items) || []), ...(opts.item ? [opts.item] : [])], pendOnly);
     delete cur.pending;
     cur.lastSentAt = new Date(now).toISOString();
     cur.lastSentBy = opts.by || "";
@@ -186,11 +203,11 @@ export async function requestLineNotify(opts: { projectId: string; kind: string;
   else if (cur.lastSentAt && now - Date.parse(cur.lastSentAt) < GAP_MS) sendAt = Date.parse(cur.lastSentAt) + GAP_MS;
   if (sendAt && isNight(sendAt)) sendAt = nextMorning(sendAt);
   if (sendAt) {
-    cur.pending = merge({ sendAt: new Date(sendAt).toISOString(), firstAt: new Date(now).toISOString() });
+    cur.pending = merge({ sendAt: new Date(sendAt).toISOString(), firstAt: new Date(now).toISOString() }, true);
     await q.setJSON(opts.projectId, cur);
     return { queued: true, sendAt: cur.pending.sendAt };
   }
-  const r = await deliverNow(opts.projectId, opts.beacon, opts.item ? [opts.item] : []);
+  const r = await deliverNow(opts.projectId, opts.beacon, opts.item ? [opts.item] : [], only);
   if (r.sent || r.pushSent) {
     cur.lastSentAt = new Date(now).toISOString();
     cur.lastSentBy = opts.by || "";
@@ -215,7 +232,7 @@ export async function flushLineQueue() {
     if (Date.parse(cur.pending.sendAt) > now) continue;
     // 昼に予約した分でも、送る時刻が夜（20時以降）にずれ込んだら、翌朝10時へ回す
     if (isNight(now)) { cur.pending.sendAt = new Date(nextMorning(now)).toISOString(); await q.setJSON(b.key, cur); continue; }
-    const r = await deliverNow(b.key, beacon, cur.pending.items || []);
+    const r = await deliverNow(b.key, beacon, cur.pending.items || [], cur.pending.only || null);
     cur.lastSentAt = new Date(now).toISOString();
     cur.lastSentBy = (cur.pending.by || []).join("、");
     cur.lastResult = { sent: r.sent, failed: r.failed, pushSent: r.pushSent, pushTotal: r.pushTotal, kinds: cur.pending.kinds || [] };

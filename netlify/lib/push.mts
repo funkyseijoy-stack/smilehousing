@@ -58,8 +58,9 @@ export async function saveSub(doc: any) {
 
 // この案件の届く端末すべてに送る
 // payload は {title,body} か、端末のページ（note／kiroku）ごとに文を作る関数
-export async function sendPushToProject(projectId: string, payload: { title: string; body: string } | ((page: string) => { title: string; body: string })) {
-  const subs = (await listSubs(projectId)).filter(isActive);
+export async function sendPushToProject(projectId: string, payload: { title: string; body: string } | ((page: string) => { title: string; body: string }), onlyIds?: Set<string>) {
+  // onlyIds を渡したときは、その端末だけに送る（「ご主人だけ」「奥様だけ」に送るとき）
+  const subs = (await listSubs(projectId)).filter(isActive).filter((x: any) => !onlyIds || onlyIds.has(String(x.id)));
   const okIds = new Set<string>();
   if (!subs.length) return { sent: 0, failed: 0, total: 0, okIds };
   const v = await getVapid();

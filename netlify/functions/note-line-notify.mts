@@ -17,6 +17,7 @@ import { requestLineNotify, recipientsOf, jstLabel, activePushIds, projectForSen
 //   届く端末があれば送れる。行に pushSub が付いた人は、その端末に届く間はLINEを送らない。
 // - スマホの通知の文（2026年11月〜）：body の text（メッセージの本文・ひとこと）・count（写真の枚数）から、何が更新されたかを出す
 //   （line-queue.mts の pushPayload。まとめて送るときは全部をまとめた文）。LINEの文面は変わらない。
+// - only（2026年11月27日〜）：送る人の行のプロラインIDの配列。その人だけに送る（LINEか、その行で選んだ通知の端末）。
 // 認証は他の機能と同じ合言葉（X-Staff-Token）。
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -62,7 +63,13 @@ export default async (req: Request, context: Context) => {
     if (!beaconOk) return json({ ok: false, error: "bad_beacon" }, 400);
   }
 
-  const r: any = await requestLineNotify({ projectId, kind: String(body.kind || "manual"), by: String(body.by || ""), beacon, item: makeItem(body) });
+  // only＝この人たちだけに送る（送る人の行のプロラインID。「ご主人だけ」「奥様だけ」）。無ければ全員
+  let only: string[] | null = null;
+  if (Array.isArray(body.only) && body.only.length) {
+    only = body.only.map((u: any) => String(u || "").trim()).filter((u: string) => allUids.includes(u));
+    if (!only.length) return json({ ok: false, error: "no_uid" }, 400);
+  }
+  const r: any = await requestLineNotify({ projectId, kind: String(body.kind || "manual"), by: String(body.by || ""), beacon, item: makeItem(body), only });
   if (r.queued) return json({ ok: true, queued: true, sendAt: r.sendAt, sendAtLabel: jstLabel(Date.parse(r.sendAt)), push: act.size, line: uids.length });
   if (!r.sent && !r.pushSent) return json({ ok: false, error: act.size ? "push_failed" : "proline_failed", failed: r.failed }, 502);
   return json({ ok: true, sent: r.sent, failed: r.failed, pushSent: r.pushSent, pushTotal: r.pushTotal, lineTo: r.lineTo || [], pushTo: r.pushTo || [] });
