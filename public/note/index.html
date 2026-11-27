@@ -919,6 +919,9 @@
     <button class="col" data-dcol="#111111" style="background:#111111;" aria-label="黒"></button>
     <button data-dtool="move" class="on">✋ 動かす</button>
     <button data-dtool="pen">✏️ ペン</button>
+    <button data-dtool="line">／ 線</button>
+    <button data-dtool="rect">□ 四角</button>
+    <button data-dtool="circle">○ 丸</button>
     <button data-dtool="text">🔤 文字</button>
     <button data-dtool="eraser">🧽 消しゴム</button>
     <button id="drawUndo">↶ 元に戻す</button>
@@ -3430,6 +3433,16 @@ function homeHtml(){ return homeParts().main; }
     dr.strokes.forEach(function(s){
       if(s.text){ g.globalCompositeOperation = "source-over"; g.fillStyle = s.color; g.font = "bold "+(tl*8)+"px sans-serif"; g.textBaseline = "top";
         String(s.text).split("\n").forEach(function(line, i){ g.fillText(line, s.x, s.y + i*tl*9); }); return; }
+      if(s.shape){
+        // 線・四角・丸：始点 a から終点 b まで、きれいな形で描く
+        g.globalCompositeOperation = "source-over"; g.strokeStyle = s.color; g.lineWidth = lw; g.lineCap = "round"; g.lineJoin = "round";
+        var ax = s.a[0], ay = s.a[1], bx = s.b[0], by = s.b[1];
+        g.beginPath();
+        if(s.shape === "line"){ g.moveTo(ax, ay); g.lineTo(bx, by); }
+        else if(s.shape === "rect"){ g.rect(Math.min(ax,bx), Math.min(ay,by), Math.abs(bx-ax), Math.abs(by-ay)); }
+        else { g.ellipse((ax+bx)/2, (ay+by)/2, Math.max(1, Math.abs(bx-ax)/2), Math.max(1, Math.abs(by-ay)/2), 0, 0, Math.PI*2); }
+        g.stroke(); return;
+      }
       g.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
       g.strokeStyle = s.color; g.lineWidth = s.erase ? tl*6 : lw; g.lineCap = "round"; g.lineJoin = "round";
       g.beginPath(); s.pts.forEach(function(p, i){ if(i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); });
@@ -3488,6 +3501,9 @@ function homeHtml(){ return homeParts().main; }
         return;
       }
       try{ drInk.setPointerCapture(e.pointerId); }catch(er){}
+      if(dr.tool==="line" || dr.tool==="rect" || dr.tool==="circle"){
+        cur = { shape:dr.tool, a:p, b:p, color:dr.color }; dr.strokes.push(cur); drawRedraw(); return;
+      }
       cur = { pts:[p], color:dr.color, erase: dr.tool==="eraser" }; dr.strokes.push(cur); drawRedraw();
     });
     drInk.addEventListener("pointermove", function(e){
@@ -3508,11 +3524,15 @@ function homeHtml(){ return homeParts().main; }
         st.scrollLeft -= e.clientX - pan.x; st.scrollTop -= e.clientY - pan.y;
         pan.x = e.clientX; pan.y = e.clientY; return;
       }
-      if(!cur) return; e.preventDefault(); cur.pts.push(pt(e)); drawRedraw(); });
+      if(!cur) return; e.preventDefault();
+      if(cur.shape) cur.b = pt(e); else cur.pts.push(pt(e));
+      drawRedraw(); });
     var end = function(e){
       if(e && touches[e.pointerId]) delete touches[e.pointerId];
       if(pan && (!e || pan.id === e.pointerId)) pan = null;
       if(pinch){ if(!tList().length) pinch = null; cur = null; return; }
+      // 図形を押しただけ（ほとんど動かしていない）なら消す
+      if(cur && cur.shape && Math.hypot(cur.b[0]-cur.a[0], cur.b[1]-cur.a[1]) < 6){ var k = dr.strokes.indexOf(cur); if(k >= 0) dr.strokes.splice(k, 1); drawRedraw(); }
       cur = null; };
     drInk.addEventListener("pointerup", end); drInk.addEventListener("pointercancel", end);
   }
