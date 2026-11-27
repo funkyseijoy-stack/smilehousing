@@ -11457,7 +11457,9 @@
       b("chgst", "🟣 変更依頼中のはんこ（手で）", hasChangeStamp(u&&u.doc))+
       b("gmail", "📥 Gmailから取り込む");
     var tail = b("edit", "✏️ 内容を編集")+(f.delOk===false ? "" : b("del", "🗑 削除", false, "danger"));
-    return [["✏️ 書き込む", drawHtml||""], ["よく使う", main], ["そのほか", other], ["", tail]];
+    var pf = uniPrintFiles(kind, id);
+    var printHtml = pf.length ? b("print", "🖨 図面・写真を印刷"+(pf.length>1 ? "（"+pf.length+"件）" : "")) : "";
+    return [["✏️ 書き込む", drawHtml||""], ["🖨 印刷", printHtml], ["よく使う", main], ["そのほか", other], ["", tail]];
   }
   function uniOpsInnerHtml(sections){
     return sections.filter(function(x){ return x && x[1]; }).map(function(x, i){
@@ -11634,6 +11636,7 @@
     return runUniOp0(act, kind, id);
   }
   function runUniOp0(act, kind, id){
+    if(act==="print"){ openNoteMenuId = null; render(); return printCardFiles(kind, id); }
     if(act==="ord") return toggleCardOrdered(kind, id);
     if(act==="cmt"){ openNoteMenuId = null; return editCardComment(kind, id); }
     // 打合せ記録（記録のカード・変更履歴の記録の写し）は、記録の操作をそのまま使う
@@ -12126,6 +12129,83 @@
   }
   // 変更履歴の写真・PDFに「✏️ 書き込む」。押すとプランボードで開き、保存すると
   // 同じ部位の変更履歴に新しいカード（書き込んだ版・お客様には未反映）として入る。元のファイルはそのまま。
+  // ===== 印刷（記録・写真PDF・見積の書類のカードの図面・写真を、そのまま1枚ずつ印刷。PDFは全ページ） =====
+  function uniPrintFiles(kind, id){
+    var u = uniDocOf(kind, id); if(!u) return [];
+    var d = u.doc, list = [];
+    if(kind==="n") list = noteAllFiles(d);
+    else if(kind==="att" && d.kind==="quote" && quoteLocked(d.quoteType) && !state.quoteUnlocked) list = [];
+    else list = [{ url:d.url, contentType:d.contentType, name:d.fileName||d.name||"" }];
+    return (list||[]).filter(function(f){
+      if(!f || !f.url) return false;
+      var ct = String(f.contentType||""), nm = String(f.name||f.fileName||"");
+      return ct.indexOf("pdf")>=0 || ct.indexOf("image/")===0 || /\.(pdf|jpe?g|png|gif|webp|heic)$/i.test(nm) || (!ct && /get-photo/.test(f.url));
+    });
+  }
+  async function printCardFiles(kind, id){
+    var files = uniPrintFiles(kind, id);
+    if(!files.length){ toast("印刷できる図面・写真がありません"); return; }
+    // ブラウザに止められないよう、押した直後に窓を開く
+    var w = window.open("", "_blank");
+    if(!w){ toast("印刷の画面を開けませんでした（ポップアップを許可してください）"); return; }
+    w.document.write('<!doctype html><meta charset="utf-8"><title>印刷の準備中…</title><body style="font-family:sans-serif;padding:24px;">🖨 印刷の準備中…（PDFは全ページを読み込んでいます）</body>');
+    var pages = [];
+    try{
+      for(var i=0;i<files.length;i++){
+        var f = files[i], ct = String(f.contentType||""), nm = String(f.name||f.fileName||"");
+        var isPdf = ct.indexOf("pdf")>=0 || /\.pdf$/i.test(nm);
+        if(!isPdf){
+          var src = await new Promise(function(res){
+            var im = new Image(); im.onload = function(){ res({ src:f.url, land: im.naturalWidth > im.naturalHeight }); }; im.onerror = function(){ res(null); }; im.src = f.url;
+          });
+          if(src) pages.push(src);
+          else {
+            // 画像として読めなければPDFとして試す（contentTypeの無い保存ファイル）
+            isPdf = true;
+          }
+        }
+        if(isPdf){
+          if(typeof pdfjsLib==="undefined"){ continue; }
+          var doc = await pdfjsLib.getDocument({url:f.url}).promise;
+          var n = Math.min(doc.numPages, 50);
+          for(var pg=1; pg<=n; pg++){
+            var page = await doc.getPage(pg);
+            var v1 = page.getViewport({scale:1});
+            var scale = Math.min(3, 2600 / Math.max(v1.width, v1.height));
+            var vp = page.getViewport({scale:scale});
+            var cv = document.createElement("canvas"); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+            var ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+            await page.render({canvasContext:ctx, viewport:vp}).promise;
+            pages.push({ src: cv.toDataURL("image/jpeg", 0.92), land: vp.width > vp.height });
+            page.cleanup && page.cleanup();
+            cv.width = cv.height = 0;
+          }
+          try{ doc.destroy(); }catch(e){}
+        }
+      }
+    }catch(e){ console.error(e); }
+    if(!pages.length){ try{ w.close(); }catch(e){} toast("図面・写真を読み込めませんでした"); return; }
+    if(w.closed) return;
+    var allLand = pages.every(function(x){ return x.land; }), allPort = pages.every(function(x){ return !x.land; });
+    var size = allLand ? "landscape" : (allPort ? "portrait" : "auto");
+    var title = String((uniDocOf(kind, id)||{doc:{}}).doc.title || files[0].name || files[0].fileName || "印刷").slice(0,60);
+    var html = '<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>'+
+      '@page{size:'+size+';margin:8mm;}html,body{margin:0;padding:0;background:#fff;}'+
+      '.pg{page-break-after:always;break-after:page;height:calc(100vh - 2px);display:flex;align-items:center;justify-content:center;}'+
+      '.pg:last-child{page-break-after:auto;break-after:auto;}'+
+      '.pg img{max-width:100%;max-height:100%;object-fit:contain;}'+
+      '.bar{position:fixed;top:8px;right:8px;font-family:sans-serif;}.bar button{font-size:16px;padding:8px 14px;margin-left:6px;}'+
+      '@media print{.bar{display:none;}}'+
+      '</style></head><body><div class="bar"><button onclick="window.print()">🖨 印刷</button><button onclick="window.close()">閉じる</button></div>'+
+      pages.map(function(x){ return '<div class="pg"><img src="'+x.src+'"></div>'; }).join("")+
+      '</body></html>';
+    w.document.open(); w.document.write(html); w.document.close();
+    var imgs = w.document.images, left = imgs.length;
+    var go = function(){ try{ w.focus(); w.print(); }catch(e){} };
+    if(!left){ go(); return; }
+    var done = function(){ if(--left<=0) setTimeout(go, 200); };
+    for(var k=0;k<imgs.length;k++){ if(imgs[k].complete) done(); else { imgs[k].onload = done; imgs[k].onerror = done; } }
+  }
   var specDrawReg = {};
   function specDrawable(f){ var ct = String((f&&f.contentType)||""); return !!(f && f.url) && (ct.indexOf("pdf")>=0 || ct.indexOf("image/")===0 || /\.pdf$/i.test(f.name||f.fileName||"")); }
   // menu=true：「⋯ 操作」「⋮ 操作」の中に並べる形（外側の行の枠を付けない）
