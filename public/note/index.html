@@ -2435,11 +2435,12 @@ function homeHtml(){ return homeParts().main; }
     return '<div class="sechd"><h3>📝 打合せ記録</h3><span class="countpill">新しい順</span></div><div class="catlist">'+out+'</div>';
   }
   function latestNotesHtml(){
-    // ホームは「総合」（部位なしも含む）の記録だけ。部位ごとの記録は「家づくり」の各項目で見る。
-    // 総合の記録が無いお客様は何も出さない（部位ごとの記録が勝手にホームに出ないように）。中身（内容・決まったこと・メッセージ・資料）の無い記録は出さない
-    var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.message||"").trim() || (n.files||[]).length); };
+    // 部位に関係なく、いちばん新しい日の打合せ記録を出す（スタッフからのメッセージのすぐ下に最新の内容が来るように。2026年11月28日〜）。
+    // 同じ日は総合（部位なし）を先に。中身（内容・決まったこと・メッセージ・資料）の無い記録・ホームに出さない記録は出さない
+    var hasBody = function(n){ return !!(String(n.talk||"").trim() || String(n.decided||"").trim() || String(n.message||"").trim() || (n.files||[]).length || (n.lines||[]).length); };
     var all = (data.notes||[]).filter(function(n){ return hasBody(n) && !n.homeHide; });
-    var gen = all.filter(function(n){ return n.scope==="general" || (n.scope==null ? (n.part==="総合" || !n.part) : !n.scope); });
+    var isGenN = function(n){ return n.scope==="general" || (n.scope==null ? (n.part==="総合" || !n.part) : !n.scope); };
+    var gen = all;
     // 下の「✅ ご確認・ご決定ください」（決定待ち）か「🔴 決定したもの」に出る記録は、ここには出さない（同じ記録を2回出さない）
     var notes = gen.filter(function(n){
       var f = noteDecItem(n); if(!f) return true;
@@ -2450,12 +2451,12 @@ function homeHtml(){ return homeParts().main; }
     homeLatestIds = {};
     if(!notes.length) return hd+'</div><div class="empty">打合せの記録が届くと、ここに表示されます。</div>';
     var last = notes.reduce(function(m,n){ var d = String(n.date||""); return d>m ? d : m; }, "");
-    var list = notes.filter(function(n){ return String(n.date||"")===last; });
+    var list = notes.filter(function(n){ return String(n.date||"")===last; })
+      .sort(function(a,b){ return (isGenN(b)?1:0)-(isGenN(a)?1:0); });
     homeLatestIds = {}; list.forEach(function(n){ homeLatestIds[n.id] = 1; });
-    // 部位ごとの記録はホームには出さない（決定待ちのものは下の「ご確認・ご決定ください」、過去の分は「家づくり」の各部位で見る）
     return hd+'<span class="countpill">'+fmtD(last)+'</span></div><div class="catlist">'+list.map(function(n){
         var f = noteDecItem(n);
-        var isGen = n.scope==="general" || !n.scope;
+        var isGen = isGenN(n);
         var link = (!isGen && f) ? '<div class="homelink" style="margin-top:6px;"><button class="linkbtn" data-buildcat="'+esc(f.c.id)+'">'+esc(f.c.name)+'の記録を見る ›</button></div>' : '';
         return '<div class="tli flat">'+noteBody(n, true, true)+(f ? homeDecHtml(n, f) : '')+link+'</div>';
       }).join("")+'</div>'+
