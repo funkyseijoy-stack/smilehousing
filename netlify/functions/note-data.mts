@@ -226,6 +226,12 @@ function updAt(...xs: any[]): string {
   return xs.map((x) => String(x || "")).reduce((m, x) => (x > m ? x : m), "");
 }
 
+// 日本時間の日付（createdAt は世界標準時なので、朝9時前に書いた記録が前の日になるのを防ぐ）
+function jstDay(iso: any): string {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d.getTime())) return String(iso || "").slice(0, 10);
+  return new Date(d.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
 function noteAt(n: any): string {
   const created = n.createdAt ? new Date(n.createdAt) : null;
   const createdJst = created && !isNaN(created.getTime()) ? new Date(created.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10) : "";
@@ -851,7 +857,7 @@ export default async (req: Request, context: Context) => {
       roomId: sp.roomId || null,
       at: noteAt(n),
       upd: updAt(n.reflectedAt, n.createdAt),
-      date: n.date || (n.createdAt || "").slice(0, 10),
+      date: n.date || jstDay(n.createdAt),
       title: n.title || "",
       decided: n.decided != null ? n.decided : n.content || "",
       open: n.open || "",
@@ -888,7 +894,7 @@ export default async (req: Request, context: Context) => {
         roomId: lp.roomId || null,
         at: noteAt(n),
         upd: updAt(n.reflectedAt, n.createdAt),
-        date: n.date || (n.createdAt || "").slice(0, 10),
+        date: n.date || jstDay(n.createdAt),
         title: "",
         decided: m === "d" ? t : "",
         open: m === "o" ? t : "",
@@ -923,7 +929,7 @@ export default async (req: Request, context: Context) => {
         roomId: g.p.roomId || null,
         at: noteAt(n),
         upd: updAt(n.reflectedAt, n.createdAt),
-        date: n.date || (n.createdAt || "").slice(0, 10),
+        date: n.date || jstDay(n.createdAt),
         title: n.title || "",
         decided,
         open,
@@ -1093,7 +1099,7 @@ export default async (req: Request, context: Context) => {
     notes: reflectedNotes
       .map((n) => ({
         id: n.id || "",
-        date: n.date || (n.createdAt || "").slice(0, 10),
+        date: n.date || jstDay(n.createdAt),
         createdAt: n.createdAt || "",
         upd: updAt(n.reflectedAt, n.createdAt),
         homeShow: !!n.homeShow,
