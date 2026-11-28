@@ -2494,7 +2494,7 @@ function homeHtml(){ return homeParts().main; }
       var c = e.c, x = e.x, room = "", roomName = "";
       (c.rooms||[]).some(function(r){ if((r.items||[]).indexOf(x)>=0){ room = r.id || x.roomId || ""; roomName = r.name || ""; return true; } return false; });
       var big = isPb(x) && !!x.file;
-      slots.push('<div class="hslot'+(big?' big':'')+'"><div class="hdate">'+tagH(roomName || partOf(c, x) || x.label || c.name)+' <span class="rqk dec">決定してください</span></div>'+
+      slots.push('<div class="hslot'+(big?' big':'')+'"><div class="hdate">'+tagH(roomName || partOf(c, x) || x.label || c.name)+'</div>'+
         feedCardHtml({c:c, x:x, room:room, at:e.at}, {row:true})+
         '<div class="homelink" style="margin-top:4px;"><button class="linkbtn" data-buildcat="'+esc(c.id)+'">'+esc(c.name)+'の記録を見る ›</button></div></div>');
     });
