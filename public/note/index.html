@@ -1048,7 +1048,7 @@
   var main = document.getElementById("main");
 
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
-  function fmtD(d){ if(!d) return ""; var p = String(d).slice(0,10).split("-"); return p.length===3 ? Number(p[0])+"."+Number(p[1])+"."+Number(p[2]) : d; }
+  function fmtD(d){ if(!d) return ""; var sd = String(d); if(sd.length>10 && sd.indexOf("T")===10){ var dt0 = new Date(sd); if(!isNaN(dt0.getTime())) sd = new Date(dt0.getTime()+9*3600*1000).toISOString(); } var p = sd.slice(0,10).split("-"); return p.length===3 ? Number(p[0])+"."+Number(p[1])+"."+Number(p[2]) : d; }
   function md(d){ if(!d) return ""; var dt = new Date(String(d).slice(0,10)+"T00:00:00"); return (dt.getMonth()+1)+"/"+dt.getDate()+"("+WD[dt.getDay()]+")"; }
   function isImg(f){ return (f.contentType||"").indexOf("image")===0 || /\.(jpe?g|png|gif|webp)$/i.test(f.name||""); }
   // お客様のみが見られる自由メモ。サーバーには送らず、この端末のlocalStorageだけに保存する。
